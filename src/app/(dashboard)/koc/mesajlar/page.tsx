@@ -46,16 +46,16 @@ export default function CoachMessagesPage() {
         student:student_profiles!coaching_relationships_student_id_fkey(
           id,
           user_id,
-          profiles:profiles!student_profiles_user_id_fkey(id, full_name, avatar_url)
+          profile:profiles!student_profiles_user_id_fkey(id, full_name, avatar_url)
         )
       `)
       .eq('coach_id', teacherProfile?.id)
       .eq('status', 'active')
 
     if (data) {
-      const students = data.map(d => ({
+      const students = data.map((d: any) => ({
         ...d.student,
-        profile_id: d.student?.profiles?.id,
+        profile_id: d.student?.profile?.id,
       }))
       setConversations(students)
       if (students.length > 0 && !selectedStudent) {
@@ -131,14 +131,14 @@ export default function CoachMessagesPage() {
                   }`}
                 >
                   <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium overflow-hidden">
-                    {conv.profiles?.avatar_url ? (
-                      <img src={conv.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                    {conv.profile?.avatar_url ? (
+                      <img src={conv.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      getInitials(conv.profiles?.full_name)
+                      getInitials(conv.profile?.full_name)
                     )}
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-medium text-surface-900">{conv.profiles?.full_name}</div>
+                    <div className="font-medium text-surface-900">{conv.profile?.full_name}</div>
                     <div className="text-sm text-surface-500">Öğrenci</div>
                   </div>
                 </button>
@@ -158,14 +158,14 @@ export default function CoachMessagesPage() {
                 {/* Header */}
                 <div className="p-4 border-b border-surface-100 flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium overflow-hidden">
-                    {selectedStudent.profiles?.avatar_url ? (
-                      <img src={selectedStudent.profiles.avatar_url} alt="" className="w-full h-full object-cover" />
+                    {selectedStudent.profile?.avatar_url ? (
+                      <img src={selectedStudent.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
-                      getInitials(selectedStudent.profiles?.full_name)
+                      getInitials(selectedStudent.profile?.full_name)
                     )}
                   </div>
                   <div>
-                    <div className="font-medium text-surface-900">{selectedStudent.profiles?.full_name}</div>
+                    <div className="font-medium text-surface-900">{selectedStudent.profile?.full_name}</div>
                     <div className="text-sm text-surface-500">Çevrimiçi</div>
                   </div>
                 </div>

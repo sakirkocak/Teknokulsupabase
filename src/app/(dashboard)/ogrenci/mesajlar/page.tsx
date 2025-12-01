@@ -53,9 +53,10 @@ export default function StudentMessagesPage() {
       .single()
 
     if (data?.coach) {
+      const coachData = data.coach as any
       setCoach({
-        ...data.coach,
-        profile_id: data.coach.profile?.id,
+        ...coachData,
+        profile_id: coachData.profile?.id,
       })
     }
   }

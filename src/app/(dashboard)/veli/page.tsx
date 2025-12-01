@@ -76,11 +76,13 @@ export default function ParentDashboard() {
           .eq('status', 'active')
           .single()
 
+        const coachData = coaching?.coach as any
+
         return {
           ...d.student,
           taskCount: taskCount || 0,
           completedCount: completedCount || 0,
-          coach: coaching?.coach?.profile?.full_name,
+          coach: coachData?.profile?.full_name,
         }
       }))
 

@@ -5,7 +5,9 @@ export interface Profile {
   email: string
   full_name: string
   avatar_url: string | null
+  phone: string | null
   role: UserRole
+  is_active: boolean
   created_at: string
   updated_at: string
 }
@@ -13,12 +15,18 @@ export interface Profile {
 export interface TeacherProfile {
   id: string
   user_id: string
+  headline: string | null
   bio: string | null
   subjects: string[]
   experience_years: number
+  education: string | null
+  languages: string[]
   hourly_rate: number
-  rating: number
-  total_reviews: number
+  available_days: string[]
+  lesson_types: string[]
+  average_rating: number
+  review_count: number
+  is_verified: boolean
   is_coach: boolean
   created_at: string
 }
@@ -26,9 +34,9 @@ export interface TeacherProfile {
 export interface StudentProfile {
   id: string
   user_id: string
-  grade: number | null
+  grade_level: string | null
   target_exam: string | null
-  school: string | null
+  school_name: string | null
   created_at: string
 }
 
@@ -108,7 +116,44 @@ export interface Notification {
   message: string
   type: string
   is_read: boolean
-  data: Record<string, any> | null
+  link: string | null
+  created_at: string
+}
+
+export interface Material {
+  id: string
+  teacher_id: string
+  title: string
+  description: string | null
+  category: string | null
+  type: string
+  price: number
+  file_url: string | null
+  preview_url: string | null
+  downloads: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface MaterialPurchase {
+  id: string
+  material_id: string
+  buyer_id: string
+  seller_id: string
+  amount: number
+  status: string
+  created_at: string
+}
+
+export interface ParentReport {
+  id: string
+  coach_id: string
+  parent_id: string
+  student_id: string
+  report_type: string
+  title: string | null
+  content: Record<string, any> | null
+  is_read: boolean
   created_at: string
 }
 
@@ -128,4 +173,3 @@ export interface AIRecommendation {
   is_dismissed: boolean
   created_at: string
 }
-

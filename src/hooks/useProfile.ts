@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile, TeacherProfile, StudentProfile, ParentProfile } from '@/types/database'
 
@@ -9,35 +9,35 @@ export function useProfile() {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (!user) {
-          setLoading(false)
-          return
-        }
-
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-
-        if (error && error.code !== 'PGRST116') throw error
-        setProfile(data)
-      } catch (error) {
-        console.error('Error loading profile:', error)
-      } finally {
+  const loadProfile = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
         setLoading(false)
+        return
       }
-    }
 
-    loadProfile()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') throw error
+      setProfile(data)
+    } catch (error) {
+      console.error('Error loading profile:', error)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  return { profile, loading, setProfile }
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
+
+  return { profile, loading, setProfile, refetch: loadProfile }
 }
 
 export function useTeacherProfile(userId: string) {
@@ -45,30 +45,31 @@ export function useTeacherProfile(userId: string) {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  useEffect(() => {
-    async function getTeacherProfile() {
-      try {
-        const { data, error } = await supabase
-          .from('teacher_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single()
+  const loadTeacherProfile = useCallback(async () => {
+    if (!userId) return
+    try {
+      const { data, error } = await supabase
+        .from('teacher_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
 
-        if (error && error.code !== 'PGRST116') throw error
-        setTeacherProfile(data)
-      } catch (error) {
-        console.error('Error loading teacher profile:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (userId) {
-      getTeacherProfile()
+      if (error && error.code !== 'PGRST116') throw error
+      setTeacherProfile(data)
+    } catch (error) {
+      console.error('Error loading teacher profile:', error)
+    } finally {
+      setLoading(false)
     }
   }, [userId])
 
-  return { teacherProfile, loading }
+  useEffect(() => {
+    if (userId) {
+      loadTeacherProfile()
+    }
+  }, [userId, loadTeacherProfile])
+
+  return { teacherProfile, loading, refetch: loadTeacherProfile }
 }
 
 export function useStudentProfile(userId: string) {
@@ -76,30 +77,31 @@ export function useStudentProfile(userId: string) {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  useEffect(() => {
-    async function getStudentProfile() {
-      try {
-        const { data, error } = await supabase
-          .from('student_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single()
+  const loadStudentProfile = useCallback(async () => {
+    if (!userId) return
+    try {
+      const { data, error } = await supabase
+        .from('student_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
 
-        if (error && error.code !== 'PGRST116') throw error
-        setStudentProfile(data)
-      } catch (error) {
-        console.error('Error loading student profile:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (userId) {
-      getStudentProfile()
+      if (error && error.code !== 'PGRST116') throw error
+      setStudentProfile(data)
+    } catch (error) {
+      console.error('Error loading student profile:', error)
+    } finally {
+      setLoading(false)
     }
   }, [userId])
 
-  return { studentProfile, loading }
+  useEffect(() => {
+    if (userId) {
+      loadStudentProfile()
+    }
+  }, [userId, loadStudentProfile])
+
+  return { studentProfile, loading, refetch: loadStudentProfile }
 }
 
 export function useParentProfile(userId: string) {
@@ -107,29 +109,29 @@ export function useParentProfile(userId: string) {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  useEffect(() => {
-    async function getParentProfile() {
-      try {
-        const { data, error } = await supabase
-          .from('parent_profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single()
+  const loadParentProfile = useCallback(async () => {
+    if (!userId) return
+    try {
+      const { data, error } = await supabase
+        .from('parent_profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .single()
 
-        if (error && error.code !== 'PGRST116') throw error
-        setParentProfile(data)
-      } catch (error) {
-        console.error('Error loading parent profile:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (userId) {
-      getParentProfile()
+      if (error && error.code !== 'PGRST116') throw error
+      setParentProfile(data)
+    } catch (error) {
+      console.error('Error loading parent profile:', error)
+    } finally {
+      setLoading(false)
     }
   }, [userId])
 
-  return { parentProfile, loading }
-}
+  useEffect(() => {
+    if (userId) {
+      loadParentProfile()
+    }
+  }, [userId, loadParentProfile])
 
+  return { parentProfile, loading, refetch: loadParentProfile }
+}

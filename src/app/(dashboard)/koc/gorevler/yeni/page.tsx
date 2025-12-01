@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useTeacherProfile } from '@/hooks/useProfile'
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function NewTaskPage() {
+function NewTaskContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preSelectedStudent = searchParams.get('ogrenci')
@@ -211,6 +211,20 @@ export default function NewTaskPage() {
         </form>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function NewTaskPage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout role="koc">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
+        </div>
+      </DashboardLayout>
+    }>
+      <NewTaskContent />
+    </Suspense>
   )
 }
 

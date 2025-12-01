@@ -63,8 +63,8 @@ export default function MaterialsPage() {
     return matchesSearch && matchesCategory && matchesType
   })
 
-  const categories = [...new Set(materials.map(m => m.category).filter(Boolean))]
-  const types = [...new Set(materials.map(m => m.type).filter(Boolean))]
+  const categories = Array.from(new Set(materials.map(m => m.category).filter(Boolean)))
+  const types = Array.from(new Set(materials.map(m => m.type).filter(Boolean)))
 
   const typeIcons: Record<string, any> = {
     pdf: FileText,
