@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { getInitials } from '@/lib/utils'
+import NotificationBell from './NotificationBell'
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -18,11 +19,11 @@ import {
   X,
   Brain,
   FileText,
-  Bell,
   ChevronDown,
   TrendingUp,
   Target,
-  Calendar
+  Calendar,
+  Send
 } from 'lucide-react'
 
 type NavItem = {
@@ -36,9 +37,10 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Dashboard', href: '/koc', icon: LayoutDashboard },
     { label: 'Öğrencilerim', href: '/koc/ogrenciler', icon: Users },
     { label: 'Görevler', href: '/koc/gorevler', icon: ClipboardList },
+    { label: 'Veli Raporları', href: '/koc/veli-raporlari', icon: Send },
     { label: 'Mesajlar', href: '/koc/mesajlar', icon: MessageSquare },
     { label: 'AI Araçları', href: '/koc/ai-araclar', icon: Brain },
-    { label: 'Ayarlar', href: '/koc/ayarlar', icon: Settings },
+    { label: 'Profil', href: '/koc/profil', icon: Settings },
   ],
   ogrenci: [
     { label: 'Dashboard', href: '/ogrenci', icon: LayoutDashboard },
@@ -48,12 +50,12 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'İlerleme', href: '/ogrenci/ilerleme', icon: TrendingUp },
     { label: 'AI Araçları', href: '/ogrenci/ai-araclar', icon: Brain },
     { label: 'Mesajlar', href: '/ogrenci/mesajlar', icon: MessageSquare },
+    { label: 'Profil', href: '/ogrenci/profil', icon: Settings },
   ],
   veli: [
     { label: 'Dashboard', href: '/veli', icon: LayoutDashboard },
-    { label: 'Çocuklarım', href: '/veli/cocuklar', icon: Users },
     { label: 'Raporlar', href: '/veli/raporlar', icon: FileText },
-    { label: 'Mesajlar', href: '/veli/mesajlar', icon: MessageSquare },
+    { label: 'Profil', href: '/veli/profil', icon: Settings },
   ],
   admin: [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -171,10 +173,7 @@ export default function DashboardLayout({
 
             <div className="flex items-center gap-4 ml-auto">
               {/* Notifications */}
-              <button className="relative p-2 text-surface-600 hover:bg-surface-100 rounded-xl">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full" />
-              </button>
+              {profile?.id && <NotificationBell userId={profile.id} />}
 
               {/* User Menu */}
               <div className="relative">
