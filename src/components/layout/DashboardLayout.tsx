@@ -37,6 +37,8 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Dashboard', href: '/koc', icon: LayoutDashboard },
     { label: 'Öğrencilerim', href: '/koc/ogrenciler', icon: Users },
     { label: 'Görevler', href: '/koc/gorevler', icon: ClipboardList },
+    { label: 'Materyaller', href: '/koc/materyaller', icon: FileText },
+    { label: 'Kazançlar', href: '/koc/kazanclar', icon: TrendingUp },
     { label: 'Veli Raporları', href: '/koc/veli-raporlari', icon: Send },
     { label: 'Mesajlar', href: '/koc/mesajlar', icon: MessageSquare },
     { label: 'AI Araçları', href: '/koc/ai-araclar', icon: Brain },
