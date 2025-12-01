@@ -17,7 +17,8 @@ import {
   Loader2,
   BookOpen,
   Award,
-  MessageSquare
+  Languages,
+  Calendar
 } from 'lucide-react'
 
 export default function CoachDetailPage() {
@@ -48,7 +49,7 @@ export default function CoachDetailPage() {
       .from('teacher_profiles')
       .select(`
         *,
-        profile:user_id(full_name, avatar_url, email)
+        profile:profiles!teacher_profiles_user_id_fkey(full_name, avatar_url, email, bio)
       `)
       .eq('id', params.id)
       .single()
@@ -102,6 +103,7 @@ export default function CoachDetailPage() {
       if (error.code === '23505') {
         alert('Zaten başvuru yapmışsınız.')
       } else {
+        console.error(error)
         alert('Bir hata oluştu: ' + error.message)
       }
     } else {
@@ -164,20 +166,21 @@ export default function CoachDetailPage() {
           {/* Header Section */}
           <div className="p-6 sm:p-8 bg-gradient-to-r from-primary-500 to-primary-600 text-white">
             <div className="flex flex-col sm:flex-row items-start gap-6">
-              <div className="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-3xl font-bold">
+              <div className="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center text-3xl font-bold overflow-hidden">
                 {coach.profile?.avatar_url ? (
-                  <img src={coach.profile.avatar_url} alt="" className="w-full h-full rounded-2xl object-cover" />
+                  <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
                   getInitials(coach.profile?.full_name)
                 )}
               </div>
               <div className="flex-1">
                 <h1 className="text-2xl sm:text-3xl font-bold mb-2">{coach.profile?.full_name}</h1>
+                <p className="text-primary-100 mb-3">{coach.headline}</p>
                 <div className="flex flex-wrap items-center gap-4 text-primary-100">
                   <div className="flex items-center gap-1">
                     <Star className="w-5 h-5 text-yellow-300 fill-yellow-300" />
-                    <span className="font-medium text-white">{coach.rating?.toFixed(1) || '5.0'}</span>
-                    <span>({coach.total_reviews || 0} değerlendirme)</span>
+                    <span className="font-medium text-white">{coach.average_rating?.toFixed(1) || '5.0'}</span>
+                    <span>({coach.review_count || 0} değerlendirme)</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-5 h-5" />
@@ -191,30 +194,63 @@ export default function CoachDetailPage() {
           {/* Content */}
           <div className="p-6 sm:p-8 space-y-6">
             {/* Bio */}
-            {coach.bio && (
+            {coach.profile?.bio && (
               <div>
                 <h2 className="text-lg font-semibold text-surface-900 mb-3">Hakkında</h2>
-                <p className="text-surface-600 leading-relaxed">{coach.bio}</p>
+                <p className="text-surface-600 leading-relaxed">{coach.profile.bio}</p>
               </div>
             )}
 
-            {/* Subjects */}
-            {coach.subjects && coach.subjects.length > 0 && (
-              <div>
-                <h2 className="text-lg font-semibold text-surface-900 mb-3">Uzmanlık Alanları</h2>
-                <div className="flex flex-wrap gap-2">
-                  {coach.subjects.map((subject: string, i: number) => (
-                    <span 
-                      key={i}
-                      className="px-3 py-1.5 bg-primary-50 text-primary-600 font-medium rounded-lg flex items-center gap-1"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      {subject}
-                    </span>
-                  ))}
+            {/* Info Grid */}
+            <div className="grid sm:grid-cols-2 gap-4">
+              {coach.education && (
+                <div className="p-4 bg-surface-50 rounded-xl">
+                  <div className="flex items-center gap-2 text-surface-500 mb-1">
+                    <Award className="w-4 h-4" />
+                    <span className="text-sm">Eğitim</span>
+                  </div>
+                  <div className="font-medium text-surface-900">{coach.education}</div>
                 </div>
-              </div>
-            )}
+              )}
+              
+              {coach.languages && coach.languages.length > 0 && (
+                <div className="p-4 bg-surface-50 rounded-xl">
+                  <div className="flex items-center gap-2 text-surface-500 mb-1">
+                    <Languages className="w-4 h-4" />
+                    <span className="text-sm">Diller</span>
+                  </div>
+                  <div className="font-medium text-surface-900">{coach.languages.join(', ')}</div>
+                </div>
+              )}
+
+              {coach.available_days && coach.available_days.length > 0 && (
+                <div className="p-4 bg-surface-50 rounded-xl">
+                  <div className="flex items-center gap-2 text-surface-500 mb-1">
+                    <Calendar className="w-4 h-4" />
+                    <span className="text-sm">Müsait Günler</span>
+                  </div>
+                  <div className="font-medium text-surface-900">{coach.available_days.join(', ')}</div>
+                </div>
+              )}
+
+              {coach.lesson_types && coach.lesson_types.length > 0 && (
+                <div className="p-4 bg-surface-50 rounded-xl">
+                  <div className="flex items-center gap-2 text-surface-500 mb-1">
+                    <BookOpen className="w-4 h-4" />
+                    <span className="text-sm">Ders Türleri</span>
+                  </div>
+                  <div className="font-medium text-surface-900 capitalize">{coach.lesson_types.join(', ')}</div>
+                </div>
+              )}
+            </div>
+
+            {/* Price */}
+            <div className="p-4 bg-primary-50 rounded-xl flex items-center justify-between">
+              <span className="text-surface-700">Saatlik Ücret</span>
+              <span className="text-2xl font-bold text-primary-600">
+                {coach.hourly_rate ? `${coach.hourly_rate}₺` : 'Ücretsiz'}
+              </span>
+            </div>
 
             {/* Apply Button */}
             <div className="pt-4 border-t border-surface-100">
@@ -223,7 +259,7 @@ export default function CoachDetailPage() {
                   <CheckCircle className="w-6 h-6 text-secondary-500" />
                   <div>
                     <div className="font-medium text-secondary-700">Bu koçun öğrencisisin!</div>
-                    <div className="text-sm text-secondary-600">Dashboard'undan mesaj gönderebilirsin.</div>
+                    <div className="text-sm text-secondary-600">Dashboard'undan koçunla iletişime geçebilirsin.</div>
                   </div>
                 </div>
               ) : applicationStatus === 'pending' ? (
@@ -231,7 +267,7 @@ export default function CoachDetailPage() {
                   <Clock className="w-6 h-6 text-yellow-500" />
                   <div>
                     <div className="font-medium text-yellow-700">Başvurun onay bekliyor</div>
-                    <div className="text-sm text-yellow-600">Koç başvurunu inceleyecek.</div>
+                    <div className="text-sm text-yellow-600">Koç başvurunu en kısa sürede değerlendirecek.</div>
                   </div>
                 </div>
               ) : (
@@ -257,4 +293,3 @@ export default function CoachDetailPage() {
     </div>
   )
 }
-

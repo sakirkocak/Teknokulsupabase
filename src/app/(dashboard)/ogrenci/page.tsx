@@ -11,15 +11,14 @@ import {
   Target, 
   ClipboardList, 
   TrendingUp, 
-  Calendar, 
   ArrowRight,
   Brain,
   Sparkles,
   CheckCircle,
   Clock,
   AlertCircle,
-  BookOpen,
-  Flame
+  Flame,
+  FileText
 } from 'lucide-react'
 
 export default function StudentDashboard() {
@@ -28,6 +27,7 @@ export default function StudentDashboard() {
   const [coach, setCoach] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [recommendations, setRecommendations] = useState<any[]>([])
+  const [coachingStatus, setCoachingStatus] = useState<'none' | 'pending' | 'active'>('none')
   const supabase = createClient()
 
   useEffect(() => {
@@ -44,20 +44,24 @@ export default function StudentDashboard() {
       .from('coaching_relationships')
       .select(`
         *,
-        coach:coach_id(
+        coach:teacher_profiles!coaching_relationships_coach_id_fkey(
           id,
           user_id,
-          bio,
-          subjects,
-          profile:user_id(full_name, avatar_url)
+          headline,
+          profile:profiles!teacher_profiles_user_id_fkey(full_name, avatar_url)
         )
       `)
       .eq('student_id', studentProfile.id)
-      .eq('status', 'active')
+      .in('status', ['active', 'pending'])
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single()
 
-    if (relationship?.coach) {
-      setCoach(relationship.coach)
+    if (relationship) {
+      setCoachingStatus(relationship.status as any)
+      if (relationship.status === 'active' && relationship.coach) {
+        setCoach(relationship.coach)
+      }
     }
 
     // Görevleri yükle
@@ -66,7 +70,6 @@ export default function StudentDashboard() {
       .select('*')
       .eq('student_id', studentProfile.id)
       .order('created_at', { ascending: false })
-      .limit(5)
 
     if (taskData) {
       setTasks(taskData)
@@ -121,7 +124,11 @@ export default function StudentDashboard() {
               <p className="text-accent-100">
                 {pendingTasks.length > 0 
                   ? `${pendingTasks.length} görev tamamlanmayı bekliyor`
-                  : 'Tüm görevler tamamlandı! 🎉'
+                  : coachingStatus === 'pending'
+                  ? 'Koçluk başvurun değerlendiriliyor'
+                  : coachingStatus === 'active'
+                  ? 'Koçunla birlikte ilerliyorsun!'
+                  : 'Bir koç bul ve yolculuğuna başla!'
                 }
               </p>
             </div>
@@ -144,23 +151,33 @@ export default function StudentDashboard() {
               <div className="p-6 border-b border-surface-100">
                 <h2 className="text-lg font-semibold text-surface-900">Koçum</h2>
               </div>
-              {coach ? (
+              {coachingStatus === 'active' && coach ? (
                 <div className="p-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white text-xl font-medium">
+                    <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white text-xl font-medium overflow-hidden">
                       {coach.profile?.avatar_url ? (
-                        <img src={coach.profile.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
+                        <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                       ) : (
                         getInitials(coach.profile?.full_name)
                       )}
                     </div>
                     <div className="flex-1">
                       <div className="font-semibold text-lg text-surface-900">{coach.profile?.full_name}</div>
-                      <div className="text-sm text-surface-500">{coach.subjects?.join(', ')}</div>
+                      <div className="text-sm text-surface-500">{coach.headline}</div>
                     </div>
                     <Link href="/ogrenci/mesajlar" className="btn btn-primary btn-sm">
                       Mesaj Gönder
                     </Link>
+                  </div>
+                </div>
+              ) : coachingStatus === 'pending' ? (
+                <div className="p-6">
+                  <div className="flex items-center gap-3 p-4 bg-yellow-50 rounded-xl">
+                    <Clock className="w-6 h-6 text-yellow-500" />
+                    <div>
+                      <div className="font-medium text-yellow-700">Başvurun değerlendiriliyor</div>
+                      <div className="text-sm text-yellow-600">Koç en kısa sürede cevap verecek.</div>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -187,7 +204,7 @@ export default function StudentDashboard() {
               </div>
               <div className="divide-y divide-surface-100">
                 {tasks.length > 0 ? tasks.slice(0, 4).map((task) => (
-                  <div key={task.id} className="p-4 flex items-center gap-4">
+                  <Link key={task.id} href={`/ogrenci/gorevler/${task.id}`} className="p-4 flex items-center gap-4 hover:bg-surface-50 transition-colors">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                       task.status === 'completed' ? 'bg-secondary-50 text-secondary-500' :
                       task.status === 'pending' ? 'bg-yellow-50 text-yellow-500' :
@@ -206,14 +223,17 @@ export default function StudentDashboard() {
                         }
                       </div>
                     </div>
-                    <Link href={`/ogrenci/gorevler/${task.id}`} className="btn btn-ghost btn-sm">
-                      Detay
-                    </Link>
-                  </div>
+                    <ArrowRight className="w-5 h-5 text-surface-400" />
+                  </Link>
                 )) : (
                   <div className="p-8 text-center">
                     <ClipboardList className="w-12 h-12 mx-auto mb-3 text-surface-300" />
-                    <p className="text-surface-500">Henüz görev atanmamış</p>
+                    <p className="text-surface-500">
+                      {coachingStatus === 'active' 
+                        ? 'Henüz görev atanmamış'
+                        : 'Koçluk başlayınca görevler burada görünecek'
+                      }
+                    </p>
                   </div>
                 )}
               </div>
@@ -282,21 +302,30 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* AI Tools */}
+            {/* Quick Links */}
             <div className="card p-6">
-              <h3 className="font-semibold text-surface-900 mb-4">AI Araçları</h3>
+              <h3 className="font-semibold text-surface-900 mb-4">Hızlı Erişim</h3>
               <div className="space-y-2">
+                <Link 
+                  href="/ogrenci/denemeler"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors"
+                >
+                  <FileText className="w-5 h-5 text-primary-500" />
+                  <span className="font-medium text-surface-900 text-sm">Deneme Sonuçları</span>
+                </Link>
                 <Link 
                   href="/ogrenci/ai-araclar"
                   className="flex items-center gap-3 p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors"
                 >
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center text-white">
-                    <Brain className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-surface-900 text-sm">Soru Çözücü</div>
-                    <div className="text-xs text-surface-500">Fotoğraf çek, çözüm al</div>
-                  </div>
+                  <Brain className="w-5 h-5 text-purple-500" />
+                  <span className="font-medium text-surface-900 text-sm">AI Araçları</span>
+                </Link>
+                <Link 
+                  href="/koclar"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors"
+                >
+                  <Target className="w-5 h-5 text-accent-500" />
+                  <span className="font-medium text-surface-900 text-sm">Koçları Keşfet</span>
                 </Link>
               </div>
             </div>
@@ -306,4 +335,3 @@ export default function StudentDashboard() {
     </DashboardLayout>
   )
 }
-

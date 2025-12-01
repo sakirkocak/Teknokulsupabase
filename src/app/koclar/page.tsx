@@ -10,20 +10,20 @@ import {
   Search, 
   Star, 
   Users, 
-  Filter,
   ArrowLeft,
-  MapPin,
+  Clock,
   BookOpen
 } from 'lucide-react'
 
 interface Coach {
   id: string
   user_id: string
-  bio: string
-  subjects: string[]
+  headline: string
+  hourly_rate: number
   experience_years: number
-  rating: number
-  total_reviews: number
+  average_rating: number
+  review_count: number
+  is_coach: boolean
   profile: {
     full_name: string
     avatar_url: string | null
@@ -34,7 +34,6 @@ export default function CoachesPage() {
   const [coaches, setCoaches] = useState<Coach[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [selectedSubject, setSelectedSubject] = useState('')
   const supabase = createClient()
 
   useEffect(() => {
@@ -49,35 +48,34 @@ export default function CoachesPage() {
       .select(`
         id,
         user_id,
-        bio,
-        subjects,
+        headline,
+        hourly_rate,
         experience_years,
-        rating,
-        total_reviews,
-        profile:user_id(full_name, avatar_url)
+        average_rating,
+        review_count,
+        is_coach,
+        profile:profiles!teacher_profiles_user_id_fkey(full_name, avatar_url)
       `)
       .eq('is_coach', true)
-      .order('rating', { ascending: false })
+      .order('average_rating', { ascending: false })
 
     if (data) {
-      setCoaches(data as any)
+      // Flatten profile data
+      const flattenedData = data.map((coach: any) => ({
+        ...coach,
+        profile: coach.profile || { full_name: 'İsimsiz Koç', avatar_url: null }
+      }))
+      setCoaches(flattenedData)
     }
     setLoading(false)
   }
-
-  // Tüm konuları topla
-  const allSubjects = [...new Set(coaches.flatMap(c => c.subjects || []))]
 
   // Filtreleme
   const filteredCoaches = coaches.filter(coach => {
     const matchesSearch = !search || 
       coach.profile?.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      coach.subjects?.some(s => s.toLowerCase().includes(search.toLowerCase()))
-    
-    const matchesSubject = !selectedSubject || 
-      coach.subjects?.includes(selectedSubject)
-
-    return matchesSearch && matchesSubject
+      coach.headline?.toLowerCase().includes(search.toLowerCase())
+    return matchesSearch
   })
 
   return (
@@ -121,28 +119,18 @@ export default function CoachesPage() {
           </p>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <div className="relative flex-1">
+        {/* Search */}
+        <div className="mb-8">
+          <div className="relative max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Koç veya konu ara..."
+              placeholder="Koç veya uzmanlık ara..."
               className="input pl-12"
             />
           </div>
-          <select
-            value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value)}
-            className="input w-full sm:w-48"
-          >
-            <option value="">Tüm Konular</option>
-            {allSubjects.map(subject => (
-              <option key={subject} value={subject}>{subject}</option>
-            ))}
-          </select>
         </div>
 
         {/* Coaches Grid */}
@@ -162,9 +150,9 @@ export default function CoachesPage() {
                 <Link href={`/koclar/${coach.id}`} className="card block hover:shadow-lg transition-shadow">
                   <div className="p-6">
                     <div className="flex items-start gap-4 mb-4">
-                      <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white text-xl font-bold">
+                      <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white text-xl font-bold overflow-hidden">
                         {coach.profile?.avatar_url ? (
-                          <img src={coach.profile.avatar_url} alt="" className="w-full h-full rounded-xl object-cover" />
+                          <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                         ) : (
                           getInitials(coach.profile?.full_name)
                         )}
@@ -175,45 +163,28 @@ export default function CoachesPage() {
                         </h3>
                         <div className="flex items-center gap-1 text-yellow-500 mt-1">
                           <Star className="w-4 h-4 fill-current" />
-                          <span className="font-medium">{coach.rating?.toFixed(1) || '5.0'}</span>
+                          <span className="font-medium">{coach.average_rating?.toFixed(1) || '5.0'}</span>
                           <span className="text-surface-400 text-sm">
-                            ({coach.total_reviews || 0} değerlendirme)
+                            ({coach.review_count || 0})
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    {coach.bio && (
+                    {coach.headline && (
                       <p className="text-surface-600 text-sm mb-4 line-clamp-2">
-                        {coach.bio}
+                        {coach.headline}
                       </p>
                     )}
 
-                    {coach.subjects && coach.subjects.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {coach.subjects.slice(0, 3).map((subject, i) => (
-                          <span 
-                            key={i}
-                            className="px-2 py-1 bg-primary-50 text-primary-600 text-xs font-medium rounded-lg"
-                          >
-                            {subject}
-                          </span>
-                        ))}
-                        {coach.subjects.length > 3 && (
-                          <span className="px-2 py-1 bg-surface-100 text-surface-600 text-xs font-medium rounded-lg">
-                            +{coach.subjects.length - 3}
-                          </span>
-                        )}
+                    <div className="flex items-center justify-between text-sm pt-4 border-t border-surface-100">
+                      <div className="flex items-center gap-1 text-surface-500">
+                        <Clock className="w-4 h-4" />
+                        <span>{coach.experience_years || 0} yıl</span>
                       </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-surface-500">
-                        {coach.experience_years || 0} yıl deneyim
-                      </span>
-                      <span className="text-primary-500 font-medium">
-                        Detaylar →
-                      </span>
+                      <div className="text-primary-500 font-semibold">
+                        {coach.hourly_rate ? `${coach.hourly_rate}₺/saat` : 'Ücretsiz'}
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -225,10 +196,7 @@ export default function CoachesPage() {
             <Users className="w-16 h-16 mx-auto mb-4 text-surface-300" />
             <h3 className="text-lg font-medium text-surface-900 mb-2">Koç bulunamadı</h3>
             <p className="text-surface-500">
-              {search || selectedSubject 
-                ? 'Arama kriterlerinize uygun koç bulunamadı.'
-                : 'Henüz kayıtlı koç bulunmuyor.'
-              }
+              {search ? 'Arama kriterlerinize uygun koç bulunamadı.' : 'Henüz kayıtlı koç bulunmuyor.'}
             </p>
           </div>
         )}
@@ -236,4 +204,3 @@ export default function CoachesPage() {
     </div>
   )
 }
-
