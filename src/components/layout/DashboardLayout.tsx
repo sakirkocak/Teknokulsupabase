@@ -61,7 +61,8 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { label: 'Kullanıcılar', href: '/admin/kullanicilar', icon: Users },
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
-    { label: 'İstatistikler', href: '/admin/istatistikler', icon: TrendingUp },
+    { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
+    { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
     { label: 'Ayarlar', href: '/admin/ayarlar', icon: Settings },
   ],
 }
