@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useTeacherProfile } from '@/hooks/useProfile'
