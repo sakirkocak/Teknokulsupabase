@@ -141,7 +141,12 @@ export default function ExamResultsPage() {
       .eq('status', 'active')
 
     if (data) {
-      const coachList = data.map(d => d.coach).filter(Boolean) as Coach[]
+      const coachList: Coach[] = []
+      data.forEach(d => {
+        if (d.coach && typeof d.coach === 'object' && 'id' in d.coach) {
+          coachList.push(d.coach as Coach)
+        }
+      })
       setCoaches(coachList)
       if (coachList.length === 1) {
         setSelectedCoachId(coachList[0].id)
