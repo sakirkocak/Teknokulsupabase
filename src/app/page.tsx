@@ -664,7 +664,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-12 px-4 border-t border-surface-100 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
             <div>
               <Link href="/" className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
@@ -703,10 +703,25 @@ export default function HomePage() {
                 <li><Link href="/kayit?role=veli" className="hover:text-primary-500">Veli Ol</Link></li>
               </ul>
             </div>
+
+            <div>
+              <h4 className="font-semibold text-surface-900 mb-4">Yasal</h4>
+              <ul className="space-y-2 text-surface-600">
+                <li><Link href="/yasal/gizlilik" className="hover:text-primary-500">Gizlilik Politikası</Link></li>
+                <li><Link href="/yasal/kullanim-kosullari" className="hover:text-primary-500">Kullanım Koşulları</Link></li>
+                <li><Link href="/yasal/kvkk" className="hover:text-primary-500">KVKK</Link></li>
+                <li><Link href="/yasal/cerezler" className="hover:text-primary-500">Çerez Politikası</Link></li>
+              </ul>
+            </div>
           </div>
           
-          <div className="pt-8 border-t border-surface-100 text-center text-surface-500 text-sm">
-            © 2024 Teknokul. Tüm hakları saklıdır.
+          <div className="pt-8 border-t border-surface-100 flex flex-col sm:flex-row justify-between items-center gap-4 text-surface-500 text-sm">
+            <p>© 2024 Teknokul. Tüm hakları saklıdır.</p>
+            <div className="flex gap-4">
+              <Link href="/yasal/gizlilik" className="hover:text-primary-500">Gizlilik</Link>
+              <Link href="/yasal/kullanim-kosullari" className="hover:text-primary-500">Koşullar</Link>
+              <Link href="/yasal/kvkk" className="hover:text-primary-500">KVKK</Link>
+            </div>
           </div>
         </div>
       </footer>
