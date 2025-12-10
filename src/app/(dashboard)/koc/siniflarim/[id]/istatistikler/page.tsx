@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -47,7 +47,7 @@ interface SubjectStats {
 
 export default function SinifIstatistiklerPage() {
   const params = useParams()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   const [stats, setStats] = useState<ClassroomStats | null>(null)
   const [topStudents, setTopStudents] = useState<StudentPerformance[]>([])

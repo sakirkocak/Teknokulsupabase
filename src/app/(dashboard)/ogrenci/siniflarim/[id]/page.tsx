@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase/client'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
@@ -53,7 +53,7 @@ interface LeaderboardEntry {
 
 export default function OgrenciSinifDetayPage() {
   const params = useParams()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
 
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
