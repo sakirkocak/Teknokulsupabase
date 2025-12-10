@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
-import { getInitials } from '@/lib/utils'
+import AvatarUpload from '@/components/ui/AvatarUpload'
 import { motion } from 'framer-motion'
 import { 
   User,
@@ -89,14 +89,16 @@ export default function ParentProfilePage() {
 
         {/* Profile Card */}
         <div className="card p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-secondary-400 to-secondary-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                getInitials(profile?.full_name)
-              )}
-            </div>
+          <div className="flex items-center gap-6 mb-6 pb-6 border-b border-surface-100">
+            <AvatarUpload
+              userId={profile?.id || ''}
+              currentAvatarUrl={profile?.avatar_url || null}
+              fullName={profile?.full_name}
+              onUploadComplete={(url) => {
+                refetch()
+              }}
+              size="md"
+            />
             <div>
               <div className="font-semibold text-surface-900 text-lg">{profile?.full_name}</div>
               <div className="text-surface-500">{profile?.email}</div>
@@ -158,4 +160,3 @@ export default function ParentProfilePage() {
     </DashboardLayout>
   )
 }
-

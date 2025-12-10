@@ -6,15 +6,24 @@ import { useProfile, useTeacherProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
 import { motion } from 'framer-motion'
+import AvatarUpload from '@/components/ui/AvatarUpload'
 import { 
   User,
-  Mail,
   Phone,
-  BookOpen,
   Award,
   Save,
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Video,
+  Target,
+  BookOpen,
+  Users,
+  Trophy,
+  Eye,
+  EyeOff,
+  Plus,
+  X,
+  ExternalLink
 } from 'lucide-react'
 
 export default function CoachProfilePage() {
@@ -22,6 +31,9 @@ export default function CoachProfilePage() {
   const { teacherProfile, loading: teacherLoading, refetch: refetchTeacher } = useTeacherProfile(profile?.id || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [activeTab, setActiveTab] = useState<'basic' | 'listing'>('basic')
+  
+  // Temel bilgiler
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
@@ -29,9 +41,23 @@ export default function CoachProfilePage() {
     bio: '',
     education: '',
     experience_years: 0,
-    hourly_rate: 0,
+  })
+
+  // İlan bilgileri
+  const [listingData, setListingData] = useState({
+    video_url: '',
+    specializations: [] as string[],
+    teaching_style: '',
+    target_students: '',
+    achievements: '',
+    certificates: [] as { name: string; issuer: string; url: string }[],
+    is_listed: true,
     is_coach: true,
   })
+
+  const [newSpecialization, setNewSpecialization] = useState('')
+  const [newCertificate, setNewCertificate] = useState({ name: '', issuer: '', url: '' })
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -43,11 +69,54 @@ export default function CoachProfilePage() {
         bio: teacherProfile.bio || '',
         education: teacherProfile.education || '',
         experience_years: teacherProfile.experience_years || 0,
-        hourly_rate: teacherProfile.hourly_rate || 0,
+      })
+
+      setListingData({
+        video_url: teacherProfile.video_url || '',
+        specializations: teacherProfile.specializations || [],
+        teaching_style: teacherProfile.teaching_style || '',
+        target_students: teacherProfile.target_students || '',
+        achievements: teacherProfile.achievements || '',
+        certificates: teacherProfile.certificates || [],
+        is_listed: teacherProfile.is_listed !== false,
         is_coach: teacherProfile.is_coach !== false,
       })
     }
   }, [profile, teacherProfile])
+
+  function addSpecialization() {
+    if (newSpecialization.trim() && !listingData.specializations.includes(newSpecialization.trim())) {
+      setListingData({
+        ...listingData,
+        specializations: [...listingData.specializations, newSpecialization.trim()]
+      })
+      setNewSpecialization('')
+    }
+  }
+
+  function removeSpecialization(spec: string) {
+    setListingData({
+      ...listingData,
+      specializations: listingData.specializations.filter(s => s !== spec)
+    })
+  }
+
+  function addCertificate() {
+    if (newCertificate.name.trim()) {
+      setListingData({
+        ...listingData,
+        certificates: [...listingData.certificates, { ...newCertificate }]
+      })
+      setNewCertificate({ name: '', issuer: '', url: '' })
+    }
+  }
+
+  function removeCertificate(index: number) {
+    setListingData({
+      ...listingData,
+      certificates: listingData.certificates.filter((_, i) => i !== index)
+    })
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,8 +139,14 @@ export default function CoachProfilePage() {
         bio: formData.bio,
         education: formData.education,
         experience_years: formData.experience_years,
-        hourly_rate: formData.hourly_rate,
-        is_coach: formData.is_coach,
+        video_url: listingData.video_url,
+        specializations: listingData.specializations,
+        teaching_style: listingData.teaching_style,
+        target_students: listingData.target_students,
+        achievements: listingData.achievements,
+        certificates: listingData.certificates,
+        is_listed: listingData.is_listed,
+        is_coach: listingData.is_coach,
       })
       .eq('user_id', profile?.id)
 
@@ -99,13 +174,20 @@ export default function CoachProfilePage() {
     )
   }
 
+  const specializationOptions = [
+    'Matematik', 'Fizik', 'Kimya', 'Biyoloji', 'Türkçe', 'Edebiyat',
+    'Tarih', 'Coğrafya', 'İngilizce', 'Almanca', 'Fransızca',
+    'LGS Hazırlık', 'YKS Hazırlık', 'TYT', 'AYT', 'KPSS',
+    'Kariyer Koçluğu', 'Motivasyon', 'Zaman Yönetimi', 'Sınav Stratejisi'
+  ]
+
   return (
     <DashboardLayout role="koc">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Profilim</h1>
-          <p className="text-surface-500">Profil bilgilerini düzenle</p>
+          <h1 className="text-2xl font-bold text-surface-900">Profilim & İlan Ayarları</h1>
+          <p className="text-surface-500">Profil bilgilerini ve ilan ayarlarını düzenle</p>
         </div>
 
         {/* Success Message */}
@@ -120,128 +202,345 @@ export default function CoachProfilePage() {
           </motion.div>
         )}
 
+        {/* Tabs */}
+        <div className="flex gap-2 p-1 bg-surface-100 rounded-xl">
+          <button
+            onClick={() => setActiveTab('basic')}
+            className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+              activeTab === 'basic'
+                ? 'bg-white text-surface-900 shadow-sm'
+                : 'text-surface-600 hover:text-surface-900'
+            }`}
+          >
+            <User className="w-4 h-4 inline mr-2" />
+            Temel Bilgiler
+          </button>
+          <button
+            onClick={() => setActiveTab('listing')}
+            className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
+              activeTab === 'listing'
+                ? 'bg-white text-surface-900 shadow-sm'
+                : 'text-surface-600 hover:text-surface-900'
+            }`}
+          >
+            <Eye className="w-4 h-4 inline mr-2" />
+            İlan Ayarları
+          </button>
+        </div>
+
         {/* Profile Card */}
         <div className="card p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold overflow-hidden">
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                getInitials(profile?.full_name)
-              )}
-            </div>
+          <div className="flex items-center gap-6 mb-6 pb-6 border-b border-surface-100">
+            <AvatarUpload
+              userId={profile?.id || ''}
+              currentAvatarUrl={profile?.avatar_url || null}
+              fullName={profile?.full_name}
+              onUploadComplete={(url) => {
+                refetch()
+              }}
+              size="md"
+            />
             <div>
               <div className="font-semibold text-surface-900 text-lg">{profile?.full_name}</div>
               <div className="text-surface-500">{profile?.email}</div>
+              <div className="flex items-center gap-2 mt-2">
+                {listingData.is_listed ? (
+                  <span className="px-2 py-1 bg-green-50 text-green-600 text-xs font-medium rounded-full flex items-center gap-1">
+                    <Eye className="w-3 h-3" />
+                    İlanlarda Görünür
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 bg-surface-100 text-surface-500 text-xs font-medium rounded-full flex items-center gap-1">
+                    <EyeOff className="w-3 h-3" />
+                    İlanlarda Gizli
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Basic Info */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="label">
-                  <User className="w-4 h-4 inline mr-1" />
-                  Ad Soyad
-                </label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="input"
-                  required
-                />
-              </div>
-              <div>
-                <label className="label">
-                  <Phone className="w-4 h-4 inline mr-1" />
-                  Telefon
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="input"
-                  placeholder="05XX XXX XX XX"
-                />
-              </div>
-            </div>
+            {activeTab === 'basic' && (
+              <>
+                {/* Basic Info */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">
+                      <User className="w-4 h-4 inline mr-1" />
+                      Ad Soyad
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      className="input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="label">
+                      <Phone className="w-4 h-4 inline mr-1" />
+                      Telefon
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      className="input"
+                      placeholder="05XX XXX XX XX"
+                    />
+                  </div>
+                </div>
 
-            {/* Headline */}
-            <div>
-              <label className="label">Başlık</label>
-              <input
-                type="text"
-                value={formData.headline}
-                onChange={(e) => setFormData({ ...formData, headline: e.target.value })}
-                className="input"
-                placeholder="Örn: Matematik Öğretmeni & Eğitim Koçu"
-              />
-            </div>
+                {/* Headline */}
+                <div>
+                  <label className="label">Başlık / Unvan</label>
+                  <input
+                    type="text"
+                    value={formData.headline}
+                    onChange={(e) => setFormData({ ...formData, headline: e.target.value })}
+                    className="input"
+                    placeholder="Örn: 10 Yıllık Deneyimli Matematik Öğretmeni"
+                  />
+                </div>
 
-            {/* Bio */}
-            <div>
-              <label className="label">Hakkımda</label>
-              <textarea
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                className="input min-h-[120px]"
-                placeholder="Kendinizi tanıtın..."
-              />
-            </div>
+                {/* Bio */}
+                <div>
+                  <label className="label">Hakkımda</label>
+                  <textarea
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    className="input min-h-[120px]"
+                    placeholder="Kendinizi ve deneyimlerinizi anlatın..."
+                  />
+                </div>
 
-            {/* Professional Info */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="label">
-                  <Award className="w-4 h-4 inline mr-1" />
-                  Eğitim
-                </label>
-                <input
-                  type="text"
-                  value={formData.education}
-                  onChange={(e) => setFormData({ ...formData, education: e.target.value })}
-                  className="input"
-                  placeholder="Örn: Boğaziçi Üniversitesi - Matematik"
-                />
-              </div>
-              <div>
-                <label className="label">Deneyim (Yıl)</label>
-                <input
-                  type="number"
-                  value={formData.experience_years}
-                  onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
-                  className="input"
-                  min="0"
-                />
-              </div>
-            </div>
+                {/* Professional Info */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">
+                      <Award className="w-4 h-4 inline mr-1" />
+                      Eğitim
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.education}
+                      onChange={(e) => setFormData({ ...formData, education: e.target.value })}
+                      className="input"
+                      placeholder="Örn: Boğaziçi Üniversitesi - Matematik"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Deneyim (Yıl)</label>
+                    <input
+                      type="number"
+                      value={formData.experience_years}
+                      onChange={(e) => setFormData({ ...formData, experience_years: parseInt(e.target.value) || 0 })}
+                      className="input"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
-            {/* Rate & Coach */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="label">Saatlik Ücret (₺)</label>
-                <input
-                  type="number"
-                  value={formData.hourly_rate}
-                  onChange={(e) => setFormData({ ...formData, hourly_rate: parseInt(e.target.value) || 0 })}
-                  className="input"
-                  min="0"
-                />
-              </div>
-              <div className="flex items-center gap-3 pt-6">
-                <input
-                  type="checkbox"
-                  id="is_coach"
-                  checked={formData.is_coach}
-                  onChange={(e) => setFormData({ ...formData, is_coach: e.target.checked })}
-                  className="w-5 h-5 rounded border-surface-300 text-primary-500 focus:ring-primary-500"
-                />
-                <label htmlFor="is_coach" className="text-surface-700">
-                  Eğitim koçluğu yapıyorum
-                </label>
-              </div>
-            </div>
+            {activeTab === 'listing' && (
+              <>
+                {/* Listing Toggle */}
+                <div className="p-4 bg-surface-50 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-surface-900">İlanlarda Görün</div>
+                    <div className="text-sm text-surface-500">Koç listesinde profiliniz görünsün mü?</div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={listingData.is_listed}
+                      onChange={(e) => setListingData({ ...listingData, is_listed: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-surface-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-surface-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-500"></div>
+                  </label>
+                </div>
+
+                {/* Video URL */}
+                <div>
+                  <label className="label">
+                    <Video className="w-4 h-4 inline mr-1" />
+                    Tanıtım Videosu (YouTube)
+                  </label>
+                  <input
+                    type="url"
+                    value={listingData.video_url}
+                    onChange={(e) => setListingData({ ...listingData, video_url: e.target.value })}
+                    className="input"
+                    placeholder="https://youtube.com/watch?v=..."
+                  />
+                  <p className="text-xs text-surface-500 mt-1">YouTube video linki yapıştırın</p>
+                </div>
+
+                {/* Specializations */}
+                <div>
+                  <label className="label">
+                    <Target className="w-4 h-4 inline mr-1" />
+                    Uzmanlık Alanları
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {listingData.specializations.map((spec, i) => (
+                      <span 
+                        key={i}
+                        className="px-3 py-1.5 bg-primary-50 text-primary-600 font-medium rounded-full flex items-center gap-2"
+                      >
+                        {spec}
+                        <button
+                          type="button"
+                          onClick={() => removeSpecialization(spec)}
+                          className="hover:text-primary-800"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={newSpecialization}
+                      onChange={(e) => setNewSpecialization(e.target.value)}
+                      className="input flex-1"
+                    >
+                      <option value="">Alan seçin veya yazın</option>
+                      {specializationOptions.filter(s => !listingData.specializations.includes(s)).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addSpecialization}
+                      className="btn btn-outline btn-md"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={newSpecialization}
+                    onChange={(e) => setNewSpecialization(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialization())}
+                    className="input mt-2"
+                    placeholder="Veya özel alan yazın ve Enter'a basın"
+                  />
+                </div>
+
+                {/* Teaching Style */}
+                <div>
+                  <label className="label">
+                    <BookOpen className="w-4 h-4 inline mr-1" />
+                    Öğretim Tarzı
+                  </label>
+                  <textarea
+                    value={listingData.teaching_style}
+                    onChange={(e) => setListingData({ ...listingData, teaching_style: e.target.value })}
+                    className="input min-h-[100px]"
+                    placeholder="Ders anlatım ve çalışma tarzınızı açıklayın..."
+                  />
+                </div>
+
+                {/* Target Students */}
+                <div>
+                  <label className="label">
+                    <Users className="w-4 h-4 inline mr-1" />
+                    Hedef Öğrenci Kitlesi
+                  </label>
+                  <textarea
+                    value={listingData.target_students}
+                    onChange={(e) => setListingData({ ...listingData, target_students: e.target.value })}
+                    className="input min-h-[80px]"
+                    placeholder="Hangi öğrencilerle çalışmak istiyorsunuz? (sınıf, seviye, hedef vb.)"
+                  />
+                </div>
+
+                {/* Achievements */}
+                <div>
+                  <label className="label">
+                    <Trophy className="w-4 h-4 inline mr-1" />
+                    Başarılar / Kazanımlar
+                  </label>
+                  <textarea
+                    value={listingData.achievements}
+                    onChange={(e) => setListingData({ ...listingData, achievements: e.target.value })}
+                    className="input min-h-[100px]"
+                    placeholder="Öğrencilerinizin başarıları, ödülleriniz vb."
+                  />
+                </div>
+
+                {/* Certificates */}
+                <div>
+                  <label className="label">
+                    <Award className="w-4 h-4 inline mr-1" />
+                    Sertifikalar
+                  </label>
+                  
+                  {listingData.certificates.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {listingData.certificates.map((cert, i) => (
+                        <div key={i} className="p-3 bg-yellow-50 rounded-xl flex items-center gap-3">
+                          <Award className="w-6 h-6 text-yellow-500" />
+                          <div className="flex-1">
+                            <div className="font-medium text-surface-900">{cert.name}</div>
+                            {cert.issuer && <div className="text-sm text-surface-500">{cert.issuer}</div>}
+                          </div>
+                          {cert.url && (
+                            <a href={cert.url} target="_blank" rel="noopener noreferrer" className="text-primary-500">
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeCertificate(i)}
+                            className="text-red-500 hover:text-red-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid sm:grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      value={newCertificate.name}
+                      onChange={(e) => setNewCertificate({ ...newCertificate, name: e.target.value })}
+                      className="input"
+                      placeholder="Sertifika Adı"
+                    />
+                    <input
+                      type="text"
+                      value={newCertificate.issuer}
+                      onChange={(e) => setNewCertificate({ ...newCertificate, issuer: e.target.value })}
+                      className="input"
+                      placeholder="Veren Kurum"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={newCertificate.url}
+                        onChange={(e) => setNewCertificate({ ...newCertificate, url: e.target.value })}
+                        className="input flex-1"
+                        placeholder="Link (opsiyonel)"
+                      />
+                      <button
+                        type="button"
+                        onClick={addCertificate}
+                        className="btn btn-outline btn-md"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Submit */}
             <button
@@ -267,4 +566,3 @@ export default function CoachProfilePage() {
     </DashboardLayout>
   )
 }
-

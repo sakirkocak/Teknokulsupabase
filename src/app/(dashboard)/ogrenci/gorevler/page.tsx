@@ -6,18 +6,39 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useStudentProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
+import { getInitials } from '@/lib/utils'
 import { 
   ClipboardList, 
   CheckCircle,
   Clock,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  User
 } from 'lucide-react'
+
+interface Task {
+  id: string
+  title: string
+  description: string
+  type: string
+  status: string
+  due_date: string
+  score: number | null
+  created_at: string
+  coach: {
+    id: string
+    user_id: string
+    profile: {
+      full_name: string
+      avatar_url: string | null
+    }
+  }
+}
 
 export default function StudentTasksPage() {
   const { profile, loading: profileLoading } = useProfile()
   const { studentProfile, loading: studentLoading } = useStudentProfile(profile?.id || '')
-  const [tasks, setTasks] = useState<any[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed'>('all')
   const supabase = createClient()
 
@@ -30,12 +51,19 @@ export default function StudentTasksPage() {
   async function loadTasks() {
     const { data } = await supabase
       .from('tasks')
-      .select('*')
+      .select(`
+        *,
+        coach:teacher_profiles!tasks_coach_id_fkey(
+          id,
+          user_id,
+          profile:profiles!teacher_profiles_user_id_fkey(full_name, avatar_url)
+        )
+      `)
       .eq('student_id', studentProfile?.id)
       .order('created_at', { ascending: false })
 
     if (data) {
-      setTasks(data)
+      setTasks(data as Task[])
     }
   }
 
@@ -70,7 +98,7 @@ export default function StudentTasksPage() {
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-surface-900">Görevlerim</h1>
-          <p className="text-surface-500">Koçunun sana atadığı görevler</p>
+          <p className="text-surface-500">Koçlarının sana atadığı görevler</p>
         </div>
 
         {/* Filter */}
@@ -100,6 +128,7 @@ export default function StudentTasksPage() {
             {filteredTasks.map((task, index) => {
               const config = statusConfig[task.status] || statusConfig.pending
               const StatusIcon = config.icon
+              const coachName = task.coach?.profile?.full_name || 'Koç'
 
               return (
                 <motion.div
@@ -128,6 +157,17 @@ export default function StudentTasksPage() {
                           <p className="text-sm text-surface-600 mt-2 line-clamp-2">{task.description}</p>
                         )}
                         <div className="flex items-center gap-4 mt-3 text-sm text-surface-500">
+                          {/* Koç Bilgisi */}
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 bg-primary-100 rounded-full flex items-center justify-center overflow-hidden">
+                              {task.coach?.profile?.avatar_url ? (
+                                <img src={task.coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <User className="w-3 h-3 text-primary-600" />
+                              )}
+                            </div>
+                            <span className="text-primary-600 font-medium">{coachName}</span>
+                          </div>
                           <span className="capitalize">{task.type}</span>
                           {task.due_date && (
                             <span>Son: {new Date(task.due_date).toLocaleDateString('tr-TR')}</span>
@@ -160,4 +200,3 @@ export default function StudentTasksPage() {
     </DashboardLayout>
   )
 }
-

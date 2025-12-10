@@ -9,7 +9,8 @@ import Link from 'next/link'
 import { 
   MessageSquare,
   Send,
-  Target
+  Target,
+  Loader2
 } from 'lucide-react'
 
 export default function StudentMessagesPage() {
@@ -29,10 +30,37 @@ export default function StudentMessagesPage() {
   }, [studentProfile?.id])
 
   useEffect(() => {
-    if (coach) {
+    if (coach?.profile_id && profile?.id) {
       loadMessages()
+      
+      // Realtime subscription for messages
+      const channel = supabase
+        .channel('student-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            const newMsg = payload.new as any
+            // Bu konuşmaya ait mesaj mı kontrol et
+            if (
+              (newMsg.sender_id === profile.id && newMsg.receiver_id === coach.profile_id) ||
+              (newMsg.sender_id === coach.profile_id && newMsg.receiver_id === profile.id)
+            ) {
+              setMessages(prev => [...prev, newMsg])
+            }
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
-  }, [coach])
+  }, [coach?.profile_id, profile?.id])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -54,9 +82,11 @@ export default function StudentMessagesPage() {
 
     if (data?.coach) {
       const coachData = data.coach as any
+      const coachProfile = Array.isArray(coachData.profile) ? coachData.profile[0] : coachData.profile
       setCoach({
         ...coachData,
-        profile_id: coachData.profile?.id,
+        profile: coachProfile,
+        profile_id: coachProfile?.id,
       })
     }
   }
@@ -77,21 +107,23 @@ export default function StudentMessagesPage() {
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if (!newMessage.trim() || !coach?.profile_id) return
+    if (!newMessage.trim() || !coach?.profile_id || sending) return
 
     setSending(true)
+    const messageContent = newMessage.trim()
+    setNewMessage('')
 
     const { error } = await supabase
       .from('messages')
       .insert({
         sender_id: profile?.id,
         receiver_id: coach.profile_id,
-        content: newMessage.trim(),
+        content: messageContent,
       })
 
-    if (!error) {
-      setNewMessage('')
-      loadMessages()
+    if (error) {
+      setNewMessage(messageContent)
+      alert('Mesaj gönderilemedi: ' + error.message)
     }
 
     setSending(false)
@@ -142,7 +174,7 @@ export default function StudentMessagesPage() {
               )}
             </div>
             <div>
-              <div className="font-medium text-surface-900">{coach.profile?.full_name}</div>
+              <div className="font-medium text-surface-900">{coach.profile?.full_name || 'Koç'}</div>
               <div className="text-sm text-surface-500">Koçun</div>
             </div>
           </div>
@@ -186,13 +218,18 @@ export default function StudentMessagesPage() {
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Mesajınızı yazın..."
                 className="input flex-1"
+                disabled={sending}
               />
               <button 
                 type="submit" 
                 disabled={sending || !newMessage.trim()}
                 className="btn btn-primary btn-md"
               >
-                <Send className="w-5 h-5" />
+                {sending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
               </button>
             </div>
           </form>
@@ -201,4 +238,3 @@ export default function StudentMessagesPage() {
     </DashboardLayout>
   )
 }
-

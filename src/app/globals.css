@@ -77,3 +77,36 @@
   @apply bg-surface-400;
 }
 
+/* Math/KaTeX Styles */
+.math-content .katex {
+  font-size: 1.1em;
+}
+
+.math-content .katex-display {
+  margin: 1em 0;
+  padding: 0.5em;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+
+.math-content .katex-display > .katex {
+  font-size: 1.2em;
+}
+
+/* Prose içindeki matematik */
+.prose .katex {
+  color: inherit;
+}
+
+/* Büyük formüller için scroll */
+.math-content .katex-html {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Inline math spacing */
+.math-content p .katex {
+  margin: 0 0.15em;
+}
+

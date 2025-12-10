@@ -10,16 +10,18 @@ import {
   Check,
   Info,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  MessageSquare,
+  UserPlus
 } from 'lucide-react'
 
 interface Notification {
   id: string
   title: string
-  message: string
-  type: 'info' | 'success' | 'warning' | 'error'
+  body: string
+  type: string
   is_read: boolean
-  link?: string
+  data?: { link?: string }
   created_at: string
 }
 
@@ -27,12 +29,46 @@ export default function NotificationBell({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [hasNewNotification, setHasNewNotification] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
     if (userId) {
       loadNotifications()
+      
+      // Realtime subscription for new notifications
+      const channel = supabase
+        .channel('notifications')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const newNotification = payload.new as Notification
+            setNotifications(prev => [newNotification, ...prev])
+            setHasNewNotification(true)
+            
+            // Play notification sound (optional)
+            try {
+              const audio = new Audio('/notification.mp3')
+              audio.volume = 0.3
+              audio.play().catch(() => {})
+            } catch {}
+            
+            // Clear animation after 2 seconds
+            setTimeout(() => setHasNewNotification(false), 2000)
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
   }, [userId])
 
@@ -53,7 +89,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(20)
 
     if (data) {
       setNotifications(data)
@@ -86,11 +122,13 @@ export default function NotificationBell({ userId }: { userId: string }) {
 
   const unreadCount = notifications.filter(n => !n.is_read).length
 
-  const typeConfig = {
+  const typeConfig: Record<string, { icon: any; color: string }> = {
     info: { icon: Info, color: 'text-blue-500 bg-blue-50' },
     success: { icon: CheckCircle, color: 'text-green-500 bg-green-50' },
     warning: { icon: AlertCircle, color: 'text-yellow-500 bg-yellow-50' },
     error: { icon: AlertCircle, color: 'text-red-500 bg-red-50' },
+    message: { icon: MessageSquare, color: 'text-primary-500 bg-primary-50' },
+    coaching: { icon: UserPlus, color: 'text-accent-500 bg-accent-50' },
   }
 
   return (
@@ -98,11 +136,15 @@ export default function NotificationBell({ userId }: { userId: string }) {
       {/* Bell Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-surface-100 transition-colors"
+        className={`relative p-2 rounded-lg hover:bg-surface-100 transition-colors ${
+          hasNewNotification ? 'animate-bounce' : ''
+        }`}
       >
-        <Bell className="w-5 h-5 text-surface-600" />
+        <Bell className={`w-5 h-5 ${hasNewNotification ? 'text-primary-500' : 'text-surface-600'}`} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center">
+          <span className={`absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-medium rounded-full flex items-center justify-center ${
+            hasNewNotification ? 'animate-pulse' : ''
+          }`}>
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -167,9 +209,9 @@ export default function NotificationBell({ userId }: { userId: string }) {
                               </button>
                             )}
                           </div>
-                          {notification.message && (
+                          {notification.body && (
                             <p className="text-sm text-surface-500 mt-0.5 line-clamp-2">
-                              {notification.message}
+                              {notification.body}
                             </p>
                           )}
                           <div className="text-xs text-surface-400 mt-1">
@@ -180,9 +222,9 @@ export default function NotificationBell({ userId }: { userId: string }) {
                               minute: '2-digit'
                             })}
                           </div>
-                          {notification.link && (
+                          {notification.data?.link && (
                             <Link
-                              href={notification.link}
+                              href={notification.data.link}
                               onClick={() => {
                                 markAsRead(notification.id)
                                 setIsOpen(false)
@@ -210,4 +252,3 @@ export default function NotificationBell({ userId }: { userId: string }) {
     </div>
   )
 }
-

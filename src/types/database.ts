@@ -28,6 +28,13 @@ export interface TeacherProfile {
   review_count: number
   is_verified: boolean
   is_coach: boolean
+  is_listed: boolean
+  video_url: string | null
+  certificates: { name: string; issuer: string; url: string }[]
+  specializations: string[]
+  teaching_style: string | null
+  target_students: string | null
+  achievements: string | null
   created_at: string
 }
 
@@ -171,5 +178,19 @@ export interface AIRecommendation {
   message: string
   priority: 'low' | 'medium' | 'high'
   is_dismissed: boolean
+  created_at: string
+}
+
+export interface Review {
+  id: string
+  teacher_id: string
+  student_id: string
+  overall_rating: number
+  communication_rating: number
+  knowledge_rating: number
+  punctuality_rating: number
+  comment: string | null
+  is_anonymous: boolean
+  is_approved: boolean
   created_at: string
 }

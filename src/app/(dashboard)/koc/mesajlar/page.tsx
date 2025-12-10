@@ -8,7 +8,9 @@ import { getInitials } from '@/lib/utils'
 import { 
   MessageSquare,
   Send,
-  Search
+  Search,
+  Loader2,
+  Users
 } from 'lucide-react'
 
 export default function CoachMessagesPage() {
@@ -29,10 +31,37 @@ export default function CoachMessagesPage() {
   }, [teacherProfile?.id])
 
   useEffect(() => {
-    if (selectedStudent) {
+    if (selectedStudent?.profile_id && profile?.id) {
       loadMessages()
+      
+      // Realtime subscription for messages
+      const channel = supabase
+        .channel('coach-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            const newMsg = payload.new as any
+            // Bu konuşmaya ait mesaj mı kontrol et
+            if (
+              (newMsg.sender_id === profile.id && newMsg.receiver_id === selectedStudent.profile_id) ||
+              (newMsg.sender_id === selectedStudent.profile_id && newMsg.receiver_id === profile.id)
+            ) {
+              setMessages(prev => [...prev, newMsg])
+            }
+          }
+        )
+        .subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
-  }, [selectedStudent])
+  }, [selectedStudent?.profile_id, profile?.id])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -53,10 +82,15 @@ export default function CoachMessagesPage() {
       .eq('status', 'active')
 
     if (data) {
-      const students = data.map((d: any) => ({
-        ...d.student,
-        profile_id: d.student?.profile?.id,
-      }))
+      const students = data.map((d: any) => {
+        const studentProfile = Array.isArray(d.student?.profile) ? d.student.profile[0] : d.student?.profile
+        return {
+          ...d.student,
+          profile: studentProfile,
+          profile_id: studentProfile?.id,
+        }
+      }).filter(s => s.profile_id)
+      
       setConversations(students)
       if (students.length > 0 && !selectedStudent) {
         setSelectedStudent(students[0])
@@ -80,21 +114,23 @@ export default function CoachMessagesPage() {
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if (!newMessage.trim() || !selectedStudent?.profile_id) return
+    if (!newMessage.trim() || !selectedStudent?.profile_id || sending) return
 
     setSending(true)
+    const messageContent = newMessage.trim()
+    setNewMessage('')
 
     const { error } = await supabase
       .from('messages')
       .insert({
         sender_id: profile?.id,
         receiver_id: selectedStudent.profile_id,
-        content: newMessage.trim(),
+        content: messageContent,
       })
 
-    if (!error) {
-      setNewMessage('')
-      loadMessages()
+    if (error) {
+      setNewMessage(messageContent)
+      alert('Mesaj gönderilemedi: ' + error.message)
     }
 
     setSending(false)
@@ -130,7 +166,7 @@ export default function CoachMessagesPage() {
                     selectedStudent?.id === conv.id ? 'bg-primary-50' : ''
                   }`}
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium overflow-hidden">
+                  <div className="w-10 h-10 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center text-white font-medium overflow-hidden">
                     {conv.profile?.avatar_url ? (
                       <img src={conv.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -138,14 +174,15 @@ export default function CoachMessagesPage() {
                     )}
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="font-medium text-surface-900">{conv.profile?.full_name}</div>
+                    <div className="font-medium text-surface-900">{conv.profile?.full_name || 'Öğrenci'}</div>
                     <div className="text-sm text-surface-500">Öğrenci</div>
                   </div>
                 </button>
               )) : (
                 <div className="p-8 text-center">
-                  <MessageSquare className="w-12 h-12 mx-auto mb-3 text-surface-300" />
+                  <Users className="w-12 h-12 mx-auto mb-3 text-surface-300" />
                   <p className="text-surface-500 text-sm">Henüz öğrencin yok</p>
+                  <p className="text-surface-400 text-xs mt-1">Öğrenci başvurularını kabul et</p>
                 </div>
               )}
             </div>
@@ -157,7 +194,7 @@ export default function CoachMessagesPage() {
               <>
                 {/* Header */}
                 <div className="p-4 border-b border-surface-100 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium overflow-hidden">
+                  <div className="w-10 h-10 bg-gradient-to-br from-accent-400 to-accent-600 rounded-full flex items-center justify-center text-white font-medium overflow-hidden">
                     {selectedStudent.profile?.avatar_url ? (
                       <img src={selectedStudent.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                     ) : (
@@ -165,14 +202,14 @@ export default function CoachMessagesPage() {
                     )}
                   </div>
                   <div>
-                    <div className="font-medium text-surface-900">{selectedStudent.profile?.full_name}</div>
-                    <div className="text-sm text-surface-500">Çevrimiçi</div>
+                    <div className="font-medium text-surface-900">{selectedStudent.profile?.full_name || 'Öğrenci'}</div>
+                    <div className="text-sm text-surface-500">Öğrenci</div>
                   </div>
                 </div>
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((msg) => {
+                  {messages.length > 0 ? messages.map((msg) => {
                     const isMine = msg.sender_id === profile?.id
                     return (
                       <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -188,7 +225,15 @@ export default function CoachMessagesPage() {
                         </div>
                       </div>
                     )
-                  })}
+                  }) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <MessageSquare className="w-12 h-12 mx-auto mb-3 text-surface-300" />
+                        <p className="text-surface-500">Henüz mesaj yok</p>
+                        <p className="text-sm text-surface-400">Öğrencinle konuşmaya başla!</p>
+                      </div>
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </div>
 
@@ -201,13 +246,18 @@ export default function CoachMessagesPage() {
                       onChange={(e) => setNewMessage(e.target.value)}
                       placeholder="Mesajınızı yazın..."
                       className="input flex-1"
+                      disabled={sending}
                     />
                     <button 
                       type="submit" 
                       disabled={sending || !newMessage.trim()}
                       className="btn btn-primary btn-md"
                     >
-                      <Send className="w-5 h-5" />
+                      {sending ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Send className="w-5 h-5" />
+                      )}
                     </button>
                   </div>
                 </form>
@@ -226,4 +276,3 @@ export default function CoachMessagesPage() {
     </DashboardLayout>
   )
 }
-

@@ -18,7 +18,13 @@ import {
   Clock,
   AlertCircle,
   Flame,
-  FileText
+  FileText,
+  Users,
+  Check,
+  X,
+  Heart,
+  Phone,
+  Mail
 } from 'lucide-react'
 
 export default function StudentDashboard() {
@@ -27,7 +33,11 @@ export default function StudentDashboard() {
   const [coach, setCoach] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [recommendations, setRecommendations] = useState<any[]>([])
+  const [examStats, setExamStats] = useState<{ weakTopics: string[], strongTopics: string[], avgNet: number, lastExam: any }>({ weakTopics: [], strongTopics: [], avgNet: 0, lastExam: null })
   const [coachingStatus, setCoachingStatus] = useState<'none' | 'pending' | 'active'>('none')
+  const [parentRequests, setParentRequests] = useState<any[]>([])
+  const [approvedParents, setApprovedParents] = useState<any[]>([])
+  const [processingRequest, setProcessingRequest] = useState<string | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -87,6 +97,185 @@ export default function StudentDashboard() {
     if (recData) {
       setRecommendations(recData)
     }
+
+    // Bekleyen veli isteklerini yükle
+    const { data: parentData } = await supabase
+      .from('parent_students')
+      .select(`
+        id,
+        parent_id,
+        status,
+        created_at,
+        parent:parent_profiles!parent_students_parent_id_fkey(
+          id,
+          user_id,
+          profile:profiles!parent_profiles_user_id_fkey(full_name, email, avatar_url)
+        )
+      `)
+      .eq('student_id', studentProfile.id)
+      .eq('status', 'pending')
+
+    if (parentData) {
+      setParentRequests(parentData)
+    }
+
+    // Onaylanmış velileri yükle
+    const { data: approvedData } = await supabase
+      .from('parent_students')
+      .select(`
+        id,
+        parent_id,
+        created_at,
+        parent:parent_profiles!parent_students_parent_id_fkey(
+          id,
+          user_id,
+          profile:profiles!parent_profiles_user_id_fkey(full_name, email, avatar_url, phone)
+        )
+      `)
+      .eq('student_id', studentProfile.id)
+      .eq('status', 'approved')
+
+    if (approvedData) {
+      setApprovedParents(approvedData)
+    }
+
+    // Deneme sonuçlarını yükle ve AI önerileri için analiz et
+    const { data: examData } = await supabase
+      .from('exam_results')
+      .select('*')
+      .eq('student_id', studentProfile.id)
+      .order('exam_date', { ascending: false })
+
+    if (examData && examData.length > 0) {
+      // Tüm zayıf ve güçlü konuları topla
+      const allWeakTopics = new Set<string>()
+      const allStrongTopics = new Set<string>()
+      
+      examData.forEach(exam => {
+        if (exam.weak_topics) {
+          exam.weak_topics.forEach((t: string) => allWeakTopics.add(t))
+        }
+        if (exam.strong_topics) {
+          exam.strong_topics.forEach((t: string) => allStrongTopics.add(t))
+        }
+      })
+
+      // Ortalama net hesapla
+      const avgNet = examData.reduce((acc, e) => acc + (e.net_score || 0), 0) / examData.length
+
+      setExamStats({
+        weakTopics: Array.from(allWeakTopics).slice(0, 5),
+        strongTopics: Array.from(allStrongTopics).slice(0, 5),
+        avgNet,
+        lastExam: examData[0]
+      })
+
+      // Deneme verilerine göre dinamik öneriler oluştur
+      const dynamicRecs: any[] = []
+      
+      // Zayıf konular varsa öneri ekle
+      if (allWeakTopics.size > 0) {
+        const weakArray = Array.from(allWeakTopics)
+        dynamicRecs.push({
+          id: 'weak-1',
+          subject: 'Zayıf Konular',
+          priority: 'high',
+          message: `${weakArray.slice(0, 3).join(', ')} konularına daha fazla odaklan.`
+        })
+      }
+
+      // Son deneme analizi
+      const lastExam = examData[0]
+      if (lastExam.ai_analysis?.analysis?.recommendations) {
+        const aiRecs = lastExam.ai_analysis.analysis.recommendations
+        if (Array.isArray(aiRecs) && aiRecs.length > 0) {
+          dynamicRecs.push({
+            id: 'ai-rec-1',
+            subject: 'AI Analizi',
+            priority: 'medium',
+            message: aiRecs[0]
+          })
+        }
+      }
+
+      // Gelişim önerisi
+      if (examData.length >= 2) {
+        const lastNet = examData[0].net_score || 0
+        const prevNet = examData[1].net_score || 0
+        const diff = lastNet - prevNet
+
+        if (diff > 0) {
+          dynamicRecs.push({
+            id: 'progress-1',
+            subject: 'Gelişim',
+            priority: 'low',
+            message: `Harika! Son denemede ${diff.toFixed(1)} net artış var. Aynı tempoda devam et!`
+          })
+        } else if (diff < 0) {
+          dynamicRecs.push({
+            id: 'progress-2',
+            subject: 'Dikkat',
+            priority: 'high',
+            message: `Son denemede ${Math.abs(diff).toFixed(1)} net düşüş var. Eksik konuları gözden geçir.`
+          })
+        }
+      }
+
+      // Hedef net önerisi
+      if (studentProfile?.target_score && avgNet < studentProfile.target_score) {
+        const gap = studentProfile.target_score - avgNet
+        dynamicRecs.push({
+          id: 'target-1',
+          subject: 'Hedef',
+          priority: 'medium',
+          message: `Hedefine ulaşmak için ${gap.toFixed(1)} net daha gerekiyor. Düzenli çalış!`
+        })
+      }
+
+      setRecommendations(dynamicRecs)
+    }
+  }
+
+  async function handleParentRequest(requestId: string, approve: boolean) {
+    setProcessingRequest(requestId)
+    
+    const request = parentRequests.find(r => r.id === requestId)
+    if (!request) return
+
+    // İsteği güncelle
+    const { error } = await supabase
+      .from('parent_students')
+      .update({ status: approve ? 'approved' : 'rejected' })
+      .eq('id', requestId)
+
+    if (error) {
+      alert('Hata: ' + error.message)
+    } else {
+      // Veliye bildirim gönder
+      const parentData = request.parent as any
+      const parentUserId = parentData?.user_id
+      
+      if (parentUserId) {
+        await supabase.from('notifications').insert({
+          user_id: parentUserId,
+          title: approve ? '✅ Veli İsteği Onaylandı' : '❌ Veli İsteği Reddedildi',
+          body: approve 
+            ? `${profile?.full_name} sizi veli olarak onayladı. Artık gelişimini takip edebilirsiniz.`
+            : `${profile?.full_name} veli isteğinizi reddetti.`,
+          type: 'parent_response',
+        })
+      }
+
+      // Listeyi güncelle
+      setParentRequests(prev => prev.filter(r => r.id !== requestId))
+      
+      // Onaylandıysa onaylı veliler listesine ekle
+      if (approve) {
+        setApprovedParents(prev => [...prev, request])
+      }
+    }
+    
+    setProcessingRequest(null)
   }
 
   const loading = profileLoading || studentLoading
@@ -143,6 +332,61 @@ export default function StudentDashboard() {
           </div>
         </motion.div>
 
+        {/* Bekleyen Veli İstekleri */}
+        {parentRequests.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="card p-4 border-2 border-purple-200 bg-purple-50"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-purple-900">Bekleyen Veli İstekleri</h3>
+                <p className="text-sm text-purple-600">{parentRequests.length} istek onayınızı bekliyor</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {parentRequests.map((request) => {
+                const parentProfile = request.parent as any
+                return (
+                  <div key={request.id} className="flex items-center justify-between p-3 bg-white rounded-xl">
+                    <div>
+                      <div className="font-medium text-surface-900">
+                        {parentProfile?.profile?.full_name || 'Bilinmeyen Veli'}
+                      </div>
+                      <div className="text-sm text-surface-500">
+                        {parentProfile?.profile?.email}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleParentRequest(request.id, false)}
+                        disabled={processingRequest === request.id}
+                        className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors disabled:opacity-50"
+                        title="Reddet"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleParentRequest(request.id, true)}
+                        disabled={processingRequest === request.id}
+                        className="p-2 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 transition-colors disabled:opacity-50"
+                        title="Onayla"
+                      >
+                        <Check className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
@@ -190,6 +434,58 @@ export default function StudentDashboard() {
                 </div>
               )}
             </div>
+
+            {/* My Parents */}
+            {approvedParents.length > 0 && (
+              <div className="card">
+                <div className="p-6 border-b border-surface-100">
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-pink-500" />
+                    <h2 className="text-lg font-semibold text-surface-900">Velim</h2>
+                  </div>
+                </div>
+                <div className="divide-y divide-surface-100">
+                  {approvedParents.map((relation) => {
+                    const parentData = relation.parent as any
+                    const parentProfile = parentData?.profile
+                    return (
+                      <div key={relation.id} className="p-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl flex items-center justify-center text-white text-lg font-medium overflow-hidden">
+                            {parentProfile?.avatar_url ? (
+                              <img src={parentProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              getInitials(parentProfile?.full_name)
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-surface-900">{parentProfile?.full_name || 'Veli'}</div>
+                            <div className="flex items-center gap-4 mt-1">
+                              {parentProfile?.email && (
+                                <a href={`mailto:${parentProfile.email}`} className="flex items-center gap-1 text-sm text-surface-500 hover:text-primary-500">
+                                  <Mail className="w-4 h-4" />
+                                  {parentProfile.email}
+                                </a>
+                              )}
+                              {parentProfile?.phone && (
+                                <a href={`tel:${parentProfile.phone}`} className="flex items-center gap-1 text-sm text-surface-500 hover:text-primary-500">
+                                  <Phone className="w-4 h-4" />
+                                  {parentProfile.phone}
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 px-3 py-1 bg-pink-50 text-pink-600 rounded-full text-sm">
+                            <Heart className="w-4 h-4" />
+                            Gelişimini takip ediyor
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Tasks */}
             <div className="card">
@@ -256,7 +552,7 @@ export default function StudentDashboard() {
                       className={`p-3 rounded-xl text-sm ${
                         rec.priority === 'high' ? 'bg-red-50 border border-red-200' :
                         rec.priority === 'medium' ? 'bg-yellow-50 border border-yellow-200' :
-                        'bg-accent-50 border border-accent-200'
+                        'bg-green-50 border border-green-200'
                       }`}
                     >
                       <div className="font-medium mb-1">{rec.subject || 'Genel'}</div>
@@ -267,12 +563,70 @@ export default function StudentDashboard() {
               ) : (
                 <div className="text-center py-4">
                   <Brain className="w-10 h-10 mx-auto mb-2 text-surface-300" />
-                  <p className="text-sm text-surface-500">
-                    Daha fazla veri toplandıkça AI önerileri burada görünecek
+                  <p className="text-sm text-surface-500 mb-3">
+                    Deneme sonucu yükleyerek AI önerileri al
                   </p>
+                  <Link href="/ogrenci/denemeler" className="btn btn-primary btn-sm">
+                    Deneme Yükle
+                  </Link>
                 </div>
               )}
             </div>
+
+            {/* Deneme Özeti */}
+            {examStats.lastExam && (
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-surface-900">Deneme Özeti</h3>
+                  <TrendingUp className="w-5 h-5 text-accent-500" />
+                </div>
+                <div className="space-y-4">
+                  <div className="text-center p-4 bg-gradient-to-br from-primary-50 to-accent-50 rounded-xl">
+                    <div className="text-3xl font-bold text-primary-600">{examStats.avgNet.toFixed(1)}</div>
+                    <div className="text-sm text-surface-500">Ortalama Net</div>
+                  </div>
+                  
+                  {examStats.weakTopics.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium text-surface-500 mb-2 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 text-red-500" />
+                        Zayıf Konular
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {examStats.weakTopics.map((topic, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {examStats.strongTopics.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium text-surface-500 mb-2 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        Güçlü Konular
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {examStats.strongTopics.map((topic, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-green-50 text-green-600 text-xs rounded-full">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <Link 
+                    href="/ogrenci/denemeler" 
+                    className="flex items-center justify-center gap-2 w-full p-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                  >
+                    Tüm Denemeleri Gör <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            )}
 
             {/* Quick Stats */}
             <div className="card p-6">

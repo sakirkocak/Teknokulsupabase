@@ -16,7 +16,10 @@ import {
   Clock,
   Plus,
   FileText,
-  ClipboardList
+  ClipboardList,
+  BookOpen,
+  Trophy,
+  Star
 } from 'lucide-react'
 
 export default function ParentDashboard() {
@@ -52,7 +55,7 @@ export default function ParentDashboard() {
       .eq('status', 'approved')
 
     if (data) {
-      // Her çocuk için görev ve koç bilgisini al
+      // Her çocuk için görev, koç ve sınıf bilgisini al
       const childrenWithStats = await Promise.all(data.map(async (d) => {
         const { count: taskCount } = await supabase
           .from('tasks')
@@ -76,6 +79,31 @@ export default function ParentDashboard() {
           .eq('status', 'active')
           .single()
 
+        // Sınıf bilgilerini al
+        const { data: classroomStudents } = await supabase
+          .from('classroom_students')
+          .select(`
+            classroom:classrooms(id, name, subject)
+          `)
+          .eq('student_id', d.student?.id)
+          .eq('status', 'joined')
+
+        const classrooms = classroomStudents?.map(cs => cs.classroom).filter(Boolean) || []
+
+        // Haftalık performans (leaderboard)
+        const weekStart = new Date()
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1)
+        const weekStartStr = weekStart.toISOString().split('T')[0]
+
+        const { data: leaderboardData } = await supabase
+          .from('classroom_leaderboard')
+          .select('points, tasks_completed, avg_score')
+          .eq('student_id', d.student?.id)
+          .eq('week_start', weekStartStr)
+
+        const weeklyPoints = leaderboardData?.reduce((acc, lb) => acc + (lb.points || 0), 0) || 0
+        const weeklyTasks = leaderboardData?.reduce((acc, lb) => acc + (lb.tasks_completed || 0), 0) || 0
+
         const coachData = coaching?.coach as any
 
         return {
@@ -83,6 +111,9 @@ export default function ParentDashboard() {
           taskCount: taskCount || 0,
           completedCount: completedCount || 0,
           coach: coachData?.profile?.full_name,
+          classrooms,
+          weeklyPoints,
+          weeklyTasks
         }
       }))
 
@@ -94,11 +125,31 @@ export default function ParentDashboard() {
     e.preventDefault()
     setAdding(true)
 
+    // Veli profili kontrolü
+    if (!parentProfile?.id) {
+      // Parent profile yoksa oluştur
+      const { data: newParentProfile, error: createError } = await supabase
+        .from('parent_profiles')
+        .insert({ user_id: profile?.id })
+        .select()
+        .single()
+
+      if (createError) {
+        alert('Veli profili oluşturulamadı: ' + createError.message)
+        setAdding(false)
+        return
+      }
+      
+      // Sayfayı yenile
+      window.location.reload()
+      return
+    }
+
     // Öğrenciyi e-posta ile bul
     const { data: studentUser } = await supabase
       .from('profiles')
       .select('id')
-      .eq('email', studentEmail)
+      .eq('email', studentEmail.toLowerCase().trim())
       .eq('role', 'ogrenci')
       .single()
 
@@ -121,25 +172,50 @@ export default function ParentDashboard() {
       return
     }
 
-    // İlişki oluştur
+    // Zaten ekli mi kontrol et
+    const { data: existingRelation } = await supabase
+      .from('parent_students')
+      .select('id, status')
+      .eq('parent_id', parentProfile.id)
+      .eq('student_id', studentProfile.id)
+      .single()
+
+    if (existingRelation) {
+      if (existingRelation.status === 'pending') {
+        alert('Bu öğrenciye zaten istek gönderildi, onay bekleniyor.')
+      } else if (existingRelation.status === 'approved') {
+        alert('Bu öğrenci zaten ekli.')
+      } else {
+        alert('Bu öğrenci isteği daha önce reddetti.')
+      }
+      setAdding(false)
+      return
+    }
+
+    // İlişki oluştur - pending durumunda
     const { error } = await supabase
       .from('parent_students')
       .insert({
-        parent_id: parentProfile?.id,
+        parent_id: parentProfile.id,
         student_id: studentProfile.id,
-        status: 'approved', // Doğrudan onaylı
+        status: 'pending', // Öğrenci onayı bekliyor
       })
 
     if (error) {
-      if (error.code === '23505') {
-        alert('Bu öğrenci zaten ekli.')
-      } else {
-        alert('Hata: ' + error.message)
-      }
+      alert('Hata: ' + error.message)
     } else {
+      // Öğrenciye bildirim gönder
+      await supabase.from('notifications').insert({
+        user_id: studentUser.id,
+        title: 'Veli Ekleme İsteği',
+        body: `${profile?.full_name || 'Bir veli'} sizi çocuğu olarak eklemek istiyor. Onaylamak için tıklayın.`,
+        type: 'parent_request',
+        data: { parent_id: parentProfile.id, student_profile_id: studentProfile.id }
+      })
+
+      alert('İstek gönderildi! Öğrenci onayladığında listeye eklenecek.')
       setShowAddModal(false)
       setStudentEmail('')
-      loadChildren()
     }
 
     setAdding(false)
@@ -257,6 +333,35 @@ export default function ParentDashboard() {
                     Detaylar
                     <ArrowRight className="w-4 h-4" />
                   </Link>
+                </div>
+
+                {/* Sınıflar ve Haftalık Performans */}
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Sınıflar */}
+                  {child.classrooms && child.classrooms.length > 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                      <BookOpen className="w-5 h-5 text-blue-500" />
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">Kayıtlı Sınıflar</p>
+                        <p className="text-xs text-blue-600">
+                          {child.classrooms.map((c: any) => c?.name).join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Haftalık Performans */}
+                  {(child.weeklyPoints > 0 || child.weeklyTasks > 0) && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg">
+                      <Trophy className="w-5 h-5 text-amber-500" />
+                      <div>
+                        <p className="text-sm font-medium text-amber-900">Bu Hafta</p>
+                        <p className="text-xs text-amber-600">
+                          {child.weeklyPoints} puan • {child.weeklyTasks} görev
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Progress Bar */}

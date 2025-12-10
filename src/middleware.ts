@@ -35,27 +35,27 @@ export async function middleware(request: NextRequest) {
   )
 
   const { data: { user } } = await supabase.auth.getUser()
+  const pathname = request.nextUrl.pathname
 
-  // Korumalı rotalar
-  const protectedPaths = ['/koc', '/ogrenci', '/veli', '/admin']
-  const isProtectedPath = protectedPaths.some(path => 
-    request.nextUrl.pathname.startsWith(path)
-  )
+  // Public rotalar (korumasız)
+  const publicPaths = ['/koclar', '/materyaller']
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
 
   // Auth sayfaları
   const authPaths = ['/giris', '/kayit']
-  const isAuthPath = authPaths.some(path => 
-    request.nextUrl.pathname.startsWith(path)
-  )
+  const isAuthPath = authPaths.some(path => pathname.startsWith(path))
+
+  // Korumalı rotalar
+  const protectedPaths = ['/koc', '/ogrenci', '/veli', '/admin']
+  const isProtectedPath = !isPublicPath && protectedPaths.some(path => pathname.startsWith(path))
 
   // Korumalı sayfaya giriş yapmadan erişim
   if (isProtectedPath && !user) {
     return NextResponse.redirect(new URL('/giris', request.url))
   }
 
-  // Giriş yapmış kullanıcı auth sayfalarına erişim
-  if (isAuthPath && user) {
-    // Kullanıcının rolüne göre yönlendir
+  // Giriş yapmış kullanıcı için rol kontrolü
+  if (user && (isProtectedPath || isAuthPath)) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -69,7 +69,33 @@ export async function middleware(request: NextRequest) {
         veli: '/veli',
         admin: '/admin',
       }
-      return NextResponse.redirect(new URL(roleRoutes[profile.role] || '/', request.url))
+
+      const userDashboard = roleRoutes[profile.role] || '/'
+
+      // Auth sayfasına giriş yapmış kullanıcı erişirse
+      if (isAuthPath) {
+        return NextResponse.redirect(new URL(userDashboard, request.url))
+      }
+
+      // Admin sadece /admin'e erişebilir
+      if (profile.role === 'admin' && !pathname.startsWith('/admin')) {
+        return NextResponse.redirect(new URL('/admin', request.url))
+      }
+
+      // Koç sadece /koc'a erişebilir
+      if (profile.role === 'ogretmen' && !pathname.startsWith('/koc')) {
+        return NextResponse.redirect(new URL('/koc', request.url))
+      }
+
+      // Öğrenci sadece /ogrenci'ye erişebilir
+      if (profile.role === 'ogrenci' && !pathname.startsWith('/ogrenci')) {
+        return NextResponse.redirect(new URL('/ogrenci', request.url))
+      }
+
+      // Veli sadece /veli'ye erişebilir
+      if (profile.role === 'veli' && !pathname.startsWith('/veli')) {
+        return NextResponse.redirect(new URL('/veli', request.url))
+      }
     }
   }
 
@@ -81,4 +107,3 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
-

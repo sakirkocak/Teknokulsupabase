@@ -23,7 +23,10 @@ import {
   TrendingUp,
   Target,
   Calendar,
-  Send
+  Send,
+  Star,
+  HelpCircle,
+  BookOpen
 } from 'lucide-react'
 
 type NavItem = {
@@ -36,8 +39,12 @@ const navItems: Record<string, NavItem[]> = {
   koc: [
     { label: 'Dashboard', href: '/koc', icon: LayoutDashboard },
     { label: 'Öğrencilerim', href: '/koc/ogrenciler', icon: Users },
+    { label: 'Sınıflarım', href: '/koc/siniflarim', icon: BookOpen },
     { label: 'Görevler', href: '/koc/gorevler', icon: ClipboardList },
-    { label: 'Materyaller', href: '/koc/materyaller', icon: FileText },
+    { label: 'Öğrenci Denemeleri', href: '/koc/ogrenci-denemeleri', icon: FileText },
+    { label: 'Öğrenci Soruları', href: '/koc/ogrenci-sorulari', icon: HelpCircle },
+    { label: 'Ödev Sonuçları', href: '/koc/odev-sonuclari', icon: Target },
+    { label: 'Değerlendirmeler', href: '/koc/degerlendirmeler', icon: Star },
     { label: 'Kazançlar', href: '/koc/kazanclar', icon: TrendingUp },
     { label: 'Veli Raporları', href: '/koc/veli-raporlari', icon: Send },
     { label: 'Mesajlar', href: '/koc/mesajlar', icon: MessageSquare },
@@ -47,9 +54,12 @@ const navItems: Record<string, NavItem[]> = {
   ogrenci: [
     { label: 'Dashboard', href: '/ogrenci', icon: LayoutDashboard },
     { label: 'Koçum', href: '/ogrenci/kocum', icon: Target },
-    { label: 'Görevlerim', href: '/ogrenci/gorevler', icon: ClipboardList },
+    { label: 'Sınıflarım', href: '/ogrenci/siniflarim', icon: BookOpen },
+    { label: 'Ödevlerim', href: '/ogrenci/odevler', icon: ClipboardList },
+    { label: 'Görevlerim', href: '/ogrenci/gorevler', icon: Calendar },
     { label: 'Denemelerim', href: '/ogrenci/denemeler', icon: FileText },
     { label: 'İlerleme', href: '/ogrenci/ilerleme', icon: TrendingUp },
+    { label: 'Değerlendirme', href: '/ogrenci/degerlendirme', icon: Star },
     { label: 'AI Araçları', href: '/ogrenci/ai-araclar', icon: Brain },
     { label: 'Mesajlar', href: '/ogrenci/mesajlar', icon: MessageSquare },
     { label: 'Profil', href: '/ogrenci/profil', icon: Settings },
