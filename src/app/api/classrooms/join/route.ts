@@ -4,11 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    console.log('API - Auth result:', { user: user?.id, email: user?.email, authError })
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Yetkilendirme gerekli' },
+        { error: 'Yetkilendirme gerekli', details: authError?.message },
         { status: 401 }
       )
     }
@@ -24,17 +26,43 @@ export async function POST(request: NextRequest) {
     }
 
     // Öğrenci profilini bul
-    const { data: studentProfile } = await supabase
+    let { data: studentProfile, error: profileError } = await supabase
       .from('student_profiles')
-      .select('id, full_name')
+      .select('id, user_id')
       .eq('user_id', user.id)
       .single()
 
+    console.log('API - Student profile:', { studentProfile, profileError, userId: user.id })
+
+    // Profil yoksa otomatik oluştur
     if (!studentProfile) {
-      return NextResponse.json(
-        { error: 'Öğrenci profili bulunamadı' },
-        { status: 404 }
-      )
+      // Önce profiles'dan ismi al
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single()
+
+      const { data: newProfile, error: createError } = await supabase
+        .from('student_profiles')
+        .insert({
+          user_id: user.id,
+          grade_level: '11. Sınıf',
+          target_exam: 'TYT'
+        })
+        .select('id, user_id')
+        .single()
+
+      if (createError) {
+        console.log('API - Profile create error:', createError)
+        return NextResponse.json(
+          { error: 'Öğrenci profili oluşturulamadı', details: createError.message },
+          { status: 500 }
+        )
+      }
+
+      console.log('API - Created new profile:', newProfile)
+      studentProfile = newProfile
     }
 
     // Sınıfı bul
@@ -51,6 +79,15 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+
+    // Kullanıcı adını al
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    const studentName = userProfile?.full_name || user.email?.split('@')[0] || 'Öğrenci'
 
     // Zaten katılmış mı kontrol et
     const { data: existingStudent } = await supabase
@@ -88,7 +125,7 @@ export async function POST(request: NextRequest) {
       .insert({
         classroom_id: classroom.id,
         student_id: studentProfile.id,
-        student_name: studentProfile.full_name,
+        student_name: studentName,
         status: 'joined',
         joined_at: new Date().toISOString()
       })
