@@ -142,11 +142,16 @@ export default function ExamResultsPage() {
 
     if (data) {
       const coachList: Coach[] = []
-      data.forEach(d => {
-        if (d.coach && typeof d.coach === 'object' && 'id' in d.coach) {
-          coachList.push(d.coach as Coach)
+      for (const d of data) {
+        const coach = d.coach as any
+        if (coach && coach.id) {
+          coachList.push({
+            id: coach.id,
+            user_id: coach.user_id,
+            profile: coach.profile
+          })
         }
-      })
+      }
       setCoaches(coachList)
       if (coachList.length === 1) {
         setSelectedCoachId(coachList[0].id)
@@ -173,8 +178,9 @@ export default function ExamResultsPage() {
     // Görsel sıkıştır
     try {
       const compressed = await compressImage(file)
-      setSelectedImage(compressed)
-      setImagePreview(URL.createObjectURL(compressed))
+      const compressedFile = new File([compressed.blob], file.name, { type: 'image/jpeg' })
+      setSelectedImage(compressedFile)
+      setImagePreview(URL.createObjectURL(compressedFile))
     } catch (error) {
       setSelectedImage(file)
       setImagePreview(URL.createObjectURL(file))

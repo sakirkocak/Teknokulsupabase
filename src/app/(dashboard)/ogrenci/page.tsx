@@ -221,14 +221,13 @@ export default function StudentDashboard() {
         }
       }
 
-      // Hedef net önerisi
-      if (studentProfile?.target_score && avgNet < studentProfile.target_score) {
-        const gap = studentProfile.target_score - avgNet
+      // Motivasyon önerisi
+      if (avgNet > 0 && avgNet < 100) {
         dynamicRecs.push({
-          id: 'target-1',
-          subject: 'Hedef',
+          id: 'motivation-1',
+          subject: 'Motivasyon',
           priority: 'medium',
-          message: `Hedefine ulaşmak için ${gap.toFixed(1)} net daha gerekiyor. Düzenli çalış!`
+          message: `Ortalama netin ${avgNet.toFixed(1)}. Düzenli çalışarak daha da yükseltebilirsin!`
         })
       }
 
