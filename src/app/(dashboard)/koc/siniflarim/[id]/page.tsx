@@ -100,15 +100,13 @@ export default function SinifDetayPage() {
       if (classroomData) setClassroom(classroomData)
 
       // Öğrenciler
-      const { data: studentsData } = await supabase
+      const { data: studentsData, error: studentsError } = await supabase
         .from('classroom_students')
-        .select(`
-          *,
-          profile:student_profiles(avatar_url)
-        `)
+        .select('*')
         .eq('classroom_id', classroomId)
-        .order('student_number', { ascending: true })
+        .order('created_at', { ascending: true })
 
+      console.log('Öğrenci verileri:', studentsData, 'Hata:', studentsError)
       if (studentsData) setStudents(studentsData)
 
       // Duyurular
@@ -550,13 +548,9 @@ export default function SinifDetayPage() {
                     <div key={student.id} className="flex items-center justify-between py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                          {student.profile?.avatar_url ? (
-                            <img src={student.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-gray-500 text-sm font-medium">
-                              {student.student_name.charAt(0)}
-                            </span>
-                          )}
+                          <span className="text-gray-500 text-sm font-medium">
+                            {student.student_name?.charAt(0) || '?'}
+                          </span>
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{student.student_name}</p>
