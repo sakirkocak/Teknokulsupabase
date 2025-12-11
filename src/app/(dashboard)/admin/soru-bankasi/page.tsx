@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { 
   BookOpen, Plus, Search, Filter, Edit2, Trash2, 
   CheckCircle, XCircle, Image as ImageIcon, Save,
-  ChevronDown, Star, Zap, Crown, Sparkles
+  ChevronDown, Star, Zap, Crown, Sparkles, Upload,
+  FileJson, Copy, Download, AlertCircle
 } from 'lucide-react'
 
 interface Topic {
@@ -48,7 +49,13 @@ export default function AdminSoruBankasiPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'list' | 'add'>('list')
+  const [activeTab, setActiveTab] = useState<'list' | 'add' | 'json'>('list')
+  
+  // JSON Yükleme
+  const [jsonInput, setJsonInput] = useState('')
+  const [jsonPreview, setJsonPreview] = useState<any[]>([])
+  const [jsonError, setJsonError] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
   
   // Filtreler
   const [filterSubject, setFilterSubject] = useState<string>('')
@@ -267,7 +274,7 @@ export default function AdminSoruBankasiPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-6 flex-wrap">
           <button
             onClick={() => { setActiveTab('list'); setEditingQuestion(null); resetForm() }}
             className={`px-6 py-3 rounded-lg font-medium transition-all ${
@@ -289,6 +296,17 @@ export default function AdminSoruBankasiPage() {
           >
             <Plus className="h-5 w-5 inline mr-2" />
             {editingQuestion ? 'Soru Düzenle' : 'Yeni Soru Ekle'}
+          </button>
+          <button
+            onClick={() => setActiveTab('json')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'json'
+                ? 'bg-green-500 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            <FileJson className="h-5 w-5 inline mr-2" />
+            JSON ile Toplu Yükle
           </button>
         </div>
 
@@ -629,6 +647,275 @@ export default function AdminSoruBankasiPage() {
               </div>
             </div>
           </form>
+        )}
+
+        {/* JSON ile Toplu Yükleme */}
+        {activeTab === 'json' && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Sol - JSON Input */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    JSON Formatında Sorular
+                  </h3>
+                  <button
+                    onClick={() => {
+                      const exampleJson = [
+                        {
+                          subject: "Matematik",
+                          main_topic: "Geometri",
+                          sub_topic: "Üçgenler",
+                          difficulty: "medium",
+                          question_text: "Bir üçgenin iç açıları toplamı kaç derecedir?",
+                          options: { A: "90°", B: "180°", C: "270°", D: "360°" },
+                          correct_answer: "B",
+                          explanation: "Bir üçgenin iç açıları toplamı her zaman 180 derecedir.",
+                          source: "2024 LGS",
+                          year: 2024
+                        }
+                      ]
+                      setJsonInput(JSON.stringify(exampleJson, null, 2))
+                    }}
+                    className="text-sm text-indigo-500 hover:text-indigo-600 flex items-center gap-1"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Örnek JSON
+                  </button>
+                </div>
+                
+                <textarea
+                  value={jsonInput}
+                  onChange={(e) => {
+                    setJsonInput(e.target.value)
+                    setJsonError(null)
+                    setJsonPreview([])
+                  }}
+                  rows={20}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm resize-none"
+                  placeholder={`[
+  {
+    "subject": "Matematik",
+    "main_topic": "Geometri", 
+    "sub_topic": "Üçgenler",
+    "difficulty": "easy|medium|hard|legendary",
+    "question_text": "Soru metni...",
+    "options": {
+      "A": "Şık A",
+      "B": "Şık B", 
+      "C": "Şık C",
+      "D": "Şık D"
+    },
+    "correct_answer": "A|B|C|D",
+    "explanation": "Açıklama (opsiyonel)",
+    "source": "Kaynak (opsiyonel)",
+    "year": 2024
+  }
+]`}
+                />
+
+                {jsonError && (
+                  <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-600 dark:text-red-400">{jsonError}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const parsed = JSON.parse(jsonInput)
+                        if (!Array.isArray(parsed)) {
+                          setJsonError('JSON bir dizi (array) olmalıdır!')
+                          return
+                        }
+                        
+                        // Validate each question
+                        const validated = []
+                        for (let i = 0; i < parsed.length; i++) {
+                          const q = parsed[i]
+                          if (!q.subject || !q.main_topic || !q.question_text || !q.options || !q.correct_answer) {
+                            setJsonError(`Soru ${i + 1}: Zorunlu alanlar eksik (subject, main_topic, question_text, options, correct_answer)`)
+                            return
+                          }
+                          if (!['A', 'B', 'C', 'D'].includes(q.correct_answer)) {
+                            setJsonError(`Soru ${i + 1}: correct_answer A, B, C veya D olmalıdır`)
+                            return
+                          }
+                          if (!['easy', 'medium', 'hard', 'legendary'].includes(q.difficulty)) {
+                            q.difficulty = 'medium' // Default
+                          }
+                          
+                          // Find topic_id
+                          const topic = topics.find(t => 
+                            t.subject === q.subject && 
+                            t.main_topic === q.main_topic &&
+                            (q.sub_topic ? t.sub_topic === q.sub_topic : true)
+                          )
+                          
+                          if (!topic) {
+                            setJsonError(`Soru ${i + 1}: Konu bulunamadı - ${q.subject} > ${q.main_topic}`)
+                            return
+                          }
+                          
+                          validated.push({
+                            ...q,
+                            topic_id: topic.id,
+                            topicName: `${topic.subject} > ${topic.main_topic}`
+                          })
+                        }
+                        
+                        setJsonPreview(validated)
+                        setJsonError(null)
+                        setMessage({ type: 'success', text: `${validated.length} soru doğrulandı! Yüklemek için "Soruları Yükle" butonuna tıklayın.` })
+                        setTimeout(() => setMessage(null), 5000)
+                      } catch (e: any) {
+                        setJsonError(`JSON parse hatası: ${e.message}`)
+                      }
+                    }}
+                    disabled={!jsonInput.trim()}
+                    className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="h-5 w-5" />
+                    JSON'u Doğrula
+                  </button>
+                  
+                  <button
+                    onClick={async () => {
+                      if (jsonPreview.length === 0) {
+                        setJsonError('Önce JSON\'u doğrulayın!')
+                        return
+                      }
+                      
+                      if (!confirm(`${jsonPreview.length} soru yüklenecek. Devam etmek istiyor musunuz?`)) {
+                        return
+                      }
+                      
+                      setSaving(true)
+                      setUploadProgress({ current: 0, total: jsonPreview.length })
+                      
+                      let successCount = 0
+                      let errorCount = 0
+                      
+                      for (let i = 0; i < jsonPreview.length; i++) {
+                        const q = jsonPreview[i]
+                        
+                        const { error } = await supabase
+                          .from('lgs_questions')
+                          .insert({
+                            topic_id: q.topic_id,
+                            difficulty: q.difficulty,
+                            question_text: q.question_text,
+                            question_image_url: q.question_image_url || null,
+                            options: q.options,
+                            correct_answer: q.correct_answer,
+                            explanation: q.explanation || null,
+                            source: q.source || null,
+                            year: q.year || null
+                          })
+                        
+                        if (error) {
+                          console.error(`Soru ${i + 1} yüklenemedi:`, error)
+                          errorCount++
+                        } else {
+                          successCount++
+                        }
+                        
+                        setUploadProgress({ current: i + 1, total: jsonPreview.length })
+                      }
+                      
+                      setSaving(false)
+                      setUploadProgress({ current: 0, total: 0 })
+                      
+                      if (errorCount === 0) {
+                        setMessage({ type: 'success', text: `${successCount} soru başarıyla yüklendi!` })
+                        setJsonInput('')
+                        setJsonPreview([])
+                        loadData()
+                      } else {
+                        setMessage({ type: 'error', text: `${successCount} soru yüklendi, ${errorCount} soru yüklenemedi.` })
+                      }
+                      
+                      setTimeout(() => setMessage(null), 5000)
+                    }}
+                    disabled={jsonPreview.length === 0 || saving}
+                    className="flex-1 py-3 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                        {uploadProgress.current}/{uploadProgress.total}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5" />
+                        Soruları Yükle ({jsonPreview.length})
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Sağ - Önizleme */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Önizleme ({jsonPreview.length} soru)
+                </h3>
+                
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-[600px] overflow-y-auto">
+                  {jsonPreview.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <FileJson className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>JSON doğrulandığında sorular burada görünecek.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {jsonPreview.map((q, i) => (
+                        <div key={i} className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
+                              {q.subject}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              q.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                              q.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              q.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
+                              'bg-purple-100 text-purple-700'
+                            }`}>
+                              {difficultyConfig[q.difficulty as keyof typeof difficultyConfig]?.label || q.difficulty}
+                            </span>
+                            <span className="text-xs text-gray-500">#{i + 1}</span>
+                          </div>
+                          <p className="text-sm text-gray-900 dark:text-white mb-2 line-clamp-2">
+                            {q.question_text}
+                          </p>
+                          <div className="text-xs text-gray-500">
+                            Doğru: <span className="font-medium text-green-600">{q.correct_answer}</span>
+                            {' • '}
+                            {q.topicName}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Format Bilgisi */}
+                <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">JSON Format</h4>
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                    <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">subject</code>: Ders adı (Türkçe, Matematik, vb.)</li>
+                    <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">main_topic</code>: Ana konu</li>
+                    <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">sub_topic</code>: Alt konu (opsiyonel)</li>
+                    <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">difficulty</code>: easy, medium, hard, legendary</li>
+                    <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">options</code>: {"{ A, B, C, D }"}</li>
+                    <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">correct_answer</code>: A, B, C veya D</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Konu İstatistikleri */}
