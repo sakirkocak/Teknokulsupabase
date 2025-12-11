@@ -978,7 +978,7 @@ export default function AdminSoruBankasiPage() {
                       disabled={!geminiSubject}
                     >
                       <option value="">Konu Seçin</option>
-                      {[...new Set(topics.filter(t => t.subject === geminiSubject).map(t => t.main_topic))].map(topic => (
+                      {Array.from(new Set(topics.filter(t => t.subject === geminiSubject).map(t => t.main_topic))).map(topic => (
                         <option key={topic} value={topic}>{topic}</option>
                       ))}
                     </select>
