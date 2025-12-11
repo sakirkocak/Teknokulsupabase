@@ -8,7 +8,7 @@ import {
   BookOpen, Plus, Search, Filter, Edit2, Trash2, 
   CheckCircle, XCircle, Image as ImageIcon, Save,
   ChevronDown, Star, Zap, Crown, Sparkles, Upload,
-  FileJson, Copy, Download, AlertCircle
+  FileJson, Copy, Download, AlertCircle, Wand2, RefreshCw
 } from 'lucide-react'
 
 interface Topic {
@@ -49,13 +49,20 @@ export default function AdminSoruBankasiPage() {
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'list' | 'add' | 'json'>('list')
+  const [activeTab, setActiveTab] = useState<'list' | 'add' | 'json' | 'gemini'>('list')
   
   // JSON Yükleme
   const [jsonInput, setJsonInput] = useState('')
   const [jsonPreview, setJsonPreview] = useState<any[]>([])
   const [jsonError, setJsonError] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
+  
+  // Gemini Format Dönüştürme
+  const [geminiInput, setGeminiInput] = useState('')
+  const [geminiSubject, setGeminiSubject] = useState('')
+  const [geminiMainTopic, setGeminiMainTopic] = useState('')
+  const [geminiDifficulty, setGeminiDifficulty] = useState<'easy' | 'medium' | 'hard' | 'legendary'>('medium')
+  const [convertedQuestions, setConvertedQuestions] = useState<any[]>([])
   
   // Filtreler
   const [filterSubject, setFilterSubject] = useState<string>('')
@@ -307,6 +314,17 @@ export default function AdminSoruBankasiPage() {
           >
             <FileJson className="h-5 w-5 inline mr-2" />
             JSON ile Toplu Yükle
+          </button>
+          <button
+            onClick={() => setActiveTab('gemini')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'gemini'
+                ? 'bg-purple-500 text-white'
+                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            <Wand2 className="h-5 w-5 inline mr-2" />
+            Gemini Format Dönüştür
           </button>
         </div>
 
@@ -912,6 +930,336 @@ export default function AdminSoruBankasiPage() {
                     <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">options</code>: {"{ A, B, C, D }"}</li>
                     <li>• <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">correct_answer</code>: A, B, C veya D</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gemini Format Dönüştürme */}
+        {activeTab === 'gemini' && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Sol - Gemini Input */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <Wand2 className="h-5 w-5 text-purple-500" />
+                  Gemini Formatını Yapıştır
+                </h3>
+                
+                {/* Ders ve Konu Seçimi */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Ders *
+                    </label>
+                    <select
+                      value={geminiSubject}
+                      onChange={(e) => {
+                        setGeminiSubject(e.target.value)
+                        setGeminiMainTopic('')
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Ders Seçin</option>
+                      {subjects.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Ana Konu *
+                    </label>
+                    <select
+                      value={geminiMainTopic}
+                      onChange={(e) => setGeminiMainTopic(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      disabled={!geminiSubject}
+                    >
+                      <option value="">Konu Seçin</option>
+                      {[...new Set(topics.filter(t => t.subject === geminiSubject).map(t => t.main_topic))].map(topic => (
+                        <option key={topic} value={topic}>{topic}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Zorluk Seviyesi
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(difficultyConfig).map(([key, { label, color, icon: Icon }]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setGeminiDifficulty(key as any)}
+                        className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
+                          geminiDifficulty === key
+                            ? `border-purple-500 ${color} text-white`
+                            : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span className="text-xs font-medium">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <textarea
+                  value={geminiInput}
+                  onChange={(e) => {
+                    setGeminiInput(e.target.value)
+                    setConvertedQuestions([])
+                  }}
+                  rows={16}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white font-mono text-sm resize-none"
+                  placeholder={`Gemini'den aldığınız JSON'u buraya yapıştırın:
+
+{
+  "title": "...",
+  "questions": [
+    {
+      "question": "...",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "answer": "A",
+      "explanation": "..."
+    }
+  ]
+}`}
+                />
+
+                <button
+                  onClick={() => {
+                    try {
+                      const parsed = JSON.parse(geminiInput)
+                      const questionsArray = parsed.questions || parsed
+                      
+                      if (!Array.isArray(questionsArray)) {
+                        setMessage({ type: 'error', text: 'Geçerli bir soru dizisi bulunamadı!' })
+                        return
+                      }
+
+                      if (!geminiSubject || !geminiMainTopic) {
+                        setMessage({ type: 'error', text: 'Lütfen ders ve konu seçin!' })
+                        return
+                      }
+
+                      const topic = topics.find(t => 
+                        t.subject === geminiSubject && 
+                        t.main_topic === geminiMainTopic
+                      )
+
+                      if (!topic) {
+                        setMessage({ type: 'error', text: 'Seçilen konu veritabanında bulunamadı!' })
+                        return
+                      }
+
+                      const converted = questionsArray.map((q: any, index: number) => {
+                        // Options'ı dönüştür
+                        let options: { A: string; B: string; C: string; D: string } = { A: '', B: '', C: '', D: '' }
+                        
+                        if (Array.isArray(q.options)) {
+                          q.options.forEach((opt: string) => {
+                            const match = opt.match(/^([A-D])\)\s*(.+)$/i)
+                            if (match) {
+                              options[match[1].toUpperCase() as 'A' | 'B' | 'C' | 'D'] = match[2].trim()
+                            }
+                          })
+                        } else if (typeof q.options === 'object') {
+                          options = q.options
+                        }
+
+                        // Answer'ı dönüştür
+                        let answer = q.answer || q.correct_answer || ''
+                        if (answer.length > 1) {
+                          answer = answer.charAt(0).toUpperCase()
+                        }
+
+                        return {
+                          subject: geminiSubject,
+                          main_topic: geminiMainTopic,
+                          sub_topic: topic.sub_topic,
+                          difficulty: geminiDifficulty,
+                          question_text: q.question || q.question_text || '',
+                          options,
+                          correct_answer: answer,
+                          explanation: (q.explanation || '').replace(/\*\*/g, ''),
+                          source: parsed.title || 'Gemini',
+                          year: new Date().getFullYear(),
+                          topic_id: topic.id,
+                          topicName: `${geminiSubject} > ${geminiMainTopic}`
+                        }
+                      })
+
+                      setConvertedQuestions(converted)
+                      setMessage({ type: 'success', text: `${converted.length} soru dönüştürüldü!` })
+                      setTimeout(() => setMessage(null), 3000)
+                    } catch (e: any) {
+                      setMessage({ type: 'error', text: `JSON parse hatası: ${e.message}` })
+                    }
+                  }}
+                  disabled={!geminiInput.trim() || !geminiSubject || !geminiMainTopic}
+                  className="w-full mt-4 py-3 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="h-5 w-5" />
+                  Dönüştür
+                </button>
+              </div>
+
+              {/* Sağ - Dönüştürülmüş Önizleme */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Dönüştürülmüş Sorular ({convertedQuestions.length})
+                  </h3>
+                  {convertedQuestions.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const systemFormat = convertedQuestions.map(q => ({
+                          subject: q.subject,
+                          main_topic: q.main_topic,
+                          sub_topic: q.sub_topic,
+                          difficulty: q.difficulty,
+                          question_text: q.question_text,
+                          options: q.options,
+                          correct_answer: q.correct_answer,
+                          explanation: q.explanation,
+                          source: q.source,
+                          year: q.year
+                        }))
+                        navigator.clipboard.writeText(JSON.stringify(systemFormat, null, 2))
+                        setMessage({ type: 'success', text: 'JSON kopyalandı!' })
+                        setTimeout(() => setMessage(null), 2000)
+                      }}
+                      className="text-sm text-purple-500 hover:text-purple-600 flex items-center gap-1"
+                    >
+                      <Copy className="h-4 w-4" />
+                      JSON Kopyala
+                    </button>
+                  )}
+                </div>
+
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-[500px] overflow-y-auto">
+                  {convertedQuestions.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <Wand2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Gemini JSON'u yapıştırıp "Dönüştür" butonuna tıklayın.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {convertedQuestions.map((q, i) => (
+                        <div key={i} className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                              {q.subject}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              q.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                              q.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              q.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
+                              'bg-purple-100 text-purple-700'
+                            }`}>
+                              {difficultyConfig[q.difficulty as keyof typeof difficultyConfig]?.label}
+                            </span>
+                            <span className="text-xs text-gray-500">#{i + 1}</span>
+                          </div>
+                          <p className="text-sm text-gray-900 dark:text-white mb-2 line-clamp-2">
+                            {q.question_text}
+                          </p>
+                          <div className="text-xs text-gray-500">
+                            Doğru: <span className="font-medium text-green-600">{q.correct_answer}</span>
+                            {' • '}
+                            {q.topicName}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Yükle Butonu */}
+                {convertedQuestions.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm(`${convertedQuestions.length} soru yüklenecek. Devam etmek istiyor musunuz?`)) {
+                        return
+                      }
+                      
+                      setSaving(true)
+                      setUploadProgress({ current: 0, total: convertedQuestions.length })
+                      
+                      let successCount = 0
+                      let errorCount = 0
+                      
+                      for (let i = 0; i < convertedQuestions.length; i++) {
+                        const q = convertedQuestions[i]
+                        
+                        const { error } = await supabase
+                          .from('lgs_questions')
+                          .insert({
+                            topic_id: q.topic_id,
+                            difficulty: q.difficulty,
+                            question_text: q.question_text,
+                            options: q.options,
+                            correct_answer: q.correct_answer,
+                            explanation: q.explanation || null,
+                            source: q.source || null,
+                            year: q.year || null
+                          })
+                        
+                        if (error) {
+                          console.error(`Soru ${i + 1} yüklenemedi:`, error)
+                          errorCount++
+                        } else {
+                          successCount++
+                        }
+                        
+                        setUploadProgress({ current: i + 1, total: convertedQuestions.length })
+                      }
+                      
+                      setSaving(false)
+                      setUploadProgress({ current: 0, total: 0 })
+                      
+                      if (errorCount === 0) {
+                        setMessage({ type: 'success', text: `${successCount} soru başarıyla yüklendi!` })
+                        setGeminiInput('')
+                        setConvertedQuestions([])
+                        loadData()
+                      } else {
+                        setMessage({ type: 'error', text: `${successCount} soru yüklendi, ${errorCount} soru yüklenemedi.` })
+                      }
+                      
+                      setTimeout(() => setMessage(null), 5000)
+                    }}
+                    disabled={saving}
+                    className="w-full mt-4 py-4 bg-green-500 hover:bg-green-600 disabled:opacity-50 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
+                        {uploadProgress.current}/{uploadProgress.total} yükleniyor...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-5 w-5" />
+                        Veritabanına Yükle ({convertedQuestions.length} soru)
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Gemini Prompt Önerisi */}
+                <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <h4 className="font-medium text-purple-900 dark:text-purple-300 mb-2">Gemini'ye Söyleyebileceğiniz Prompt</h4>
+                  <p className="text-sm text-purple-700 dark:text-purple-400 mb-2">
+                    "LGS [DERS ADI] dersi [KONU ADI] konusu için [ZORLUK] seviyede 10 adet çoktan seçmeli soru hazırla. JSON formatında döndür."
+                  </p>
+                  <code className="text-xs bg-purple-100 dark:bg-purple-800 p-2 rounded block overflow-x-auto">
+                    {`{"questions": [{"question": "...", "options": ["A) ...", "B) ...", "C) ...", "D) ..."], "answer": "A", "explanation": "..."}]}`}
+                  </code>
                 </div>
               </div>
             </div>
