@@ -9,7 +9,8 @@ import {
   ArrowLeft, Users, Copy, Check, Settings, BookOpen,
   Megaphone, FileText, BarChart2, Plus, Upload, X,
   Trash2, Pin, Edit2, Download, Loader2, Send, Trophy,
-  Camera, Sparkles, UserPlus
+  Camera, Sparkles, UserPlus, Link2, QrCode, Share2,
+  MessageCircle, User
 } from 'lucide-react'
 
 interface Classroom {
@@ -70,6 +71,12 @@ export default function SinifDetayPage() {
   const [showMaterialModal, setShowMaterialModal] = useState(false)
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [showAddStudentModal, setShowAddStudentModal] = useState(false)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showManualAddModal, setShowManualAddModal] = useState(false)
+  
+  // Invite states
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [manualStudentForm, setManualStudentForm] = useState({ name: '', number: '' })
 
   // Form states
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', is_pinned: false })
@@ -140,6 +147,51 @@ export default function SinifDetayPage() {
     navigator.clipboard.writeText(classroom.join_code)
     setCopiedCode(true)
     setTimeout(() => setCopiedCode(false), 2000)
+  }
+
+  function getInviteLink() {
+    if (!classroom) return ''
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    return `${baseUrl}/katil/${classroom.join_code}`
+  }
+
+  function copyInviteLink() {
+    navigator.clipboard.writeText(getInviteLink())
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  function shareViaWhatsApp() {
+    const text = `${classroom?.name} sınıfına katılmak için linke tıklayın: ${getInviteLink()}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  // Manuel öğrenci ekleme
+  async function handleManualAddStudent() {
+    if (!manualStudentForm.name.trim()) return
+    setSubmitting(true)
+
+    try {
+      const { error } = await supabase
+        .from('classroom_students')
+        .insert({
+          classroom_id: params.id,
+          student_name: manualStudentForm.name.trim(),
+          student_number: manualStudentForm.number.trim(),
+          status: 'pending'
+        })
+
+      if (error) throw error
+
+      await loadClassroomData()
+      setShowManualAddModal(false)
+      setManualStudentForm({ name: '', number: '' })
+    } catch (error) {
+      console.error('Öğrenci ekleme hatası:', error)
+      alert('Öğrenci eklenirken bir hata oluştu')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   // Duyuru ekleme
@@ -428,6 +480,13 @@ export default function SinifDetayPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Link2 className="w-4 h-4" />
+            Davet Linki
+          </button>
           <Link
             href={`/koc/siniflarim/${classroom.id}/istatistikler`}
             className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-colors"
@@ -525,13 +584,22 @@ export default function SinifDetayPage() {
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Öğrenci Listesi</h3>
-                <button
-                  onClick={() => setShowAddStudentModal(true)}
-                  className="flex items-center gap-2 text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Öğrenci Ekle
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowManualAddModal(true)}
+                    className="flex items-center gap-2 text-sm bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200"
+                  >
+                    <User className="w-4 h-4" />
+                    Manuel Ekle
+                  </button>
+                  <button
+                    onClick={() => setShowAddStudentModal(true)}
+                    className="flex items-center gap-2 text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    AI ile Ekle
+                  </button>
+                </div>
               </div>
 
               {students.length === 0 ? (
@@ -989,6 +1057,176 @@ export default function SinifDetayPage() {
                     )}
                   </button>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Davet Linki Modal */}
+      <AnimatePresence>
+        {showInviteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowInviteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-green-500" />
+                Davet Linki
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Bu linki öğrencilerinizle paylaşın. Linke tıklayan öğrenciler kayıt olup otomatik sınıfa katılır.
+              </p>
+
+              {/* Link Box */}
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={getInviteLink()}
+                    readOnly
+                    className="flex-1 bg-transparent text-sm text-gray-700 outline-none"
+                  />
+                  <button
+                    onClick={copyInviteLink}
+                    className={`p-2 rounded-lg transition-colors ${
+                      copiedLink ? 'bg-green-100 text-green-600' : 'bg-white hover:bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Share Buttons */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={copyInviteLink}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  <Copy className="w-4 h-4" />
+                  {copiedLink ? 'Kopyalandı!' : 'Linki Kopyala'}
+                </button>
+                <button
+                  onClick={shareViaWhatsApp}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp
+                </button>
+              </div>
+
+              {/* QR Code Section */}
+              <div className="border-t pt-4">
+                <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  <QrCode className="w-4 h-4" />
+                  QR Kod
+                </p>
+                <div className="flex justify-center p-4 bg-white border rounded-lg">
+                  {/* QR Code Placeholder - basit bir görsel */}
+                  <div className="w-32 h-32 bg-gray-100 rounded flex items-center justify-center">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=128x128&data=${encodeURIComponent(getInviteLink())}`}
+                      alt="QR Code"
+                      className="w-full h-full"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 text-center mt-2">
+                  QR kodu taratarak sınıfa katılabilirler
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowInviteModal(false)}
+                className="w-full mt-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Kapat
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Manuel Öğrenci Ekleme Modal */}
+      <AnimatePresence>
+        {showManualAddModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowManualAddModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-white rounded-xl p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-500" />
+                Manuel Öğrenci Ekle
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Bekleyenler listesine öğrenci ekleyin. Öğrenci davet linki ile katıldığında otomatik eşleşir.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Öğrenci Adı *
+                  </label>
+                  <input
+                    type="text"
+                    value={manualStudentForm.name}
+                    onChange={(e) => setManualStudentForm({ ...manualStudentForm, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Örn: Ahmet Yılmaz"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Okul No (opsiyonel)
+                  </label>
+                  <input
+                    type="text"
+                    value={manualStudentForm.number}
+                    onChange={(e) => setManualStudentForm({ ...manualStudentForm, number: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Örn: 123"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => {
+                    setShowManualAddModal(false)
+                    setManualStudentForm({ name: '', number: '' })
+                  }}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleManualAddStudent}
+                  disabled={submitting || !manualStudentForm.name.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ekle'}
+                </button>
               </div>
             </motion.div>
           </motion.div>
