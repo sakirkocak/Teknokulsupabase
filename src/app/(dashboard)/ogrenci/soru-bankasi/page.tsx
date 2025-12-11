@@ -29,6 +29,8 @@ interface Question {
   correct_answer: 'A' | 'B' | 'C' | 'D'
   explanation: string | null
   topic?: Topic
+  times_answered?: number
+  times_correct?: number
 }
 
 interface StudentStats {
@@ -213,8 +215,8 @@ export default function SoruBankasiPage() {
     await supabase
       .from('lgs_questions')
       .update({
-        times_answered: currentQuestion.times_answered + 1,
-        times_correct: currentQuestion.times_correct + (correct ? 1 : 0)
+        times_answered: (currentQuestion.times_answered || 0) + 1,
+        times_correct: (currentQuestion.times_correct || 0) + (correct ? 1 : 0)
       })
       .eq('id', currentQuestion.id)
 

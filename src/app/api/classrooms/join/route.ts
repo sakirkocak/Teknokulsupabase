@@ -138,6 +138,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Öğrenci ismini al
+    const { data: studentUser } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
     const { data: coach } = await supabase
       .from('teacher_profiles')
       .select('user_id')
@@ -148,7 +155,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('notifications').insert({
         user_id: coach.user_id,
         title: 'Yeni Öğrenci Katıldı',
-        message: `${studentProfile.full_name} "${classroom.name}" sınıfına katıldı.`,
+        message: `${studentUser?.full_name || 'Bir öğrenci'} "${classroom.name}" sınıfına katıldı.`,
         type: 'classroom'
       })
     }

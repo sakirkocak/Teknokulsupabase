@@ -42,6 +42,10 @@ interface Exam {
   time_spent_seconds: number
   started_at: string | null
   questions: string[]
+  total_correct?: number
+  total_wrong?: number
+  total_empty?: number
+  total_net?: number
 }
 
 const subjectOrder = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'İnkılap Tarihi', 'Din Kültürü', 'İngilizce']
