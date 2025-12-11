@@ -48,7 +48,7 @@ export default function OgrencilerScreen() {
 
       if (studentsData) {
         const enrichedStudents = await Promise.all(
-          studentsData.map(async (s) => {
+          studentsData.map(async (s: any) => {
             const { count: totalTasks } = await supabase
               .from('tasks')
               .select('*', { count: 'exact', head: true })
@@ -60,10 +60,13 @@ export default function OgrencilerScreen() {
               .eq('student_id', s.student_id)
               .eq('status', 'completed');
 
+            const studentData = s.student as any;
+            const profileData = studentData?.profile;
+
             return {
               id: s.student_id,
-              student_name: s.student?.profile?.full_name || 'Ogrenci',
-              avatar_url: s.student?.profile?.avatar_url,
+              student_name: profileData?.full_name || 'Ogrenci',
+              avatar_url: profileData?.avatar_url || null,
               total_tasks: totalTasks || 0,
               completed_tasks: completedTasks || 0,
             };

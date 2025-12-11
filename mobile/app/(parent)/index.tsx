@@ -50,7 +50,7 @@ export default function ParentDashboard() {
 
       if (childrenData) {
         const enriched = await Promise.all(
-          childrenData.map(async (c) => {
+          childrenData.map(async (c: any) => {
             const { count: totalTasks } = await supabase
               .from('tasks')
               .select('*', { count: 'exact', head: true })
@@ -62,9 +62,12 @@ export default function ParentDashboard() {
               .eq('student_id', c.student_id)
               .eq('status', 'completed');
 
+            const studentData = c.student as any;
+            const profileData = studentData?.profile;
+
             return {
               id: c.student_id,
-              name: c.student?.profile?.full_name || 'Cocuk',
+              name: profileData?.full_name || 'Cocuk',
               total_tasks: totalTasks || 0,
               completed_tasks: completedTasks || 0,
             };
