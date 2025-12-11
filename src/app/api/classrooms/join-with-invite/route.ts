@@ -47,40 +47,107 @@ export async function POST(req: NextRequest) {
       
       studentName = profile?.full_name || 'Öğrenci'
     } else {
-      // Yeni kullanıcı kaydı - EMAIL DOĞRULAMA KAPALI
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true, // Otomatik doğrula
-        user_metadata: {
-          full_name: fullName
-        }
-      })
+      // Yeni kullanıcı kaydı
+      console.log('Yeni kullanıcı oluşturuluyor:', { email, fullName })
+      
+      // Önce admin.createUser dene
+      let authData: any = null
+      let authError: any = null
+      
+      try {
+        const result = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            full_name: fullName
+          }
+        })
+        authData = result.data
+        authError = result.error
+        console.log('Admin createUser sonucu:', { user: authData?.user?.id, error: authError })
+      } catch (e: any) {
+        console.error('Admin API exception:', e)
+        authError = { message: e.message || 'Admin API hatası' }
+      }
 
-      if (authError) {
-        if (authError.message.includes('already')) {
-          return NextResponse.json({ error: 'Bu email zaten kayıtlı. Giriş yaparak katılabilirsiniz.' }, { status: 400 })
+      // Admin API başarısız olduysa, normal signUp dene
+      if (authError || !authData?.user) {
+        console.log('Admin API başarısız, normal signUp deneniyor...')
+        
+        const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName
+            }
+          }
+        })
+        
+        console.log('SignUp sonucu:', { user: signUpData?.user?.id, error: signUpError })
+        
+        if (signUpError) {
+          if (signUpError.message.includes('already') || signUpError.message.includes('duplicate')) {
+            return NextResponse.json({ error: 'Bu email zaten kayıtlı. Giriş yaparak katılabilirsiniz.' }, { status: 400 })
+          }
+          return NextResponse.json({ error: `Kayıt hatası: ${signUpError.message}` }, { status: 400 })
         }
-        return NextResponse.json({ error: authError.message }, { status: 400 })
+        
+        if (!signUpData?.user) {
+          return NextResponse.json({ error: 'Kullanıcı oluşturulamadı' }, { status: 500 })
+        }
+        
+        authData = signUpData
       }
 
       userId = authData.user.id
       studentName = fullName
 
-      // Profil oluştur
-      await supabaseAdmin.from('profiles').insert({
-        id: userId,
-        email,
-        full_name: fullName,
-        role: 'ogrenci'
-      })
+      // Profil kontrolü - trigger zaten oluşturmuş olabilir
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single()
+      
+      if (!existingProfile) {
+        const { error: profileError } = await supabaseAdmin.from('profiles').insert({
+          id: userId,
+          email,
+          full_name: fullName,
+          role: 'ogrenci'
+        })
+        
+        if (profileError) {
+          console.error('Profil oluşturma hatası:', profileError)
+        }
+      } else {
+        // Profil varsa güncelle
+        await supabaseAdmin.from('profiles').update({
+          full_name: fullName,
+          role: 'ogrenci'
+        }).eq('id', userId)
+      }
 
-      // Student profile oluştur
-      await supabaseAdmin.from('student_profiles').insert({
-        user_id: userId,
-        grade_level: '11. Sınıf',
-        target_exam: 'TYT'
-      })
+      // Student profile kontrolü
+      const { data: existingStudentProfile } = await supabaseAdmin
+        .from('student_profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .single()
+      
+      if (!existingStudentProfile) {
+        const { error: studentProfileError } = await supabaseAdmin.from('student_profiles').insert({
+          user_id: userId,
+          grade_level: '11. Sınıf',
+          target_exam: 'TYT'
+        })
+        
+        if (studentProfileError) {
+          console.error('Öğrenci profili oluşturma hatası:', studentProfileError)
+        }
+      }
     }
 
     // 3. Student profile ID'sini al

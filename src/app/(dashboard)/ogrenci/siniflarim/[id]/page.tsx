@@ -85,12 +85,26 @@ export default function OgrenciSinifDetayPage() {
         .from('classrooms')
         .select(`
           *,
-          coach:teacher_profiles(full_name, avatar_url)
+          teacher:teacher_profiles(user_id)
         `)
         .eq('id', classroomId)
         .single()
 
-      if (classroomData) setClassroom(classroomData)
+      if (classroomData) {
+        // Koç bilgisini profiles tablosundan al
+        if (classroomData.teacher?.user_id) {
+          const { data: coachProfile } = await supabase
+            .from('profiles')
+            .select('full_name, avatar_url')
+            .eq('id', classroomData.teacher.user_id)
+            .single()
+          
+          classroomData.coach = coachProfile || { full_name: 'Öğretmen', avatar_url: null }
+        } else {
+          classroomData.coach = { full_name: 'Öğretmen', avatar_url: null }
+        }
+        setClassroom(classroomData)
+      }
 
       // Duyurular
       const { data: announcementsData } = await supabase
@@ -117,19 +131,39 @@ export default function OgrenciSinifDetayPage() {
         .from('classroom_leaderboard')
         .select(`
           *,
-          student:student_profiles(full_name, avatar_url)
+          student:student_profiles(user_id)
         `)
         .eq('classroom_id', classroomId)
         .eq('week_start', weekStart)
         .order('points', { ascending: false })
 
       if (leaderboardData) {
-        const enriched = leaderboardData.map((entry, index) => ({
-          ...entry,
-          student_name: entry.student?.full_name || 'Öğrenci',
-          avatar_url: entry.student?.avatar_url,
-          rank: index + 1
+        // Her öğrenci için profil bilgisini al
+        const enriched = await Promise.all(leaderboardData.map(async (entry, index) => {
+          let studentName = 'Öğrenci'
+          let avatarUrl = null
+          
+          if (entry.student?.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', entry.student.user_id)
+              .single()
+            
+            if (profile) {
+              studentName = profile.full_name || 'Öğrenci'
+              avatarUrl = profile.avatar_url
+            }
+          }
+          
+          return {
+            ...entry,
+            student_name: studentName,
+            avatar_url: avatarUrl,
+            rank: index + 1
+          }
         }))
+        
         setLeaderboard(enriched)
 
         // Benim sıramı bul

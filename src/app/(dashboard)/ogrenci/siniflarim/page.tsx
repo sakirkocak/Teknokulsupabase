@@ -40,22 +40,26 @@ export default function OgrenciSiniflarimPage() {
   async function loadClassrooms() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      console.log('Giriş yapan kullanıcı:', user?.id, user?.email)
       if (!user) return
 
-      const { data: studentProfile } = await supabase
+      const { data: studentProfile, error: profileError } = await supabase
         .from('student_profiles')
         .select('id')
         .eq('user_id', user.id)
         .single()
 
+      console.log('Öğrenci profili:', studentProfile, 'Hata:', profileError)
       if (!studentProfile) return
 
       // Öğrencinin katıldığı sınıfları getir
-      const { data: classroomStudents } = await supabase
+      const { data: classroomStudents, error: csError } = await supabase
         .from('classroom_students')
         .select('classroom_id')
         .eq('student_id', studentProfile.id)
         .eq('status', 'joined')
+
+      console.log('Sınıf kayıtları:', classroomStudents, 'Hata:', csError)
 
       if (!classroomStudents || classroomStudents.length === 0) {
         setLoading(false)
@@ -68,10 +72,29 @@ export default function OgrenciSiniflarimPage() {
         .from('classrooms')
         .select(`
           *,
-          coach:teacher_profiles(full_name, avatar_url)
+          teacher:teacher_profiles(
+            user_id
+          )
         `)
         .in('id', classroomIds)
         .eq('is_active', true)
+
+      // Koç bilgilerini profiles tablosundan al
+      if (classroomsData) {
+        for (const classroom of classroomsData) {
+          if (classroom.teacher?.user_id) {
+            const { data: coachProfile } = await supabase
+              .from('profiles')
+              .select('full_name, avatar_url')
+              .eq('id', classroom.teacher.user_id)
+              .single()
+            
+            classroom.coach = coachProfile || { full_name: 'Öğretmen', avatar_url: null }
+          } else {
+            classroom.coach = { full_name: 'Öğretmen', avatar_url: null }
+          }
+        }
+      }
 
       if (classroomsData) {
         // Her sınıf için ek veriler
