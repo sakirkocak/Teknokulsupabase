@@ -26,7 +26,8 @@ import {
   Send,
   Star,
   HelpCircle,
-  BookOpen
+  BookOpen,
+  Trophy
 } from 'lucide-react'
 
 type NavItem = {
@@ -56,6 +57,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Koçum', href: '/ogrenci/kocum', icon: Target },
     { label: 'Sınıflarım', href: '/ogrenci/siniflarim', icon: BookOpen },
     { label: 'Soru Bankası', href: '/ogrenci/soru-bankasi', icon: GraduationCap },
+    { label: 'Liderlik', href: '/ogrenci/liderlik', icon: Trophy },
     { label: 'Ödevlerim', href: '/ogrenci/odevler', icon: ClipboardList },
     { label: 'Görevlerim', href: '/ogrenci/gorevler', icon: Calendar },
     { label: 'Denemelerim', href: '/ogrenci/denemeler', icon: FileText },

@@ -197,6 +197,9 @@ export default function SoruBankasiPage() {
     }
   }
 
+  const [earnedPoints, setEarnedPoints] = useState<number | null>(null)
+  const [totalPoints, setTotalPoints] = useState(0)
+
   const handleAnswer = async (answer: string) => {
     if (showResult || !currentQuestion) return
 
@@ -204,6 +207,11 @@ export default function SoruBankasiPage() {
     const correct = answer === currentQuestion.correct_answer
     setIsCorrect(correct)
     setShowResult(true)
+
+    // Puan hesapla: Doğru +2, Yanlış -1
+    const points = correct ? 2 : -1
+    setEarnedPoints(points)
+    setTotalPoints(prev => Math.max(0, prev + points))
 
     // Session stats güncelle
     setSessionStats(prev => ({
@@ -250,6 +258,78 @@ export default function SoruBankasiPage() {
             total_wrong: correct ? 0 : 1,
             last_attempted_at: new Date().toISOString()
           })
+      }
+
+      // PUAN SİSTEMİ: student_points tablosunu güncelle
+      const subject = currentQuestion.topic?.subject || ''
+      
+      // Önce mevcut puanları al
+      const { data: existingPoints } = await supabase
+        .from('student_points')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .single()
+
+      const subjectMap: Record<string, { points: string; correct: string; wrong: string }> = {
+        'Türkçe': { points: 'turkce_points', correct: 'turkce_correct', wrong: 'turkce_wrong' },
+        'Matematik': { points: 'matematik_points', correct: 'matematik_correct', wrong: 'matematik_wrong' },
+        'Fen Bilimleri': { points: 'fen_points', correct: 'fen_correct', wrong: 'fen_wrong' },
+        'İnkılap Tarihi': { points: 'inkilap_points', correct: 'inkilap_correct', wrong: 'inkilap_wrong' },
+        'Din Kültürü': { points: 'din_points', correct: 'din_correct', wrong: 'din_wrong' },
+        'İngilizce': { points: 'ingilizce_points', correct: 'ingilizce_correct', wrong: 'ingilizce_wrong' },
+      }
+
+      if (existingPoints) {
+        // Güncelle
+        const updateData: any = {
+          total_points: Math.max(0, existingPoints.total_points + points),
+          total_questions: existingPoints.total_questions + 1,
+          total_correct: existingPoints.total_correct + (correct ? 1 : 0),
+          total_wrong: existingPoints.total_wrong + (correct ? 0 : 1),
+          current_streak: correct ? existingPoints.current_streak + 1 : 0,
+          max_streak: correct && existingPoints.current_streak + 1 > existingPoints.max_streak 
+            ? existingPoints.current_streak + 1 
+            : existingPoints.max_streak,
+          last_activity_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+
+        // Ders bazlı güncelleme
+        if (subjectMap[subject]) {
+          const cols = subjectMap[subject]
+          updateData[cols.points] = Math.max(0, (existingPoints[cols.points] || 0) + points)
+          updateData[cols.correct] = (existingPoints[cols.correct] || 0) + (correct ? 1 : 0)
+          updateData[cols.wrong] = (existingPoints[cols.wrong] || 0) + (correct ? 0 : 1)
+        }
+
+        await supabase
+          .from('student_points')
+          .update(updateData)
+          .eq('student_id', studentProfile.id)
+      } else {
+        // Yeni kayıt oluştur
+        const insertData: any = {
+          student_id: studentProfile.id,
+          total_points: Math.max(0, points),
+          total_questions: 1,
+          total_correct: correct ? 1 : 0,
+          total_wrong: correct ? 0 : 1,
+          current_streak: correct ? 1 : 0,
+          max_streak: correct ? 1 : 0,
+          last_activity_at: new Date().toISOString()
+        }
+
+        // Ders bazlı başlangıç değerleri
+        if (subjectMap[subject]) {
+          const cols = subjectMap[subject]
+          insertData[cols.points] = Math.max(0, points)
+          insertData[cols.correct] = correct ? 1 : 0
+          insertData[cols.wrong] = correct ? 0 : 1
+        }
+
+        await supabase
+          .from('student_points')
+          .insert(insertData)
       }
     }
   }
@@ -368,22 +448,35 @@ export default function SoruBankasiPage() {
                   className="mt-6"
                 >
                   {/* Sonuç Mesajı */}
-                  <div className={`flex items-center gap-3 p-4 rounded-xl ${
+                  <div className={`flex items-center justify-between p-4 rounded-xl ${
                     isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'
                   }`}>
-                    {isCorrect ? (
-                      <>
-                        <CheckCircle className="h-6 w-6 text-green-400" />
-                        <span className="text-green-400 font-medium">Doğru Cevap!</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-6 w-6 text-red-400" />
-                        <span className="text-red-400 font-medium">
-                          Yanlış! Doğru cevap: {currentQuestion.correct_answer}
-                        </span>
-                      </>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {isCorrect ? (
+                        <>
+                          <CheckCircle className="h-6 w-6 text-green-400" />
+                          <span className="text-green-400 font-medium">Doğru Cevap!</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="h-6 w-6 text-red-400" />
+                          <span className="text-red-400 font-medium">
+                            Yanlış! Doğru cevap: {currentQuestion.correct_answer}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    {/* Puan Göstergesi */}
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full font-bold ${
+                        isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      }`}
+                    >
+                      <Trophy className="h-4 w-4" />
+                      {isCorrect ? '+2' : '-1'} puan
+                    </motion.div>
                   </div>
 
                   {/* Açıklama */}

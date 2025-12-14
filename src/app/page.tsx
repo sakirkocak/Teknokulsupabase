@@ -115,11 +115,44 @@ export default function HomePage() {
   const [loadingCoaches, setLoadingCoaches] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [testimonialIndex, setTestimonialIndex] = useState(0)
+  const [topLeaders, setTopLeaders] = useState<any[]>([])
   const supabase = createClient()
 
   useEffect(() => {
     loadFeaturedCoaches()
+    loadTopLeaders()
   }, [])
+
+  async function loadTopLeaders() {
+    const { data } = await supabase
+      .from('student_points')
+      .select(`
+        student_id,
+        total_points,
+        total_questions,
+        total_correct,
+        max_streak,
+        student:student_profiles!student_points_student_id_fkey(
+          user_id,
+          profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
+        )
+      `)
+      .gt('total_questions', 0)
+      .order('total_points', { ascending: false })
+      .limit(5)
+
+    if (data) {
+      setTopLeaders(data.map((item: any, index: number) => ({
+        rank: index + 1,
+        name: item.student?.profile?.full_name || 'Anonim',
+        avatar: item.student?.profile?.avatar_url,
+        points: item.total_points,
+        questions: item.total_questions,
+        correct: item.total_correct,
+        streak: item.max_streak
+      })))
+    }
+  }
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -197,6 +230,10 @@ export default function HomePage() {
               <Link href="/materyaller" className="text-surface-600 hover:text-primary-500 font-medium transition-colors">
                 Materyaller
               </Link>
+              <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                <Trophy className="w-4 h-4" />
+                Liderlik
+              </Link>
             </div>
 
             <div className="hidden md:flex items-center gap-4">
@@ -239,6 +276,14 @@ export default function HomePage() {
                 className="block px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
               >
                 Materyaller
+              </Link>
+              <Link 
+                href="/liderlik" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
+              >
+                <Trophy className="w-4 h-4" />
+                Liderlik
               </Link>
               <div className="pt-3 border-t border-surface-100 space-y-2">
                 <Link href="/giris" className="btn btn-ghost btn-md w-full">
@@ -319,6 +364,148 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
+
+      {/* Leaderboard Section */}
+      {topLeaders.length > 0 && (
+        <section className="py-16 px-4 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-900 relative overflow-hidden">
+          {/* Background decorations */}
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjAyIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
+          
+          <div className="max-w-5xl mx-auto relative">
+            <div className="text-center mb-10">
+              <motion.div
+                initial={{ scale: 0 }}
+                whileInView={{ scale: 1 }}
+                viewport={{ once: true }}
+                className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-yellow-500/30"
+              >
+                <Trophy className="w-8 h-8 text-white" />
+              </motion.div>
+              <h2 className="text-3xl font-bold text-white mb-2">
+                🏆 Haftanın Liderleri
+              </h2>
+              <p className="text-white/60">
+                En çok soru çözen ve en yüksek puana sahip öğrenciler
+              </p>
+            </div>
+
+            {/* Top 3 */}
+            <div className="flex flex-col md:flex-row items-end justify-center gap-4 mb-8">
+              {/* 2nd Place */}
+              {topLeaders[1] && (
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  viewport={{ once: true }}
+                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center w-full md:w-48 border border-white/10"
+                >
+                  <div className="text-3xl mb-2">🥈</div>
+                  <div className="w-14 h-14 bg-gray-500 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-lg overflow-hidden">
+                    {topLeaders[1].avatar ? (
+                      <img src={topLeaders[1].avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials(topLeaders[1].name)
+                    )}
+                  </div>
+                  <div className="font-semibold text-white truncate">{topLeaders[1].name}</div>
+                  <div className="text-2xl font-bold text-gray-300">{topLeaders[1].points}</div>
+                  <div className="text-xs text-white/50">puan</div>
+                </motion.div>
+              )}
+
+              {/* 1st Place */}
+              {topLeaders[0] && (
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="bg-gradient-to-br from-yellow-500/20 to-amber-500/20 backdrop-blur-sm rounded-2xl p-6 text-center w-full md:w-56 border border-yellow-500/30 relative"
+                >
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-yellow-500 text-yellow-900 text-xs font-bold rounded-full">
+                    ŞAMPİYON
+                  </div>
+                  <div className="text-4xl mb-2">👑</div>
+                  <div className="w-18 h-18 w-[72px] h-[72px] bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 text-white font-bold text-xl shadow-lg shadow-yellow-500/30 overflow-hidden">
+                    {topLeaders[0].avatar ? (
+                      <img src={topLeaders[0].avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials(topLeaders[0].name)
+                    )}
+                  </div>
+                  <div className="text-lg font-bold text-white truncate">{topLeaders[0].name}</div>
+                  <div className="text-3xl font-bold text-yellow-400">{topLeaders[0].points}</div>
+                  <div className="text-sm text-white/50">puan</div>
+                  <div className="mt-2 text-xs text-white/60">
+                    {topLeaders[0].correct} doğru • {topLeaders[0].questions} soru
+                  </div>
+                </motion.div>
+              )}
+
+              {/* 3rd Place */}
+              {topLeaders[2] && (
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  viewport={{ once: true }}
+                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center w-full md:w-48 border border-white/10"
+                >
+                  <div className="text-3xl mb-2">🥉</div>
+                  <div className="w-14 h-14 bg-amber-700 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-lg overflow-hidden">
+                    {topLeaders[2].avatar ? (
+                      <img src={topLeaders[2].avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials(topLeaders[2].name)
+                    )}
+                  </div>
+                  <div className="font-semibold text-white truncate">{topLeaders[2].name}</div>
+                  <div className="text-2xl font-bold text-amber-500">{topLeaders[2].points}</div>
+                  <div className="text-xs text-white/50">puan</div>
+                </motion.div>
+              )}
+            </div>
+
+            {/* 4th and 5th */}
+            {topLeaders.slice(3, 5).length > 0 && (
+              <div className="flex justify-center gap-3 mb-8">
+                {topLeaders.slice(3, 5).map((leader, index) => (
+                  <motion.div
+                    key={leader.rank}
+                    initial={{ opacity: 0 }}
+                    whileInView={{ opacity: 1 }}
+                    transition={{ delay: 0.3 + index * 0.1 }}
+                    viewport={{ once: true }}
+                    className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2 border border-white/10"
+                  >
+                    <span className="text-white/60 font-bold">{leader.rank}.</span>
+                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden">
+                      {leader.avatar ? (
+                        <img src={leader.avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(leader.name)
+                      )}
+                    </div>
+                    <span className="text-white font-medium">{leader.name}</span>
+                    <span className="text-white/60">{leader.points} puan</span>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* CTA */}
+            <div className="text-center">
+              <Link 
+                href="/liderlik" 
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
+              >
+                Tüm Sıralamayı Gör
+                <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Featured Coaches */}
       <section className="py-16 px-4 bg-white">
