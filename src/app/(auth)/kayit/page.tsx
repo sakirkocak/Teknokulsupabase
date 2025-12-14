@@ -77,6 +77,81 @@ function RegisterForm() {
       if (authError) throw authError
 
       if (authData.user) {
+        // 2. Trigger çalışmayabilir, manuel olarak profil oluştur
+        // Önce profil var mı kontrol et
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', authData.user.id)
+          .single()
+
+        if (!existingProfile) {
+          // Profile oluştur
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authData.user.id,
+              email: email,
+              full_name: fullName,
+              role: role,
+            })
+
+          if (profileError && !profileError.message.includes('duplicate')) {
+            console.error('Profil oluşturma hatası:', profileError)
+          }
+        }
+
+        // 3. Role göre ek profil oluştur
+        if (role === 'ogrenci') {
+          const { data: existingStudentProfile } = await supabase
+            .from('student_profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+
+          if (!existingStudentProfile) {
+            const { error: studentError } = await supabase
+              .from('student_profiles')
+              .insert({ user_id: authData.user.id })
+
+            if (studentError && !studentError.message.includes('duplicate')) {
+              console.error('Öğrenci profili oluşturma hatası:', studentError)
+            }
+          }
+        } else if (role === 'ogretmen') {
+          const { data: existingTeacherProfile } = await supabase
+            .from('teacher_profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+
+          if (!existingTeacherProfile) {
+            const { error: teacherError } = await supabase
+              .from('teacher_profiles')
+              .insert({ user_id: authData.user.id, is_coach: true })
+
+            if (teacherError && !teacherError.message.includes('duplicate')) {
+              console.error('Öğretmen profili oluşturma hatası:', teacherError)
+            }
+          }
+        } else if (role === 'veli') {
+          const { data: existingParentProfile } = await supabase
+            .from('parent_profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+
+          if (!existingParentProfile) {
+            const { error: parentError } = await supabase
+              .from('parent_profiles')
+              .insert({ user_id: authData.user.id })
+
+            if (parentError && !parentError.message.includes('duplicate')) {
+              console.error('Veli profili oluşturma hatası:', parentError)
+            }
+          }
+        }
+
         // Redirect URL varsa oraya git
         if (redirectUrl) {
           router.push(redirectUrl)

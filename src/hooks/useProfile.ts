@@ -18,11 +18,53 @@ export function useProfile() {
         return
       }
 
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
+
+      // Profil yoksa oluştur (trigger çalışmamış olabilir)
+      if (error && error.code === 'PGRST116') {
+        const role = user.user_metadata?.role || 'ogrenci'
+        const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || ''
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email || '',
+            full_name: fullName,
+            role: role,
+          })
+          .select()
+          .single()
+
+        if (insertError && !insertError.message.includes('duplicate')) {
+          console.error('Profil oluşturma hatası:', insertError)
+        } else if (newProfile) {
+          data = newProfile
+          error = null
+          
+          // Role göre ek profil de oluştur
+          if (role === 'ogrenci') {
+            await supabase
+              .from('student_profiles')
+              .insert({ user_id: user.id })
+              .single()
+          } else if (role === 'ogretmen') {
+            await supabase
+              .from('teacher_profiles')
+              .insert({ user_id: user.id, is_coach: true })
+              .single()
+          } else if (role === 'veli') {
+            await supabase
+              .from('parent_profiles')
+              .insert({ user_id: user.id })
+              .single()
+          }
+        }
+      }
 
       if (error && error.code !== 'PGRST116') throw error
       setProfile(data)
@@ -78,13 +120,32 @@ export function useStudentProfile(userId: string) {
   const supabase = createClient()
 
   const loadStudentProfile = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      setLoading(false)
+      return
+    }
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('student_profiles')
         .select('*')
         .eq('user_id', userId)
         .single()
+
+      // Öğrenci profili yoksa oluştur
+      if (error && error.code === 'PGRST116') {
+        const { data: newProfile, error: insertError } = await supabase
+          .from('student_profiles')
+          .insert({ user_id: userId })
+          .select()
+          .single()
+
+        if (insertError && !insertError.message.includes('duplicate')) {
+          console.error('Öğrenci profili oluşturma hatası:', insertError)
+        } else if (newProfile) {
+          data = newProfile
+          error = null
+        }
+      }
 
       if (error && error.code !== 'PGRST116') throw error
       setStudentProfile(data)
@@ -98,6 +159,8 @@ export function useStudentProfile(userId: string) {
   useEffect(() => {
     if (userId) {
       loadStudentProfile()
+    } else {
+      setLoading(false)
     }
   }, [userId, loadStudentProfile])
 
