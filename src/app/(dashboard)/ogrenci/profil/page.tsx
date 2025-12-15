@@ -16,34 +16,131 @@ import {
   Save,
   Loader2,
   CheckCircle,
-  GraduationCap
+  GraduationCap,
+  MapPin,
+  Building2,
+  Trophy,
+  Medal,
+  Sparkles
 } from 'lucide-react'
+import { TurkeyCity, TurkeyDistrict, School as SchoolType, League } from '@/types/database'
 
 export default function StudentProfilePage() {
   const { profile, loading: profileLoading, refetch } = useProfile()
   const { studentProfile, loading: studentLoading, refetch: refetchStudent } = useStudentProfile(profile?.id || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  
+  // Location states
+  const [cities, setCities] = useState<TurkeyCity[]>([])
+  const [districts, setDistricts] = useState<TurkeyDistrict[]>([])
+  const [schools, setSchools] = useState<SchoolType[]>([])
+  const [league, setLeague] = useState<any>(null)
+  const [studentPoints, setStudentPoints] = useState<any>(null)
+  
   const [formData, setFormData] = useState({
     full_name: '',
     phone: '',
+    grade: '',
     grade_level: '',
     school_name: '',
     target_exam: '',
+    city_id: '',
+    district_id: '',
+    school_id: '',
   })
+  
   const supabase = createClient()
 
+  // İlleri yükle
+  useEffect(() => {
+    async function loadCities() {
+      const { data } = await supabase
+        .from('turkey_cities')
+        .select('*')
+        .order('name')
+      if (data) setCities(data)
+    }
+    loadCities()
+  }, [])
+
+  // İl seçildiğinde ilçeleri yükle
+  useEffect(() => {
+    async function loadDistricts() {
+      if (!formData.city_id) {
+        setDistricts([])
+        return
+      }
+      const { data } = await supabase
+        .from('turkey_districts')
+        .select('*')
+        .eq('city_id', formData.city_id)
+        .order('name')
+      if (data) setDistricts(data)
+    }
+    loadDistricts()
+  }, [formData.city_id])
+
+  // İlçe seçildiğinde okulları yükle
+  useEffect(() => {
+    async function loadSchools() {
+      if (!formData.district_id) {
+        setSchools([])
+        return
+      }
+      const { data } = await supabase
+        .from('schools')
+        .select('*')
+        .eq('district_id', formData.district_id)
+        .order('name')
+      if (data) setSchools(data)
+    }
+    loadSchools()
+  }, [formData.district_id])
+
+  // Form verilerini doldur
   useEffect(() => {
     if (profile && studentProfile) {
       setFormData({
         full_name: profile.full_name || '',
         phone: profile.phone || '',
+        grade: studentProfile.grade?.toString() || '',
         grade_level: studentProfile.grade_level || '',
         school_name: studentProfile.school_name || '',
         target_exam: studentProfile.target_exam || '',
+        city_id: studentProfile.city_id || '',
+        district_id: studentProfile.district_id || '',
+        school_id: studentProfile.school_id || '',
       })
     }
   }, [profile, studentProfile])
+
+  // Öğrenci puanlarını ve ligini yükle
+  useEffect(() => {
+    async function loadStudentData() {
+      if (!studentProfile?.id) return
+
+      // Puanları al
+      const { data: points } = await supabase
+        .from('student_points')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+        .single()
+      
+      if (points) {
+        setStudentPoints(points)
+        
+        // Ligi hesapla
+        const { data: leagueData } = await supabase
+          .rpc('get_student_league', { p_points: points.total_points })
+        
+        if (leagueData && leagueData.length > 0) {
+          setLeague(leagueData[0])
+        }
+      }
+    }
+    loadStudentData()
+  }, [studentProfile?.id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -59,12 +156,18 @@ export default function StudentProfilePage() {
       .eq('id', profile?.id)
 
     // Öğrenci profili güncelle
+    const gradeNumber = formData.grade ? parseInt(formData.grade) : null
+    
     const { error: studentError } = await supabase
       .from('student_profiles')
       .update({
+        grade: gradeNumber,
         grade_level: formData.grade_level,
-        school_name: formData.school_name,
+        school_name: formData.school_name || (formData.school_id ? null : formData.school_name),
         target_exam: formData.target_exam,
+        city_id: formData.city_id || null,
+        district_id: formData.district_id || null,
+        school_id: formData.school_id || null,
       })
       .eq('user_id', profile?.id)
 
@@ -80,6 +183,39 @@ export default function StudentProfilePage() {
     setSaving(false)
   }
 
+  // Yeni okul ekle
+  async function handleAddSchool() {
+    if (!formData.school_name || !formData.city_id || !formData.district_id) {
+      alert('Lütfen önce il, ilçe ve okul adını girin')
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('schools')
+      .insert({
+        name: formData.school_name,
+        city_id: formData.city_id,
+        district_id: formData.district_id,
+        school_type: getSchoolType(parseInt(formData.grade) || 8),
+      })
+      .select()
+      .single()
+
+    if (data) {
+      setSchools([...schools, data])
+      setFormData({ ...formData, school_id: data.id })
+      alert('Okul başarıyla eklendi!')
+    } else if (error) {
+      alert('Hata: ' + error.message)
+    }
+  }
+
+  function getSchoolType(grade: number): 'ilkokul' | 'ortaokul' | 'lise' {
+    if (grade <= 4) return 'ilkokul'
+    if (grade <= 8) return 'ortaokul'
+    return 'lise'
+  }
+
   const pageLoading = profileLoading || studentLoading
 
   if (pageLoading) {
@@ -93,9 +229,18 @@ export default function StudentProfilePage() {
   }
 
   const gradeOptions = [
-    '5. Sınıf', '6. Sınıf', '7. Sınıf', '8. Sınıf',
-    '9. Sınıf', '10. Sınıf', '11. Sınıf', '12. Sınıf',
-    'Mezun'
+    { value: '1', label: '1. Sınıf' },
+    { value: '2', label: '2. Sınıf' },
+    { value: '3', label: '3. Sınıf' },
+    { value: '4', label: '4. Sınıf' },
+    { value: '5', label: '5. Sınıf' },
+    { value: '6', label: '6. Sınıf' },
+    { value: '7', label: '7. Sınıf' },
+    { value: '8', label: '8. Sınıf' },
+    { value: '9', label: '9. Sınıf' },
+    { value: '10', label: '10. Sınıf' },
+    { value: '11', label: '11. Sınıf' },
+    { value: '12', label: '12. Sınıf' },
   ]
 
   const examOptions = [
@@ -104,11 +249,11 @@ export default function StudentProfilePage() {
 
   return (
     <DashboardLayout role="ogrenci">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-surface-900">Profilim</h1>
-          <p className="text-surface-500">Profil bilgilerini düzenle</p>
+          <h1 className="text-2xl font-bold text-surface-900 dark:text-white">Profilim</h1>
+          <p className="text-surface-500">Profil bilgilerini düzenle ve liderlik tablosunda yerini al!</p>
         </div>
 
         {/* Success Message */}
@@ -116,16 +261,51 @@ export default function StudentProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 bg-green-50 text-green-700 rounded-xl flex items-center gap-2"
+            className="p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl flex items-center gap-2"
           >
             <CheckCircle className="w-5 h-5" />
             Profil başarıyla güncellendi!
           </motion.div>
         )}
 
+        {/* Stats Card */}
+        {studentPoints && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card p-6 bg-gradient-to-r from-primary-500 to-primary-600 text-white"
+          >
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {league && (
+                  <div className="text-4xl">{league.league_icon}</div>
+                )}
+                <div>
+                  <div className="text-sm text-primary-100">Mevcut Lig</div>
+                  <div className="text-xl font-bold">{league?.league_name || 'Bronz'}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-6 text-center">
+                <div>
+                  <div className="text-2xl font-bold">{studentPoints.total_points}</div>
+                  <div className="text-xs text-primary-100">Puan</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{studentPoints.total_questions}</div>
+                  <div className="text-xs text-primary-100">Soru</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{studentPoints.max_streak}</div>
+                  <div className="text-xs text-primary-100">Max Seri</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Profile Card */}
         <div className="card p-6">
-          <div className="flex items-center gap-6 mb-6 pb-6 border-b border-surface-100">
+          <div className="flex items-center gap-6 mb-6 pb-6 border-b border-surface-100 dark:border-surface-700">
             <AvatarUpload
               userId={profile?.id || ''}
               currentAvatarUrl={profile?.avatar_url || null}
@@ -136,7 +316,7 @@ export default function StudentProfilePage() {
               size="md"
             />
             <div>
-              <div className="font-semibold text-surface-900 text-lg">{profile?.full_name}</div>
+              <div className="font-semibold text-surface-900 dark:text-white text-lg">{profile?.full_name}</div>
               <div className="text-surface-500">{profile?.email}</div>
             </div>
           </div>
@@ -180,13 +360,20 @@ export default function StudentProfilePage() {
                   Sınıf
                 </label>
                 <select
-                  value={formData.grade_level}
-                  onChange={(e) => setFormData({ ...formData, grade_level: e.target.value })}
+                  value={formData.grade}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setFormData({ 
+                      ...formData, 
+                      grade: val,
+                      grade_level: val ? `${val}. Sınıf` : ''
+                    })
+                  }}
                   className="input"
                 >
                   <option value="">Seçin</option>
                   {gradeOptions.map(g => (
-                    <option key={g} value={g}>{g}</option>
+                    <option key={g.value} value={g.value}>{g.label}</option>
                   ))}
                 </select>
               </div>
@@ -208,19 +395,123 @@ export default function StudentProfilePage() {
               </div>
             </div>
 
-            {/* School */}
-            <div>
-              <label className="label">
-                <School className="w-4 h-4 inline mr-1" />
-                Okul
-              </label>
-              <input
-                type="text"
-                value={formData.school_name}
-                onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
-                className="input"
-                placeholder="Okulunuzun adı"
-              />
+            {/* Location Info - Liderlik için önemli */}
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800">
+              <div className="flex items-center gap-2 mb-3">
+                <Trophy className="w-5 h-5 text-amber-600" />
+                <span className="font-semibold text-amber-800 dark:text-amber-400">
+                  Liderlik Tablosu İçin Konum Bilgilerin
+                </span>
+              </div>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+                İl, ilçe ve okul bilgilerini doldurarak sınıf, okul, ilçe ve il liderlik tablolarında yer alabilirsin!
+              </p>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label">
+                    <MapPin className="w-4 h-4 inline mr-1" />
+                    İl
+                  </label>
+                  <select
+                    value={formData.city_id}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      city_id: e.target.value,
+                      district_id: '',
+                      school_id: ''
+                    })}
+                    className="input"
+                  >
+                    <option value="">İl Seçin</option>
+                    {cities.map(city => (
+                      <option key={city.id} value={city.id}>{city.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">
+                    <Building2 className="w-4 h-4 inline mr-1" />
+                    İlçe
+                  </label>
+                  <select
+                    value={formData.district_id}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      district_id: e.target.value,
+                      school_id: ''
+                    })}
+                    className="input"
+                    disabled={!formData.city_id}
+                  >
+                    <option value="">İlçe Seçin</option>
+                    {districts.map(district => (
+                      <option key={district.id} value={district.id}>{district.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="label">
+                  <School className="w-4 h-4 inline mr-1" />
+                  Okul
+                </label>
+                {schools.length > 0 ? (
+                  <select
+                    value={formData.school_id}
+                    onChange={(e) => setFormData({ ...formData, school_id: e.target.value })}
+                    className="input"
+                    disabled={!formData.district_id}
+                  >
+                    <option value="">Okul Seçin</option>
+                    {schools.map(school => (
+                      <option key={school.id} value={school.id}>{school.name}</option>
+                    ))}
+                    <option value="other">Listemizde yok, eklemek istiyorum</option>
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={formData.school_name}
+                      onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
+                      className="input"
+                      placeholder="Okulunuzun adını yazın"
+                      disabled={!formData.district_id}
+                    />
+                    {formData.school_name && formData.district_id && (
+                      <button
+                        type="button"
+                        onClick={handleAddSchool}
+                        className="text-sm text-primary-500 hover:text-primary-600"
+                      >
+                        + Okulu listeye ekle
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {formData.school_id === 'other' && (
+                  <div className="mt-2 space-y-2">
+                    <input
+                      type="text"
+                      value={formData.school_name}
+                      onChange={(e) => setFormData({ ...formData, school_name: e.target.value })}
+                      className="input"
+                      placeholder="Okulunuzun tam adını yazın"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddSchool}
+                      className="text-sm text-primary-500 hover:text-primary-600 flex items-center gap-1"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      Okulu sisteme ekle
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Submit */}
@@ -242,6 +533,23 @@ export default function StudentProfilePage() {
               )}
             </button>
           </form>
+        </div>
+
+        {/* Info Card */}
+        <div className="card p-4 bg-surface-50 dark:bg-surface-800/50">
+          <div className="flex items-start gap-3">
+            <Medal className="w-5 h-5 text-primary-500 mt-0.5" />
+            <div className="text-sm text-surface-600 dark:text-surface-400">
+              <strong>Liderlik Tablosu Seviyeleri:</strong>
+              <ul className="mt-2 space-y-1">
+                <li>🏫 <strong>Sınıf Liderliği:</strong> Aynı okul ve sınıftaki öğrenciler</li>
+                <li>🎓 <strong>Okul Liderliği:</strong> Tüm okul öğrencileri</li>
+                <li>🏘️ <strong>İlçe Liderliği:</strong> Aynı ilçedeki tüm öğrenciler</li>
+                <li>🌆 <strong>İl Liderliği:</strong> Aynı ildeki tüm öğrenciler</li>
+                <li>🇹🇷 <strong>Türkiye Liderliği:</strong> Tüm Türkiye öğrencileri</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>

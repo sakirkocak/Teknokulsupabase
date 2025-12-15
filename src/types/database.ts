@@ -42,8 +42,12 @@ export interface StudentProfile {
   id: string
   user_id: string
   grade_level: string | null
+  grade: number | null
   target_exam: string | null
   school_name: string | null
+  city_id: string | null
+  district_id: string | null
+  school_id: string | null
   created_at: string
 }
 
@@ -193,4 +197,227 @@ export interface Review {
   is_anonymous: boolean
   is_approved: boolean
   created_at: string
+}
+
+// =====================================================
+// OYUNLAŞTIRMA TİPLERİ
+// =====================================================
+
+export interface TurkeyCity {
+  id: string
+  name: string
+  plate_code: number
+  created_at: string
+}
+
+export interface TurkeyDistrict {
+  id: string
+  city_id: string
+  name: string
+  created_at: string
+}
+
+export interface School {
+  id: string
+  name: string
+  city_id: string
+  district_id: string
+  school_type: 'ilkokul' | 'ortaokul' | 'lise' | 'kolej' | null
+  is_verified: boolean
+  created_at: string
+}
+
+export interface Badge {
+  id: string
+  name: string
+  description: string | null
+  icon: string
+  category: 'streak' | 'points' | 'subject' | 'special' | 'rank'
+  requirement_type: string
+  requirement_value: number
+  requirement_subject: string | null
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | null
+  points_reward: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface StudentBadge {
+  id: string
+  student_id: string
+  badge_id: string
+  earned_at: string
+  badge?: Badge
+}
+
+export interface AvatarItem {
+  id: string
+  name: string
+  description: string | null
+  category: 'head' | 'face' | 'body' | 'accessory' | 'background' | 'frame'
+  image_url: string | null
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | null
+  unlock_type: 'default' | 'points' | 'badge' | 'streak' | 'rank' | 'event' | 'purchase'
+  unlock_value: number
+  unlock_badge_id: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface StudentAvatar {
+  id: string
+  student_id: string
+  equipped_head: string | null
+  equipped_face: string | null
+  equipped_body: string | null
+  equipped_accessory: string | null
+  equipped_background: string | null
+  equipped_frame: string | null
+  unlocked_items: string[]
+  updated_at: string
+}
+
+export interface Duel {
+  id: string
+  challenger_id: string
+  opponent_id: string
+  subject: string | null
+  question_count: number
+  status: 'pending' | 'active' | 'completed' | 'cancelled' | 'expired'
+  challenger_score: number
+  opponent_score: number
+  challenger_answers: any[]
+  opponent_answers: any[]
+  winner_id: string | null
+  question_ids: string[]
+  current_question: number
+  expires_at: string | null
+  started_at: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+export interface DuelStats {
+  id: string
+  student_id: string
+  total_duels: number
+  wins: number
+  losses: number
+  draws: number
+  win_streak: number
+  max_win_streak: number
+  total_points_earned: number
+  updated_at: string
+}
+
+export interface League {
+  id: string
+  name: string
+  min_points: number
+  max_points: number | null
+  icon: string
+  color: string
+  tier: number
+  created_at: string
+}
+
+export interface Season {
+  id: string
+  name: string
+  start_date: string
+  end_date: string
+  is_active: boolean
+  rewards: Record<string, any>
+  created_at: string
+}
+
+export interface SeasonRanking {
+  id: string
+  season_id: string
+  student_id: string
+  total_points: number
+  total_questions: number
+  total_correct: number
+  final_rank: number | null
+  rewards_claimed: boolean
+  created_at: string
+}
+
+export interface DailyQuest {
+  id: string
+  name: string
+  description: string | null
+  quest_type: string
+  target_value: number
+  target_subject: string | null
+  points_reward: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface StudentDailyQuest {
+  id: string
+  student_id: string
+  quest_id: string
+  quest_date: string
+  current_progress: number
+  is_completed: boolean
+  completed_at: string | null
+  reward_claimed: boolean
+  created_at: string
+  quest?: DailyQuest
+}
+
+export interface StudentPoints {
+  id: string
+  student_id: string
+  total_points: number
+  total_questions: number
+  total_correct: number
+  total_wrong: number
+  turkce_points: number
+  turkce_correct: number
+  turkce_wrong: number
+  matematik_points: number
+  matematik_correct: number
+  matematik_wrong: number
+  fen_points: number
+  fen_correct: number
+  fen_wrong: number
+  inkilap_points: number
+  inkilap_correct: number
+  inkilap_wrong: number
+  din_points: number
+  din_correct: number
+  din_wrong: number
+  ingilizce_points: number
+  ingilizce_correct: number
+  ingilizce_wrong: number
+  current_streak: number
+  max_streak: number
+  last_activity_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface LeaderboardEntry {
+  student_id: string
+  full_name: string
+  avatar_url: string | null
+  grade: number | null
+  city_name: string | null
+  district_name: string | null
+  school_name: string | null
+  total_points: number
+  total_questions: number
+  total_correct: number
+  total_wrong?: number
+  max_streak: number
+  success_rate: number
+  rank: number
+  class_rank?: number
+  school_rank?: number
+  district_rank?: number
+  city_rank?: number
+  turkey_rank?: number
 }

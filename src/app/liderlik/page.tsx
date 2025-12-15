@@ -8,21 +8,10 @@ import { motion } from 'framer-motion'
 import { 
   Trophy, Medal, Crown, Star, Target, Zap,
   TrendingUp, Users, BookOpen, GraduationCap,
-  ChevronRight, Flame, Award, BarChart3
+  ChevronRight, Flame, Award, BarChart3, MapPin,
+  Building2, School, Globe, Filter
 } from 'lucide-react'
-
-interface LeaderboardEntry {
-  student_id: string
-  full_name: string
-  avatar_url: string | null
-  total_points: number
-  total_questions: number
-  total_correct: number
-  total_wrong: number
-  max_streak: number
-  success_rate: number
-  rank: number
-}
+import { TurkeyCity, LeaderboardEntry } from '@/types/database'
 
 interface SubjectLeader {
   student_id: string
@@ -43,8 +32,16 @@ const subjects = [
   { key: 'fen', label: 'Fen Bilimleri', icon: Zap, color: 'from-green-500 to-emerald-600' },
 ]
 
+const scopes = [
+  { key: 'turkey', label: 'Türkiye', icon: Globe },
+  { key: 'city', label: 'İl Bazlı', icon: MapPin },
+]
+
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('genel')
+  const [activeScope, setActiveScope] = useState('turkey')
+  const [selectedCity, setSelectedCity] = useState<string>('')
+  const [cities, setCities] = useState<TurkeyCity[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [subjectLeaders, setSubjectLeaders] = useState<SubjectLeader[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,51 +50,125 @@ export default function LeaderboardPage() {
 
   const supabase = createClient()
 
+  // İlleri yükle
+  useEffect(() => {
+    async function loadCities() {
+      const { data } = await supabase
+        .from('turkey_cities')
+        .select('*')
+        .order('name')
+      if (data) setCities(data)
+    }
+    loadCities()
+  }, [])
+
   useEffect(() => {
     loadLeaderboard()
-  }, [activeTab])
+  }, [activeTab, activeScope, selectedCity])
 
   const loadLeaderboard = async () => {
     setLoading(true)
 
     if (activeTab === 'genel') {
-      // Genel liderlik
-      const { data, error } = await supabase
-        .from('student_points')
-        .select(`
-          student_id,
-          total_points,
-          total_questions,
-          total_correct,
-          total_wrong,
-          max_streak,
-          student:student_profiles!student_points_student_id_fkey(
-            user_id,
-            profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
-          )
-        `)
-        .gt('total_questions', 0)
-        .order('total_points', { ascending: false })
-        .limit(100)
+      if (activeScope === 'turkey') {
+        // Türkiye liderliği
+        const { data } = await supabase
+          .from('leaderboard_turkey')
+          .select('*')
+          .limit(100)
 
-      if (data) {
-        const formatted = data.map((item: any, index: number) => ({
-          student_id: item.student_id,
-          full_name: item.student?.profile?.full_name || 'Anonim',
-          avatar_url: item.student?.profile?.avatar_url,
-          total_points: item.total_points,
-          total_questions: item.total_questions,
-          total_correct: item.total_correct,
-          total_wrong: item.total_wrong,
-          max_streak: item.max_streak,
-          success_rate: item.total_questions > 0 
-            ? Math.round((item.total_correct / item.total_questions) * 100) 
-            : 0,
-          rank: index + 1
-        }))
-        setLeaderboard(formatted)
-        setTotalStudents(formatted.length)
-        setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        if (data) {
+          const formatted: LeaderboardEntry[] = data.map((item: any) => ({
+            student_id: item.student_id,
+            full_name: item.full_name || 'Anonim',
+            avatar_url: item.avatar_url,
+            grade: item.grade,
+            city_name: item.city_name,
+            district_name: item.district_name,
+            school_name: item.school_name,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            max_streak: item.max_streak,
+            success_rate: item.success_rate || 0,
+            rank: item.turkey_rank,
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
+      } else if (activeScope === 'city' && selectedCity) {
+        // İl liderliği
+        const { data } = await supabase
+          .from('leaderboard_by_city')
+          .select('*')
+          .eq('city_id', selectedCity)
+          .limit(100)
+
+        if (data) {
+          const formatted: LeaderboardEntry[] = data.map((item: any) => ({
+            student_id: item.student_id,
+            full_name: item.full_name || 'Anonim',
+            avatar_url: item.avatar_url,
+            grade: item.grade,
+            city_name: item.city_name,
+            district_name: null,
+            school_name: null,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            max_streak: item.max_streak,
+            success_rate: item.success_rate || 0,
+            rank: item.city_rank,
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
+      } else {
+        // Fallback to student_points
+        const { data } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            total_wrong,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(100)
+
+        if (data) {
+          const formatted: LeaderboardEntry[] = data.map((item: any, index: number) => ({
+            student_id: item.student_id,
+            full_name: item.student?.profile?.full_name || 'Anonim',
+            avatar_url: item.student?.profile?.avatar_url,
+            grade: item.student?.grade,
+            city_name: null,
+            district_name: null,
+            school_name: null,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            total_wrong: item.total_wrong,
+            max_streak: item.max_streak,
+            success_rate: item.total_questions > 0 
+              ? Math.round((item.total_correct / item.total_questions) * 100) 
+              : 0,
+            rank: index + 1
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
       }
     } else {
       // Ders bazlı liderlik
@@ -162,6 +233,11 @@ export default function LeaderboardPage() {
     if (rank === 2) return 'bg-gradient-to-r from-gray-400/20 to-gray-500/20 border-gray-400/50'
     if (rank === 3) return 'bg-gradient-to-r from-amber-600/20 to-orange-600/20 border-amber-600/50'
     return 'bg-white/5 border-white/10 hover:bg-white/10'
+  }
+
+  const getSelectedCityName = () => {
+    const city = cities.find(c => c.id === selectedCity)
+    return city?.name || 'İl'
   }
 
   return (
@@ -258,7 +334,45 @@ export default function LeaderboardPage() {
           </div>
         </div>
 
-        {/* Tab'lar */}
+        {/* Scope ve Tab Seçimi */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+          {/* Scope */}
+          <div className="flex gap-2">
+            {scopes.map((scope) => (
+              <button
+                key={scope.key}
+                onClick={() => {
+                  setActiveScope(scope.key)
+                  if (scope.key === 'turkey') setSelectedCity('')
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                  activeScope === scope.key
+                    ? 'bg-white text-gray-900 shadow-lg'
+                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                <scope.icon className="h-4 w-4" />
+                {scope.label}
+              </button>
+            ))}
+          </div>
+
+          {/* İl Seçimi */}
+          {activeScope === 'city' && (
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500"
+            >
+              <option value="" className="bg-gray-900">İl Seçin</option>
+              {cities.map(city => (
+                <option key={city.id} value={city.id} className="bg-gray-900">{city.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Ders Tab'ları */}
         <div className="flex flex-wrap gap-2 mb-8">
           {subjects.map((subject) => (
             <button
@@ -275,6 +389,14 @@ export default function LeaderboardPage() {
             </button>
           ))}
         </div>
+
+        {/* Başlık */}
+        {activeScope === 'city' && selectedCity && (
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <MapPin className="h-6 w-6 text-primary-400" />
+            {getSelectedCityName()} İl Liderliği
+          </h2>
+        )}
 
         {/* Liderlik Listesi */}
         {loading ? (
@@ -304,6 +426,9 @@ export default function LeaderboardPage() {
                         )}
                       </div>
                       <div className="font-bold text-white mb-1">{leaderboard[1].full_name}</div>
+                      {leaderboard[1].city_name && (
+                        <div className="text-xs text-white/50 mb-2">{leaderboard[1].city_name}</div>
+                      )}
                       <div className="text-2xl font-bold text-gray-300">{leaderboard[1].total_points}</div>
                       <div className="text-xs text-white/50">puan</div>
                     </div>
@@ -328,6 +453,9 @@ export default function LeaderboardPage() {
                         )}
                       </div>
                       <div className="text-xl font-bold text-white mb-1">{leaderboard[0].full_name}</div>
+                      {leaderboard[0].city_name && (
+                        <div className="text-sm text-white/60 mb-2">{leaderboard[0].city_name}</div>
+                      )}
                       <div className="text-3xl font-bold text-yellow-400">{leaderboard[0].total_points}</div>
                       <div className="text-sm text-white/50">puan</div>
                       <div className="flex items-center justify-center gap-4 mt-4 text-sm">
@@ -357,6 +485,9 @@ export default function LeaderboardPage() {
                         )}
                       </div>
                       <div className="font-bold text-white mb-1">{leaderboard[2].full_name}</div>
+                      {leaderboard[2].city_name && (
+                        <div className="text-xs text-white/50 mb-2">{leaderboard[2].city_name}</div>
+                      )}
                       <div className="text-2xl font-bold text-amber-500">{leaderboard[2].total_points}</div>
                       <div className="text-xs text-white/50">puan</div>
                     </div>
@@ -388,7 +519,9 @@ export default function LeaderboardPage() {
                   <div className="flex-1">
                     <div className="font-medium text-white">{entry.full_name}</div>
                     <div className="text-sm text-white/50">
-                      {entry.total_questions} soru • %{entry.success_rate} başarı
+                      {entry.city_name && <span className="mr-2">{entry.city_name}</span>}
+                      {entry.grade && <span className="mr-2">{entry.grade}. Sınıf</span>}
+                      • {entry.total_questions} soru • %{entry.success_rate} başarı
                     </div>
                   </div>
                   <div className="text-right">
@@ -435,7 +568,9 @@ export default function LeaderboardPage() {
               (activeTab !== 'genel' && subjectLeaders.length === 0)) && (
               <div className="text-center py-16">
                 <Trophy className="h-16 w-16 text-white/20 mx-auto mb-4" />
-                <h3 className="text-xl font-medium text-white/60 mb-2">Henüz veri yok</h3>
+                <h3 className="text-xl font-medium text-white/60 mb-2">
+                  {activeScope === 'city' && !selectedCity ? 'Lütfen bir il seçin' : 'Henüz veri yok'}
+                </h3>
                 <p className="text-white/40">İlk soru çözen sen ol!</p>
               </div>
             )}
@@ -472,8 +607,52 @@ export default function LeaderboardPage() {
             </Link>
           </div>
         </motion.div>
+
+        {/* Liderlik Seviyeleri Bilgisi */}
+        <div className="mt-8 bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Award className="h-5 w-5 text-primary-400" />
+            Liderlik Seviyeleri
+          </h3>
+          <div className="grid sm:grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-amber-400 mb-1">
+                <GraduationCap className="h-4 w-4" />
+                <span className="font-medium">Sınıf Lideri</span>
+              </div>
+              <p className="text-white/60">Sınıfındaki 1. ol</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-purple-400 mb-1">
+                <School className="h-4 w-4" />
+                <span className="font-medium">Okul Şampiyonu</span>
+              </div>
+              <p className="text-white/60">Okulundaki 1. ol</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-green-400 mb-1">
+                <Building2 className="h-4 w-4" />
+                <span className="font-medium">İlçe Yıldızı</span>
+              </div>
+              <p className="text-white/60">İlçendeki 1. ol</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-blue-400 mb-1">
+                <MapPin className="h-4 w-4" />
+                <span className="font-medium">İl Efsanesi</span>
+              </div>
+              <p className="text-white/60">İlindeki 1. ol</p>
+            </div>
+            <div className="bg-white/5 rounded-lg p-3">
+              <div className="flex items-center gap-2 text-red-400 mb-1">
+                <Globe className="h-4 w-4" />
+                <span className="font-medium">Türkiye 1.si</span>
+              </div>
+              <p className="text-white/60">Türkiye'de 1. ol</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
-

@@ -26,8 +26,11 @@ import {
   X,
   Heart,
   Phone,
-  Mail
+  Mail,
+  Trophy,
+  BookOpen
 } from 'lucide-react'
+import GamificationPanel from '@/components/gamification/GamificationPanel'
 
 export default function StudentDashboard() {
   const { profile, loading: profileLoading } = useProfile()
@@ -539,6 +542,26 @@ export default function StudentDashboard() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
+            {/* Gamification Panel */}
+            {studentProfile?.id && (
+              <GamificationPanel 
+                studentId={studentProfile.id} 
+                grade={studentProfile.grade || null}
+              />
+            )}
+
+            {/* Soru Bankası Hızlı Erişim */}
+            <Link href="/ogrenci/soru-bankasi" className="card p-4 flex items-center gap-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:shadow-lg transition-shadow">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <div className="font-semibold">Soru Bankası</div>
+                <div className="text-sm text-primary-100">Şimdi soru çözmeye başla!</div>
+              </div>
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+
             {/* AI Recommendations */}
             <div className="card p-6">
               <div className="flex items-center justify-between mb-4">
