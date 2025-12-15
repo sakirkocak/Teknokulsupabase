@@ -8,15 +8,34 @@ import { useRouter } from 'next/navigation'
 import { 
   BookOpen, Filter, Play, CheckCircle, XCircle, 
   ChevronRight, Trophy, Target, Zap, Crown, Star,
-  BarChart3, ArrowRight, Clock, Brain
+  BarChart3, ArrowRight, Clock, Brain, GraduationCap
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
+interface Subject {
+  id: string
+  name: string
+  code: string
+  icon: string | null
+  color: string | null
+  category: string | null
+}
+
+interface GradeSubject {
+  id: string
+  grade_id: number
+  subject_id: string
+  is_exam_subject: boolean
+  subject: Subject
+}
+
 interface Topic {
   id: string
-  subject: string
+  subject_id: string
+  grade: number
   main_topic: string
-  sub_topic: string
+  sub_topic: string | null
+  subject?: Subject
 }
 
 interface Question {
@@ -40,8 +59,6 @@ interface StudentStats {
   total_wrong: number
 }
 
-const subjects = ['Türkçe', 'Matematik', 'Fen Bilimleri', 'İnkılap Tarihi', 'Din Kültürü', 'İngilizce']
-
 const difficultyConfig = {
   easy: { label: 'Kolay', color: 'bg-green-500', textColor: 'text-green-500', icon: CheckCircle },
   medium: { label: 'Orta', color: 'bg-yellow-500', textColor: 'text-yellow-500', icon: Star },
@@ -49,17 +66,35 @@ const difficultyConfig = {
   legendary: { label: 'Efsane', color: 'bg-purple-500', textColor: 'text-purple-500', icon: Crown }
 }
 
-const subjectColors: Record<string, string> = {
-  'Türkçe': 'from-blue-500 to-blue-600',
-  'Matematik': 'from-red-500 to-red-600',
-  'Fen Bilimleri': 'from-green-500 to-green-600',
-  'İnkılap Tarihi': 'from-amber-500 to-amber-600',
-  'Din Kültürü': 'from-teal-500 to-teal-600',
-  'İngilizce': 'from-purple-500 to-purple-600'
+// Ders renkleri
+const subjectColorMap: Record<string, string> = {
+  'turkce': 'from-blue-500 to-blue-600',
+  'matematik': 'from-red-500 to-red-600',
+  'fen_bilimleri': 'from-green-500 to-green-600',
+  'inkilap_tarihi': 'from-amber-500 to-amber-600',
+  'din_kulturu': 'from-teal-500 to-teal-600',
+  'ingilizce': 'from-purple-500 to-purple-600',
+  'hayat_bilgisi': 'from-lime-500 to-lime-600',
+  'sosyal_bilgiler': 'from-orange-500 to-orange-600',
+  'edebiyat': 'from-indigo-500 to-indigo-600',
+  'fizik': 'from-cyan-500 to-cyan-600',
+  'kimya': 'from-violet-500 to-violet-600',
+  'biyoloji': 'from-emerald-500 to-emerald-600',
+  'tarih': 'from-yellow-500 to-yellow-600',
+  'cografya': 'from-sky-500 to-sky-600',
+  'felsefe': 'from-fuchsia-500 to-fuchsia-600',
 }
+
+// Sınıf grupları
+const gradeGroups = [
+  { name: 'İlkokul', grades: [1, 2, 3, 4], color: 'bg-green-100 text-green-700' },
+  { name: 'Ortaokul', grades: [5, 6, 7, 8], color: 'bg-blue-100 text-blue-700' },
+  { name: 'Lise', grades: [9, 10, 11, 12], color: 'bg-purple-100 text-purple-700' },
+]
 
 export default function SoruBankasiPage() {
   const router = useRouter()
+  const [gradeSubjects, setGradeSubjects] = useState<GradeSubject[]>([])
   const [topics, setTopics] = useState<Topic[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [stats, setStats] = useState<StudentStats[]>([])
@@ -67,6 +102,7 @@ export default function SoruBankasiPage() {
   const [studentProfile, setStudentProfile] = useState<any>(null)
 
   // Filtreler
+  const [selectedGrade, setSelectedGrade] = useState<number>(8)
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [selectedTopic, setSelectedTopic] = useState<string>('')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('')
@@ -83,10 +119,16 @@ export default function SoruBankasiPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    loadData()
+    loadInitialData()
   }, [])
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (selectedGrade) {
+      loadGradeSubjects()
+    }
+  }, [selectedGrade])
+
+  const loadInitialData = async () => {
     setLoading(true)
 
     // Kullanıcı bilgisi
@@ -103,49 +145,69 @@ export default function SoruBankasiPage() {
       .eq('user_id', user.id)
       .single()
     
-    if (profile) setStudentProfile(profile)
-
-    // Konuları yükle
-    const { data: topicsData } = await supabase
-      .from('lgs_topics')
-      .select('*')
-      .eq('is_active', true)
-      .order('subject')
-      .order('main_topic')
-    
-    if (topicsData) setTopics(topicsData)
-
-    // Soru sayılarını yükle (ders bazlı)
-    const { data: questionsData } = await supabase
-      .from('lgs_questions')
-      .select('id, topic_id, difficulty, topic:lgs_topics(subject)')
-      .eq('is_active', true)
-    
-    if (questionsData) setQuestions(questionsData as any)
-
-    // İstatistikleri yükle
     if (profile) {
-      const { data: statsData } = await supabase
-        .from('student_question_stats')
-        .select('*')
-        .eq('student_id', profile.id)
-      
-      if (statsData) setStats(statsData)
+      setStudentProfile(profile)
+      // Öğrencinin sınıfını varsayılan olarak seç
+      if (profile.grade) {
+        setSelectedGrade(profile.grade)
+      }
     }
 
     setLoading(false)
   }
 
-  const filteredTopics = topics.filter(t => 
-    !selectedSubject || t.subject === selectedSubject
-  )
+  const loadGradeSubjects = async () => {
+    // Seçilen sınıfın derslerini yükle
+    const { data: gsData } = await supabase
+      .from('grade_subjects')
+      .select(`
+        id,
+        grade_id,
+        subject_id,
+        is_exam_subject,
+        subject:subjects(id, name, code, icon, color, category)
+      `)
+      .eq('grade_id', selectedGrade)
+      .order('is_exam_subject', { ascending: false })
 
-  const getSubjectQuestionCount = (subject: string) => {
-    return questions.filter(q => (q.topic as any)?.subject === subject).length
+    if (gsData) {
+      setGradeSubjects(gsData as any)
+    }
+
+    // Konuları yükle
+    const { data: topicsData } = await supabase
+      .from('topics')
+      .select('*, subject:subjects(*)')
+      .eq('grade', selectedGrade)
+      .eq('is_active', true)
+
+    if (topicsData) {
+      setTopics(topicsData as any)
+    }
+
+    // İstatistikleri yükle
+    if (studentProfile?.id) {
+      const { data: statsData } = await supabase
+        .from('student_question_stats')
+        .select('*')
+        .eq('student_id', studentProfile.id)
+
+      if (statsData) setStats(statsData)
+    }
   }
 
-  const getSubjectStats = (subject: string) => {
-    const subjectTopics = topics.filter(t => t.subject === subject)
+  const filteredTopics = topics.filter(t => 
+    (!selectedSubject || t.subject_id === selectedSubject) && t.grade === selectedGrade
+  )
+
+  const getSubjectQuestionCount = (subjectId: string) => {
+    const subjectTopics = topics.filter(t => t.subject_id === subjectId)
+    // Gerçek soru sayısı için questions tablosundan sayma gerekebilir
+    return subjectTopics.length * 5 // Yaklaşık değer
+  }
+
+  const getSubjectStats = (subjectId: string) => {
+    const subjectTopics = topics.filter(t => t.subject_id === subjectId)
     const topicIds = subjectTopics.map(t => t.id)
     const subjectStats = stats.filter(s => topicIds.includes(s.topic_id))
     
@@ -170,15 +232,17 @@ export default function SoruBankasiPage() {
     setShowResult(false)
 
     let query = supabase
-      .from('lgs_questions')
-      .select('*, topic:lgs_topics(*)')
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
       .eq('is_active', true)
 
     if (selectedTopic) {
       query = query.eq('topic_id', selectedTopic)
     } else if (selectedSubject) {
-      const subjectTopicIds = topics.filter(t => t.subject === selectedSubject).map(t => t.id)
-      query = query.in('topic_id', subjectTopicIds)
+      const subjectTopicIds = topics.filter(t => t.subject_id === selectedSubject).map(t => t.id)
+      if (subjectTopicIds.length > 0) {
+        query = query.in('topic_id', subjectTopicIds)
+      }
     }
 
     if (selectedDifficulty) {
@@ -186,11 +250,57 @@ export default function SoruBankasiPage() {
     }
 
     // Rastgele bir soru seç
-    const { data, count } = await query
+    const { data } = await query
     
     if (data && data.length > 0) {
       const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex])
+      setCurrentQuestion(data[randomIndex] as any)
+      setQuestionIndex(prev => prev + 1)
+    } else {
+      // Yeni sistemde soru yoksa, eski LGS sisteminden dene
+      await loadLegacyQuestion()
+    }
+  }
+
+  // Eski LGS sisteminden soru yükle (geriye uyumluluk)
+  const loadLegacyQuestion = async () => {
+    let query = supabase
+      .from('lgs_questions')
+      .select('*, topic:lgs_topics(*)')
+      .eq('is_active', true)
+
+    if (selectedSubject) {
+      const subjectData = gradeSubjects.find(gs => gs.subject_id === selectedSubject)
+      if (subjectData) {
+        const subjectName = subjectData.subject.name
+        const subjectTopicIds = (await supabase
+          .from('lgs_topics')
+          .select('id')
+          .eq('subject', subjectName)).data?.map(t => t.id) || []
+        
+        if (subjectTopicIds.length > 0) {
+          query = query.in('topic_id', subjectTopicIds)
+        }
+      }
+    }
+
+    if (selectedDifficulty) {
+      query = query.eq('difficulty', selectedDifficulty)
+    }
+
+    const { data } = await query
+
+    if (data && data.length > 0) {
+      const randomIndex = Math.floor(Math.random() * data.length)
+      const legacyQuestion = data[randomIndex]
+      // Legacy formatı yeni formata dönüştür
+      setCurrentQuestion({
+        ...legacyQuestion,
+        topic: {
+          ...legacyQuestion.topic,
+          subject: { name: legacyQuestion.topic.subject, code: legacyQuestion.topic.subject.toLowerCase() }
+        }
+      } as any)
       setQuestionIndex(prev => prev + 1)
     } else {
       setCurrentQuestion(null)
@@ -221,49 +331,17 @@ export default function SoruBankasiPage() {
 
     // Soru istatistiklerini güncelle
     await supabase
-      .from('lgs_questions')
+      .from('questions')
       .update({
         times_answered: (currentQuestion.times_answered || 0) + 1,
         times_correct: (currentQuestion.times_correct || 0) + (correct ? 1 : 0)
       })
       .eq('id', currentQuestion.id)
 
-    // Öğrenci istatistiklerini güncelle
+    // Öğrenci puanlarını güncelle
     if (studentProfile) {
-      const { data: existingStat } = await supabase
-        .from('student_question_stats')
-        .select('*')
-        .eq('student_id', studentProfile.id)
-        .eq('topic_id', currentQuestion.topic_id)
-        .single()
-
-      if (existingStat) {
-        await supabase
-          .from('student_question_stats')
-          .update({
-            total_attempted: existingStat.total_attempted + 1,
-            total_correct: existingStat.total_correct + (correct ? 1 : 0),
-            total_wrong: existingStat.total_wrong + (correct ? 0 : 1),
-            last_attempted_at: new Date().toISOString()
-          })
-          .eq('id', existingStat.id)
-      } else {
-        await supabase
-          .from('student_question_stats')
-          .insert({
-            student_id: studentProfile.id,
-            topic_id: currentQuestion.topic_id,
-            total_attempted: 1,
-            total_correct: correct ? 1 : 0,
-            total_wrong: correct ? 0 : 1,
-            last_attempted_at: new Date().toISOString()
-          })
-      }
-
-      // PUAN SİSTEMİ: student_points tablosunu güncelle
-      const subject = currentQuestion.topic?.subject || ''
+      const subjectCode = currentQuestion.topic?.subject?.code || 'turkce'
       
-      // Önce mevcut puanları al
       const { data: existingPoints } = await supabase
         .from('student_points')
         .select('*')
@@ -271,16 +349,15 @@ export default function SoruBankasiPage() {
         .single()
 
       const subjectMap: Record<string, { points: string; correct: string; wrong: string }> = {
-        'Türkçe': { points: 'turkce_points', correct: 'turkce_correct', wrong: 'turkce_wrong' },
-        'Matematik': { points: 'matematik_points', correct: 'matematik_correct', wrong: 'matematik_wrong' },
-        'Fen Bilimleri': { points: 'fen_points', correct: 'fen_correct', wrong: 'fen_wrong' },
-        'İnkılap Tarihi': { points: 'inkilap_points', correct: 'inkilap_correct', wrong: 'inkilap_wrong' },
-        'Din Kültürü': { points: 'din_points', correct: 'din_correct', wrong: 'din_wrong' },
-        'İngilizce': { points: 'ingilizce_points', correct: 'ingilizce_correct', wrong: 'ingilizce_wrong' },
+        'turkce': { points: 'turkce_points', correct: 'turkce_correct', wrong: 'turkce_wrong' },
+        'matematik': { points: 'matematik_points', correct: 'matematik_correct', wrong: 'matematik_wrong' },
+        'fen_bilimleri': { points: 'fen_points', correct: 'fen_correct', wrong: 'fen_wrong' },
+        'inkilap_tarihi': { points: 'inkilap_points', correct: 'inkilap_correct', wrong: 'inkilap_wrong' },
+        'din_kulturu': { points: 'din_points', correct: 'din_correct', wrong: 'din_wrong' },
+        'ingilizce': { points: 'ingilizce_points', correct: 'ingilizce_correct', wrong: 'ingilizce_wrong' },
       }
 
       if (existingPoints) {
-        // Güncelle
         const updateData: any = {
           total_points: Math.max(0, existingPoints.total_points + points),
           total_questions: existingPoints.total_questions + 1,
@@ -294,9 +371,8 @@ export default function SoruBankasiPage() {
           updated_at: new Date().toISOString()
         }
 
-        // Ders bazlı güncelleme
-        if (subjectMap[subject]) {
-          const cols = subjectMap[subject]
+        if (subjectMap[subjectCode]) {
+          const cols = subjectMap[subjectCode]
           updateData[cols.points] = Math.max(0, (existingPoints[cols.points] || 0) + points)
           updateData[cols.correct] = (existingPoints[cols.correct] || 0) + (correct ? 1 : 0)
           updateData[cols.wrong] = (existingPoints[cols.wrong] || 0) + (correct ? 0 : 1)
@@ -307,7 +383,6 @@ export default function SoruBankasiPage() {
           .update(updateData)
           .eq('student_id', studentProfile.id)
       } else {
-        // Yeni kayıt oluştur
         const insertData: any = {
           student_id: studentProfile.id,
           total_points: Math.max(0, points),
@@ -319,9 +394,8 @@ export default function SoruBankasiPage() {
           last_activity_at: new Date().toISOString()
         }
 
-        // Ders bazlı başlangıç değerleri
-        if (subjectMap[subject]) {
-          const cols = subjectMap[subject]
+        if (subjectMap[subjectCode]) {
+          const cols = subjectMap[subjectCode]
           insertData[cols.points] = Math.max(0, points)
           insertData[cols.correct] = correct ? 1 : 0
           insertData[cols.wrong] = correct ? 0 : 1
@@ -339,7 +413,7 @@ export default function SoruBankasiPage() {
     setCurrentQuestion(null)
     setSelectedAnswer(null)
     setShowResult(false)
-    loadData() // Stats'ları yenile
+    loadGradeSubjects()
   }
 
   if (loading) {
@@ -386,7 +460,7 @@ export default function SoruBankasiPage() {
           >
             {/* Konu Bilgisi */}
             <div className="text-indigo-300 text-sm mb-4">
-              {currentQuestion.topic?.subject} • {currentQuestion.topic?.main_topic}
+              {currentQuestion.topic?.subject?.name || 'Ders'} • {currentQuestion.topic?.main_topic || 'Konu'}
             </div>
 
             {/* Soru Metni */}
@@ -512,11 +586,48 @@ export default function SoruBankasiPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
             <BookOpen className="h-8 w-8 text-indigo-500" />
-            LGS Soru Bankası
+            Soru Bankası
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Konu bazlı soru çöz, kendini geliştir!
+            Sınıf ve ders seçerek soru çözmeye başla!
           </p>
+        </div>
+
+        {/* Sınıf Seçimi */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <GraduationCap className="h-5 w-5 text-indigo-500" />
+            <h2 className="font-semibold text-gray-900 dark:text-white">Sınıf Seç</h2>
+          </div>
+          
+          <div className="space-y-4">
+            {gradeGroups.map(group => (
+              <div key={group.name}>
+                <p className="text-xs font-medium text-gray-500 mb-2">{group.name}</p>
+                <div className="flex flex-wrap gap-2">
+                  {group.grades.map(grade => (
+                    <button
+                      key={grade}
+                      onClick={() => {
+                        setSelectedGrade(grade)
+                        setSelectedSubject('')
+                        setSelectedTopic('')
+                      }}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        selectedGrade === grade
+                          ? 'bg-indigo-500 text-white shadow-lg scale-105'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {grade}. Sınıf
+                      {grade === 8 && <span className="ml-1 text-xs opacity-75">(LGS)</span>}
+                      {grade === 12 && <span className="ml-1 text-xs opacity-75">(YKS)</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Hızlı Aksiyonlar */}
@@ -528,7 +639,9 @@ export default function SoruBankasiPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xl font-bold mb-1">Deneme Sınavı</h3>
-                <p className="text-white/70">90 soruluk tam LGS denemesi çöz</p>
+                <p className="text-white/70">
+                  {selectedGrade === 8 ? '90 soruluk tam LGS denemesi çöz' : 'Ders bazlı deneme çöz'}
+                </p>
               </div>
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Target className="h-8 w-8" />
@@ -562,43 +675,56 @@ export default function SoruBankasiPage() {
         </div>
 
         {/* Ders Kartları */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          {subjects.map(subject => {
-            const questionCount = getSubjectQuestionCount(subject)
-            const subjectStats = getSubjectStats(subject)
-            const isSelected = selectedSubject === subject
+        {gradeSubjects.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-8">
+            {gradeSubjects.map(gs => {
+              const subject = gs.subject
+              const subjectStats = getSubjectStats(subject.id)
+              const isSelected = selectedSubject === subject.id
+              const colorClass = subjectColorMap[subject.code] || 'from-gray-500 to-gray-600'
 
-            return (
-              <button
-                key={subject}
-                onClick={() => {
-                  setSelectedSubject(isSelected ? '' : subject)
-                  setSelectedTopic('')
-                }}
-                className={`p-4 rounded-xl transition-all ${
-                  isSelected
-                    ? `bg-gradient-to-br ${subjectColors[subject]} text-white shadow-lg scale-105`
-                    : 'bg-white dark:bg-gray-800 hover:shadow-md'
-                }`}
-              >
-                <div className={`text-2xl font-bold ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                  {questionCount}
-                </div>
-                <div className={`text-sm font-medium ${isSelected ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'}`}>
-                  {subject}
-                </div>
-                {subjectStats.total > 0 && (
-                  <div className={`text-xs mt-1 ${isSelected ? 'text-white/70' : 'text-gray-500'}`}>
-                    %{subjectStats.percentage} başarı
+              return (
+                <button
+                  key={gs.id}
+                  onClick={() => {
+                    setSelectedSubject(isSelected ? '' : subject.id)
+                    setSelectedTopic('')
+                  }}
+                  className={`p-4 rounded-xl transition-all ${
+                    isSelected
+                      ? `bg-gradient-to-br ${colorClass} text-white shadow-lg scale-105`
+                      : 'bg-white dark:bg-gray-800 hover:shadow-md'
+                  }`}
+                >
+                  <div className="text-2xl mb-2">{subject.icon || '📚'}</div>
+                  <div className={`text-sm font-medium ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                    {subject.name}
                   </div>
-                )}
-              </button>
-            )
-          })}
-        </div>
+                  {gs.is_exam_subject && (
+                    <div className={`text-xs mt-1 ${isSelected ? 'text-white/80' : 'text-indigo-500'}`}>
+                      ⭐ Sınav Dersi
+                    </div>
+                  )}
+                  {subjectStats.total > 0 && (
+                    <div className={`text-xs mt-1 ${isSelected ? 'text-white/70' : 'text-gray-500'}`}>
+                      %{subjectStats.percentage} başarı
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-white dark:bg-gray-800 rounded-2xl mb-8">
+            <BookOpen className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500">
+              {selectedGrade}. sınıf için henüz ders tanımlanmamış.
+            </p>
+          </div>
+        )}
 
         {/* Konu Seçimi ve Filtreler */}
-        {selectedSubject && (
+        {selectedSubject && filteredTopics.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -606,7 +732,7 @@ export default function SoruBankasiPage() {
           >
             <div className="flex flex-wrap items-center gap-4 mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {selectedSubject} Konuları
+                {gradeSubjects.find(gs => gs.subject_id === selectedSubject)?.subject.name} Konuları
               </h3>
               
               {/* Zorluk Filtresi */}
@@ -669,15 +795,28 @@ export default function SoruBankasiPage() {
           </motion.div>
         )}
 
-        {/* Soru Yoksa Mesaj */}
-        {!selectedSubject && questions.length === 0 && (
-          <div className="text-center py-12">
+        {/* Konu yoksa veya ders seçilmediyse bilgi */}
+        {selectedSubject && filteredTopics.length === 0 && (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
             <Brain className="h-16 w-16 mx-auto text-gray-300 mb-4" />
             <h3 className="text-xl font-medium text-gray-600 dark:text-gray-400">
-              Henüz soru eklenmemiş
+              Bu ders için henüz konu eklenmemiş
             </h3>
             <p className="text-gray-500 mt-2">
-              Admin panelinden soru ekleyebilirsiniz.
+              Admin panelinden konu ve soru ekleyebilirsiniz.
+            </p>
+          </div>
+        )}
+
+        {/* Ders seçilmemişse mesaj */}
+        {!selectedSubject && gradeSubjects.length > 0 && (
+          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl">
+            <Target className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-xl font-medium text-gray-600 dark:text-gray-400">
+              Soru çözmek için bir ders seç
+            </h3>
+            <p className="text-gray-500 mt-2">
+              Yukarıdaki derslerden birini seçerek konulara göz atabilirsin.
             </p>
           </div>
         )}
@@ -685,4 +824,3 @@ export default function SoruBankasiPage() {
     </div>
   )
 }
-

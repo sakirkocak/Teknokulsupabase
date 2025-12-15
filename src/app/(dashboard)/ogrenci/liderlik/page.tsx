@@ -52,12 +52,20 @@ const scopes = [
   { key: 'class', label: 'Sınıf', icon: GraduationCap, color: 'from-amber-500 to-amber-600' },
 ]
 
+// Sınıf filtreleri
+const gradeFilters = [
+  { label: 'Tümü', value: 0 },
+  { label: '8. Sınıf (LGS)', value: 8 },
+  { label: '12. Sınıf (YKS)', value: 12 },
+]
+
 export default function StudentLeaderboardPage() {
   const { profile } = useProfile()
   const { studentProfile } = useStudentProfile(profile?.id || '')
   
   const [activeTab, setActiveTab] = useState('genel')
   const [activeScope, setActiveScope] = useState('turkey')
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number>(0)
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [myStats, setMyStats] = useState<MyStats | null>(null)
   const [myRanks, setMyRanks] = useState<MyRanks | null>(null)
@@ -77,7 +85,7 @@ export default function StudentLeaderboardPage() {
       loadMyRanks()
       loadLocationInfo()
     }
-  }, [studentProfile?.id, activeTab, activeScope])
+  }, [studentProfile?.id, activeTab, activeScope, selectedGradeFilter])
 
   const loadLocationInfo = async () => {
     if (!studentProfile?.id) return
@@ -425,29 +433,55 @@ export default function StudentLeaderboardPage() {
           </div>
         )}
 
-        {/* Scope Seçimi */}
-        <div className="flex flex-wrap gap-2">
-          {scopes.map((scope) => {
-            const canAccess = canAccessScope(scope.key)
-            return (
-              <button
-                key={scope.key}
-                onClick={() => canAccess && setActiveScope(scope.key)}
-                disabled={!canAccess}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
-                  activeScope === scope.key
-                    ? `bg-gradient-to-r ${scope.color} text-white shadow-lg`
-                    : canAccess
-                    ? 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
-                    : 'bg-surface-100 dark:bg-surface-800 text-surface-400 cursor-not-allowed opacity-50'
-                }`}
-              >
-                <scope.icon className="h-4 w-4" />
-                {scope.label}
-                {!canAccess && <span className="text-xs">(Profil eksik)</span>}
-              </button>
-            )
-          })}
+        {/* Filtreler */}
+        <div className="card p-4 space-y-4">
+          {/* Scope Seçimi */}
+          <div>
+            <p className="text-sm font-medium text-surface-500 mb-2">Kapsam</p>
+            <div className="flex flex-wrap gap-2">
+              {scopes.map((scope) => {
+                const canAccess = canAccessScope(scope.key)
+                return (
+                  <button
+                    key={scope.key}
+                    onClick={() => canAccess && setActiveScope(scope.key)}
+                    disabled={!canAccess}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                      activeScope === scope.key
+                        ? `bg-gradient-to-r ${scope.color} text-white shadow-lg`
+                        : canAccess
+                        ? 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+                        : 'bg-surface-100 dark:bg-surface-800 text-surface-400 cursor-not-allowed opacity-50'
+                    }`}
+                  >
+                    <scope.icon className="h-4 w-4" />
+                    {scope.label}
+                    {!canAccess && <span className="text-xs">(Profil eksik)</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Sınıf Filtresi */}
+          <div>
+            <p className="text-sm font-medium text-surface-500 mb-2">Sınıf Filtresi</p>
+            <div className="flex flex-wrap gap-2">
+              {gradeFilters.map((filter) => (
+                <button
+                  key={filter.value}
+                  onClick={() => setSelectedGradeFilter(filter.value)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    selectedGradeFilter === filter.value
+                      ? 'bg-indigo-500 text-white shadow-lg'
+                      : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+                  }`}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Liderlik Listesi */}

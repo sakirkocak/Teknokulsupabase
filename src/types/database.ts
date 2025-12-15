@@ -171,7 +171,64 @@ export interface ParentReport {
 export interface Subject {
   id: string
   name: string
-  category: string
+  slug: string
+  code: string
+  icon: string | null
+  color: string | null
+  category: string | null
+  created_at: string
+}
+
+export interface Grade {
+  id: number
+  name: string
+  level: 'ilkokul' | 'ortaokul' | 'lise'
+  exam_type: string | null
+  created_at: string
+}
+
+export interface GradeSubject {
+  id: string
+  grade_id: number
+  subject_id: string
+  is_exam_subject: boolean
+  weekly_hours: number
+  created_at: string
+  grade?: Grade
+  subject?: Subject
+}
+
+export interface Topic {
+  id: string
+  subject_id: string
+  grade: number
+  unit_number: number | null
+  main_topic: string
+  sub_topic: string | null
+  learning_outcome: string | null
+  is_active: boolean
+  created_at: string
+  subject?: Subject
+}
+
+export interface Question {
+  id: string
+  topic_id: string
+  difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
+  question_text: string
+  question_image_url: string | null
+  options: { A: string; B: string; C: string; D: string }
+  correct_answer: 'A' | 'B' | 'C' | 'D'
+  explanation: string | null
+  source: string | null
+  year: number | null
+  times_answered: number
+  times_correct: number
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  topic?: Topic
 }
 
 export interface AIRecommendation {

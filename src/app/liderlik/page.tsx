@@ -37,10 +37,21 @@ const scopes = [
   { key: 'city', label: 'İl Bazlı', icon: MapPin },
 ]
 
+// Sınıf grupları
+const gradeGroups = [
+  { label: 'Tümü', value: 0 },
+  { label: '1-4', value: 'ilkokul' },
+  { label: '5-8', value: 'ortaokul' },
+  { label: '9-12', value: 'lise' },
+  { label: '8 (LGS)', value: 8 },
+  { label: '12 (YKS)', value: 12 },
+]
+
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('genel')
   const [activeScope, setActiveScope] = useState('turkey')
   const [selectedCity, setSelectedCity] = useState<string>('')
+  const [selectedGrade, setSelectedGrade] = useState<number | string>(0) // 0 = tümü
   const [cities, setCities] = useState<TurkeyCity[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [subjectLeaders, setSubjectLeaders] = useState<SubjectLeader[]>([])
@@ -64,7 +75,7 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     loadLeaderboard()
-  }, [activeTab, activeScope, selectedCity])
+  }, [activeTab, activeScope, selectedCity, selectedGrade])
 
   const loadLeaderboard = async () => {
     setLoading(true)
@@ -147,7 +158,22 @@ export default function LeaderboardPage() {
           .limit(100)
 
         if (data) {
-          const formatted: LeaderboardEntry[] = data.map((item: any, index: number) => ({
+          let filteredData = data
+          
+          // Sınıf filtrelemesi uygula
+          if (selectedGrade !== 0) {
+            if (selectedGrade === 'ilkokul') {
+              filteredData = data.filter((item: any) => item.student?.grade >= 1 && item.student?.grade <= 4)
+            } else if (selectedGrade === 'ortaokul') {
+              filteredData = data.filter((item: any) => item.student?.grade >= 5 && item.student?.grade <= 8)
+            } else if (selectedGrade === 'lise') {
+              filteredData = data.filter((item: any) => item.student?.grade >= 9 && item.student?.grade <= 12)
+            } else if (typeof selectedGrade === 'number') {
+              filteredData = data.filter((item: any) => item.student?.grade === selectedGrade)
+            }
+          }
+          
+          const formatted: LeaderboardEntry[] = filteredData.map((item: any, index: number) => ({
             student_id: item.student_id,
             full_name: item.student?.profile?.full_name || 'Anonim',
             avatar_url: item.student?.profile?.avatar_url,
@@ -331,6 +357,29 @@ export default function LeaderboardPage() {
                 <div className="text-xs text-white/50">En Uzun Seri</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Sınıf Filtresi */}
+        <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <GraduationCap className="h-5 w-5 text-indigo-400" />
+            <span className="text-sm font-medium text-white/70">Sınıf Filtresi</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {gradeGroups.map((group) => (
+              <button
+                key={String(group.value)}
+                onClick={() => setSelectedGrade(group.value)}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  selectedGrade === group.value
+                    ? 'bg-indigo-500 text-white'
+                    : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
+                }`}
+              >
+                {group.label}
+              </button>
+            ))}
           </div>
         </div>
 

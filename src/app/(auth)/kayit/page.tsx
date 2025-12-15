@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft } from 'lucide-react'
+import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft, School } from 'lucide-react'
 
 type RoleOption = {
   id: 'ogrenci' | 'ogretmen' | 'veli'
@@ -34,12 +34,29 @@ const roles: RoleOption[] = [
   },
 ]
 
+// Sınıf seçenekleri
+const gradeOptions = [
+  { id: 1, name: '1. Sınıf', level: 'İlkokul' },
+  { id: 2, name: '2. Sınıf', level: 'İlkokul' },
+  { id: 3, name: '3. Sınıf', level: 'İlkokul' },
+  { id: 4, name: '4. Sınıf', level: 'İlkokul' },
+  { id: 5, name: '5. Sınıf', level: 'Ortaokul' },
+  { id: 6, name: '6. Sınıf', level: 'Ortaokul' },
+  { id: 7, name: '7. Sınıf', level: 'Ortaokul' },
+  { id: 8, name: '8. Sınıf', level: 'Ortaokul (LGS)' },
+  { id: 9, name: '9. Sınıf', level: 'Lise' },
+  { id: 10, name: '10. Sınıf', level: 'Lise' },
+  { id: 11, name: '11. Sınıf', level: 'Lise (TYT)' },
+  { id: 12, name: '12. Sınıf', level: 'Lise (TYT-AYT)' },
+]
+
 function RegisterForm() {
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<'ogrenci' | 'ogretmen' | 'veli'>('ogrenci')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [grade, setGrade] = useState<number>(8) // Varsayılan 8. sınıf (LGS)
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -112,7 +129,10 @@ function RegisterForm() {
           if (!existingStudentProfile) {
             const { error: studentError } = await supabase
               .from('student_profiles')
-              .insert({ user_id: authData.user.id })
+              .insert({ 
+                user_id: authData.user.id,
+                grade: grade // Sınıf bilgisi
+              })
 
             if (studentError && !studentError.message.includes('duplicate')) {
               console.error('Öğrenci profili oluşturma hatası:', studentError)
@@ -238,11 +258,94 @@ function RegisterForm() {
             </button>
           ))}
           <button
-            onClick={() => setStep(2)}
+            onClick={() => setStep(role === 'ogrenci' ? 2 : 3)}
             className="btn btn-primary btn-lg w-full mt-6"
           >
             Devam Et
           </button>
+        </div>
+      ) : step === 2 && role === 'ogrenci' ? (
+        <div className="space-y-4">
+          <p className="text-sm text-surface-600 mb-4">Sınıfını seç:</p>
+          
+          {/* İlkokul */}
+          <div>
+            <p className="text-xs font-medium text-surface-500 mb-2">İLKOKUL</p>
+            <div className="grid grid-cols-4 gap-2">
+              {gradeOptions.filter(g => g.id <= 4).map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setGrade(g.id)}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    grade === g.id
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-surface-200 hover:border-surface-300'
+                  }`}
+                >
+                  <span className="font-bold">{g.id}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ortaokul */}
+          <div>
+            <p className="text-xs font-medium text-surface-500 mb-2">ORTAOKUL</p>
+            <div className="grid grid-cols-4 gap-2">
+              {gradeOptions.filter(g => g.id >= 5 && g.id <= 8).map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setGrade(g.id)}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    grade === g.id
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-surface-200 hover:border-surface-300'
+                  } ${g.id === 8 ? 'ring-2 ring-orange-300' : ''}`}
+                >
+                  <span className="font-bold">{g.id}</span>
+                  {g.id === 8 && <span className="block text-xs text-orange-600">LGS</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Lise */}
+          <div>
+            <p className="text-xs font-medium text-surface-500 mb-2">LİSE</p>
+            <div className="grid grid-cols-4 gap-2">
+              {gradeOptions.filter(g => g.id >= 9).map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setGrade(g.id)}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    grade === g.id
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-surface-200 hover:border-surface-300'
+                  } ${g.id >= 11 ? 'ring-2 ring-purple-300' : ''}`}
+                >
+                  <span className="font-bold">{g.id}</span>
+                  {g.id === 11 && <span className="block text-xs text-purple-600">TYT</span>}
+                  {g.id === 12 && <span className="block text-xs text-purple-600">AYT</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="btn btn-ghost btn-lg flex-1"
+            >
+              Geri
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              className="btn btn-primary btn-lg flex-1"
+            >
+              Devam Et
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleRegister} className="space-y-5">
@@ -302,7 +405,7 @@ function RegisterForm() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => setStep(role === 'ogrenci' ? 2 : 1)}
               className="btn btn-ghost btn-lg flex-1"
             >
               Geri
