@@ -48,15 +48,79 @@ export default function AdminUsersPage() {
     setLoading(false)
   }
 
-  async function updateUserRole(userId: string, newRole: string) {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', userId)
+  const [updating, setUpdating] = useState(false)
 
-    if (!error) {
+  async function updateUserRole(userId: string, newRole: string, currentRole: string) {
+    if (updating) return
+    setUpdating(true)
+
+    try {
+      // 1. Ana profil tablosunu güncelle
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId)
+
+      if (profileError) {
+        console.error('Profil güncelleme hatası:', profileError)
+        alert('Rol güncellenirken bir hata oluştu: ' + profileError.message)
+        setUpdating(false)
+        return
+      }
+
+      // 2. Eski role göre ilgili profili sil (opsiyonel - veri kaybı olabilir)
+      // Şimdilik silmiyoruz, sadece yeni profil oluşturuyoruz
+
+      // 3. Yeni role göre ilgili profil tablosuna ekle
+      if (newRole === 'ogrenci') {
+        // Öğrenci profili var mı kontrol et
+        const { data: existing } = await supabase
+          .from('student_profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .single()
+
+        if (!existing) {
+          await supabase
+            .from('student_profiles')
+            .insert({ user_id: userId })
+        }
+      } else if (newRole === 'ogretmen') {
+        // Öğretmen profili var mı kontrol et
+        const { data: existing } = await supabase
+          .from('teacher_profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .single()
+
+        if (!existing) {
+          await supabase
+            .from('teacher_profiles')
+            .insert({ user_id: userId, is_coach: true })
+        }
+      } else if (newRole === 'veli') {
+        // Veli profili var mı kontrol et
+        const { data: existing } = await supabase
+          .from('parent_profiles')
+          .select('id')
+          .eq('user_id', userId)
+          .single()
+
+        if (!existing) {
+          await supabase
+            .from('parent_profiles')
+            .insert({ user_id: userId })
+        }
+      }
+
+      alert('Rol başarıyla güncellendi!')
       loadUsers()
       setSelectedUser(null)
+    } catch (err: any) {
+      console.error('Hata:', err)
+      alert('Bir hata oluştu: ' + err.message)
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -226,13 +290,15 @@ export default function AdminUsersPage() {
                               {['ogretmen', 'ogrenci', 'veli', 'admin'].map(r => (
                                 <button
                                   key={r}
-                                  onClick={() => updateUserRole(user.id, r)}
-                                  disabled={user.role === r}
-                                  className={`w-full px-4 py-2 text-left text-sm hover:bg-surface-50 ${
+                                  onClick={() => updateUserRole(user.id, r, user.role)}
+                                  disabled={user.role === r || updating}
+                                  className={`w-full px-4 py-2 text-left text-sm hover:bg-surface-50 flex items-center gap-2 ${
                                     user.role === r ? 'text-surface-300' : ''
-                                  }`}
+                                  } ${updating ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
+                                  {r === 'admin' && <Shield className="w-4 h-4 text-red-500" />}
                                   {roleConfig[r]?.label || r}
+                                  {user.role === r && <CheckCircle className="w-3 h-3 ml-auto" />}
                                 </button>
                               ))}
                             </div>
