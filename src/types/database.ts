@@ -217,8 +217,8 @@ export interface Question {
   difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
   question_text: string
   question_image_url: string | null
-  options: { A: string; B: string; C: string; D: string }
-  correct_answer: 'A' | 'B' | 'C' | 'D'
+  options: { A: string; B: string; C: string; D: string; E?: string }
+  correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
   explanation: string | null
   source: string | null
   year: number | null
@@ -277,11 +277,18 @@ export interface TurkeyDistrict {
 export interface School {
   id: string
   name: string
-  city_id: string
   district_id: string
-  school_type: 'ilkokul' | 'ortaokul' | 'lise' | 'kolej' | null
-  is_verified: boolean
+  address: string | null
+  phone: string | null
+  fax: string | null
+  website: string | null
+  school_type: string | null
+  school_type_code: number | null
+  institution_code: number | null
+  ownership_type: string
+  is_active: boolean
   created_at: string
+  updated_at: string
 }
 
 export interface Badge {

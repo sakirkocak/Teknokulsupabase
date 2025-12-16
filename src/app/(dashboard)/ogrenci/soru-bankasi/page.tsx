@@ -44,8 +44,8 @@ interface Question {
   difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
   question_text: string
   question_image_url: string | null
-  options: { A: string; B: string; C: string; D: string }
-  correct_answer: 'A' | 'B' | 'C' | 'D'
+  options: { A: string; B: string; C: string; D: string; E?: string }
+  correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
   explanation: string | null
   topic?: Topic
   times_answered?: number

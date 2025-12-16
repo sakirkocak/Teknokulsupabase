@@ -185,7 +185,7 @@ export default function StudentProfilePage() {
 
   // Yeni okul ekle
   async function handleAddSchool() {
-    if (!formData.school_name || !formData.city_id || !formData.district_id) {
+    if (!formData.school_name || !formData.district_id) {
       alert('Lütfen önce il, ilçe ve okul adını girin')
       return
     }
@@ -194,7 +194,6 @@ export default function StudentProfilePage() {
       .from('schools')
       .insert({
         name: formData.school_name,
-        city_id: formData.city_id,
         district_id: formData.district_id,
         school_type: getSchoolType(parseInt(formData.grade) || 8),
       })

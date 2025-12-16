@@ -82,62 +82,7 @@ export default function LeaderboardPage() {
 
     if (activeTab === 'genel') {
       if (activeScope === 'turkey') {
-        // Türkiye liderliği
-        const { data } = await supabase
-          .from('leaderboard_turkey')
-          .select('*')
-          .limit(100)
-
-        if (data) {
-          const formatted: LeaderboardEntry[] = data.map((item: any) => ({
-            student_id: item.student_id,
-            full_name: item.full_name || 'Anonim',
-            avatar_url: item.avatar_url,
-            grade: item.grade,
-            city_name: item.city_name,
-            district_name: item.district_name,
-            school_name: item.school_name,
-            total_points: item.total_points,
-            total_questions: item.total_questions,
-            total_correct: item.total_correct,
-            max_streak: item.max_streak,
-            success_rate: item.success_rate || 0,
-            rank: item.turkey_rank,
-          }))
-          setLeaderboard(formatted)
-          setTotalStudents(formatted.length)
-          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
-        }
-      } else if (activeScope === 'city' && selectedCity) {
-        // İl liderliği
-        const { data } = await supabase
-          .from('leaderboard_by_city')
-          .select('*')
-          .eq('city_id', selectedCity)
-          .limit(100)
-
-        if (data) {
-          const formatted: LeaderboardEntry[] = data.map((item: any) => ({
-            student_id: item.student_id,
-            full_name: item.full_name || 'Anonim',
-            avatar_url: item.avatar_url,
-            grade: item.grade,
-            city_name: item.city_name,
-            district_name: null,
-            school_name: null,
-            total_points: item.total_points,
-            total_questions: item.total_questions,
-            total_correct: item.total_correct,
-            max_streak: item.max_streak,
-            success_rate: item.success_rate || 0,
-            rank: item.city_rank,
-          }))
-          setLeaderboard(formatted)
-          setTotalStudents(formatted.length)
-          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
-        }
-      } else {
-        // Fallback to student_points
+        // Türkiye liderliği - doğrudan student_points'tan çek
         const { data } = await supabase
           .from('student_points')
           .select(`
@@ -150,12 +95,144 @@ export default function LeaderboardPage() {
             student:student_profiles!student_points_student_id_fkey(
               user_id,
               grade,
-              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
+              city:turkey_cities!student_profiles_city_id_fkey(name),
+              district:turkey_districts!student_profiles_district_id_fkey(name),
+              school:schools!student_profiles_school_id_fkey(name)
             )
           `)
           .gt('total_questions', 0)
           .order('total_points', { ascending: false })
-          .limit(100)
+          .limit(200)
+
+        if (data) {
+          let filteredData = data
+          
+          // Sınıf filtrelemesi uygula
+          if (selectedGrade !== 0) {
+            if (selectedGrade === 'ilkokul') {
+              filteredData = data.filter((item: any) => item.student?.grade >= 1 && item.student?.grade <= 4)
+            } else if (selectedGrade === 'ortaokul') {
+              filteredData = data.filter((item: any) => item.student?.grade >= 5 && item.student?.grade <= 8)
+            } else if (selectedGrade === 'lise') {
+              filteredData = data.filter((item: any) => item.student?.grade >= 9 && item.student?.grade <= 12)
+            } else if (typeof selectedGrade === 'number') {
+              filteredData = data.filter((item: any) => item.student?.grade === selectedGrade)
+            }
+          }
+
+          const formatted: LeaderboardEntry[] = filteredData.map((item: any, index: number) => ({
+            student_id: item.student_id,
+            full_name: item.student?.profile?.full_name || 'Anonim',
+            avatar_url: item.student?.profile?.avatar_url,
+            grade: item.student?.grade,
+            city_name: item.student?.city?.name || null,
+            district_name: item.student?.district?.name || null,
+            school_name: item.student?.school?.name || null,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            total_wrong: item.total_wrong,
+            max_streak: item.max_streak,
+            success_rate: item.total_questions > 0 
+              ? Math.round((item.total_correct / item.total_questions) * 100) 
+              : 0,
+            rank: index + 1,
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
+      } else if (activeScope === 'city' && selectedCity) {
+        // İl liderliği - doğrudan student_points'tan çek
+        const { data } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            total_wrong,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              city_id,
+              district_id,
+              school_id,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
+              city:turkey_cities!student_profiles_city_id_fkey(name),
+              district:turkey_districts!student_profiles_district_id_fkey(name),
+              school:schools!student_profiles_school_id_fkey(name)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(500)
+
+        if (data) {
+          // İl'e göre filtrele
+          let filteredData = data.filter((item: any) => item.student?.city_id === selectedCity)
+          
+          // Sınıf filtrelemesi uygula
+          if (selectedGrade !== 0) {
+            if (selectedGrade === 'ilkokul') {
+              filteredData = filteredData.filter((item: any) => item.student?.grade >= 1 && item.student?.grade <= 4)
+            } else if (selectedGrade === 'ortaokul') {
+              filteredData = filteredData.filter((item: any) => item.student?.grade >= 5 && item.student?.grade <= 8)
+            } else if (selectedGrade === 'lise') {
+              filteredData = filteredData.filter((item: any) => item.student?.grade >= 9 && item.student?.grade <= 12)
+            } else if (typeof selectedGrade === 'number') {
+              filteredData = filteredData.filter((item: any) => item.student?.grade === selectedGrade)
+            }
+          }
+
+          const formatted: LeaderboardEntry[] = filteredData.map((item: any, index: number) => ({
+            student_id: item.student_id,
+            full_name: item.student?.profile?.full_name || 'Anonim',
+            avatar_url: item.student?.profile?.avatar_url,
+            grade: item.student?.grade,
+            city_name: item.student?.city?.name,
+            district_name: item.student?.district?.name,
+            school_name: item.student?.school?.name,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            total_wrong: item.total_wrong,
+            max_streak: item.max_streak,
+            success_rate: item.total_questions > 0 
+              ? Math.round((item.total_correct / item.total_questions) * 100) 
+              : 0,
+            rank: index + 1
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
+      } else {
+        // Fallback - tüm öğrenciler
+        const { data } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            total_wrong,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              city_id,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
+              city:turkey_cities!student_profiles_city_id_fkey(name),
+              district:turkey_districts!student_profiles_district_id_fkey(name),
+              school:schools!student_profiles_school_id_fkey(name)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(200)
 
         if (data) {
           let filteredData = data
@@ -178,9 +255,9 @@ export default function LeaderboardPage() {
             full_name: item.student?.profile?.full_name || 'Anonim',
             avatar_url: item.student?.profile?.avatar_url,
             grade: item.student?.grade,
-            city_name: null,
-            district_name: null,
-            school_name: null,
+            city_name: item.student?.city?.name || null,
+            district_name: item.student?.district?.name || null,
+            school_name: item.student?.school?.name || null,
             total_points: item.total_points,
             total_questions: item.total_questions,
             total_correct: item.total_correct,

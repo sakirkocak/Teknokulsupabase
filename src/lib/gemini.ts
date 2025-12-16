@@ -6,7 +6,23 @@ export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' 
 
 // Soru tipleri
 export type QuestionType = 'multiple_choice' | 'true_false' | 'open_ended' | 'fill_blank'
-export type Difficulty = 'easy' | 'medium' | 'hard'
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'legendary'
+
+// Müfredat bazlı soru tipi
+export interface CurriculumQuestion {
+  question_text: string
+  options: {
+    A: string
+    B: string
+    C: string
+    D: string
+    E?: string // Lise için 5. şık
+  }
+  correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
+  explanation: string
+  difficulty: Difficulty
+  bloom_level: 'bilgi' | 'kavrama' | 'uygulama' | 'analiz' | 'sentez' | 'değerlendirme'
+}
 
 export interface GeneratedQuestion {
   question_text: string
@@ -258,6 +274,168 @@ Maksimum 3-4 cümle ile pratik öneri ver. Türkçe yaz.`
     return response.text()
   } catch (error) {
     console.error('Öneri üretme hatası:', error)
+    throw error
+  }
+}
+
+// =====================================================
+// PREMIUM MÜFREDAT BAZLI SORU ÜRETİCİ
+// MEB müfredatına uygun, profesyonel kalitede sorular
+// =====================================================
+
+export async function generateCurriculumQuestions(
+  grade: number,
+  subject: string,
+  topic: string,
+  learningOutcome: string,
+  difficulty: Difficulty,
+  count: number = 5
+): Promise<CurriculumQuestion[]> {
+  // Sınıf seviyesine göre şık sayısı
+  const isHighSchool = grade >= 9
+  const optionCount = isHighSchool ? 5 : 4
+  const optionLetters = isHighSchool ? 'A, B, C, D, E' : 'A, B, C, D'
+  
+  // Sınıf seviyesine göre dil ayarı
+  const languageLevel = grade <= 4 
+    ? 'çok basit ve anlaşılır, kısa cümleler' 
+    : grade <= 8 
+      ? 'orta düzey, açık ve net' 
+      : 'akademik ve formal'
+  
+  // Zorluk açıklaması
+  const difficultyDescriptions: Record<Difficulty, string> = {
+    easy: 'Temel düzey - Doğrudan bilgi hatırlama, basit kavram soruları',
+    medium: 'Orta düzey - Kavrama ve uygulama gerektiren sorular',
+    hard: 'Zor - Analiz ve sentez gerektiren, çok adımlı problemler',
+    legendary: 'Efsane - En üst düzey, yarışma/olimpiyat seviyesi sorular'
+  }
+
+  const prompt = `Sen Türkiye'nin en iyi soru yazarısın. MEB müfredatına %100 uygun, profesyonel kalitede ${count} adet çoktan seçmeli soru üreteceksin.
+
+═══════════════════════════════════════════════════════════════
+📚 SORU BİLGİLERİ
+═══════════════════════════════════════════════════════════════
+• Sınıf: ${grade}. Sınıf ${grade <= 4 ? '(İlkokul)' : grade <= 8 ? '(Ortaokul)' : '(Lise)'}
+• Ders: ${subject}
+• Konu: ${topic}
+• Kazanım: ${learningOutcome}
+• Zorluk: ${difficulty.toUpperCase()} - ${difficultyDescriptions[difficulty]}
+• Şık Sayısı: ${optionCount} (${optionLetters})
+• Dil Seviyesi: ${languageLevel}
+
+═══════════════════════════════════════════════════════════════
+🎯 BLOOM TAKSONOMİSİ SEVİYELERİ
+═══════════════════════════════════════════════════════════════
+Her soru şu seviyelerden birini hedeflemeli:
+1. BİLGİ: Ezbere dayalı, tanım/kavram hatırlama
+2. KAVRAMA: Açıklama, yorumlama, örneklendirme
+3. UYGULAMA: Bilgiyi yeni durumlarda kullanma
+4. ANALİZ: Parçalara ayırma, ilişki kurma, karşılaştırma
+5. SENTEZ: Birleştirme, yeni ürün oluşturma
+6. DEĞERLENDİRME: Yargılama, eleştirme, karar verme
+
+═══════════════════════════════════════════════════════════════
+📝 SORU YAZIM KURALLARI (KRİTİK!)
+═══════════════════════════════════════════════════════════════
+✅ YAPILMASI GEREKENLER:
+• Soru kökü açık, net ve tek anlama gelmeli
+• Soru ${languageLevel} olmalı
+• Gerçek hayat bağlamı ve örnekler kullan
+• Her şık mantıklı ve tutarlı uzunlukta olmalı
+• Doğru cevap kesinlikle tek olmalı
+• Açıklama detaylı ve öğretici olmalı
+
+❌ YAPILMAMASI GEREKENLER:
+• "Aşağıdakilerden hangisi yanlıştır?" gibi olumsuz soru kökü KULLANMA
+• "Hepsi", "Hiçbiri" gibi şıklar KOYMA
+• Çok uzun veya karmaşık cümleler KURMA
+• Şıklarda ipucu veren kelimeler KULLANMA
+• Birbirine çok benzeyen şıklar YAZMA
+
+═══════════════════════════════════════════════════════════════
+🔥 ÇELDİRİCİ KALİTESİ (ÇOK ÖNEMLİ!)
+═══════════════════════════════════════════════════════════════
+Her yanlış şık (çeldirici):
+• Mantıklı görünmeli ama yanlış olmalı
+• Yaygın öğrenci hatalarını hedeflemeli
+• Doğru cevapla aynı kategoriden olmalı
+• Rastgele veya saçma olmamalı
+• Doğru cevabı bilmeyeni cezbetmeli
+
+═══════════════════════════════════════════════════════════════
+📋 JSON FORMAT (SADECE BU FORMATTA YANIT VER!)
+═══════════════════════════════════════════════════════════════
+
+{"questions":[
+  {
+    "question_text": "Soru metni buraya",
+    "options": {
+      "A": "Birinci şık",
+      "B": "İkinci şık",
+      "C": "Üçüncü şık",
+      "D": "Dördüncü şık"${isHighSchool ? ',\n      "E": "Beşinci şık"' : ''}
+    },
+    "correct_answer": "${isHighSchool ? 'A/B/C/D/E' : 'A/B/C/D'}",
+    "explanation": "Doğru cevap X'dir çünkü... Diğer şıkların neden yanlış olduğu...",
+    "difficulty": "${difficulty}",
+    "bloom_level": "bilgi/kavrama/uygulama/analiz/sentez/değerlendirme"
+  }
+]}
+
+═══════════════════════════════════════════════════════════════
+⚠️ KRİTİK KURALLAR
+═══════════════════════════════════════════════════════════════
+• SADECE JSON döndür, başka hiçbir metin ekleme
+• correct_answer sadece harf olmalı (${optionLetters})
+• bloom_level değerleri: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme
+• Tüm ${count} soruyu üret
+• Her soru benzersiz ve farklı açıdan sormalı
+• Açıklamalar öğretici ve detaylı olmalı
+
+Şimdi ${count} adet mükemmel kalitede soru üret:`
+
+  try {
+    const result = await geminiModel.generateContent(prompt)
+    const response = await result.response
+    let text = response.text()
+    
+    // Markdown code block'u kaldır
+    text = text.replace(/```json\s*/gi, '')
+    text = text.replace(/```\s*/g, '')
+    text = text.trim()
+    
+    // JSON'u bul
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('JSON format bulunamadı')
+    }
+    
+    let jsonStr = jsonMatch[0]
+    
+    // Trailing commas temizle
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1')
+    
+    try {
+      const data = JSON.parse(jsonStr)
+      return data.questions as CurriculumQuestion[]
+    } catch (parseError) {
+      // İkinci deneme - daha agresif temizleme
+      console.log('İlk parse başarısız, alternatif yöntem deneniyor...')
+      
+      jsonStr = jsonStr.replace(/\n/g, ' ').replace(/\r/g, '')
+      jsonStr = jsonStr.replace(/\s+/g, ' ')
+      
+      try {
+        const data = JSON.parse(jsonStr)
+        return data.questions as CurriculumQuestion[]
+      } catch (secondError) {
+        console.error('JSON parse hatası, raw text:', text.substring(0, 500))
+        throw new Error('AI yanıtı geçerli JSON formatında değil. Lütfen tekrar deneyin.')
+      }
+    }
+  } catch (error) {
+    console.error('Müfredat sorusu üretme hatası:', error)
     throw error
   }
 }

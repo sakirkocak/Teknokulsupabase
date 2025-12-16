@@ -30,7 +30,8 @@ import {
   Trophy,
   Award,
   Swords,
-  UserCircle
+  UserCircle,
+  Wand2
 } from 'lucide-react'
 
 type NavItem = {
@@ -82,6 +83,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Kullanıcılar', href: '/admin/kullanicilar', icon: Users },
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
     { label: 'Soru Bankası', href: '/admin/soru-bankasi', icon: GraduationCap },
+    { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
     { label: 'Ayarlar', href: '/admin/ayarlar', icon: Settings },
