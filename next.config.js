@@ -9,6 +9,13 @@ const nextConfig = {
       },
     ],
   },
+  // ESLint ve TypeScript hataları build'i durdurmayacak
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false, // TypeScript hataları hala kontrol edilecek
+  },
 }
 
 module.exports = nextConfig

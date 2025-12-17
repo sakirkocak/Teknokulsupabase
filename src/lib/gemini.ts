@@ -123,7 +123,7 @@ Kurallar:
   }
 }
 
-// Çalışma planı üretici
+// Çalışma planı üretici - Türkiye Yüzyılı Maarif Modeli uyumlu
 export async function generateStudyPlan(
   studentName: string,
   gradeLevel: string,
@@ -133,25 +133,95 @@ export async function generateStudyPlan(
   hoursPerDay: number,
   weeks: number
 ): Promise<string> {
-  const prompt = `Sen bir eğitim koçusun. Bir öğrenci için kişiselleştirilmiş çalışma planı hazırla.
+  // Sınıf seviyesine göre sınav ve müfredat bilgisi
+  const gradeNum = parseInt(gradeLevel) || 8
+  const examInfo = gradeNum === 8 ? {
+    exam: 'LGS',
+    subjects: 'Türkçe, Matematik, Fen Bilimleri, Sosyal Bilgiler, Din Kültürü, İngilizce',
+    format: '90 dakika, 90 soru (her ders 10-15 soru)',
+    tip: 'Paragraf yorumlama ve çıkarım soruları ağırlıklı'
+  } : gradeNum >= 11 ? {
+    exam: 'YKS (TYT + AYT)',
+    subjects: gradeNum === 11 ? 'TYT: Türkçe, Matematik, Fen, Sosyal | AYT hazırlık başlangıcı' : 'TYT + AYT tam kapsamlı hazırlık',
+    format: 'TYT: 135 dk, 120 soru | AYT: 180 dk, 160 soru',
+    tip: gradeNum === 12 ? 'Türev, integral, modern fizik, organik kimya, Cumhuriyet edebiyatı ODAKLI' : 'Trigonometri, elektrik, kimyasal denge, fizyoloji ODAKLI'
+  } : gradeNum >= 9 ? {
+    exam: 'TYT Hazırlık',
+    subjects: 'Temel Matematik, Türkçe, Fen Bilimleri, Sosyal Bilimler',
+    format: 'Lise müfredatı pekiştirme + TYT altyapısı',
+    tip: 'Temel kavramları sağlam öğrenme dönemi'
+  } : {
+    exam: 'Okul Sınavları',
+    subjects: `${gradeNum}. sınıf müfredatı`,
+    format: 'Yazılı sınavlar ve performans değerlendirme',
+    tip: gradeNum <= 4 ? 'Okuma-yazma ve temel matematik becerilerini güçlendirme' : 'Soyut düşünme ve problem çözme becerisi geliştirme'
+  }
 
-Öğrenci Bilgileri:
-- İsim: ${studentName}
-- Sınıf: ${gradeLevel}
-- Hedef Sınav: ${targetExam}
-- Zayıf Konular: ${weakSubjects.join(', ') || 'Belirtilmemiş'}
-- Güçlü Konular: ${strongSubjects.join(', ') || 'Belirtilmemiş'}
-- Günlük Çalışma Süresi: ${hoursPerDay} saat
-- Plan Süresi: ${weeks} hafta
+  const prompt = `SEN TÜRKİYE'NİN EN BAŞARILI EĞİTİM KOÇUSUN. Öğrenci için KİŞİSELLEŞTİRİLMİŞ ve UYGULANABILIR bir çalışma planı hazırla.
 
-Lütfen şunları içeren detaylı bir plan hazırla:
-1. Haftalık çalışma programı
-2. Günlük görev listesi
-3. Konu önceliklendirmesi
-4. Mola ve dinlenme önerileri
-5. Motivasyon ipuçları
+═══════════════════════════════════════════════════════
+📚 ÖĞRENCİ PROFİLİ
+═══════════════════════════════════════════════════════
+👤 İsim: ${studentName}
+📖 Sınıf: ${gradeLevel}. Sınıf
+🎯 Hedef: ${targetExam || examInfo.exam}
+📅 Plan Süresi: ${weeks} hafta
+⏰ Günlük Çalışma: ${hoursPerDay} saat
 
-Planı Türkçe ve markdown formatında hazırla.`
+📊 SINAVIN YAPISI (${examInfo.exam}):
+• Kapsam: ${examInfo.subjects}
+• Format: ${examInfo.format}
+• İpucu: ${examInfo.tip}
+
+💪 GÜÇLÜ YÖNLER: ${strongSubjects.length > 0 ? strongSubjects.join(', ') : 'Henüz belirlenmemiş - genel değerlendirme yap'}
+⚠️ GELİŞTİRİLECEK: ${weakSubjects.length > 0 ? weakSubjects.join(', ') : 'Henüz belirlenmemiş - tüm dersler için plan yap'}
+
+═══════════════════════════════════════════════════════
+📋 PLAN FORMATI (Markdown)
+═══════════════════════════════════════════════════════
+
+Aşağıdaki başlıklarda DETAYLI plan hazırla:
+
+## 🎯 Genel Strateji
+- ${weeks} haftalık ana hedef
+- Öncelik sıralaması ve gerekçesi
+- Başarı kriterleri
+
+## 📅 Haftalık Program
+Her hafta için:
+- Odak konuları
+- Günlük ders dağılımı
+- Hafta sonu değerlendirme
+
+## ⏰ Günlük Rutin
+${hoursPerDay} saatlik örnek günlük program:
+- Pomodoro tekniği (25 dk çalışma + 5 dk mola)
+- Ders geçişleri
+- Tekrar zamanları
+
+## 📚 Ders Bazlı Plan
+${weakSubjects.length > 0 ? weakSubjects.map(s => `### ${s}\n- Öncelikli konular\n- Kaynak önerileri\n- Haftalık hedef soru sayısı`).join('\n\n') : 'Her ana ders için öncelikli konular ve hedefler'}
+
+## 🧠 Verimli Çalışma İpuçları
+- ${gradeNum <= 8 ? 'LGS stratejileri' : 'YKS/TYT stratejileri'}
+- Konsantrasyon teknikleri
+- Not tutma yöntemleri
+
+## 😊 Motivasyon ve Denge
+- Mola ve dinlenme zamanları
+- Haftalık ödüller
+- Stres yönetimi
+- ${gradeNum <= 8 ? 'Aile ile iletişim önerileri' : 'Özerklik ve sorumluluk'}
+
+## ✅ Kontrol Listesi
+Her hafta değerlendirilecek maddeler
+
+═══════════════════════════════════════════════════════
+
+Planı Türkçe, samimi ama profesyonel bir dilde yaz. 
+${studentName}'e direkt hitap et.
+Gerçekçi ve uygulanabilir hedefler koy.
+Motivasyon verici ama abartısız ol.`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -163,7 +233,7 @@ Planı Türkçe ve markdown formatında hazırla.`
   }
 }
 
-// Öğrenci raporu üretici
+// Öğrenci raporu üretici - Detaylı performans analizi
 export async function generateStudentReport(
   studentName: string,
   gradeLevel: string,
@@ -188,61 +258,115 @@ export async function generateStudentReport(
     }[]
   }
 ): Promise<string> {
+  // Sınıf bilgisi çıkarımı
+  const gradeNum = parseInt(gradeLevel) || 8
+  const examContext = gradeNum === 8 ? 'LGS' : gradeNum >= 11 ? 'YKS (TYT/AYT)' : gradeNum >= 9 ? 'TYT Hazırlık' : 'Okul Sınavları'
+  
+  // Performans değerlendirme eşikleri
+  const getPerformanceLevel = (rate: number): string => {
+    if (rate >= 90) return '🌟 Mükemmel'
+    if (rate >= 75) return '✅ İyi'
+    if (rate >= 60) return '📊 Orta'
+    if (rate >= 40) return '⚠️ Geliştirilmeli'
+    return '🚨 Kritik'
+  }
+  
   // Soru performansı bölümü
   let questionSection = ''
+  let overallRate = 0
   if (performanceData && performanceData.totalQuestions > 0) {
+    overallRate = (performanceData.correctAnswers / performanceData.totalQuestions) * 100
     questionSection = `
-## Soru Çözme Performansı:
-- Toplam Çözülen Soru: ${performanceData.totalQuestions}
-- Doğru Cevap: ${performanceData.correctAnswers}
-- Başarı Oranı: ${((performanceData.correctAnswers / performanceData.totalQuestions) * 100).toFixed(1)}%
-- Trend: ${performanceData.recentTrend === 'improving' ? 'Yükseliyor ↗' : performanceData.recentTrend === 'stable' ? 'Sabit →' : 'Düşüyor ↘'}
+═══════════════════════════════════════════════════════
+📊 SORU ÇÖZME PERFORMANSI
+═══════════════════════════════════════════════════════
+• Toplam Çözülen: ${performanceData.totalQuestions} soru
+• Doğru Cevap: ${performanceData.correctAnswers}
+• Başarı Oranı: ${overallRate.toFixed(1)}% ${getPerformanceLevel(overallRate)}
+• Trend: ${performanceData.recentTrend === 'improving' ? '📈 Yükseliyor' : performanceData.recentTrend === 'stable' ? '➡️ Sabit' : '📉 Düşüyor'}
 
-Ders Bazlı Performans:
-${performanceData.subjectPerformance.map(s => `- ${s.subject}: ${s.correct}/${s.total} (${((s.correct/s.total)*100).toFixed(1)}%)`).join('\n')}`
+📚 DERS BAZLI ANALİZ:
+${performanceData.subjectPerformance.map(s => {
+  const rate = (s.correct/s.total)*100
+  return `│ ${s.subject}: ${s.correct}/${s.total} (${rate.toFixed(0)}%) ${getPerformanceLevel(rate)}`
+}).join('\n')}`
   }
 
   // Görev performansı bölümü
   let taskSection = ''
   if (taskData && taskData.totalTasks > 0) {
-    const completionRate = ((taskData.completedTasks / taskData.totalTasks) * 100).toFixed(0)
-    const statusText = {
-      'completed': 'Tamamlandı',
-      'submitted': 'Teslim Edildi',
-      'in_progress': 'Devam Ediyor',
-      'pending': 'Bekliyor'
+    const completionRate = (taskData.completedTasks / taskData.totalTasks) * 100
+    const statusText: Record<string, string> = {
+      'completed': '✅ Tamamlandı',
+      'submitted': '📤 Teslim Edildi',
+      'in_progress': '🔄 Devam Ediyor',
+      'pending': '⏳ Bekliyor'
     }
     taskSection = `
-## Görev Performansı:
-- Toplam Atanan Görev: ${taskData.totalTasks}
-- Tamamlanan: ${taskData.completedTasks} (${completionRate}%)
-- Bekleyen: ${taskData.pendingTasks}
-- Ortalama Puan: ${taskData.averageScore > 0 ? taskData.averageScore + '/100' : 'Henüz puanlanmamış'}
+═══════════════════════════════════════════════════════
+📋 GÖREV PERFORMANSI
+═══════════════════════════════════════════════════════
+• Toplam Görev: ${taskData.totalTasks}
+• Tamamlanan: ${taskData.completedTasks} (${completionRate.toFixed(0)}%)
+• Bekleyen: ${taskData.pendingTasks}
+• Ortalama Puan: ${taskData.averageScore > 0 ? taskData.averageScore + '/100' : 'Henüz puanlanmamış'}
 
-Son Görevler:
-${taskData.recentTasks.map(t => `- "${t.title}" (${t.type}) - ${statusText[t.status as keyof typeof statusText] || t.status}${t.score !== null ? ` - Puan: ${t.score}` : ''}`).join('\n')}`
+📝 SON GÖREVLER:
+${taskData.recentTasks.map(t => `│ "${t.title}" → ${statusText[t.status] || t.status}${t.score !== null ? ` • Puan: ${t.score}` : ''}`).join('\n')}`
   }
 
-  const prompt = `Sen bir eğitim koçusun ve danışmanısın. Bir öğrencinin detaylı performans raporunu hazırla.
+  const prompt = `SEN DENEYİMLİ BİR EĞİTİM KOÇU VE DANIŞMANISIN. ${studentName} için profesyonel bir performans raporu hazırla.
 
-# Öğrenci Bilgileri:
-- İsim: ${studentName}
-- Sınıf: ${gradeLevel}
-- Hedef Sınav: ${targetExam}
-
+═══════════════════════════════════════════════════════
+👤 ÖĞRENCİ BİLGİLERİ
+═══════════════════════════════════════════════════════
+• İsim: ${studentName}
+• Sınıf: ${gradeLevel}. Sınıf
+• Hedef: ${targetExam || examContext}
 ${questionSection}
-
 ${taskSection}
 
-Lütfen şunları içeren kapsamlı bir rapor hazırla:
-1. **Genel Değerlendirme** - Öğrencinin genel durumu hakkında kısa bir özet
-2. **Güçlü Yönler** - Öğrencinin iyi olduğu alanlar (hem soru çözme hem görev tamamlama açısından)
-3. **Geliştirilmesi Gereken Alanlar** - Hangi konularda daha fazla çalışması gerekiyor
-4. **Görev Disiplini Değerlendirmesi** - Görevleri zamanında tamamlama, kalitesi vb.
-5. **Öneriler ve Aksiyon Planı** - Somut adımlar ve öneriler
-6. **Veli İçin Özet** - 2-3 cümlelik kısa özet
+═══════════════════════════════════════════════════════
+📄 RAPOR FORMATI (Markdown)
+═══════════════════════════════════════════════════════
 
-Raporu Türkçe ve profesyonel bir dilde hazırla. Markdown formatında olsun. Pozitif ve motive edici bir ton kullan ama gerçekçi ol.`
+Aşağıdaki bölümleri DETAYLI hazırla:
+
+## 🎯 Genel Değerlendirme
+${studentName}'in genel durumu hakkında 3-4 cümlelik özet.
+${overallRate > 0 ? `${overallRate.toFixed(0)}% başarı oranını ${examContext} bağlamında değerlendir.` : 'Mevcut verileri değerlendir.'}
+
+## 💪 Güçlü Yönler
+- Başarılı olduğu dersler/konular
+- Pozitif çalışma alışkanlıkları
+- Dikkat çeken gelişim alanları
+
+## ⚠️ Geliştirilmesi Gereken Alanlar
+- Zayıf dersler ve konular
+- Eksik kalan beceriler
+- Öncelikli çalışma önerileri
+
+## 📊 Disiplin ve Düzenlilik
+- Görev tamamlama analizi
+- Zaman yönetimi değerlendirmesi
+- Süreklilik ve tutarlılık
+
+## 🚀 Aksiyon Planı
+${gradeNum === 8 ? 'LGS\'ye' : gradeNum >= 11 ? 'YKS\'ye' : 'Sınavlara'} yönelik somut adımlar:
+1. Bu hafta yapılması gerekenler
+2. Bu ay hedefler
+3. Kritik konular
+
+## 📱 Veli İçin Özet
+2-3 cümlelik, velinin hızlıca okuyabileceği özet.
+Pozitif bir dil kullan ama gerçekçi ol.
+
+═══════════════════════════════════════════════════════
+
+Raporu Türkçe, profesyonel ve motive edici bir dilde yaz.
+Emoji kullan ama abartma.
+${studentName}'e güven ver ama gerçekçi ol.
+Somut ve uygulanabilir öneriler sun.`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -254,19 +378,49 @@ Raporu Türkçe ve profesyonel bir dilde hazırla. Markdown formatında olsun. P
   }
 }
 
-// AI önerisi üretici
+// AI önerisi üretici - Kişiselleştirilmiş kısa öneriler
 export async function generateAIRecommendation(
   studentName: string,
   weakTopics: string[],
-  recentMistakes: string[]
+  recentMistakes: string[],
+  grade?: number,
+  subject?: string
 ): Promise<string> {
-  const prompt = `Bir öğrenci için kısa ve öz çalışma önerisi hazırla.
+  const gradeContext = grade 
+    ? grade === 8 ? 'LGS hazırlığında' : grade >= 11 ? 'YKS hazırlığında' : `${grade}. sınıfta`
+    : ''
+  
+  const subjectTip = subject ? {
+    'Matematik': 'Formülleri ezberleme, anla. Günde en az 10 soru çöz.',
+    'Türkçe': 'Her gün 2-3 paragraf oku ve soru çöz.',
+    'Fen Bilimleri': 'Deneyleri görselleştir, grafikleri analiz et.',
+    'Fizik': 'Formüllerin nereden geldiğini anla, birim analizini ihmal etme.',
+    'Kimya': 'Periyodik tabloyu iyi öğren, mol hesaplarına hakim ol.',
+    'Biyoloji': 'Şemaları çiz, sistemleri birbiriyle ilişkilendir.',
+    'Tarih': 'Kronolojik sıralamayı kafanda canlandır.',
+    'Coğrafya': 'Haritalarla çalış, görsel hafıza kullan.',
+    'İngilizce': 'Her gün 10 yeni kelime, 1 paragraf okuma.',
+  }[subject] || '' : ''
 
-Öğrenci: ${studentName}
-Zayıf Konular: ${weakTopics.join(', ')}
-Son Hatalar: ${recentMistakes.join(', ')}
+  const prompt = `${studentName} için KİŞİSELLEŞTİRİLMİŞ, KISA ve ETKİLİ çalışma önerisi yaz.
 
-Maksimum 3-4 cümle ile pratik öneri ver. Türkçe yaz.`
+📊 VERİLER:
+• Öğrenci: ${studentName} ${gradeContext}
+• Zayıf Konular: ${weakTopics.length > 0 ? weakTopics.join(', ') : 'Genel çalışma önerisi'}
+• Son Hatalar: ${recentMistakes.length > 0 ? recentMistakes.join(', ') : 'Belirtilmemiş'}
+${subjectTip ? `• Ders İpucu: ${subjectTip}` : ''}
+
+📝 KURALLAR:
+• Maksimum 3-4 cümle
+• ${studentName}'e direkt hitap et (Senli)
+• Somut ve uygulanabilir öneri
+• Pozitif ve motive edici dil
+• Emoji kullanabilirsin (1-2 tane)
+
+Örnek format:
+"${studentName}, [konu] konusunda zorlanıyorsun. [Somut öneri]. [Motive edici kapanış]."
+
+ŞİMDİ ÖNERİNİ YAZ:`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -280,9 +434,170 @@ Maksimum 3-4 cümle ile pratik öneri ver. Türkçe yaz.`
 
 // =====================================================
 // PREMIUM MÜFREDAT BAZLI SORU ÜRETİCİ
-// MEB Müfredatına Uygun, Kazanım Odaklı Sorular
-// Türkiye Yüzyılı Maarif Modeli + 2018 Programı
+// MEB Türkiye Yüzyılı Maarif Modeli (1-12. Sınıf)
+// TYT/AYT/LGS Sınavlarına Tam Uyumlu
 // =====================================================
+
+// Ders bazlı özel yönergeler
+const getSubjectGuidelines = (subject: string, grade: number): string => {
+  const guidelines: Record<string, string> = {
+    'Matematik': `
+   • Günlük hayat problemleri kullan (alışveriş, zaman, mesafe)
+   • ${grade <= 4 ? 'Görsel ve somut örnekler ekle' : grade <= 8 ? 'Adım adım çözüm gerektiren problemler' : 'Analitik düşünme ve modelleme soruları'}
+   • İşlem hataları yapan şıklar ekle
+   • ${grade >= 11 ? 'Türev/integral için grafik yorumlama soruları' : grade >= 9 ? 'Fonksiyon ve denklem çözümü' : 'Temel aritmetik ve geometri'}`,
+    
+    'Türkçe': `
+   • Okuma anlama ve metin çözümleme ağırlıklı
+   • ${grade <= 4 ? 'Kısa ve basit metinler' : 'Paragraf analizi ve çıkarım soruları'}
+   • Dil bilgisi kuralları bağlam içinde sorsun
+   • Anlam ilişkileri (eş, zıt, yakın anlam) soruları`,
+    
+    'Türk Dili ve Edebiyatı': `
+   • Edebi dönem ve akım karşılaştırmaları
+   • Metin şerhi ve edebi sanat tespiti
+   • ${grade >= 11 ? 'Cumhuriyet dönemi edebiyatı ağırlıklı' : 'Divan ve Halk edebiyatı temelleri'}
+   • Yazar-eser-dönem eşleştirmeleri`,
+    
+    'Fen Bilimleri': `
+   • Deney ve gözlem sonuçlarını yorumlama
+   • ${grade <= 6 ? 'Günlük hayattan örnekler' : 'Grafik ve tablo okuma soruları'}
+   • Neden-sonuç ilişkisi kurma
+   • Bilimsel süreç becerileri`,
+    
+    'Fizik': `
+   • ${grade >= 11 ? 'Modern fizik ve dalga mekaniği' : 'Kuvvet, hareket ve enerji temelleri'}
+   • Formül uygulaması ve birim dönüşümleri
+   • Grafik yorumlama (konum-zaman, hız-zaman)
+   • Deneysel verileri analiz etme`,
+    
+    'Kimya': `
+   • ${grade >= 11 ? 'Termodinamik, denge ve organik kimya' : 'Atom yapısı ve periyodik tablo'}
+   • Mol hesaplamaları ve denkleştirme
+   • Günlük hayat uygulamaları (pH, korozyon)
+   • Lewis yapıları ve VSEPR`,
+    
+    'Biyoloji': `
+   • ${grade >= 11 ? 'İnsan fizyolojisi ve genetik' : 'Hücre yapısı ve canlı sistemleri'}
+   • Şema ve diyagram yorumlama
+   • Deney sonuçlarını analiz etme
+   • Ekoloji ve çevre bilinci`,
+    
+    'Tarih': `
+   • Neden-sonuç ilişkileri ve kronolojik sıralama
+   • ${grade >= 11 ? 'Osmanlı modernleşmesi ve Cumhuriyet' : grade === 8 ? 'İnkılap Tarihi' : 'Türk-İslam tarihi'}
+   • Harita ve görsel kaynak yorumlama
+   • Karşılaştırmalı tarih analizi`,
+    
+    'Coğrafya': `
+   • Harita okuma ve yorumlama
+   • ${grade >= 10 ? 'Türkiye ekonomisi ve jeopolitik' : 'Fiziki coğrafya temelleri'}
+   • İklim ve bitki örtüsü ilişkisi
+   • Nüfus ve yerleşme özellikleri`,
+    
+    'İngilizce': `
+   • Reading comprehension ve vocabulary
+   • ${grade >= 9 ? 'B1-B2 seviyesi, akademik dil' : 'A1-A2 seviyesi, günlük iletişim'}
+   • Grammar in context (bağlam içinde dilbilgisi)
+   • Dialogue completion ve rephrasing`,
+    
+    'Din Kültürü ve Ahlak Bilgisi': `
+   • ${grade >= 11 ? 'Dünya dinleri ve karşılaştırmalı din' : 'İslam inanç esasları'}
+   • Ayet ve hadis yorumlama
+   • Ahlaki değerler ve güncel meseleler
+   • İslam düşünce tarihi`,
+    
+    'Sosyal Bilgiler': `
+   • Vatandaşlık bilinci ve demokratik değerler
+   • Harita ve grafik okuma
+   • Güncel olaylarla ilişkilendirme
+   • Kültürel miras ve tarih bilinci`,
+    
+    'Hayat Bilgisi': `
+   • Günlük yaşam becerileri
+   • Görsel ve somut örnekler
+   • Basit ve anlaşılır dil
+   • Çocuğun yakın çevresinden örnekler`,
+    
+    'Felsefe': `
+   • Felsefi kavramları ayırt etme
+   • Felsefe tarihi ve düşünürler
+   • Argüman analizi ve mantık
+   • Farklı görüşleri karşılaştırma`,
+    
+    'Mantık': `
+   • Önerme ve çıkarım analizi
+   • Sembolik mantık işlemleri
+   • Doğruluk tablosu oluşturma
+   • Mantık ilkeleri uygulaması`
+  }
+  
+  return guidelines[subject] || `
+   • Kazanım odaklı, net sorular
+   • ${grade}. sınıf seviyesine uygun dil
+   • Gerçek hayatla ilişkilendirme`
+}
+
+// Sınav formatı ve sınıf özelliklerini belirle
+const getExamContext = (grade: number): { examType: string; format: string; tips: string } => {
+  if (grade <= 4) {
+    return {
+      examType: 'İlkokul Değerlendirme',
+      format: '4 şıklı (A-D), görsel destekli olabilir',
+      tips: `
+   • SOMUT düşünme döneminde, soyut kavramlardan kaçın
+   • Kısa cümleler ve basit kelimeler kullan
+   • Görsel öğeler açıklamalarda kullanılabilir
+   • Oyun ve eğlence öğeleri eklenebilir
+   • Pozitif ve cesaretlendirici dil`
+    }
+  } else if (grade <= 7) {
+    return {
+      examType: 'Ortaokul Kazanım Değerlendirme',
+      format: '4 şıklı (A-D), LGS formatına hazırlık',
+      tips: `
+   • Soyut düşünmeye geçiş dönemi
+   • Çıkarım ve yorumlama becerileri
+   • Grafik ve tablo okuma başlangıcı
+   • Çok adımlı problemlere giriş
+   • Disiplinler arası bağlantılar`
+    }
+  } else if (grade === 8) {
+    return {
+      examType: 'LGS (Liselere Geçiş Sınavı)',
+      format: '4 şıklı (A-D), MEB merkezi sınav formatı',
+      tips: `
+   • LGS tarzı paragraf ve yorum soruları
+   • 90 dakikada 90 soru mantığı (hızlı çözüm)
+   • Her soru aynı puan ağırlığında
+   • Çeldirici şıklar MEB standartlarında
+   • Sözel ve sayısal mantık dengesi`
+    }
+  } else if (grade <= 10) {
+    return {
+      examType: 'TYT Hazırlık (Temel Yeterlilik)',
+      format: '5 şıklı (A-E), ÖSYM TYT formatı',
+      tips: `
+   • TYT temel kavram ve uygulama soruları
+   • Geniş müfredat, dar derinlik
+   • Hız ve doğruluk dengesi
+   • Tüm öğrenciler için ortak sorular
+   • Temel okur-yazarlık ve matematik`
+    }
+  } else {
+    return {
+      examType: 'YKS (TYT + AYT)',
+      format: '5 şıklı (A-E), ÖSYM AYT formatı',
+      tips: `
+   • AYT ileri düzey, alan spesifik sorular
+   • Analiz, sentez ve değerlendirme ağırlıklı
+   • Uzun ve karmaşık soru kökleri olabilir
+   • Grafik, tablo ve veri analizi
+   • Üniversite düzeyi akademik dil
+   • ${grade === 12 ? 'Türev, integral, modern fizik, organik kimya AĞIRLIKLI' : '11. sınıf konuları pekiştirme'}`
+    }
+  }
+}
 
 export async function generateCurriculumQuestions(
   grade: number,
@@ -296,111 +611,109 @@ export async function generateCurriculumQuestions(
   const isHighSchool = grade >= 9
   const optionCount = isHighSchool ? 5 : 4
   
-  // Sınav tipi belirleme
-  const examType = grade === 8 ? 'LGS' : grade >= 11 ? 'YKS (TYT/AYT)' : 'MEB Kazanım Değerlendirme'
+  // Sınav bağlamı
+  const examContext = getExamContext(grade)
   
-  // Sınıf seviyesi açıklaması
-  const levelDescription = grade <= 4 
-    ? 'İlkokul - somut düşünme, görsellik ağırlıklı, basit ve anlaşılır dil' 
-    : grade <= 8 
-    ? 'Ortaokul - soyut düşünmeye geçiş, çıkarım yapma, analiz becerisi' 
-    : 'Lise - ileri düzey analiz, sentez, değerlendirme, akademik dil'
+  // Ders bazlı yönergeler
+  const subjectGuidelines = getSubjectGuidelines(subject, grade)
   
   // Zorluk açıklaması
   const difficultyDetails: Record<Difficulty, string> = {
-    easy: 'Temel kavram soruları - doğrudan bilgi hatırlama ve basit uygulama',
-    medium: 'Orta düzey sorular - kavrama, yorumlama ve iki adımlı işlemler',
-    hard: 'İleri düzey sorular - analiz, çoklu adım, yorum gerektiren sorular',
-    legendary: 'Olimpiyat/yarışma düzeyi - sentez, değerlendirme, özgün düşünme'
+    easy: `Temel seviye - bilgi hatırlama, basit uygulama (${grade <= 4 ? 'Çocuğun rahatça yapabileceği' : 'Konuyu yeni öğrenen öğrenci için'})`,
+    medium: `Orta seviye - kavrama, yorumlama, iki adımlı işlemler (${grade >= 9 ? 'TYT' : 'LGS'} ortalaması)`,
+    hard: `İleri seviye - analiz, çoklu adım, derinlemesine yorum (${grade >= 9 ? 'AYT zorluğu' : 'LGS ayırt edici'})`,
+    legendary: `Olimpiyat/yarışma - sentez, özgün düşünme (${grade >= 9 ? 'TÜBİTAK/olimpiyat' : 'MEB proje yarışması'} düzeyi)`
   }
 
-  // Bloom Taksonomisi açıklaması
-  const bloomLevels = {
-    bilgi: 'Bilgiyi hatırlama (tanıma, listeleme)',
-    kavrama: 'Anlama ve yorumlama (açıklama, örnekleme)',
-    uygulama: 'Bilgiyi yeni durumlarda kullanma (hesaplama, çözme)',
-    analiz: 'Parçalara ayırma, ilişki kurma (karşılaştırma, sınıflandırma)',
-    sentez: 'Yeni ürün oluşturma (tasarlama, planlama)',
-    değerlendirme: 'Yargıda bulunma (eleştirme, savunma)'
-  }
+  // Bloom Taksonomisi - sınıf seviyesine göre ağırlıklandır
+  const bloomPriority = grade <= 4 
+    ? { easy: ['bilgi', 'kavrama'], medium: ['kavrama', 'uygulama'], hard: ['uygulama', 'analiz'], legendary: ['analiz'] }
+    : grade <= 8 
+    ? { easy: ['bilgi', 'kavrama'], medium: ['kavrama', 'uygulama', 'analiz'], hard: ['analiz', 'sentez'], legendary: ['sentez', 'değerlendirme'] }
+    : { easy: ['kavrama', 'uygulama'], medium: ['uygulama', 'analiz'], hard: ['analiz', 'sentez'], legendary: ['sentez', 'değerlendirme'] }
 
-  const prompt = `SEN BİR MEB SORU BANKASI UZMANISIN. Türkiye eğitim sistemine uygun, ${examType} formatında sorular üreteceksin.
+  const prompt = `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.
 
-═══════════════════════════════════════════════════════
-📚 HEDEF KAZANIM BİLGİLERİ
-═══════════════════════════════════════════════════════
-• Sınıf: ${grade}. Sınıf (${levelDescription})
-• Ders: ${subject}
-• Konu: ${topic}
-• Kazanım: "${learningOutcome}"
-• Zorluk: ${difficulty.toUpperCase()} - ${difficultyDetails[difficulty]}
-• Soru Sayısı: ${count}
-• Şık Sayısı: ${optionCount} (${isHighSchool ? 'YKS Formatı A-E' : 'LGS Formatı A-D'})
+════════════════════════════════════════════════════════════
+🎯 GÖREV: ${grade}. SINIF ${subject.toUpperCase()} SORUSU ÜRET
+════════════════════════════════════════════════════════════
 
-═══════════════════════════════════════════════════════
-📋 SORU TASARIM KURALLARI
-═══════════════════════════════════════════════════════
+📚 KAZANIM BİLGİLERİ:
+┌─────────────────────────────────────────────────────────┐
+│ Sınıf: ${grade}. Sınıf                                    
+│ Ders: ${subject}                                          
+│ Konu: ${topic}                                            
+│ Kazanım: "${learningOutcome}"                              
+│ Zorluk: ${difficulty.toUpperCase()} - ${difficultyDetails[difficulty]}
+│ Format: ${examContext.format}                             
+│ Üretilecek: ${count} soru                                 
+└─────────────────────────────────────────────────────────┘
 
-1️⃣ SORU METNİ:
-   • Kazanımla doğrudan ilişkili olmalı
-   • ${grade}. sınıf öğrencisinin anlayacağı dilde
-   • Net, açık ve tek anlama gelecek şekilde
-   • Gereksiz detay içermemeli
-   • Problem kurgusu gerçek hayatla ilişkili olabilir
+📋 ${examContext.examType.toUpperCase()} FORMATI:
+${examContext.tips}
 
-2️⃣ ŞIKLAR:
-   • Tüm şıklar mantıklı ve olası görünmeli
-   • Yanlış şıklar yaygın öğrenci hatalarını yansıtmalı
-   • "Hiçbiri" veya "Hepsi" şıkkı KULLANMA
-   • Şıklar birbirine yakın uzunlukta olmalı
-   • Doğru cevap rastgele dağıtılmalı (her zaman B olmasın)
+📖 ${subject.toUpperCase()} DERSİ İÇİN ÖZEL KURALLAR:
+${subjectGuidelines}
 
-3️⃣ BLOOM TAKSONOMİSİ:
-   ${Object.entries(bloomLevels).map(([k,v]) => `   • ${k}: ${v}`).join('\n')}
+🎓 BLOOM TAKSONOMİSİ (${difficulty} için):
+   Öncelikli kullan: ${bloomPriority[difficulty].join(', ')}
    
-   Zorluk ${difficulty} için öncelikli kullan:
-   ${difficulty === 'easy' ? '• bilgi, kavrama' : 
-     difficulty === 'medium' ? '• kavrama, uygulama, analiz' : 
-     difficulty === 'hard' ? '• analiz, sentez' : 
-     '• sentez, değerlendirme'}
+   • bilgi: Tanıma, listeleme, hatırlama
+   • kavrama: Açıklama, örnekleme, yorumlama  
+   • uygulama: Hesaplama, problem çözme, kullanma
+   • analiz: Karşılaştırma, ilişki kurma, ayırt etme
+   • sentez: Tasarlama, planlama, oluşturma
+   • değerlendirme: Eleştirme, yargılama, savunma
 
-4️⃣ AÇIKLAMA:
-   • Neden doğru cevabın o olduğunu açıkla
-   • Yanlış şıkların neden yanlış olduğuna değin
-   • Öğretici ve bilgilendirici ol
-   • Kısa ama kapsamlı
+⚡ SORU YAZIM KURALLARI:
 
-═══════════════════════════════════════════════════════
-📐 MATEMATİK / FEN FORMÜLLEME
-═══════════════════════════════════════════════════════
-Matematiksel ifadeler için LaTeX kullan, $$...$$ içinde yaz.
-JSON için backslash'i ÇİFT yaz (\\\\):
+1. SORU KÖKÜ:
+   ✓ Net, anlaşılır ve tek anlama gelen
+   ✓ ${grade}. sınıf Türkçe seviyesine uygun
+   ✓ Kazanımı doğrudan ölçen
+   ✓ Gereksiz bilgi içermeyen
+   ${grade <= 4 ? '✓ Kısa ve basit cümleler' : grade >= 9 ? '✓ Akademik dil kullanılabilir' : '✓ Orta uzunlukta, net ifadeler'}
 
-• Kesir: $$\\\\frac{a}{b}$$
-• Karekök: $$\\\\sqrt{x}$$
-• Üs: $$x^{2}$$, $$a^{n}$$
-• Alt indis: $$x_{1}$$
-• Çarpı: $$\\\\times$$ veya $$\\\\cdot$$
-• Bölme: $$\\\\div$$
-• Pi: $$\\\\pi$$
-• Eşitsizlik: $$\\\\geq$$, $$\\\\leq$$, $$\\\\neq$$
-• Toplam: $$\\\\sum$$
-• Limit: $$\\\\lim$$
-• İntegral: $$\\\\int$$
+2. ŞIKLAR (${optionCount} adet):
+   ✓ Tüm şıklar mantıklı ve olası
+   ✓ Yanlışlar yaygın öğrenci hatalarını yansıtsın
+   ✓ Birbirine yakın uzunlukta
+   ✓ "Hiçbiri/Hepsi" YASAK
+   ✓ Doğru cevap RASTGELE dağılsın (A,B,C,D${isHighSchool ? ',E' : ''})
 
-═══════════════════════════════════════════════════════
-📤 ÇIKTI FORMATI - SADECE JSON
-═══════════════════════════════════════════════════════
-{"questions":[{"question_text":"...","options":{"A":"...","B":"...","C":"...","D":"..."${isHighSchool ? ',"E":"..."' : ''}},"correct_answer":"A","explanation":"...","difficulty":"${difficulty}","bloom_level":"kavrama"}]}
+3. AÇIKLAMA:
+   ✓ Doğru cevabı gerekçelendir
+   ✓ Neden diğerleri yanlış açıkla
+   ✓ Öğretici ve motive edici
+   ✓ ${grade <= 6 ? 'Basit dil' : 'Akademik ama anlaşılır'}
 
-⚠️ ÖNEMLİ:
-• SADECE JSON yaz, başka açıklama YAZMA
-• JSON syntax hatası YAPMA
-• Türkçe karakterleri düzgün kullan (ş,ğ,ü,ö,ı,ç)
-• correct_answer sadece harf: ${isHighSchool ? 'A, B, C, D veya E' : 'A, B, C veya D'}
+📐 MATEMATİK/FEN FORMÜLLEME (LaTeX):
+   • Kesir: $$\\\\frac{a}{b}$$
+   • Kök: $$\\\\sqrt{x}$$, $$\\\\sqrt[3]{x}$$
+   • Üs: $$x^{2}$$, $$e^{x}$$
+   • İndis: $$x_{1}$$, $$a_{n}$$
+   • İşlemler: $$\\\\times$$, $$\\\\div$$, $$\\\\pm$$
+   • Özel: $$\\\\pi$$, $$\\\\infty$$, $$\\\\sum$$, $$\\\\int$$
+   • Eşitsizlik: $$\\\\leq$$, $$\\\\geq$$, $$\\\\neq$$
+
+════════════════════════════════════════════════════════════
+📤 ÇIKTI - SADECE JSON (başka metin YASAK)
+════════════════════════════════════════════════════════════
+{"questions":[{"question_text":"Soru metni","options":{"A":"Şık A","B":"Şık B","C":"Şık C","D":"Şık D"${isHighSchool ? ',"E":"Şık E"' : ''}},"correct_answer":"B","explanation":"Açıklama","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"}]}
+
+⛔ YASAK:
+• JSON dışında metin yazma
+• Trailing comma (son elemandan sonra virgül)
+• Tek backslash (LaTeX için çift \\\\ kullan)
+• "Hiçbiri" veya "Hepsi" şıkkı
+• Aynı harfin sürekli doğru cevap olması
+
+✅ ZORUNLU:
+• correct_answer: ${isHighSchool ? 'A, B, C, D veya E' : 'A, B, C veya D'}
 • bloom_level: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme
+• Türkçe karakterler: ş, ğ, ü, ö, ı, ç, Ş, Ğ, Ü, Ö, İ, Ç
 
-ŞİMDİ ${count} ADET "${topic}" KONUSUNDA "${learningOutcome}" KAZANIMINA UYGUN SORU ÜRET:`
+ŞİMDİ ${count} ADET MÜKEMMEL ${subject.toUpperCase()} SORUSU ÜRET:`
 
   try {
     console.log(`AI Soru Üretimi başlatılıyor: ${grade}. Sınıf ${subject} - ${topic}`)
