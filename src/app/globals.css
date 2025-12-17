@@ -77,6 +77,15 @@
   @apply bg-surface-400;
 }
 
+/* Scrollbar gizle */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Math/KaTeX Styles */
 .math-content .katex {
   font-size: 1.1em;

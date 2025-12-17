@@ -198,10 +198,23 @@ export interface GradeSubject {
   subject?: Subject
 }
 
+export interface Unit {
+  id: string
+  subject_id: string
+  grade: number
+  unit_number: number
+  name: string
+  description: string | null
+  is_active: boolean
+  created_at: string
+  subject?: Subject
+}
+
 export interface Topic {
   id: string
   subject_id: string
   grade: number
+  unit_id: string | null
   unit_number: number | null
   main_topic: string
   sub_topic: string | null
@@ -209,6 +222,7 @@ export interface Topic {
   is_active: boolean
   created_at: string
   subject?: Subject
+  unit?: Unit
 }
 
 export interface Question {

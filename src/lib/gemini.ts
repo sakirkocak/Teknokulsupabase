@@ -280,7 +280,8 @@ Maksimum 3-4 cümle ile pratik öneri ver. Türkçe yaz.`
 
 // =====================================================
 // PREMIUM MÜFREDAT BAZLI SORU ÜRETİCİ
-// MEB müfredatına uygun, profesyonel kalitede sorular
+// MEB Müfredatına Uygun, Kazanım Odaklı Sorular
+// Türkiye Yüzyılı Maarif Modeli + 2018 Programı
 // =====================================================
 
 export async function generateCurriculumQuestions(
@@ -291,150 +292,220 @@ export async function generateCurriculumQuestions(
   difficulty: Difficulty,
   count: number = 5
 ): Promise<CurriculumQuestion[]> {
-  // Sınıf seviyesine göre şık sayısı
+  // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5)
   const isHighSchool = grade >= 9
   const optionCount = isHighSchool ? 5 : 4
-  const optionLetters = isHighSchool ? 'A, B, C, D, E' : 'A, B, C, D'
   
-  // Sınıf seviyesine göre dil ayarı
-  const languageLevel = grade <= 4 
-    ? 'çok basit ve anlaşılır, kısa cümleler' 
+  // Sınav tipi belirleme
+  const examType = grade === 8 ? 'LGS' : grade >= 11 ? 'YKS (TYT/AYT)' : 'MEB Kazanım Değerlendirme'
+  
+  // Sınıf seviyesi açıklaması
+  const levelDescription = grade <= 4 
+    ? 'İlkokul - somut düşünme, görsellik ağırlıklı, basit ve anlaşılır dil' 
     : grade <= 8 
-      ? 'orta düzey, açık ve net' 
-      : 'akademik ve formal'
+    ? 'Ortaokul - soyut düşünmeye geçiş, çıkarım yapma, analiz becerisi' 
+    : 'Lise - ileri düzey analiz, sentez, değerlendirme, akademik dil'
   
   // Zorluk açıklaması
-  const difficultyDescriptions: Record<Difficulty, string> = {
-    easy: 'Temel düzey - Doğrudan bilgi hatırlama, basit kavram soruları',
-    medium: 'Orta düzey - Kavrama ve uygulama gerektiren sorular',
-    hard: 'Zor - Analiz ve sentez gerektiren, çok adımlı problemler',
-    legendary: 'Efsane - En üst düzey, yarışma/olimpiyat seviyesi sorular'
+  const difficultyDetails: Record<Difficulty, string> = {
+    easy: 'Temel kavram soruları - doğrudan bilgi hatırlama ve basit uygulama',
+    medium: 'Orta düzey sorular - kavrama, yorumlama ve iki adımlı işlemler',
+    hard: 'İleri düzey sorular - analiz, çoklu adım, yorum gerektiren sorular',
+    legendary: 'Olimpiyat/yarışma düzeyi - sentez, değerlendirme, özgün düşünme'
   }
 
-  const prompt = `Sen Türkiye'nin en iyi soru yazarısın. MEB müfredatına %100 uygun, profesyonel kalitede ${count} adet çoktan seçmeli soru üreteceksin.
+  // Bloom Taksonomisi açıklaması
+  const bloomLevels = {
+    bilgi: 'Bilgiyi hatırlama (tanıma, listeleme)',
+    kavrama: 'Anlama ve yorumlama (açıklama, örnekleme)',
+    uygulama: 'Bilgiyi yeni durumlarda kullanma (hesaplama, çözme)',
+    analiz: 'Parçalara ayırma, ilişki kurma (karşılaştırma, sınıflandırma)',
+    sentez: 'Yeni ürün oluşturma (tasarlama, planlama)',
+    değerlendirme: 'Yargıda bulunma (eleştirme, savunma)'
+  }
 
-═══════════════════════════════════════════════════════════════
-📚 SORU BİLGİLERİ
-═══════════════════════════════════════════════════════════════
-• Sınıf: ${grade}. Sınıf ${grade <= 4 ? '(İlkokul)' : grade <= 8 ? '(Ortaokul)' : '(Lise)'}
+  const prompt = `SEN BİR MEB SORU BANKASI UZMANISIN. Türkiye eğitim sistemine uygun, ${examType} formatında sorular üreteceksin.
+
+═══════════════════════════════════════════════════════
+📚 HEDEF KAZANIM BİLGİLERİ
+═══════════════════════════════════════════════════════
+• Sınıf: ${grade}. Sınıf (${levelDescription})
 • Ders: ${subject}
 • Konu: ${topic}
-• Kazanım: ${learningOutcome}
-• Zorluk: ${difficulty.toUpperCase()} - ${difficultyDescriptions[difficulty]}
-• Şık Sayısı: ${optionCount} (${optionLetters})
-• Dil Seviyesi: ${languageLevel}
+• Kazanım: "${learningOutcome}"
+• Zorluk: ${difficulty.toUpperCase()} - ${difficultyDetails[difficulty]}
+• Soru Sayısı: ${count}
+• Şık Sayısı: ${optionCount} (${isHighSchool ? 'YKS Formatı A-E' : 'LGS Formatı A-D'})
 
-═══════════════════════════════════════════════════════════════
-🎯 BLOOM TAKSONOMİSİ SEVİYELERİ
-═══════════════════════════════════════════════════════════════
-Her soru şu seviyelerden birini hedeflemeli:
-1. BİLGİ: Ezbere dayalı, tanım/kavram hatırlama
-2. KAVRAMA: Açıklama, yorumlama, örneklendirme
-3. UYGULAMA: Bilgiyi yeni durumlarda kullanma
-4. ANALİZ: Parçalara ayırma, ilişki kurma, karşılaştırma
-5. SENTEZ: Birleştirme, yeni ürün oluşturma
-6. DEĞERLENDİRME: Yargılama, eleştirme, karar verme
+═══════════════════════════════════════════════════════
+📋 SORU TASARIM KURALLARI
+═══════════════════════════════════════════════════════
 
-═══════════════════════════════════════════════════════════════
-📝 SORU YAZIM KURALLARI (KRİTİK!)
-═══════════════════════════════════════════════════════════════
-✅ YAPILMASI GEREKENLER:
-• Soru kökü açık, net ve tek anlama gelmeli
-• Soru ${languageLevel} olmalı
-• Gerçek hayat bağlamı ve örnekler kullan
-• Her şık mantıklı ve tutarlı uzunlukta olmalı
-• Doğru cevap kesinlikle tek olmalı
-• Açıklama detaylı ve öğretici olmalı
+1️⃣ SORU METNİ:
+   • Kazanımla doğrudan ilişkili olmalı
+   • ${grade}. sınıf öğrencisinin anlayacağı dilde
+   • Net, açık ve tek anlama gelecek şekilde
+   • Gereksiz detay içermemeli
+   • Problem kurgusu gerçek hayatla ilişkili olabilir
 
-❌ YAPILMAMASI GEREKENLER:
-• "Aşağıdakilerden hangisi yanlıştır?" gibi olumsuz soru kökü KULLANMA
-• "Hepsi", "Hiçbiri" gibi şıklar KOYMA
-• Çok uzun veya karmaşık cümleler KURMA
-• Şıklarda ipucu veren kelimeler KULLANMA
-• Birbirine çok benzeyen şıklar YAZMA
+2️⃣ ŞIKLAR:
+   • Tüm şıklar mantıklı ve olası görünmeli
+   • Yanlış şıklar yaygın öğrenci hatalarını yansıtmalı
+   • "Hiçbiri" veya "Hepsi" şıkkı KULLANMA
+   • Şıklar birbirine yakın uzunlukta olmalı
+   • Doğru cevap rastgele dağıtılmalı (her zaman B olmasın)
 
-═══════════════════════════════════════════════════════════════
-🔥 ÇELDİRİCİ KALİTESİ (ÇOK ÖNEMLİ!)
-═══════════════════════════════════════════════════════════════
-Her yanlış şık (çeldirici):
-• Mantıklı görünmeli ama yanlış olmalı
-• Yaygın öğrenci hatalarını hedeflemeli
-• Doğru cevapla aynı kategoriden olmalı
-• Rastgele veya saçma olmamalı
-• Doğru cevabı bilmeyeni cezbetmeli
+3️⃣ BLOOM TAKSONOMİSİ:
+   ${Object.entries(bloomLevels).map(([k,v]) => `   • ${k}: ${v}`).join('\n')}
+   
+   Zorluk ${difficulty} için öncelikli kullan:
+   ${difficulty === 'easy' ? '• bilgi, kavrama' : 
+     difficulty === 'medium' ? '• kavrama, uygulama, analiz' : 
+     difficulty === 'hard' ? '• analiz, sentez' : 
+     '• sentez, değerlendirme'}
 
-═══════════════════════════════════════════════════════════════
-📋 JSON FORMAT (SADECE BU FORMATTA YANIT VER!)
-═══════════════════════════════════════════════════════════════
+4️⃣ AÇIKLAMA:
+   • Neden doğru cevabın o olduğunu açıkla
+   • Yanlış şıkların neden yanlış olduğuna değin
+   • Öğretici ve bilgilendirici ol
+   • Kısa ama kapsamlı
 
-{"questions":[
-  {
-    "question_text": "Soru metni buraya",
-    "options": {
-      "A": "Birinci şık",
-      "B": "İkinci şık",
-      "C": "Üçüncü şık",
-      "D": "Dördüncü şık"${isHighSchool ? ',\n      "E": "Beşinci şık"' : ''}
-    },
-    "correct_answer": "${isHighSchool ? 'A/B/C/D/E' : 'A/B/C/D'}",
-    "explanation": "Doğru cevap X'dir çünkü... Diğer şıkların neden yanlış olduğu...",
-    "difficulty": "${difficulty}",
-    "bloom_level": "bilgi/kavrama/uygulama/analiz/sentez/değerlendirme"
-  }
-]}
+═══════════════════════════════════════════════════════
+📐 MATEMATİK / FEN FORMÜLLEME
+═══════════════════════════════════════════════════════
+Matematiksel ifadeler için LaTeX kullan, $$...$$ içinde yaz.
+JSON için backslash'i ÇİFT yaz (\\\\):
 
-═══════════════════════════════════════════════════════════════
-⚠️ KRİTİK KURALLAR
-═══════════════════════════════════════════════════════════════
-• SADECE JSON döndür, başka hiçbir metin ekleme
-• correct_answer sadece harf olmalı (${optionLetters})
-• bloom_level değerleri: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme
-• Tüm ${count} soruyu üret
-• Her soru benzersiz ve farklı açıdan sormalı
-• Açıklamalar öğretici ve detaylı olmalı
+• Kesir: $$\\\\frac{a}{b}$$
+• Karekök: $$\\\\sqrt{x}$$
+• Üs: $$x^{2}$$, $$a^{n}$$
+• Alt indis: $$x_{1}$$
+• Çarpı: $$\\\\times$$ veya $$\\\\cdot$$
+• Bölme: $$\\\\div$$
+• Pi: $$\\\\pi$$
+• Eşitsizlik: $$\\\\geq$$, $$\\\\leq$$, $$\\\\neq$$
+• Toplam: $$\\\\sum$$
+• Limit: $$\\\\lim$$
+• İntegral: $$\\\\int$$
 
-Şimdi ${count} adet mükemmel kalitede soru üret:`
+═══════════════════════════════════════════════════════
+📤 ÇIKTI FORMATI - SADECE JSON
+═══════════════════════════════════════════════════════
+{"questions":[{"question_text":"...","options":{"A":"...","B":"...","C":"...","D":"..."${isHighSchool ? ',"E":"..."' : ''}},"correct_answer":"A","explanation":"...","difficulty":"${difficulty}","bloom_level":"kavrama"}]}
+
+⚠️ ÖNEMLİ:
+• SADECE JSON yaz, başka açıklama YAZMA
+• JSON syntax hatası YAPMA
+• Türkçe karakterleri düzgün kullan (ş,ğ,ü,ö,ı,ç)
+• correct_answer sadece harf: ${isHighSchool ? 'A, B, C, D veya E' : 'A, B, C veya D'}
+• bloom_level: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme
+
+ŞİMDİ ${count} ADET "${topic}" KONUSUNDA "${learningOutcome}" KAZANIMINA UYGUN SORU ÜRET:`
 
   try {
+    console.log(`AI Soru Üretimi başlatılıyor: ${grade}. Sınıf ${subject} - ${topic}`)
+    
     const result = await geminiModel.generateContent(prompt)
     const response = await result.response
     let text = response.text()
     
+    console.log('AI Ham Yanıt (ilk 500 karakter):', text.substring(0, 500))
+    
     // Markdown code block'u kaldır
     text = text.replace(/```json\s*/gi, '')
-    text = text.replace(/```\s*/g, '')
+    text = text.replace(/```\s*/gi, '')
     text = text.trim()
     
-    // JSON'u bul
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('JSON format bulunamadı')
+    // JSON'u bul - en dıştaki { } arasını al
+    let jsonStr = ''
+    let braceCount = 0
+    let started = false
+    let startIdx = 0
+    
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] === '{') {
+        if (!started) {
+          started = true
+          startIdx = i
+        }
+        braceCount++
+      } else if (text[i] === '}') {
+        braceCount--
+        if (started && braceCount === 0) {
+          jsonStr = text.substring(startIdx, i + 1)
+          break
+        }
+      }
     }
     
-    let jsonStr = jsonMatch[0]
+    if (!jsonStr) {
+      console.error('JSON bulunamadı, tam yanıt:', text)
+      throw new Error('AI yanıtında JSON bulunamadı')
+    }
     
-    // Trailing commas temizle
-    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1')
+    // JSON temizleme
+    jsonStr = jsonStr
+      .replace(/,(\s*[}\]])/g, '$1') // Trailing commas
+      .replace(/[\x00-\x1F\x7F]/g, ' ') // Control characters
+      .replace(/\n/g, ' ')
+      .replace(/\r/g, '')
+      .replace(/\t/g, ' ')
+    
+    // LaTeX backslash'lerini düzelt - JSON'da tek \ geçersiz
+    // \frac, \sqrt, \cdot, \times, \div gibi LaTeX komutlarını çift \\ yap
+    jsonStr = jsonStr.replace(/\\([a-zA-Z]+)/g, (match, cmd) => {
+      // Zaten valid JSON escape sequence ise dokunma
+      const validEscapes = ['n', 'r', 't', 'b', 'f', 'u']
+      if (validEscapes.includes(cmd) || cmd.startsWith('u')) {
+        return match
+      }
+      // LaTeX komutu ise çift backslash yap
+      return '\\\\' + cmd
+    })
+    
+    // Tek kalan backslash'leri de düzelt (örn: \$ gibi)
+    jsonStr = jsonStr.replace(/\\([^\\nrtbfu"])/g, '\\\\$1')
     
     try {
       const data = JSON.parse(jsonStr)
-      return data.questions as CurriculumQuestion[]
-    } catch (parseError) {
-      // İkinci deneme - daha agresif temizleme
-      console.log('İlk parse başarısız, alternatif yöntem deneniyor...')
+      const questions = data.questions || []
       
-      jsonStr = jsonStr.replace(/\n/g, ' ').replace(/\r/g, '')
-      jsonStr = jsonStr.replace(/\s+/g, ' ')
+      console.log(`${questions.length} soru başarıyla parse edildi`)
       
+      // Soruları doğrula ve düzelt
+      return questions.map((q: any) => ({
+        question_text: q.question_text || q.question || '',
+        options: {
+          A: q.options?.A || q.options?.a || '',
+          B: q.options?.B || q.options?.b || '',
+          C: q.options?.C || q.options?.c || '',
+          D: q.options?.D || q.options?.d || '',
+          ...(isHighSchool && { E: q.options?.E || q.options?.e || '' })
+        },
+        correct_answer: (q.correct_answer || q.answer || 'A').toUpperCase(),
+        explanation: q.explanation || '',
+        difficulty: q.difficulty || difficulty,
+        bloom_level: q.bloom_level || 'kavrama'
+      })) as CurriculumQuestion[]
+      
+    } catch (parseError: any) {
+      console.error('JSON Parse Hatası:', parseError.message)
+      console.error('Temizlenmiş JSON:', jsonStr.substring(0, 500))
+      
+      // Son çare: Regex ile soruları çıkarmayı dene
       try {
-        const data = JSON.parse(jsonStr)
-        return data.questions as CurriculumQuestion[]
-      } catch (secondError) {
-        console.error('JSON parse hatası, raw text:', text.substring(0, 500))
-        throw new Error('AI yanıtı geçerli JSON formatında değil. Lütfen tekrar deneyin.')
+        const questionMatches = jsonStr.match(/"question_text"\s*:\s*"([^"]+)"/g)
+        if (questionMatches && questionMatches.length > 0) {
+          console.log('Regex ile soru bulundu, manuel parse deneniyor...')
+          // Manuel parse çok karmaşık, hata fırlat
+        }
+      } catch (e) {
+        // Ignore
       }
+      
+      throw new Error(`JSON parse hatası: ${parseError.message}. Lütfen tekrar deneyin.`)
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Müfredat sorusu üretme hatası:', error)
     throw error
   }

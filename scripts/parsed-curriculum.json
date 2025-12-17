@@ -1,0 +1,1680 @@
+{
+  "units": [
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 1,
+      "name": "Güzel Davranışlarımız"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 2,
+      "name": "Mustafa Kemal'den Atatürk'e"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 3,
+      "name": "Çevremizdeki Yaşam"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 4,
+      "name": "Yol Arkadaşımız Kitaplar"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 5,
+      "name": "Yeteneklerimizi Keşfediyoruz"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 6,
+      "name": "Minik Kâşifler"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 7,
+      "name": "Atalarımızın İzleri"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 8,
+      "name": "Sorumluluklarımız"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_number": 1,
+      "name": "İlk Okuma Yazma"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_number": 1,
+      "name": "Sayılar ve Nicelikler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_number": 2,
+      "name": "İşlemlerle Cebirsel Düşünme"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_number": 4,
+      "name": "Nesnelerin Geometrisi"
+    },
+    {
+      "subject_code": "hayat_bilgisi",
+      "grade": 1,
+      "unit_number": 1,
+      "name": "Ben ve Okulum"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 2,
+      "unit_number": 1,
+      "name": "Okuma ve Anlama"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 2,
+      "unit_number": 1,
+      "name": "Doğal Sayılar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 2,
+      "unit_number": 2,
+      "name": "Doğal Sayılarla İşlemler"
+    },
+    {
+      "subject_code": "ingilizce",
+      "grade": 2,
+      "unit_number": 1,
+      "name": "Words"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 3,
+      "unit_number": 1,
+      "name": "Gezegenimizi Tanıyalım"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 3,
+      "unit_number": 2,
+      "name": "Beş Duyumuz"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 3,
+      "unit_number": 1,
+      "name": "Sayılar"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 4,
+      "unit_number": 1,
+      "name": "Birey ve Toplum"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 4,
+      "unit_number": 2,
+      "name": "Kültür ve Miras"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 4,
+      "unit_number": 1,
+      "name": "Yer Kabuğu"
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 4,
+      "unit_number": 1,
+      "name": "Günlük Konuşmalar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 5,
+      "unit_number": 1,
+      "name": "Geometrik Şekiller"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 5,
+      "unit_number": 2,
+      "name": "Sayılar ve Nicelikler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 5,
+      "unit_number": 3,
+      "name": "Kesirler"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 5,
+      "unit_number": 1,
+      "name": "Gökyüzündeki Komşular"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 5,
+      "unit_number": 1,
+      "name": "Birlikte Yaşamak"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_number": 1,
+      "name": "Sayılar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_number": 3,
+      "name": "Tam Sayılar"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 6,
+      "unit_number": 1,
+      "name": "Kültür ve Miras"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 7,
+      "unit_number": 1,
+      "name": "Tam Sayılar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 7,
+      "unit_number": 2,
+      "name": "Cebir"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 7,
+      "unit_number": 1,
+      "name": "Hücre Bölünmeleri"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 7,
+      "unit_number": 1,
+      "name": "Osmanlı Devleti"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 1,
+      "name": "Çarpanlar ve Katlar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 2,
+      "name": "Üslü İfadeler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 3,
+      "name": "Kareköklü İfadeler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 4,
+      "name": "Veri Analizi"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 5,
+      "name": "Olasılık"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 6,
+      "name": "Cebirsel İfadeler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 7,
+      "name": "Doğrusal Denklemler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_number": 8,
+      "name": "Geometri"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_number": 1,
+      "name": "Mevsimler ve İklim"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_number": 2,
+      "name": "DNA ve Genetik Kod"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_number": 3,
+      "name": "Basınç"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_number": 4,
+      "name": "Madde ve Endüstri"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_number": 5,
+      "name": "Basit Makineler"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_number": 1,
+      "name": "Bir Kahraman Doğuyor"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_number": 2,
+      "name": "Milli Uyanış"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_number": 3,
+      "name": "Ya İstiklal Ya Ölüm"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_number": 4,
+      "name": "Atatürkçülük"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_number": 1,
+      "name": "Sayılar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_number": 2,
+      "name": "Fonksiyonlar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_number": 3,
+      "name": "Algoritma"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_number": 4,
+      "name": "Geometri"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 9,
+      "unit_number": 1,
+      "name": "Fizik Bilimi"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 9,
+      "unit_number": 2,
+      "name": "Kuvvet ve Hareket"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 9,
+      "unit_number": 1,
+      "name": "Atom ve Periyodik Sistem"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 9,
+      "unit_number": 1,
+      "name": "Yaşam Bilimi"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 9,
+      "unit_number": 1,
+      "name": "Tarih ve Zaman"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 10,
+      "unit_number": 1,
+      "name": "Sayma"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 10,
+      "unit_number": 2,
+      "name": "Fonksiyonlar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 10,
+      "unit_number": 3,
+      "name": "Polinomlar"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 10,
+      "unit_number": 1,
+      "name": "Elektrik"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 10,
+      "unit_number": 1,
+      "name": "Kimyanın Temel Kanunları"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 10,
+      "unit_number": 1,
+      "name": "Hücre Bölünmeleri"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 11,
+      "unit_number": 1,
+      "name": "Trigonometri"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 11,
+      "unit_number": 2,
+      "name": "Analitik Geometri"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 11,
+      "unit_number": 1,
+      "name": "Dinamik"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 11,
+      "unit_number": 1,
+      "name": "Modern Atom Teorisi"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 11,
+      "unit_number": 1,
+      "name": "İnsan Fizyolojisi"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_number": 1,
+      "name": "Üstel ve Logaritmik Fonksiyonlar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_number": 2,
+      "name": "Diziler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_number": 3,
+      "name": "Türev"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_number": 4,
+      "name": "İntegral"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 12,
+      "unit_number": 1,
+      "name": "Çembersel Hareket"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 12,
+      "unit_number": 2,
+      "name": "Modern Fizik"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 12,
+      "unit_number": 1,
+      "name": "Organik Kimya"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 12,
+      "unit_number": 1,
+      "name": "Genden Proteine"
+    }
+  ],
+  "topics": [
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_name": null,
+      "unit_number": null,
+      "main_topic": "1. Sınıf Müfredatı ve Kazanımları",
+      "sub_topic": "Türkiye Yüzyılı Maarif Modeli",
+      "learning_outcome": "1. Sınıf Müfredatı ve Kazanımları (Türkiye Yüzyılı Maarif Modeli)"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_name": null,
+      "unit_number": null,
+      "main_topic": "lenen Kazanımlar ve Beceriler",
+      "sub_topic": null,
+      "learning_outcome": "lenen Kazanımlar ve Beceriler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "ve İçerik Detayları",
+      "sub_topic": null,
+      "learning_outcome": "ve İçerik Detayları"
+    },
+    {
+      "subject_code": "hayat_bilgisi",
+      "grade": 2,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "2. Sınıf Müfredatı ve Kazanımları",
+      "sub_topic": "2018 Programı",
+      "learning_outcome": "2. Sınıf Müfredatı ve Kazanımları (2018 Programı)"
+    },
+    {
+      "subject_code": "ingilizce",
+      "grade": 3,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "3. Sınıf Müfredatı ve Kazanımları",
+      "sub_topic": "2018 Programı",
+      "learning_outcome": "3. Sınıf Müfredatı ve Kazanımları (2018 Programı)"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 4,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "4. Sınıf Müfredatı ve Kazanımları",
+      "sub_topic": "2018 Programı",
+      "learning_outcome": "4. Sınıf Müfredatı ve Kazanımları (2018 Programı)"
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 5,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "5. Sınıf Müfredatı",
+      "sub_topic": "Türkiye Yüzyılı Maarif Modeli",
+      "learning_outcome": "5. Sınıf Müfredatı (Türkiye Yüzyılı Maarif Modeli)"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "6. Sınıf Müfredatı",
+      "sub_topic": "2018 Programı",
+      "learning_outcome": "6. Sınıf Müfredatı (2018 Programı)"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Sayılar: Üslü ifadeler, işlem önceliği, dağılma özelliği. Bölünebilme kuralları",
+      "sub_topic": "2, 3, 4, 5, 6, 9, 10), asal sayılar, çarpanlar ve katlar. Kümeler kavramı (birleşim, kesişim",
+      "learning_outcome": "Sayılar: Üslü ifadeler, işlem önceliği, dağılma özelliği. Bölünebilme kuralları (2, 3, 4, 5, 6, 9, 10), asal sayılar, çarpanlar ve katlar. Kümeler kavramı (birleşim, kesişim)."
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Tam Sayılar: Tam sayıları tanıma",
+      "sub_topic": null,
+      "learning_outcome": "mutlak değer, sayı doğrusunda sıralama."
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Cebir: Cebirsel ifadelerin değerini bulma",
+      "sub_topic": null,
+      "learning_outcome": "basit denklemler kurma.18"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Kültür ve Miras: Orta Asya İlk Türk Devletleri",
+      "sub_topic": "Hun, Göktürk, Uygur). İslamiyet'in doğuşu ve değişimi (Dört Halife, Emevi, Abbasi). Türklerin İslamiyet'i kabulü ve İlk Türk-İslam Devletleri (Gazneli, Karahanlı, Selçuklu",
+      "learning_outcome": "Kültür ve Miras: Orta Asya İlk Türk Devletleri (Hun, Göktürk, Uygur). İslamiyet'in doğuşu ve değişimi (Dört Halife, Emevi, Abbasi). Türklerin İslamiyet'i kabulü ve İlk Türk-İslam Devletleri (Gazneli, Karahanlı, Selçuklu).18"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Üretim, Dağıtım, Tüketim: Ülkemizin kaynakları",
+      "sub_topic": "tarım, hayvancılık, madenler",
+      "learning_outcome": "Üretim, Dağıtım, Tüketim: Ülkemizin kaynakları (tarım, hayvancılık, madenler), vergi vermenin önemi."
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Peygamber ve İlahi Kitap: Peygamberlerin sıfatları, vahiy, ilahi kitaplar",
+      "sub_topic": "Tevrat, Zebur, İncil, Kur'an",
+      "learning_outcome": "Peygamber ve İlahi Kitap: Peygamberlerin sıfatları, vahiy, ilahi kitaplar (Tevrat, Zebur, İncil, Kur'an) ve gönderildiği peygamberler."
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 6,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Namaz: Namazın çeşitleri",
+      "sub_topic": null,
+      "learning_outcome": "kılınışı, abdest alma.19"
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 7,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "7. Sınıf Müfredatı",
+      "sub_topic": "2018 Programı",
+      "learning_outcome": "7. Sınıf Müfredatı (2018 Programı)"
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 7,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Matematik: Tam sayılarla işlemler",
+      "sub_topic": "negatif sayılarla çarpma/bölme",
+      "learning_outcome": "Matematik: Tam sayılarla işlemler (negatif sayılarla çarpma/bölme), rasyonel sayılar ve çok adımlı işlemler. Cebirsel ifadelerle toplama-çıkarma, doğrusal denklemler, oran-orantı ve yüzdeler."
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 7,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Fen Bilimleri: Uzay araştırmaları, hücre bölünmeleri",
+      "sub_topic": "Mitoz-Mayoz), kütle ve ağırlık ilişkisi, potansiyel ve kinetik enerji, saf maddeler (element-bileşik",
+      "learning_outcome": "Fen Bilimleri: Uzay araştırmaları, hücre bölünmeleri (Mitoz-Mayoz), kütle ve ağırlık ilişkisi, potansiyel ve kinetik enerji, saf maddeler (element-bileşik), karışımları ayırma, ışığın kırılması ve mercekler."
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 7,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Sosyal Bilgiler: Osmanlı Devleti'nin kuruluşu ve yükselişi, Avrupa'daki gelişmeler",
+      "sub_topic": "Rönesans, Reform, Aydınlanma Çağı",
+      "learning_outcome": "Sosyal Bilgiler: Osmanlı Devleti'nin kuruluşu ve yükselişi, Avrupa'daki gelişmeler (Rönesans, Reform, Aydınlanma Çağı), İletişim özgürlüğü."
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "8. Sınıf Müfredatı ve LGS",
+      "sub_topic": "Sınav Odaklı",
+      "learning_outcome": "8. Sınıf Müfredatı ve LGS (Sınav Odaklı)"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Mevsimler ve İklim: Eksen eğikliği",
+      "sub_topic": null,
+      "learning_outcome": "mevsimlerin oluşumu, iklim ve hava olayları arasındaki farklar."
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "DNA ve Genetik Kod: Nükleotid, gen, kromozom ilişkisi. DNA'nın kendini eşlemesi. Kalıtım",
+      "sub_topic": "Mendel çaprazlamaları). Mutasyon, modifikasyon ve adaptasyon kavramları. Biyoteknoloji uygulamaları (Yarar-zarar tartışması",
+      "learning_outcome": "DNA ve Genetik Kod: Nükleotid, gen, kromozom ilişkisi. DNA'nın kendini eşlemesi. Kalıtım (Mendel çaprazlamaları). Mutasyon, modifikasyon ve adaptasyon kavramları. Biyoteknoloji uygulamaları (Yarar-zarar tartışması).23"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Basınç: Katı",
+      "sub_topic": null,
+      "learning_outcome": "sıvı ve gaz basıncını etkileyen değişkenler. Pascal prensibi ve günlük hayattaki uygulamaları."
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Madde ve Endüstri: Periyodik sistem",
+      "sub_topic": "Tarihçesi, metal-ametal-yarı metal özellikleri). Fiziksel ve kimyasal değişimler. Kimyasal tepkimeler (Kütlenin korunumu). Asitler ve bazlar (pH kavramı, asit yağmurları). Maddenin ısı ile etkileşimi ",
+      "learning_outcome": "Madde ve Endüstri: Periyodik sistem (Tarihçesi, metal-ametal-yarı metal özellikleri). Fiziksel ve kimyasal değişimler. Kimyasal tepkimeler (Kütlenin korunumu). Asitler ve bazlar (pH kavramı, asit yağmurları). Maddenin ısı ile etkileşimi (Öz ısı)."
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Basit Makineler: Makaralar",
+      "sub_topic": null,
+      "learning_outcome": "kaldıraçlar, eğik düzlem, çıkrık, dişli çarklar ve vidanın çalışma prensipleri."
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Enerji Dönüşümleri: Besin zinciri, fotosentez",
+      "sub_topic": "Işık gerekliliği), solunum (Oksijenli-Oksijensiz), madde döngüleri (Su, Karbon, Azot",
+      "learning_outcome": "Enerji Dönüşümleri: Besin zinciri, fotosentez (Işık gerekliliği), solunum (Oksijenli-Oksijensiz), madde döngüleri (Su, Karbon, Azot).21"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Bir Kahraman Doğuyor: Mustafa Kemal'in çocukluğu",
+      "sub_topic": null,
+      "learning_outcome": "öğrenim hayatı ve askerlik hayatı. Fikir hayatını etkileyen kişiler ve olaylar."
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Milli Uyanış: I. Dünya Savaşı'nın sebepleri ve sonuçları. Mondros Ateşkesi ve Cemiyetler. Misak-ı Milli ve TBMM'nin açılışı.",
+      "sub_topic": null,
+      "learning_outcome": "Milli Uyanış: I. Dünya Savaşı'nın sebepleri ve sonuçları. Mondros Ateşkesi ve Cemiyetler. Misak-ı Milli ve TBMM'nin açılışı."
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Ya İstiklal Ya Ölüm: Kurtuluş Savaşı cepheleri",
+      "sub_topic": "Doğu, Güney, Batı",
+      "learning_outcome": "Ya İstiklal Ya Ölüm: Kurtuluş Savaşı cepheleri (Doğu, Güney, Batı). Maarif Kongresi. Tekalif-i Milliye Emirleri. Mudanya Ateşkesi ve Lozan Barış Antlaşması."
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Atatürkçülük ve Çağdaşlaşan Türkiye: Siyasi, hukuk, eğitim, toplumsal ve ekonomik alanda yapılan inkılaplar. Atatürk İlkeleri",
+      "sub_topic": "Cumhuriyetçilik, Milliyetçilik, Halkçılık, Devletçilik, Laiklik, İnkılapçılık",
+      "learning_outcome": "Atatürkçülük ve Çağdaşlaşan Türkiye: Siyasi, hukuk, eğitim, toplumsal ve ekonomik alanda yapılan inkılaplar. Atatürk İlkeleri (Cumhuriyetçilik, Milliyetçilik, Halkçılık, Devletçilik, Laiklik, İnkılapçılık)."
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Demokratikleşme Çabaları: Çok partili hayata geçiş denemeleri.",
+      "sub_topic": null,
+      "learning_outcome": "Demokratikleşme Çabaları: Çok partili hayata geçiş denemeleri."
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Dış Politika: Hatay'ın anavatana katılması.23",
+      "sub_topic": null,
+      "learning_outcome": "Dış Politika: Hatay'ın anavatana katılması.23"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 9,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "9. Sınıf Müfredatı",
+      "sub_topic": "Türkiye Yüzyılı Maarif Modeli",
+      "learning_outcome": "9. Sınıf Müfredatı (Türkiye Yüzyılı Maarif Modeli)"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "ve Değişiklikler",
+      "sub_topic": null,
+      "learning_outcome": "ve Değişiklikler"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 9,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Tarih ve Zaman: Tarih biliminin yöntemi",
+      "sub_topic": null,
+      "learning_outcome": "kaynakları, takvim sistemleri."
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 9,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "İnsanlığın İlk Dönemleri: Yazının icadı, İlk Çağ uygarlıkları",
+      "sub_topic": "Sümer, Mısır, Yunan, Anadolu medeniyetleri",
+      "learning_outcome": "İnsanlığın İlk Dönemleri: Yazının icadı, İlk Çağ uygarlıkları (Sümer, Mısır, Yunan, Anadolu medeniyetleri)."
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 9,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Türk Dünyası: Orta Asya coğrafyası, Türk adının anlamı, İlk Türk Devletleri",
+      "sub_topic": "Asya Hun, Kök Türk, Uygur",
+      "learning_outcome": "Türk Dünyası: Orta Asya coğrafyası, Türk adının anlamı, İlk Türk Devletleri (Asya Hun, Kök Türk, Uygur). Kavimler Göçü."
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 9,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "İslam Medeniyeti: İslamiyet'in doğuşu, Türklerin İslamiyet'i kabulü ve ilk Türk-İslam Devletleri",
+      "sub_topic": "Karahanlı, Gazneli, Büyük Selçuklu",
+      "learning_outcome": "İslam Medeniyeti: İslamiyet'in doğuşu, Türklerin İslamiyet'i kabulü ve ilk Türk-İslam Devletleri (Karahanlı, Gazneli, Büyük Selçuklu).28"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "10. Sınıf Müfredatı",
+      "sub_topic": "TYT Temeli - 2018 Programı",
+      "learning_outcome": "10. Sınıf Müfredatı (TYT Temeli - 2018 Programı)"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Matematik: Sayma",
+      "sub_topic": "Permütasyon, Kombinasyon), Olasılık, Fonksiyonlar (Grafik çizimi, bileşke, ters fonksiyon), Polinomlar ve Çarpanlara Ayırma, İkinci Dereceden Denklemler (Karmaşık sayılara giriş), Dörtgenler ve Çokgen",
+      "learning_outcome": "Matematik: Sayma (Permütasyon, Kombinasyon), Olasılık, Fonksiyonlar (Grafik çizimi, bileşke, ters fonksiyon), Polinomlar ve Çarpanlara Ayırma, İkinci Dereceden Denklemler (Karmaşık sayılara giriş), Dörtgenler ve Çokgenler (Yamuk, Paralelkenar, Eşkenar Dörtgen, Dikdörtgen, Kare), Katı Cisimler (Prizma ve Piramitler).29"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Fizik: Elektrik",
+      "sub_topic": "Akım, Direnç, Potansiyel Fark, Ohm Yasası, Lambalar), Manyetizma, Basınç ve Kaldırma Kuvveti (Detaylı analiz), Dalgalar (Yay, Su, Ses, Deprem), Optik (Aydınlanma, Gölge, Aynalar, Kırılma, Renk, Mercek",
+      "learning_outcome": "Fizik: Elektrik (Akım, Direnç, Potansiyel Fark, Ohm Yasası, Lambalar), Manyetizma, Basınç ve Kaldırma Kuvveti (Detaylı analiz), Dalgalar (Yay, Su, Ses, Deprem), Optik (Aydınlanma, Gölge, Aynalar, Kırılma, Renk, Mercekler).30"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Kimya: Kimyanın Temel Kanunları",
+      "sub_topic": "Kütlenin korunumu, Sabit Oranlar), Mol Kavramı, Kimyasal Tepkimeler ve Hesaplamalar, Karışımlar (Homojen-Heterojen), Asitler-Bazlar ve Tuzlar (Tepkimeler, pH), Kimya Her Yerde (Polimerler, geri dönüşü",
+      "learning_outcome": "Kimya: Kimyanın Temel Kanunları (Kütlenin korunumu, Sabit Oranlar), Mol Kavramı, Kimyasal Tepkimeler ve Hesaplamalar, Karışımlar (Homojen-Heterojen), Asitler-Bazlar ve Tuzlar (Tepkimeler, pH), Kimya Her Yerde (Polimerler, geri dönüşüm, kozmetikler).31"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Biyoloji: Hücre Bölünmeleri",
+      "sub_topic": "Mitoz, Mayoz), Üreme Çeşitleri (Eşeyli, Eşeysiz), Kalıtım (Mendel genetiği, kan grupları, eşeye bağlı kalıtım",
+      "learning_outcome": "Biyoloji: Hücre Bölünmeleri (Mitoz, Mayoz), Üreme Çeşitleri (Eşeyli, Eşeysiz), Kalıtım (Mendel genetiği, kan grupları, eşeye bağlı kalıtım), Ekosistem Ekolojisi ve Güncel Çevre Sorunları.32"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Coğrafya: Yerin yapısı",
+      "sub_topic": "Kayaçlar, Tektonik hareketler",
+      "learning_outcome": "Coğrafya: Yerin yapısı (Kayaçlar, Tektonik hareketler), İç ve Dış Kuvvetler, Su-Toprak-Bitki varlığı, Nüfus ve Göç.29"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 10,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Tarih: Osmanlı Tarihi",
+      "sub_topic": "Kuruluş 1300 - Duraklama sonu 1699). Beylikten Devlete, Dünya Gücü Osmanlı (Fatih, Yavuz, Kanuni dönemleri",
+      "learning_outcome": "Tarih: Osmanlı Tarihi (Kuruluş 1300 - Duraklama sonu 1699). Beylikten Devlete, Dünya Gücü Osmanlı (Fatih, Yavuz, Kanuni dönemleri)."
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "11. Sınıf Müfredatı",
+      "sub_topic": "Alanlaşma ve Derinleşme",
+      "learning_outcome": "11. Sınıf Müfredatı (Alanlaşma ve Derinleşme)"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Matematik",
+      "sub_topic": "İleri Düzey): Trigonometri (Birim çember, esas ölçü, sinüs/kosinüs teoremleri, grafikler), Analitik Geometri (Nokta ve doğru analitiği), Fonksiyonlarda Uygulamalar (Parabol, dönüşümler), Denklem ve Eş",
+      "learning_outcome": "Matematik (İleri Düzey): Trigonometri (Birim çember, esas ölçü, sinüs/kosinüs teoremleri, grafikler), Analitik Geometri (Nokta ve doğru analitiği), Fonksiyonlarda Uygulamalar (Parabol, dönüşümler), Denklem ve Eşitsizlik Sistemleri (İşaret tablosu), Çember ve Daire, Uzay Geometri, Olasılık (Koşullu olasılık).33"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Fizik",
+      "sub_topic": "Sayısal): Vektörler, Bağıl Hareket, Newton'un Hareket Yasaları (Dinamik), Bir ve İki Boyutta Sabit İvmeli Hareket (Atışlar), Enerji ve Hareket, İtme ve Momentum, Tork ve Denge, Elektrik ve Manyetizma ",
+      "learning_outcome": "Fizik (Sayısal): Vektörler, Bağıl Hareket, Newton'un Hareket Yasaları (Dinamik), Bir ve İki Boyutta Sabit İvmeli Hareket (Atışlar), Enerji ve Hareket, İtme ve Momentum, Tork ve Denge, Elektrik ve Manyetizma (Elektriksel kuvvet/alan, Potansiyel, Sığaçlar, Manyetik alan, İndüksiyon, Alternatif Akım ve Transformatörler)."
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Kimya",
+      "sub_topic": "Sayısal): Modern Atom Teorisi (Kuantum sayıları, elektron dizilimleri), Gazlar (İdeal gaz yasası), Sıvı Çözeltiler (Derişimler, koligatif özellikler), Kimyasal Tepkimelerde Enerji (Entalpi), Tepkime H",
+      "learning_outcome": "Kimya (Sayısal): Modern Atom Teorisi (Kuantum sayıları, elektron dizilimleri), Gazlar (İdeal gaz yasası), Sıvı Çözeltiler (Derişimler, koligatif özellikler), Kimyasal Tepkimelerde Enerji (Entalpi), Tepkime Hızı, Kimyasal Denge (Asit-baz dengesi, Kçça).31"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Biyoloji",
+      "sub_topic": "Sayısal): İnsan Fizyolojisi (Sistemler: Sinir, Endokrin, Duyu, Destek-Hareket, Sindirim, Dolaşım, Solunum, Boşaltım, Üreme",
+      "learning_outcome": "Biyoloji (Sayısal): İnsan Fizyolojisi (Sistemler: Sinir, Endokrin, Duyu, Destek-Hareket, Sindirim, Dolaşım, Solunum, Boşaltım, Üreme).32"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Tarih: Değişim ve Diplomasi",
+      "sub_topic": "18. ve 19. yüzyıl Osmanlı Tarihi). Avrupa tarihi (Fransız İhtilali, Sanayi Devrimi",
+      "learning_outcome": "Tarih: Değişim ve Diplomasi (18. ve 19. yüzyıl Osmanlı Tarihi). Avrupa tarihi (Fransız İhtilali, Sanayi Devrimi)."
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 11,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "İngilizce: Future Jobs",
+      "sub_topic": null,
+      "learning_outcome": "Hobbies and Skills, Hard Times, What a Life, Back to the Past, Open Your Heart gibi temalar üzerinden ileri düzey okuma ve konuşma.34"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 12,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "12. Sınıf Müfredatı",
+      "sub_topic": "YKS - AYT Final",
+      "learning_outcome": "12. Sınıf Müfredatı (YKS - AYT Final)"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 12,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Fizik: Çembersel Hareket",
+      "sub_topic": "Düzgün çembersel, dönerek öteleme, açısal momentum), Kütle Çekim ve Kepler Yasaları, Basit Harmonik Hareket, Dalga Mekaniği (Kırınım, Girişim, Doppler), Modern Fizik (Özel Görelilik, Kuantum Fiziğine ",
+      "learning_outcome": "Fizik: Çembersel Hareket (Düzgün çembersel, dönerek öteleme, açısal momentum), Kütle Çekim ve Kepler Yasaları, Basit Harmonik Hareket, Dalga Mekaniği (Kırınım, Girişim, Doppler), Modern Fizik (Özel Görelilik, Kuantum Fiziğine Giriş, Fotoelektrik Olay, Compton Saçılması, Radyoaktivite).30"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 12,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Kimya: Kimya ve Elektrik",
+      "sub_topic": "Redoks, Piller, Elektroliz, Korozyon), Karbon Kimyasına Giriş (Hibritleşme, Molekül Geometrisi), Organik Kimya (Hidrokarbonlar, Fonksiyonel Gruplar: Alkol, Eter, Aldehit, Keton, Asit, Ester",
+      "learning_outcome": "Kimya: Kimya ve Elektrik (Redoks, Piller, Elektroliz, Korozyon), Karbon Kimyasına Giriş (Hibritleşme, Molekül Geometrisi), Organik Kimya (Hidrokarbonlar, Fonksiyonel Gruplar: Alkol, Eter, Aldehit, Keton, Asit, Ester), Enerji Kaynakları.31"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 12,
+      "unit_name": "Sorumluluklarımız",
+      "unit_number": 8,
+      "main_topic": "Biyoloji: Genden Proteine",
+      "sub_topic": "DNA, RNA, Protein Sentezi, Biyoteknoloji), Canlılarda Enerji Dönüşümleri (Fotosentez, Kemosentez, Solunum), Bitki Biyolojisi (Bitki yapısı, taşıma, üreme), Canlılar ve Çevre (Evrimsel süreçler, adapta",
+      "learning_outcome": "Biyoloji: Genden Proteine (DNA, RNA, Protein Sentezi, Biyoteknoloji), Canlılarda Enerji Dönüşümleri (Fotosentez, Kemosentez, Solunum), Bitki Biyolojisi (Bitki yapısı, taşıma, üreme), Canlılar ve Çevre (Evrimsel süreçler, adaptasyon tartışmaları müfredatta \"Canlılar ve Çevre\" başlığı altında işlenir).32"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_name": "İlk Okuma Yazma",
+      "unit_number": 1,
+      "main_topic": "Ses Grupları ve Harfler",
+      "sub_topic": null,
+      "learning_outcome": "Yeni harf grupları sıralaması ile sesleri tanır, ayırt eder, hece, kelime ve cümle oluşturur"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 1,
+      "unit_name": "Güzel Davranışlarımız",
+      "unit_number": 2,
+      "main_topic": "İletişim ve Nezaket",
+      "sub_topic": null,
+      "learning_outcome": "Dinleme kurallarını uygulama, nezaket ifadelerini yerinde kullanma"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_name": "Sayılar ve Nicelikler",
+      "unit_number": 1,
+      "main_topic": "Doğal Sayılar",
+      "sub_topic": null,
+      "learning_outcome": "20'ye kadar olan sayıları nesnelerle eşleştirerek sayar, rakamları okur ve yazar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_name": "İşlemlerle Cebirsel Düşünme",
+      "unit_number": 2,
+      "main_topic": "Toplama İşlemi",
+      "sub_topic": null,
+      "learning_outcome": "Toplamları 20'yi geçmeyen sayılarla toplama yapar, sembolleri kullanır"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_name": "İşlemlerle Cebirsel Düşünme",
+      "unit_number": 3,
+      "main_topic": "Çıkarma İşlemi",
+      "sub_topic": null,
+      "learning_outcome": "20'ye kadar olan sayılarla çıkarma yapar, zihinden çıkarma stratejileri geliştirir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 1,
+      "unit_name": "Nesnelerin Geometrisi",
+      "unit_number": 4,
+      "main_topic": "Geometrik Şekiller",
+      "sub_topic": null,
+      "learning_outcome": "Üçgen, kare, dikdörtgen ve çemberi tanır ve modeller üzerinde gösterir"
+    },
+    {
+      "subject_code": "hayat_bilgisi",
+      "grade": 1,
+      "unit_name": "Ben ve Okulum",
+      "unit_number": 1,
+      "main_topic": "Okula Uyum",
+      "sub_topic": null,
+      "learning_outcome": "Sınıfını ve okulunun bölümlerini tanır, okul kurallarına uyar"
+    },
+    {
+      "subject_code": "turkce",
+      "grade": 2,
+      "unit_name": "Okuma ve Anlama",
+      "unit_number": 1,
+      "main_topic": "Metin Anlama",
+      "sub_topic": null,
+      "learning_outcome": "Okuduğu metinle ilgili 5N1K sorularını cevaplar, metnin ana fikrini belirler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 2,
+      "unit_name": "Doğal Sayılar",
+      "unit_number": 1,
+      "main_topic": "Sayılar ve Basamaklar",
+      "sub_topic": null,
+      "learning_outcome": "100 içinde nesne sayısını belirler, deste ve düzine kavramlarını öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 2,
+      "unit_name": "Doğal Sayılarla İşlemler",
+      "unit_number": 2,
+      "main_topic": "Toplama ve Çıkarma",
+      "sub_topic": null,
+      "learning_outcome": "Eldeli toplama ve onluk bozarak çıkarma işlemini yapar"
+    },
+    {
+      "subject_code": "ingilizce",
+      "grade": 2,
+      "unit_name": "Words",
+      "unit_number": 1,
+      "main_topic": "Kelimeler",
+      "sub_topic": null,
+      "learning_outcome": "Alfabeyi tanır, basit kelimeleri resimlerle eşleştirir"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 3,
+      "unit_name": "Gezegenimizi Tanıyalım",
+      "unit_number": 1,
+      "main_topic": "Dünya'nın Yapısı",
+      "sub_topic": null,
+      "learning_outcome": "Dünya'nın şeklinin küreye benzediğini kavrar, katmanlarını model üzerinde gösterir"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 3,
+      "unit_name": "Beş Duyumuz",
+      "unit_number": 2,
+      "main_topic": "Duyu Organları",
+      "sub_topic": null,
+      "learning_outcome": "Duyu organlarını tanır ve görevlerini açıklar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 3,
+      "unit_name": "Sayılar",
+      "unit_number": 1,
+      "main_topic": "Doğal Sayılar",
+      "sub_topic": null,
+      "learning_outcome": "3 basamaklı doğal sayıları okur ve yazar, Romen rakamlarını tanır"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 4,
+      "unit_name": "Birey ve Toplum",
+      "unit_number": 1,
+      "main_topic": "Kimlik Bilinci",
+      "sub_topic": null,
+      "learning_outcome": "Resmi kimlik belgesini inceler, kronolojik sıralama becerisi kazanır"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 4,
+      "unit_name": "Kültür ve Miras",
+      "unit_number": 2,
+      "main_topic": "Milli Kültürümüz",
+      "sub_topic": null,
+      "learning_outcome": "Aile tarihini sözlü tarih yöntemiyle araştırır, milli kültür ögelerini tanır"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 4,
+      "unit_name": "Yer Kabuğu",
+      "unit_number": 1,
+      "main_topic": "Kayaçlar ve Madenler",
+      "sub_topic": null,
+      "learning_outcome": "Yer kabuğunun yapısını açıklar, kayaç, maden ve fosil kavramlarını ilişkilendirir"
+    },
+    {
+      "subject_code": "din_kulturu",
+      "grade": 4,
+      "unit_name": "Günlük Konuşmalar",
+      "unit_number": 1,
+      "main_topic": "Dini İfadeler",
+      "sub_topic": null,
+      "learning_outcome": "Besmele, selamlaşma, hamd, şükür gibi ifadelerin anlamlarını ve kullanım yerlerini öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 5,
+      "unit_name": "Geometrik Şekiller",
+      "unit_number": 1,
+      "main_topic": "Temel Çizimler ve Açı",
+      "sub_topic": null,
+      "learning_outcome": "Doğru, doğru parçası ve ışını çizer, açıyı açıölçerle ölçer"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 5,
+      "unit_name": "Sayılar ve Nicelikler",
+      "unit_number": 2,
+      "main_topic": "Doğal Sayılar ve İşlemler",
+      "sub_topic": null,
+      "learning_outcome": "Milyonlu sayıları okur ve yazar, bölük ve basamak kavramlarını pekiştirir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 5,
+      "unit_name": "Kesirler",
+      "unit_number": 3,
+      "main_topic": "Kesirler ve Ondalık",
+      "sub_topic": null,
+      "learning_outcome": "Birim kesirleri sıralar, bileşik ve tam sayılı kesirleri birbirine dönüştürür"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 5,
+      "unit_name": "Gökyüzündeki Komşular",
+      "unit_number": 1,
+      "main_topic": "Astronomi",
+      "sub_topic": null,
+      "learning_outcome": "Güneş'in yapısını ve dönme hareketini kavrar, Ay'ın evrelerini modeller"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 5,
+      "unit_name": "Birlikte Yaşamak",
+      "unit_number": 1,
+      "main_topic": "Toplumsal Uyum",
+      "sub_topic": null,
+      "learning_outcome": "Dahil olduğu gruplardaki rollerini ve sorumluluklarını fark eder"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_name": "Sayılar",
+      "unit_number": 1,
+      "main_topic": "Üslü İfadeler",
+      "sub_topic": null,
+      "learning_outcome": "Üslü ifadeler, işlem önceliği, dağılma özelliği kavramlarını öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_name": "Sayılar",
+      "unit_number": 2,
+      "main_topic": "Bölünebilme Kuralları",
+      "sub_topic": null,
+      "learning_outcome": "Bölünebilme kurallarını, asal sayıları, çarpanları ve katları öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 6,
+      "unit_name": "Tam Sayılar",
+      "unit_number": 3,
+      "main_topic": "Tam Sayıları Tanıma",
+      "sub_topic": null,
+      "learning_outcome": "Tam sayıları tanır, mutlak değer ve sayı doğrusunda sıralama yapar"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 6,
+      "unit_name": "Kültür ve Miras",
+      "unit_number": 1,
+      "main_topic": "Orta Asya İlk Türk Devletleri",
+      "sub_topic": null,
+      "learning_outcome": "Hun, Göktürk, Uygur devletlerini öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 7,
+      "unit_name": "Tam Sayılar",
+      "unit_number": 1,
+      "main_topic": "Tam Sayılarla İşlemler",
+      "sub_topic": null,
+      "learning_outcome": "Negatif sayılarla çarpma/bölme yapar, rasyonel sayılarla çok adımlı işlemler çözer"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 7,
+      "unit_name": "Cebir",
+      "unit_number": 2,
+      "main_topic": "Cebirsel İfadeler",
+      "sub_topic": null,
+      "learning_outcome": "Cebirsel ifadelerle toplama-çıkarma, doğrusal denklemler çözer"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 7,
+      "unit_name": "Hücre Bölünmeleri",
+      "unit_number": 1,
+      "main_topic": "Mitoz ve Mayoz",
+      "sub_topic": null,
+      "learning_outcome": "Mitoz ve mayoz bölünmeleri ayırt eder ve açıklar"
+    },
+    {
+      "subject_code": "sosyal_bilgiler",
+      "grade": 7,
+      "unit_name": "Osmanlı Devleti",
+      "unit_number": 1,
+      "main_topic": "Kuruluş ve Yükseliş",
+      "sub_topic": null,
+      "learning_outcome": "Osmanlı Devleti'nin kuruluşu ve yükselişini öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Çarpanlar ve Katlar",
+      "unit_number": 1,
+      "main_topic": "EBOB - EKOK",
+      "sub_topic": null,
+      "learning_outcome": "Pozitif tam sayıların çarpanlarını bulur, EBOB ve EKOK hesaplar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Üslü İfadeler",
+      "unit_number": 2,
+      "main_topic": "Üslü Sayı İşlemleri",
+      "sub_topic": null,
+      "learning_outcome": "Tam sayıların tam sayı kuvvetlerini hesaplar, bilimsel gösterimle ifade eder"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Kareköklü İfadeler",
+      "unit_number": 3,
+      "main_topic": "Kök Hesaplama",
+      "sub_topic": null,
+      "learning_outcome": "Tam kare sayıları tanır, kareköklü ifadelerle dört işlem yapar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Veri Analizi",
+      "unit_number": 4,
+      "main_topic": "Grafikler",
+      "sub_topic": null,
+      "learning_outcome": "Çizgi, sütun ve daire grafiklerini çizer ve dönüşüm yapar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Olasılık",
+      "unit_number": 5,
+      "main_topic": "Basit Olayların Olasılığı",
+      "sub_topic": null,
+      "learning_outcome": "Bir olayın olma olasılığını hesaplar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Cebirsel İfadeler",
+      "unit_number": 6,
+      "main_topic": "Özdeşlikler",
+      "sub_topic": null,
+      "learning_outcome": "Cebirsel ifadeleri çarpar, özdeşlikleri modeller, çarpanlarına ayırır"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Doğrusal Denklemler",
+      "unit_number": 7,
+      "main_topic": "Denklem ve Eğim",
+      "sub_topic": null,
+      "learning_outcome": "Birinci dereceden denklemleri çözer, doğrunun eğimini hesaplar"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 8,
+      "unit_name": "Geometri",
+      "unit_number": 8,
+      "main_topic": "Üçgenler ve Cisimler",
+      "sub_topic": null,
+      "learning_outcome": "Pisagor bağıntısını kullanır, eşlik ve benzerlik kurallarını uygular"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Mevsimler ve İklim",
+      "unit_number": 1,
+      "main_topic": "Mevsimlerin Oluşumu",
+      "sub_topic": null,
+      "learning_outcome": "Eksen eğikliği ve mevsimlerin oluşumunu açıklar"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "DNA ve Genetik Kod",
+      "unit_number": 2,
+      "main_topic": "Kalıtım",
+      "sub_topic": null,
+      "learning_outcome": "Nükleotid, gen, kromozom ilişkisini açıklar, Mendel çaprazlamaları yapar"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Basınç",
+      "unit_number": 3,
+      "main_topic": "Katı, Sıvı ve Gaz Basıncı",
+      "sub_topic": null,
+      "learning_outcome": "Pascal prensibini ve günlük hayattaki uygulamalarını açıklar"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Madde ve Endüstri",
+      "unit_number": 4,
+      "main_topic": "Periyodik Sistem",
+      "sub_topic": null,
+      "learning_outcome": "Metal-ametal-yarı metal özelliklerini açıklar, asit ve bazları tanır"
+    },
+    {
+      "subject_code": "fen_bilimleri",
+      "grade": 8,
+      "unit_name": "Basit Makineler",
+      "unit_number": 5,
+      "main_topic": "Mekanik Sistemler",
+      "sub_topic": null,
+      "learning_outcome": "Makaralar, kaldıraçlar, eğik düzlem prensiplerini açıklar"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Bir Kahraman Doğuyor",
+      "unit_number": 1,
+      "main_topic": "Mustafa Kemal'in Hayatı",
+      "sub_topic": null,
+      "learning_outcome": "Mustafa Kemal'in çocukluğu, öğrenim ve askerlik hayatını öğrenir"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Milli Uyanış",
+      "unit_number": 2,
+      "main_topic": "I. Dünya Savaşı",
+      "sub_topic": null,
+      "learning_outcome": "I. Dünya Savaşı'nın sebeplerini ve sonuçlarını açıklar"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Ya İstiklal Ya Ölüm",
+      "unit_number": 3,
+      "main_topic": "Kurtuluş Savaşı",
+      "sub_topic": null,
+      "learning_outcome": "Kurtuluş Savaşı cephelerini ve önemli olayları öğrenir"
+    },
+    {
+      "subject_code": "inkilap_tarihi",
+      "grade": 8,
+      "unit_name": "Atatürkçülük",
+      "unit_number": 4,
+      "main_topic": "İnkılaplar",
+      "sub_topic": null,
+      "learning_outcome": "Atatürk ilke ve inkılaplarını öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_name": "Sayılar",
+      "unit_number": 1,
+      "main_topic": "Sayı Kümeleri",
+      "sub_topic": null,
+      "learning_outcome": "Sayı kümelerini (N, Z, Q, R) tanır, aralık kavramını kullanır"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_name": "Fonksiyonlar",
+      "unit_number": 2,
+      "main_topic": "Doğrusal Fonksiyonlar",
+      "sub_topic": null,
+      "learning_outcome": "Doğrusal fonksiyonları tanır ve grafiğini çizer"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_name": "Algoritma",
+      "unit_number": 3,
+      "main_topic": "Algoritmik Düşünme",
+      "sub_topic": null,
+      "learning_outcome": "Problem çözme sürecinde algoritma mantığını kullanır"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 9,
+      "unit_name": "Geometri",
+      "unit_number": 4,
+      "main_topic": "Üçgenler",
+      "sub_topic": null,
+      "learning_outcome": "Üçgende açı ve kenar bağıntılarını kurar, trigonometrik oranlara giriş yapar"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 9,
+      "unit_name": "Fizik Bilimi",
+      "unit_number": 1,
+      "main_topic": "Temel Kavramlar",
+      "sub_topic": null,
+      "learning_outcome": "Fiziğin alt dallarını ve fiziksel büyüklükleri sınıflandırır"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 9,
+      "unit_name": "Kuvvet ve Hareket",
+      "unit_number": 2,
+      "main_topic": "Newton Yasaları",
+      "sub_topic": null,
+      "learning_outcome": "Newton'un hareket yasalarını günlük hayat örnekleriyle açıklar"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 9,
+      "unit_name": "Atom ve Periyodik Sistem",
+      "unit_number": 1,
+      "main_topic": "Atom Modelleri",
+      "sub_topic": null,
+      "learning_outcome": "Dalton'dan günümüze atom modellerini inceler"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 9,
+      "unit_name": "Yaşam Bilimi",
+      "unit_number": 1,
+      "main_topic": "Canlıların Özellikleri",
+      "sub_topic": null,
+      "learning_outcome": "Canlıların ortak özelliklerini açıklar"
+    },
+    {
+      "subject_code": "tarih",
+      "grade": 9,
+      "unit_name": "Tarih ve Zaman",
+      "unit_number": 1,
+      "main_topic": "Tarih Bilimi",
+      "sub_topic": null,
+      "learning_outcome": "Tarih biliminin yöntemi, kaynakları ve takvim sistemlerini öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 10,
+      "unit_name": "Sayma",
+      "unit_number": 1,
+      "main_topic": "Permütasyon ve Kombinasyon",
+      "sub_topic": null,
+      "learning_outcome": "Permütasyon ve kombinasyon kavramlarını öğrenir ve uygular"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 10,
+      "unit_name": "Fonksiyonlar",
+      "unit_number": 2,
+      "main_topic": "Fonksiyon Grafikleri",
+      "sub_topic": null,
+      "learning_outcome": "Fonksiyon grafiklerini çizer, bileşke ve ters fonksiyonu bulur"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 10,
+      "unit_name": "Polinomlar",
+      "unit_number": 3,
+      "main_topic": "Polinomlar ve Çarpanlara Ayırma",
+      "sub_topic": null,
+      "learning_outcome": "Polinomlarda işlem yapar ve çarpanlara ayırır"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 10,
+      "unit_name": "Elektrik",
+      "unit_number": 1,
+      "main_topic": "Elektrik Devreleri",
+      "sub_topic": null,
+      "learning_outcome": "Akım, direnç, potansiyel fark ve Ohm yasasını uygular"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 10,
+      "unit_name": "Kimyanın Temel Kanunları",
+      "unit_number": 1,
+      "main_topic": "Mol Kavramı",
+      "sub_topic": null,
+      "learning_outcome": "Mol kavramını ve kimyasal hesaplamaları öğrenir"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 10,
+      "unit_name": "Hücre Bölünmeleri",
+      "unit_number": 1,
+      "main_topic": "Mitoz ve Mayoz",
+      "sub_topic": null,
+      "learning_outcome": "Hücre bölünmelerini detaylı olarak inceler"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 11,
+      "unit_name": "Trigonometri",
+      "unit_number": 1,
+      "main_topic": "Birim Çember",
+      "sub_topic": null,
+      "learning_outcome": "Birim çember ve trigonometrik fonksiyonları öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 11,
+      "unit_name": "Analitik Geometri",
+      "unit_number": 2,
+      "main_topic": "Nokta ve Doğru",
+      "sub_topic": null,
+      "learning_outcome": "Nokta ve doğru analitiğini öğrenir"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 11,
+      "unit_name": "Dinamik",
+      "unit_number": 1,
+      "main_topic": "Newton'un Hareket Yasaları",
+      "sub_topic": null,
+      "learning_outcome": "Dinamik problemlerini çözer"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 11,
+      "unit_name": "Modern Atom Teorisi",
+      "unit_number": 1,
+      "main_topic": "Kuantum Sayıları",
+      "sub_topic": null,
+      "learning_outcome": "Kuantum sayıları ve elektron dizilimlerini öğrenir"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 11,
+      "unit_name": "İnsan Fizyolojisi",
+      "unit_number": 1,
+      "main_topic": "Sistemler",
+      "sub_topic": null,
+      "learning_outcome": "İnsan vücut sistemlerini öğrenir"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_name": "Üstel ve Logaritmik Fonksiyonlar",
+      "unit_number": 1,
+      "main_topic": "Logaritma",
+      "sub_topic": null,
+      "learning_outcome": "Logaritma fonksiyonunu tanır ve denklem çözer"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_name": "Diziler",
+      "unit_number": 2,
+      "main_topic": "Aritmetik ve Geometrik Diziler",
+      "sub_topic": null,
+      "learning_outcome": "Dizilerin özelliklerini kavrar ve formüllerini uygular"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_name": "Türev",
+      "unit_number": 3,
+      "main_topic": "Türev Alma",
+      "sub_topic": null,
+      "learning_outcome": "Limit, süreklilik ve türev kavramlarını öğrenir, uygular"
+    },
+    {
+      "subject_code": "matematik",
+      "grade": 12,
+      "unit_name": "İntegral",
+      "unit_number": 4,
+      "main_topic": "Belirsiz ve Belirli İntegral",
+      "sub_topic": null,
+      "learning_outcome": "İntegral hesabı ve alan bulma işlemlerini yapar"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 12,
+      "unit_name": "Çembersel Hareket",
+      "unit_number": 1,
+      "main_topic": "Düzgün Çembersel Hareket",
+      "sub_topic": null,
+      "learning_outcome": "Çembersel hareket ve açısal momentum kavramlarını öğrenir"
+    },
+    {
+      "subject_code": "fizik",
+      "grade": 12,
+      "unit_name": "Modern Fizik",
+      "unit_number": 2,
+      "main_topic": "Özel Görelilik",
+      "sub_topic": null,
+      "learning_outcome": "Özel görelilik ve kuantum fiziğine giriş yapar"
+    },
+    {
+      "subject_code": "kimya",
+      "grade": 12,
+      "unit_name": "Organik Kimya",
+      "unit_number": 1,
+      "main_topic": "Hidrokarbonlar",
+      "sub_topic": null,
+      "learning_outcome": "Organik bileşikleri ve fonksiyonel grupları öğrenir"
+    },
+    {
+      "subject_code": "biyoloji",
+      "grade": 12,
+      "unit_name": "Genden Proteine",
+      "unit_number": 1,
+      "main_topic": "DNA ve Protein Sentezi",
+      "sub_topic": null,
+      "learning_outcome": "DNA, RNA ve protein sentezini detaylı öğrenir"
+    }
+  ]
+}
