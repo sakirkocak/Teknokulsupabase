@@ -370,15 +370,27 @@ export default function SoruBankasiPage() {
     }
   }
 
-  // Belirli bir konunun soru sayısını getir
+  // Belirli bir konunun soru sayısını getir (zorluk filtresine göre)
   const getTopicQuestionCount = (topicId: string) => {
-    return topicQuestionCounts.find(tc => tc.topic_id === topicId)?.count || 0
+    const tc = topicQuestionCounts.find(tc => tc.topic_id === topicId)
+    if (!tc) return 0
+    
+    // Zorluk filtresi seçiliyse, sadece o zorluktaki soruları say
+    if (selectedDifficulty) {
+      return tc[selectedDifficulty as keyof typeof tc] as number || 0
+    }
+    return tc.count || 0
   }
 
   // Belirli bir konunun zorluk detaylarını getir
   const getTopicDifficultyBreakdown = (topicId: string) => {
     const tc = topicQuestionCounts.find(tc => tc.topic_id === topicId)
     return tc ? { easy: tc.easy, medium: tc.medium, hard: tc.hard, legendary: tc.legendary } : null
+  }
+
+  // Ana konunun toplam soru sayısı (zorluk filtresine göre)
+  const getMainTopicQuestionCount = (subTopics: Topic[]) => {
+    return subTopics.reduce((total, topic) => total + getTopicQuestionCount(topic.id), 0)
   }
 
   // Ana konulara göre grupla
@@ -1227,8 +1239,13 @@ export default function SoruBankasiPage() {
                       <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500">
                         {topicList.length} kazanım
                       </span>
-                      <span className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
-                        {topicList.reduce((sum, t) => sum + getTopicQuestionCount(t.id), 0)} soru
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        getMainTopicQuestionCount(topicList) > 0
+                          ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-400'
+                      }`}>
+                        {getMainTopicQuestionCount(topicList)} soru
+                        {selectedDifficulty && ` (${difficultyConfig[selectedDifficulty as keyof typeof difficultyConfig]?.label})`}
                       </span>
                     </div>
                     {expandedMainTopics.includes(mainTopic) ? (
@@ -1274,8 +1291,8 @@ export default function SoruBankasiPage() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 sm:gap-3">
-                                  {/* Zorluk Dağılımı */}
-                                  {topicQCount > 0 && diffBreakdown && (
+                                  {/* Zorluk Dağılımı - Sadece filtre yokken göster */}
+                                  {!selectedDifficulty && topicQCount > 0 && diffBreakdown && (
                                     <div className="hidden sm:flex items-center gap-1">
                                       {diffBreakdown.easy > 0 && (
                                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" title="Kolay">
@@ -1298,6 +1315,18 @@ export default function SoruBankasiPage() {
                                         </span>
                                       )}
                                     </div>
+                                  )}
+                                  {/* Seçili Zorluk Badge'i */}
+                                  {selectedDifficulty && topicQCount > 0 && (
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                      selectedDifficulty === 'easy' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                                      selectedDifficulty === 'medium' ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                      selectedDifficulty === 'hard' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' :
+                                      'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                                    }`}>
+                                      {difficultyConfig[selectedDifficulty as keyof typeof difficultyConfig]?.emoji}
+                                      {difficultyConfig[selectedDifficulty as keyof typeof difficultyConfig]?.label}
+                                    </span>
                                   )}
                                   {/* Toplam Soru Sayısı */}
                                   <span className={`text-xs px-2 py-1 rounded-full ${
