@@ -10,7 +10,7 @@ import {
   ChevronRight, Trophy, Target, Zap, Crown, Star,
   BarChart3, ArrowRight, Clock, Brain, GraduationCap,
   ChevronDown, ChevronUp, Layers, Sparkles, ArrowLeft,
-  TrendingUp, Award, Flame, Home
+  TrendingUp, Award, Flame, Home, Flag
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import MathRenderer from '@/components/MathRenderer'
@@ -71,6 +71,10 @@ interface QuestionCount {
 interface TopicQuestionCount {
   topic_id: string
   count: number
+  easy: number
+  medium: number
+  hard: number
+  legendary: number
 }
 
 const difficultyConfig = {
@@ -134,6 +138,13 @@ export default function SoruBankasiPage() {
   const [questionIndex, setQuestionIndex] = useState(0)
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 })
   const [earnedPoints, setEarnedPoints] = useState<number | null>(null)
+  
+  // Oturum özeti ve bildirim state
+  const [showSessionSummary, setShowSessionSummary] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reportSubmitting, setReportSubmitting] = useState(false)
+  const [reportSuccess, setReportSuccess] = useState(false)
 
   // İlk yükleme
   useEffect(() => {
@@ -321,23 +332,35 @@ export default function SoruBankasiPage() {
     try {
       const topicIds = topicsData.map(t => t.id)
       
-      // Tüm soruları topic_id ile al ve grupla
+      // Tüm soruları topic_id ve difficulty ile al
       const { data: questions } = await supabase
         .from('questions')
-        .select('topic_id')
+        .select('topic_id, difficulty')
         .eq('is_active', true)
         .in('topic_id', topicIds)
 
       if (questions) {
-        // topic_id bazında grupla
-        const countMap: Record<string, number> = {}
+        // topic_id bazında zorluk seviyelerine göre grupla
+        const countMap: Record<string, { total: number, easy: number, medium: number, hard: number, legendary: number }> = {}
+        
         questions.forEach(q => {
-          countMap[q.topic_id] = (countMap[q.topic_id] || 0) + 1
+          if (!countMap[q.topic_id]) {
+            countMap[q.topic_id] = { total: 0, easy: 0, medium: 0, hard: 0, legendary: 0 }
+          }
+          countMap[q.topic_id].total++
+          const diff = q.difficulty as 'easy' | 'medium' | 'hard' | 'legendary'
+          if (diff && countMap[q.topic_id][diff] !== undefined) {
+            countMap[q.topic_id][diff]++
+          }
         })
 
         const counts = topicsData.map(topic => ({
           topic_id: topic.id,
-          count: countMap[topic.id] || 0
+          count: countMap[topic.id]?.total || 0,
+          easy: countMap[topic.id]?.easy || 0,
+          medium: countMap[topic.id]?.medium || 0,
+          hard: countMap[topic.id]?.hard || 0,
+          legendary: countMap[topic.id]?.legendary || 0
         }))
         
         setTopicQuestionCounts(counts)
@@ -350,6 +373,12 @@ export default function SoruBankasiPage() {
   // Belirli bir konunun soru sayısını getir
   const getTopicQuestionCount = (topicId: string) => {
     return topicQuestionCounts.find(tc => tc.topic_id === topicId)?.count || 0
+  }
+
+  // Belirli bir konunun zorluk detaylarını getir
+  const getTopicDifficultyBreakdown = (topicId: string) => {
+    const tc = topicQuestionCounts.find(tc => tc.topic_id === topicId)
+    return tc ? { easy: tc.easy, medium: tc.medium, hard: tc.hard, legendary: tc.legendary } : null
   }
 
   // Ana konulara göre grupla
@@ -548,6 +577,7 @@ export default function SoruBankasiPage() {
         .eq('student_id', studentProfile.id)
         .single()
 
+      // Ders bazlı puan kolonları (student_points tablosunda varsa güncellenir)
       const subjectMap: Record<string, { points: string; correct: string; wrong: string }> = {
         'turkce': { points: 'turkce_points', correct: 'turkce_correct', wrong: 'turkce_wrong' },
         'matematik': { points: 'matematik_points', correct: 'matematik_correct', wrong: 'matematik_wrong' },
@@ -555,18 +585,22 @@ export default function SoruBankasiPage() {
         'inkilap_tarihi': { points: 'inkilap_points', correct: 'inkilap_correct', wrong: 'inkilap_wrong' },
         'din_kulturu': { points: 'din_points', correct: 'din_correct', wrong: 'din_wrong' },
         'ingilizce': { points: 'ingilizce_points', correct: 'ingilizce_correct', wrong: 'ingilizce_wrong' },
+        // Diğer dersler için genel puanlama yapılır (total_points)
       }
+      
+      // Ders kodu bulunamazsa yine de total puanlar güncellenir
+      console.log('Soru çözüldü - Ders kodu:', subjectCode, 'Puan:', points, 'Doğru:', correct)
 
       if (existingPoints) {
         const updateData: any = {
-          total_points: Math.max(0, existingPoints.total_points + points),
-          total_questions: existingPoints.total_questions + 1,
-          total_correct: existingPoints.total_correct + (correct ? 1 : 0),
-          total_wrong: existingPoints.total_wrong + (correct ? 0 : 1),
-          current_streak: correct ? existingPoints.current_streak + 1 : 0,
-          max_streak: correct && existingPoints.current_streak + 1 > existingPoints.max_streak 
-            ? existingPoints.current_streak + 1 
-            : existingPoints.max_streak,
+          total_points: Math.max(0, (existingPoints.total_points || 0) + points),
+          total_questions: (existingPoints.total_questions || 0) + 1,
+          total_correct: (existingPoints.total_correct || 0) + (correct ? 1 : 0),
+          total_wrong: (existingPoints.total_wrong || 0) + (correct ? 0 : 1),
+          current_streak: correct ? (existingPoints.current_streak || 0) + 1 : 0,
+          max_streak: correct && (existingPoints.current_streak || 0) + 1 > (existingPoints.max_streak || 0)
+            ? (existingPoints.current_streak || 0) + 1 
+            : (existingPoints.max_streak || 0),
           last_activity_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -578,13 +612,18 @@ export default function SoruBankasiPage() {
           updateData[cols.wrong] = (existingPoints[cols.wrong] || 0) + (correct ? 0 : 1)
         }
 
-        await supabase
+        const { error: updateError } = await supabase
           .from('student_points')
           .update(updateData)
           .eq('student_id', studentProfile.id)
 
-        setStudentPoints({ ...existingPoints, ...updateData })
+        if (updateError) {
+          console.error('Puan güncelleme hatası:', updateError)
+        } else {
+          setStudentPoints({ ...existingPoints, ...updateData })
+        }
       } else {
+        // Yeni kayıt oluştur
         const insertData: any = {
           student_id: studentProfile.id,
           total_points: Math.max(0, points),
@@ -596,8 +635,53 @@ export default function SoruBankasiPage() {
           last_activity_at: new Date().toISOString()
         }
 
-        await supabase.from('student_points').insert(insertData)
-        setStudentPoints(insertData)
+        const { error: insertError } = await supabase.from('student_points').insert(insertData)
+        
+        if (insertError) {
+          console.error('Puan ekleme hatası:', insertError)
+        } else {
+          setStudentPoints(insertData)
+        }
+      }
+
+      // Ders bazlı puanları güncelle (student_subject_points tablosu)
+      const subjectId = currentQuestion.topic?.subject?.id
+      if (subjectId) {
+        // Önce mevcut kaydı kontrol et
+        const { data: existingSubjectPoints } = await supabase
+          .from('student_subject_points')
+          .select('*')
+          .eq('student_id', studentProfile.id)
+          .eq('subject_id', subjectId)
+          .single()
+
+        if (existingSubjectPoints) {
+          // Mevcut kaydı güncelle (puanları biriktir)
+          await supabase
+            .from('student_subject_points')
+            .update({
+              points: Math.max(0, (existingSubjectPoints.points || 0) + points),
+              correct_count: (existingSubjectPoints.correct_count || 0) + (correct ? 1 : 0),
+              wrong_count: (existingSubjectPoints.wrong_count || 0) + (correct ? 0 : 1),
+              last_activity_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingSubjectPoints.id)
+        } else {
+          // Yeni kayıt oluştur
+          await supabase
+            .from('student_subject_points')
+            .insert({
+              student_id: studentProfile.id,
+              subject_id: subjectId,
+              points: Math.max(0, points),
+              correct_count: correct ? 1 : 0,
+              wrong_count: correct ? 0 : 1,
+              last_activity_at: new Date().toISOString()
+            })
+        }
+
+        console.log('Ders puanı güncellendi:', subjectId, 'Puan:', points)
       }
     }
   }
@@ -618,6 +702,48 @@ export default function SoruBankasiPage() {
     setSelectedSubject(null)
     setSelectedTopic(null)
     setTopics([])
+  }
+
+  // Oturumu bitir ve özeti göster
+  const endSession = () => {
+    setShowSessionSummary(true)
+  }
+
+  // Özeti kapat ve çık
+  const closeSessionSummary = () => {
+    setShowSessionSummary(false)
+    setSessionStats({ correct: 0, wrong: 0 })
+    setQuestionIndex(0)
+    goBack()
+  }
+
+  // Soruyu bildir
+  const reportQuestion = async () => {
+    if (!currentQuestion || !reportReason.trim() || !studentProfile) return
+
+    setReportSubmitting(true)
+    try {
+      const { error } = await supabase.from('question_reports').insert({
+        question_id: currentQuestion.id,
+        student_id: studentProfile.id,
+        reason: reportReason.trim(),
+        status: 'pending'
+      })
+
+      if (error) throw error
+
+      setReportSuccess(true)
+      setTimeout(() => {
+        setShowReportModal(false)
+        setReportReason('')
+        setReportSuccess(false)
+      }, 2000)
+    } catch (error) {
+      console.error('Soru bildirme hatası:', error)
+      alert('Bildirim gönderilemedi. Lütfen tekrar deneyin.')
+    } finally {
+      setReportSubmitting(false)
+    }
     setCurrentQuestion(null)
   }
 
@@ -661,22 +787,23 @@ export default function SoruBankasiPage() {
         <div className="max-w-4xl mx-auto">
           {/* Üst Bar */}
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               <button
-                onClick={goBack}
-                className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
+                onClick={endSession}
+                className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
+                title="Bitir"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <XCircle className="h-5 w-5" />
               </button>
-              <span className="text-white/70">Soru {questionIndex}</span>
-              <div className={`${difficultyConfig[currentQuestion.difficulty].color} px-3 py-1 rounded-full text-white text-sm flex items-center gap-1`}>
-                <DiffIcon className="h-4 w-4" />
-                {difficultyConfig[currentQuestion.difficulty].label}
+              <span className="text-white/70 text-sm sm:text-base">Soru {questionIndex}</span>
+              <div className={`${difficultyConfig[currentQuestion.difficulty].color} px-2 sm:px-3 py-1 rounded-full text-white text-xs sm:text-sm flex items-center gap-1`}>
+                <DiffIcon className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">{difficultyConfig[currentQuestion.difficulty].label}</span>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {/* Session Stats */}
-              <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-xl">
+              <div className="flex items-center gap-2 sm:gap-3 bg-white/10 px-2 sm:px-4 py-2 rounded-xl">
                 <span className="text-green-400 flex items-center gap-1">
                   <CheckCircle className="h-4 w-4" />
                   {sessionStats.correct}
@@ -688,7 +815,7 @@ export default function SoruBankasiPage() {
               </div>
               {/* Streak */}
               {studentPoints?.current_streak > 0 && (
-                <div className="flex items-center gap-1 bg-orange-500/20 px-3 py-2 rounded-xl text-orange-400">
+                <div className="hidden sm:flex items-center gap-1 bg-orange-500/20 px-3 py-2 rounded-xl text-orange-400">
                   <Flame className="h-4 w-4" />
                   {studentPoints.current_streak}
                 </div>
@@ -816,18 +943,195 @@ export default function SoruBankasiPage() {
                     </div>
                   )}
 
-                  {/* Sonraki Soru Butonu */}
-                  <button
-                    onClick={() => loadNextQuestion()}
-                    className="w-full mt-6 py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                  >
-                    Sonraki Soru
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
+                  {/* Butonlar */}
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={() => setShowReportModal(true)}
+                      className="px-4 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl transition-colors flex items-center gap-2"
+                      title="Hatalı Soru Bildir"
+                    >
+                      <Flag className="h-5 w-5" />
+                      <span className="hidden sm:inline">Bildir</span>
+                    </button>
+                    <button
+                      onClick={() => loadNextQuestion()}
+                      className="flex-1 py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                      Sonraki Soru
+                      <ArrowRight className="h-5 w-5" />
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
+
+          {/* Oturum Özeti Modal */}
+          <AnimatePresence>
+            {showSessionSummary && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                onClick={closeSessionSummary}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Trophy className="h-8 w-8 text-indigo-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                      Oturum Özeti
+                    </h2>
+                    <p className="text-gray-500 dark:text-gray-400 mb-6">
+                      Toplam {questionIndex} soru çözdün
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4">
+                        <div className="flex items-center justify-center gap-2 text-green-600 dark:text-green-400 mb-1">
+                          <CheckCircle className="h-5 w-5" />
+                          <span className="font-medium">Doğru</span>
+                        </div>
+                        <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                          {sessionStats.correct}
+                        </p>
+                      </div>
+                      <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4">
+                        <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 mb-1">
+                          <XCircle className="h-5 w-5" />
+                          <span className="font-medium">Yanlış</span>
+                        </div>
+                        <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                          {sessionStats.wrong}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Başarı Oranı */}
+                    {questionIndex > 0 && (
+                      <div className="mb-6">
+                        <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
+                          <span>Başarı Oranı</span>
+                          <span>{Math.round((sessionStats.correct / questionIndex) * 100)}%</span>
+                        </div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-green-500 to-emerald-500 transition-all"
+                            style={{ width: `${(sessionStats.correct / questionIndex) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={closeSessionSummary}
+                      className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-colors"
+                    >
+                      Kapat
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Soru Bildir Modal */}
+          <AnimatePresence>
+            {showReportModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                onClick={() => setShowReportModal(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {reportSuccess ? (
+                    <div className="text-center py-4">
+                      <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <CheckCircle className="h-8 w-8 text-green-500" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        Bildirim Gönderildi!
+                      </h3>
+                      <p className="text-gray-500 dark:text-gray-400">
+                        İnceleyip gerekli düzeltmeleri yapacağız.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                          <Flag className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                            Hatalı Soru Bildir
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Bu soruda bir hata mı var?
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Hata Açıklaması
+                        </label>
+                        <textarea
+                          value={reportReason}
+                          onChange={(e) => setReportReason(e.target.value)}
+                          placeholder="Sorunun nesi hatalı? (Örn: Cevap yanlış, soru anlaşılmıyor, yazım hatası var...)"
+                          className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                          rows={4}
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowReportModal(false)}
+                          className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          İptal
+                        </button>
+                        <button
+                          onClick={reportQuestion}
+                          disabled={!reportReason.trim() || reportSubmitting}
+                          className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {reportSubmitting ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Gönderiliyor...
+                            </>
+                          ) : (
+                            <>
+                              <Flag className="h-5 w-5" />
+                              Bildir
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     )
@@ -946,6 +1250,7 @@ export default function SoruBankasiPage() {
                         <div className="border-t border-gray-100 dark:border-gray-700">
                           {topicList.map((topic, idx) => {
                             const topicQCount = getTopicQuestionCount(topic.id)
+                            const diffBreakdown = getTopicDifficultyBreakdown(topic.id)
                             return (
                               <button
                                 key={topic.id}
@@ -968,10 +1273,36 @@ export default function SoruBankasiPage() {
                                     </p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                  {/* Zorluk Dağılımı */}
+                                  {topicQCount > 0 && diffBreakdown && (
+                                    <div className="hidden sm:flex items-center gap-1">
+                                      {diffBreakdown.easy > 0 && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" title="Kolay">
+                                          🟢{diffBreakdown.easy}
+                                        </span>
+                                      )}
+                                      {diffBreakdown.medium > 0 && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400" title="Orta">
+                                          🟡{diffBreakdown.medium}
+                                        </span>
+                                      )}
+                                      {diffBreakdown.hard > 0 && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400" title="Zor">
+                                          🟠{diffBreakdown.hard}
+                                        </span>
+                                      )}
+                                      {diffBreakdown.legendary > 0 && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400" title="Efsane">
+                                          🔴{diffBreakdown.legendary}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                  {/* Toplam Soru Sayısı */}
                                   <span className={`text-xs px-2 py-1 rounded-full ${
                                     topicQCount > 0 
-                                      ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+                                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' 
                                       : 'bg-gray-100 text-gray-400 dark:bg-gray-700'
                                   }`}>
                                     {topicQCount} soru
@@ -1089,33 +1420,55 @@ export default function SoruBankasiPage() {
           </motion.button>
         )}
 
-        {/* Sınıf Seçimi */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <GraduationCap className="h-5 w-5 text-indigo-500" />
-            <span className="font-medium text-gray-900 dark:text-white">Sınıf</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {[1,2,3,4,5,6,7,8,9,10,11,12].map(grade => (
+        {/* Sınıf Bilgisi */}
+        {studentProfile?.grade ? (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl p-4 mb-6 border border-indigo-100 dark:border-indigo-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-indigo-500 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md">
+                  {studentProfile.grade}
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">
+                    {studentProfile.grade}. Sınıf Soruları
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Profilindeki sınıfa göre sorular gösteriliyor
+                  </p>
+                </div>
+              </div>
               <button
-                key={grade}
-                onClick={() => {
-                  setSelectedGrade(grade)
-                  setSelectedSubject(null)
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  selectedGrade === grade
-                    ? 'bg-indigo-500 text-white shadow-md'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-                }`}
+                onClick={() => router.push('/ogrenci/profil')}
+                className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
               >
-                {grade}
-                {grade === 8 && <span className="text-xs ml-1 opacity-75">(LGS)</span>}
-                {grade === 12 && <span className="text-xs ml-1 opacity-75">(YKS)</span>}
+                Sınıfı Değiştir
+                <ChevronRight className="h-4 w-4" />
               </button>
-            ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 mb-6 border border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center text-white">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800 dark:text-amber-200">
+                  Sınıfını Belirle
+                </p>
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  Sana uygun soruları görmek için profilinden sınıfını seç
+                </p>
+              </div>
+              <button
+                onClick={() => router.push('/ogrenci/profil')}
+                className="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition-colors"
+              >
+                Profile Git
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Dersler - Kart Grid */}
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">

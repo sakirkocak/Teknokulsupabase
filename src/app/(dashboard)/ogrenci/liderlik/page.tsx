@@ -37,12 +37,13 @@ interface MyRanks {
   turkey_rank: number | null
 }
 
-const subjects = [
-  { key: 'genel', label: 'Genel', icon: Trophy, color: 'from-yellow-500 to-amber-600' },
-  { key: 'matematik', label: 'Matematik', icon: Target, color: 'from-red-500 to-rose-600' },
-  { key: 'turkce', label: 'Türkçe', icon: BookOpen, color: 'from-blue-500 to-indigo-600' },
-  { key: 'fen', label: 'Fen Bilimleri', icon: Zap, color: 'from-green-500 to-emerald-600' },
-]
+// Ders seçenekleri
+interface SubjectOption {
+  id: string
+  name: string
+  code: string
+  icon: string
+}
 
 const scopes = [
   { key: 'turkey', label: 'Türkiye', icon: Globe, color: 'from-red-500 to-red-600' },
@@ -73,9 +74,10 @@ export default function StudentLeaderboardPage() {
   const { profile } = useProfile()
   const { studentProfile } = useStudentProfile(profile?.id || '')
   
-  const [activeTab, setActiveTab] = useState('genel')
-  const [activeScope, setActiveScope] = useState('turkey')
-  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number>(0)
+  const [activeScope, setActiveScope] = useState('school') // Varsayılan: Okul
+  const [selectedGradeFilter, setSelectedGradeFilter] = useState<number | null>(null) // null = henüz yüklenmedi
+  const [selectedSubject, setSelectedSubject] = useState<string>('genel') // 'genel' veya subject_id
+  const [availableSubjects, setAvailableSubjects] = useState<SubjectOption[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [myStats, setMyStats] = useState<MyStats | null>(null)
   const [myRanks, setMyRanks] = useState<MyRanks | null>(null)
@@ -89,13 +91,47 @@ export default function StudentLeaderboardPage() {
 
   const supabase = createClient()
 
+  // Öğrenci profili yüklendiğinde varsayılan sınıf filtresini ayarla
   useEffect(() => {
-    if (studentProfile?.id) {
+    if (studentProfile?.grade && selectedGradeFilter === null) {
+      setSelectedGradeFilter(studentProfile.grade)
+      loadSubjectsForGrade(studentProfile.grade)
+    }
+  }, [studentProfile?.grade])
+
+  // Sınıf değiştiğinde dersleri yükle
+  useEffect(() => {
+    if (selectedGradeFilter && selectedGradeFilter > 0) {
+      loadSubjectsForGrade(selectedGradeFilter)
+      setSelectedSubject('genel') // Sınıf değişince genel'e dön
+    }
+  }, [selectedGradeFilter])
+
+  useEffect(() => {
+    if (studentProfile?.id && selectedGradeFilter !== null) {
       loadData()
       loadMyRanks()
       loadLocationInfo()
     }
-  }, [studentProfile?.id, activeTab, activeScope, selectedGradeFilter])
+  }, [studentProfile?.id, activeScope, selectedGradeFilter, selectedSubject])
+
+  // Sınıfa göre dersleri yükle
+  const loadSubjectsForGrade = async (grade: number) => {
+    const { data } = await supabase
+      .from('grade_subjects')
+      .select(`
+        subject:subjects(id, name, code, icon)
+      `)
+      .eq('grade_id', grade)
+
+    if (data) {
+      const subjects = data
+        .map((item: any) => item.subject)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr'))
+      setAvailableSubjects(subjects)
+    }
+  }
 
   const loadLocationInfo = async () => {
     if (!studentProfile?.id) return
@@ -193,80 +229,163 @@ export default function StudentLeaderboardPage() {
       })
     }
 
-    // Scope'a göre liderlik tablosu
-    let viewName = 'leaderboard_turkey'
-    let rankColumn = 'turkey_rank'
-    let filterColumn: string | null = null
-    let filterValue: string | null = null
+    // Ders seçimine göre farklı tablo kullan
+    let pointsData: any[] = []
 
-    switch (activeScope) {
-      case 'city':
-        viewName = 'leaderboard_by_city'
-        rankColumn = 'city_rank'
-        filterColumn = 'city_id'
-        filterValue = studentProfile.city_id
-        break
-      case 'district':
-        viewName = 'leaderboard_by_district'
-        rankColumn = 'district_rank'
-        filterColumn = 'district_id'
-        filterValue = studentProfile.district_id
-        break
-      case 'school':
-        viewName = 'leaderboard_by_school'
-        rankColumn = 'school_rank'
-        filterColumn = 'school_id'
-        filterValue = studentProfile.school_id
-        break
-      case 'class':
-        viewName = 'leaderboard_by_classroom'
-        rankColumn = 'class_rank'
-        filterColumn = 'school_id'
-        filterValue = studentProfile.school_id
-        break
+    if (selectedSubject === 'genel') {
+      // Genel: student_points tablosundan
+      const { data, error } = await supabase
+        .from('student_points')
+        .select('*')
+        .gt('total_questions', 0)
+        .order('total_points', { ascending: false })
+        .limit(200)
+
+      if (error) {
+        console.error('Puanlar yüklenirken hata:', error)
+        setLeaderboard([])
+        setLoading(false)
+        return
+      }
+      pointsData = data || []
+    } else {
+      // Ders bazlı: student_subject_points tablosundan
+      const { data, error } = await supabase
+        .from('student_subject_points')
+        .select('*')
+        .eq('subject_id', selectedSubject)
+        .gt('points', 0)
+        .order('points', { ascending: false })
+        .limit(200)
+
+      if (error) {
+        console.error('Ders puanları yüklenirken hata:', error)
+        // Tablo yoksa genel liderliğe dön
+        setSelectedSubject('genel')
+        setLoading(false)
+        return
+      }
+      pointsData = data || []
     }
 
-    let query = supabase
-      .from(viewName)
-      .select('*')
-      .order(rankColumn, { ascending: true })
-      .limit(100)
-
-    if (filterColumn && filterValue) {
-      query = query.eq(filterColumn, filterValue)
+    if (pointsData.length === 0) {
+      setLeaderboard([])
+      setLoading(false)
+      return
     }
 
-    // Sınıf scope'u için kendi sınıfını göster
-    if (activeScope === 'class' && studentProfile.grade) {
-      query = query.eq('grade', studentProfile.grade)
+    // Tüm student_id'leri al
+    const studentIds = pointsData.map(p => p.student_id)
+
+    // Student profillerini çek
+    const { data: studentsData } = await supabase
+      .from('student_profiles')
+      .select(`
+        id,
+        grade,
+        city_id,
+        district_id,
+        school_id,
+        user_id
+      `)
+      .in('id', studentIds)
+
+    // Profile bilgilerini çek
+    const userIds = studentsData?.map(s => s.user_id).filter(Boolean) || []
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', userIds)
+
+    // Okul/İl/İlçe bilgilerini çek
+    const schoolIds = studentsData?.map(s => s.school_id).filter(Boolean) || []
+    const cityIds = studentsData?.map(s => s.city_id).filter(Boolean) || []
+    const districtIds = studentsData?.map(s => s.district_id).filter(Boolean) || []
+
+    const { data: schoolsData } = await supabase.from('schools').select('id, name').in('id', schoolIds)
+    const { data: citiesData } = await supabase.from('turkey_cities').select('id, name').in('id', cityIds)
+    const { data: districtsData } = await supabase.from('turkey_districts').select('id, name').in('id', districtIds)
+
+    // Map'ler oluştur
+    const studentMap = new Map(studentsData?.map(s => [s.id, s]) || [])
+    const profileMap = new Map(profilesData?.map(p => [p.id, p]) || [])
+    const schoolMap = new Map(schoolsData?.map(s => [s.id, s.name]) || [])
+    const cityMap = new Map(citiesData?.map(c => [c.id, c.name]) || [])
+    const districtMap = new Map(districtsData?.map(d => [d.id, d.name]) || [])
+
+    // Verileri birleştir ve filtrele
+    let combined = pointsData.map(points => {
+      const student = studentMap.get(points.student_id)
+      const profile = student ? profileMap.get(student.user_id) : null
+      return {
+        ...points,
+        grade: student?.grade,
+        city_id: student?.city_id,
+        district_id: student?.district_id,
+        school_id: student?.school_id,
+        full_name: profile?.full_name || 'Anonim',
+        avatar_url: profile?.avatar_url,
+        school_name: student?.school_id ? schoolMap.get(student.school_id) : null,
+        city_name: student?.city_id ? cityMap.get(student.city_id) : null,
+        district_name: student?.district_id ? districtMap.get(student.district_id) : null,
+      }
+    })
+
+    // Scope filtreleri
+    if (activeScope === 'city' && studentProfile.city_id) {
+      combined = combined.filter(item => item.city_id === studentProfile.city_id)
+    } else if (activeScope === 'district' && studentProfile.district_id) {
+      combined = combined.filter(item => item.district_id === studentProfile.district_id)
+    } else if (activeScope === 'school' && studentProfile.school_id) {
+      combined = combined.filter(item => item.school_id === studentProfile.school_id)
+    } else if (activeScope === 'class' && studentProfile.school_id && studentProfile.grade) {
+      combined = combined.filter(item => 
+        item.school_id === studentProfile.school_id && item.grade === studentProfile.grade
+      )
     }
 
-    // Genel sınıf filtresi - tüm scope'larda çalışır
-    if (selectedGradeFilter > 0) {
-      query = query.eq('grade', selectedGradeFilter)
+    // Sınıf filtresi
+    if (selectedGradeFilter && selectedGradeFilter > 0) {
+      combined = combined.filter(item => item.grade === selectedGradeFilter)
     }
 
-    const { data, error } = await query
+    // Sırala (puana göre)
+    const pointsKey = selectedSubject === 'genel' ? 'total_points' : 'points'
+    combined.sort((a, b) => {
+      const aPoints = (a as any)[pointsKey] || 0
+      const bPoints = (b as any)[pointsKey] || 0
+      return bPoints - aPoints
+    })
 
-    if (data) {
-      const formatted: LeaderboardEntry[] = data.map((item: any) => ({
+    // Top 100 al ve formatla
+    const formatted: LeaderboardEntry[] = combined.slice(0, 100).map((item, index) => {
+      // Ders bazlı için farklı alanlar kullan
+      const isSubject = selectedSubject !== 'genel'
+      const totalQuestions = isSubject 
+        ? ((item as any).correct_count || 0) + ((item as any).wrong_count || 0)
+        : (item.total_questions || 0)
+      const totalCorrect = isSubject ? ((item as any).correct_count || 0) : (item.total_correct || 0)
+      
+      return {
         student_id: item.student_id,
-        full_name: item.full_name || 'Anonim',
+        full_name: item.full_name,
         avatar_url: item.avatar_url,
         grade: item.grade,
         city_name: item.city_name,
         district_name: item.district_name,
         school_name: item.school_name,
-        total_points: item.total_points,
-        total_questions: item.total_questions,
-        total_correct: item.total_correct,
-        max_streak: item.max_streak,
-        success_rate: item.success_rate || 0,
-        rank: item[rankColumn] || 0,
-      }))
-      setLeaderboard(formatted)
-    }
+        total_points: isSubject ? ((item as any).points || 0) : (item.total_points || 0),
+        total_questions: totalQuestions,
+        total_correct: totalCorrect,
+        max_streak: (item as any).max_streak || 0,
+        success_rate: totalQuestions > 0 
+          ? Math.round((totalCorrect / totalQuestions) * 100) 
+          : 0,
+        rank: index + 1,
+      }
+    })
 
+    setLeaderboard(formatted)
     setLoading(false)
   }
 
@@ -278,13 +397,18 @@ export default function StudentLeaderboardPage() {
   }
 
   const getScopeTitle = () => {
+    const subjectName = selectedSubject !== 'genel' 
+      ? availableSubjects.find(s => s.id === selectedSubject)?.name 
+      : null
+    const subjectSuffix = subjectName ? ` - ${subjectName}` : ''
+    
     switch (activeScope) {
-      case 'turkey': return 'Türkiye Liderlik Tablosu'
-      case 'city': return locationInfo.city_name ? `${locationInfo.city_name} İl Liderliği` : 'İl Liderliği'
-      case 'district': return locationInfo.district_name ? `${locationInfo.district_name} İlçe Liderliği` : 'İlçe Liderliği'
-      case 'school': return locationInfo.school_name ? `${locationInfo.school_name} Okul Liderliği` : 'Okul Liderliği'
-      case 'class': return locationInfo.grade ? `${locationInfo.grade}. Sınıf Liderliği` : 'Sınıf Liderliği'
-      default: return 'Liderlik Tablosu'
+      case 'turkey': return `Türkiye Liderlik Tablosu${subjectSuffix}`
+      case 'city': return locationInfo.city_name ? `${locationInfo.city_name} İl Liderliği${subjectSuffix}` : `İl Liderliği${subjectSuffix}`
+      case 'district': return locationInfo.district_name ? `${locationInfo.district_name} İlçe Liderliği${subjectSuffix}` : `İlçe Liderliği${subjectSuffix}`
+      case 'school': return locationInfo.school_name ? `${locationInfo.school_name} Okul Liderliği${subjectSuffix}` : `Okul Liderliği${subjectSuffix}`
+      case 'class': return locationInfo.grade ? `${locationInfo.grade}. Sınıf Liderliği${subjectSuffix}` : `Sınıf Liderliği${subjectSuffix}`
+      default: return `Liderlik Tablosu${subjectSuffix}`
     }
   }
 
@@ -299,7 +423,7 @@ export default function StudentLeaderboardPage() {
     }
   }
 
-  if (loading && !myStats) {
+  if ((loading && !myStats) || selectedGradeFilter === null) {
     return (
       <DashboardLayout role="ogrenci">
         <div className="flex items-center justify-center h-64">
@@ -478,23 +602,67 @@ export default function StudentLeaderboardPage() {
             </div>
           </div>
 
-          {/* Sınıf Filtresi */}
+          {/* Ders Seçimi */}
           <div>
-            <p className="text-sm font-medium text-surface-500 mb-2">Sınıf Filtresi</p>
+            <p className="text-sm font-medium text-surface-500 mb-2">Ders</p>
             <div className="flex flex-wrap gap-2">
-              {gradeFilters.map((filter) => (
+              <button
+                onClick={() => setSelectedSubject('genel')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                  selectedSubject === 'genel'
+                    ? 'bg-gradient-to-r from-yellow-500 to-amber-600 text-white shadow-lg'
+                    : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+                }`}
+              >
+                <Trophy className="h-4 w-4" />
+                Tüm Dersler
+              </button>
+              {availableSubjects.map((subject) => (
                 <button
-                  key={filter.value}
-                  onClick={() => setSelectedGradeFilter(filter.value)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                    selectedGradeFilter === filter.value
-                      ? 'bg-indigo-500 text-white shadow-lg'
+                  key={subject.id}
+                  onClick={() => setSelectedSubject(subject.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                    selectedSubject === subject.id
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
                       : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
                   }`}
                 >
-                  {filter.label}
+                  <span>{subject.icon || '📚'}</span>
+                  {subject.name}
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Sınıf Filtresi */}
+          <div>
+            <p className="text-sm font-medium text-surface-500 mb-2">
+              Sınıf Filtresi 
+              {studentProfile?.grade && (
+                <span className="text-xs ml-2 text-primary-500">(Senin sınıfın: {studentProfile.grade})</span>
+              )}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {gradeFilters.map((filter) => {
+                const isSelected = selectedGradeFilter === filter.value
+                const isMyGrade = filter.value === studentProfile?.grade
+                return (
+                  <button
+                    key={filter.value}
+                    onClick={() => setSelectedGradeFilter(filter.value)}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                      isSelected
+                        ? 'bg-indigo-500 text-white shadow-lg'
+                        : isMyGrade
+                        ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-2 border-indigo-300 dark:border-indigo-700'
+                        : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700'
+                    }`}
+                  >
+                    {filter.label}
+                    {isMyGrade && !isSelected && <span className="ml-1 text-xs">★</span>}
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -506,6 +674,12 @@ export default function StudentLeaderboardPage() {
               <Award className="h-5 w-5 text-primary-500" />
               {getScopeTitle()}
             </h3>
+            <p className="text-xs text-surface-500 mt-1">
+              {selectedSubject === 'genel' 
+                ? '📚 Tüm derslerden kazanılan puanlar dahildir' 
+                : `📖 Sadece ${availableSubjects.find(s => s.id === selectedSubject)?.name || 'seçili ders'} puanları`
+              }
+            </p>
           </div>
           
           {loading ? (
