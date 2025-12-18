@@ -68,6 +68,11 @@ interface QuestionCount {
   count: number
 }
 
+interface TopicQuestionCount {
+  topic_id: string
+  count: number
+}
+
 const difficultyConfig = {
   easy: { label: 'Kolay', color: 'bg-green-500', textColor: 'text-green-500', emoji: '🟢', icon: CheckCircle },
   medium: { label: 'Orta', color: 'bg-yellow-500', textColor: 'text-yellow-500', emoji: '🟡', icon: Star },
@@ -106,8 +111,11 @@ export default function SoruBankasiPage() {
   const [gradeSubjects, setGradeSubjects] = useState<GradeSubject[]>([])
   const [topics, setTopics] = useState<Topic[]>([])
   const [questionCounts, setQuestionCounts] = useState<QuestionCount[]>([])
+  const [topicQuestionCounts, setTopicQuestionCounts] = useState<TopicQuestionCount[]>([])
+  const [totalGradeQuestions, setTotalGradeQuestions] = useState(0)
   const [stats, setStats] = useState<StudentStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [countsLoading, setCountsLoading] = useState(false)
   const [studentProfile, setStudentProfile] = useState<any>(null)
   const [studentPoints, setStudentPoints] = useState<any>(null)
 
@@ -203,27 +211,79 @@ export default function SoruBankasiPage() {
       setGradeSubjects(gsData as any)
     }
 
-    // Her ders için soru sayısını hesapla
-    const counts: QuestionCount[] = []
-    if (gsData) {
-      for (const gs of gsData) {
+    // Soru sayılarını paralel olarak yükle (arka planda)
+    loadQuestionCountsParallel(gsData)
+  }
+
+  // Soru sayılarını paralel yükle - UI'ı bloklamadan
+  const loadQuestionCountsParallel = async (gsData: any[] | null) => {
+    if (!gsData || gsData.length === 0) {
+      setQuestionCounts([])
+      setTotalGradeQuestions(0)
+      return
+    }
+
+    setCountsLoading(true)
+
+    try {
+      // Önce bu sınıftaki TÜM topic'leri al (tek sorgu)
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('id, subject_id')
+        .eq('grade', selectedGrade)
+        .eq('is_active', true)
+
+      if (!allTopics || allTopics.length === 0) {
+        setQuestionCounts(gsData.map((gs: any) => ({ subject_id: gs.subject_id, count: 0 })))
+        setTotalGradeQuestions(0)
+        setCountsLoading(false)
+        return
+      }
+
+      // Topic ID'lerini subject bazında grupla
+      const topicsBySubject: Record<string, string[]> = {}
+      allTopics.forEach(topic => {
+        if (!topicsBySubject[topic.subject_id]) {
+          topicsBySubject[topic.subject_id] = []
+        }
+        topicsBySubject[topic.subject_id].push(topic.id)
+      })
+
+      // Tüm topic ID'lerini birleştir
+      const allTopicIds = allTopics.map(t => t.id)
+
+      // Toplam soru sayısını al (tek sorgu)
+      const { count: totalCount } = await supabase
+        .from('questions')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .in('topic_id', allTopicIds)
+
+      setTotalGradeQuestions(totalCount || 0)
+
+      // Her ders için PARALEL olarak soru sayısını hesapla
+      const countPromises = gsData.map(async (gs: any) => {
+        const topicIds = topicsBySubject[gs.subject_id] || []
+        if (topicIds.length === 0) {
+          return { subject_id: gs.subject_id, count: 0 }
+        }
+
         const { count } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true })
           .eq('is_active', true)
-          .in('topic_id', 
-            (await supabase
-              .from('topics')
-              .select('id')
-              .eq('subject_id', (gs as any).subject_id)
-              .eq('grade', selectedGrade)
-            ).data?.map(t => t.id) || []
-          )
-        
-        counts.push({ subject_id: (gs as any).subject_id, count: count || 0 })
-      }
+          .in('topic_id', topicIds)
+
+        return { subject_id: gs.subject_id, count: count || 0 }
+      })
+
+      const counts = await Promise.all(countPromises)
+      setQuestionCounts(counts)
+    } catch (error) {
+      console.error('Soru sayıları yüklenirken hata:', error)
+    } finally {
+      setCountsLoading(false)
     }
-    setQuestionCounts(counts)
   }
 
   const loadSubjectTopics = async () => {
@@ -245,7 +305,51 @@ export default function SoruBankasiPage() {
       if (mainTopics.length > 0) {
         setExpandedMainTopics([mainTopics[0]])
       }
+
+      // Konu bazında soru sayılarını paralel yükle
+      loadTopicQuestionCounts(data)
     }
+  }
+
+  // Konu bazında soru sayılarını yükle
+  const loadTopicQuestionCounts = async (topicsData: Topic[]) => {
+    if (!topicsData || topicsData.length === 0) {
+      setTopicQuestionCounts([])
+      return
+    }
+
+    try {
+      const topicIds = topicsData.map(t => t.id)
+      
+      // Tüm soruları topic_id ile al ve grupla
+      const { data: questions } = await supabase
+        .from('questions')
+        .select('topic_id')
+        .eq('is_active', true)
+        .in('topic_id', topicIds)
+
+      if (questions) {
+        // topic_id bazında grupla
+        const countMap: Record<string, number> = {}
+        questions.forEach(q => {
+          countMap[q.topic_id] = (countMap[q.topic_id] || 0) + 1
+        })
+
+        const counts = topicsData.map(topic => ({
+          topic_id: topic.id,
+          count: countMap[topic.id] || 0
+        }))
+        
+        setTopicQuestionCounts(counts)
+      }
+    } catch (error) {
+      console.error('Konu soru sayıları yüklenirken hata:', error)
+    }
+  }
+
+  // Belirli bir konunun soru sayısını getir
+  const getTopicQuestionCount = (topicId: string) => {
+    return topicQuestionCounts.find(tc => tc.topic_id === topicId)?.count || 0
   }
 
   // Ana konulara göre grupla
@@ -279,6 +383,98 @@ export default function SoruBankasiPage() {
     setQuestionIndex(0)
     setSessionStats({ correct: 0, wrong: 0 })
     await loadNextQuestion(topic)
+  }
+
+  // Hızlı Başla - Rastgele soru çöz (tüm derslerden)
+  const quickStart = async () => {
+    setSelectedSubject(null)
+    setSelectedTopic(null)
+    setSelectedDifficulty('')
+    setViewMode('practice')
+    setQuestionIndex(0)
+    setSessionStats({ correct: 0, wrong: 0 })
+    await loadRandomQuestion()
+  }
+
+  // Ders bazlı hızlı başla
+  const quickStartSubject = async (gs: GradeSubject) => {
+    setSelectedSubject(gs)
+    setSelectedTopic(null)
+    setSelectedDifficulty('')
+    setViewMode('practice')
+    setQuestionIndex(0)
+    setSessionStats({ correct: 0, wrong: 0 })
+    await loadRandomQuestionFromSubject(gs.subject_id)
+  }
+
+  // Tüm sınıftan rastgele soru yükle
+  const loadRandomQuestion = async () => {
+    setSelectedAnswer(null)
+    setShowResult(false)
+    setEarnedPoints(null)
+
+    // Bu sınıftaki tüm topic'leri al
+    const { data: allTopics } = await supabase
+      .from('topics')
+      .select('id')
+      .eq('grade', selectedGrade)
+      .eq('is_active', true)
+
+    if (!allTopics || allTopics.length === 0) {
+      setCurrentQuestion(null)
+      return
+    }
+
+    const topicIds = allTopics.map(t => t.id)
+    
+    const { data } = await supabase
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
+      .eq('is_active', true)
+      .in('topic_id', topicIds)
+
+    if (data && data.length > 0) {
+      const randomIndex = Math.floor(Math.random() * data.length)
+      setCurrentQuestion(data[randomIndex] as any)
+      setQuestionIndex(prev => prev + 1)
+    } else {
+      setCurrentQuestion(null)
+    }
+  }
+
+  // Belirli dersten rastgele soru yükle
+  const loadRandomQuestionFromSubject = async (subjectId: string) => {
+    setSelectedAnswer(null)
+    setShowResult(false)
+    setEarnedPoints(null)
+
+    const { data: subjectTopics } = await supabase
+      .from('topics')
+      .select('id')
+      .eq('subject_id', subjectId)
+      .eq('grade', selectedGrade)
+      .eq('is_active', true)
+
+    if (!subjectTopics || subjectTopics.length === 0) {
+      setCurrentQuestion(null)
+      return
+    }
+
+    const topicIds = subjectTopics.map(t => t.id)
+    
+    const { data } = await supabase
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
+      .eq('is_active', true)
+      .in('topic_id', topicIds)
+
+    if (data && data.length > 0) {
+      const randomIndex = Math.floor(Math.random() * data.length)
+      setCurrentQuestion(data[randomIndex] as any)
+      setQuestionIndex(prev => prev + 1)
+    } else {
+      setCurrentQuestion(null)
+    }
   }
 
   const loadNextQuestion = async (topic?: Topic) => {
@@ -721,11 +917,14 @@ export default function SoruBankasiPage() {
                     onClick={() => toggleMainTopic(mainTopic)}
                     className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 transition-all"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <Layers className={`h-5 w-5 ${colorClass.text}`} />
                       <span className="font-medium text-gray-900 dark:text-white">{mainTopic}</span>
                       <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500">
-                        {topicList.length} konu
+                        {topicList.length} kazanım
+                      </span>
+                      <span className="text-xs px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full text-indigo-600 dark:text-indigo-400">
+                        {topicList.reduce((sum, t) => sum + getTopicQuestionCount(t.id), 0)} soru
                       </span>
                     </div>
                     {expandedMainTopics.includes(mainTopic) ? (
@@ -745,26 +944,45 @@ export default function SoruBankasiPage() {
                         className="overflow-hidden"
                       >
                         <div className="border-t border-gray-100 dark:border-gray-700">
-                          {topicList.map((topic, idx) => (
-                            <button
-                              key={topic.id}
-                              onClick={() => startPractice(topic)}
-                              className="w-full px-5 py-3 flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border-b border-gray-50 dark:border-gray-700 last:border-b-0"
-                            >
-                              <div className="flex items-start gap-3 text-left">
-                                <span className="text-gray-400 text-sm mt-0.5">{idx + 1}.</span>
-                                <div>
-                                  {topic.sub_topic && (
-                                    <p className="text-xs text-gray-500 mb-0.5">{topic.sub_topic}</p>
-                                  )}
-                                  <p className="text-gray-700 dark:text-gray-300">
-                                    {topic.learning_outcome || topic.main_topic}
-                                  </p>
+                          {topicList.map((topic, idx) => {
+                            const topicQCount = getTopicQuestionCount(topic.id)
+                            return (
+                              <button
+                                key={topic.id}
+                                onClick={() => startPractice(topic)}
+                                disabled={topicQCount === 0}
+                                className={`w-full px-5 py-3 flex items-center justify-between transition-all border-b border-gray-50 dark:border-gray-700 last:border-b-0 ${
+                                  topicQCount > 0 
+                                    ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer' 
+                                    : 'opacity-50 cursor-not-allowed'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3 text-left flex-1">
+                                  <span className="text-gray-400 text-sm mt-0.5">{idx + 1}.</span>
+                                  <div className="flex-1">
+                                    {topic.sub_topic && (
+                                      <p className="text-xs text-gray-500 mb-0.5">{topic.sub_topic}</p>
+                                    )}
+                                    <p className="text-gray-700 dark:text-gray-300">
+                                      {topic.learning_outcome || topic.main_topic}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                              <Play className="h-4 w-4 text-indigo-500 opacity-0 group-hover:opacity-100" />
-                            </button>
-                          ))}
+                                <div className="flex items-center gap-3">
+                                  <span className={`text-xs px-2 py-1 rounded-full ${
+                                    topicQCount > 0 
+                                      ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' 
+                                      : 'bg-gray-100 text-gray-400 dark:bg-gray-700'
+                                  }`}>
+                                    {topicQCount} soru
+                                  </span>
+                                  {topicQCount > 0 && (
+                                    <Play className="h-4 w-4 text-indigo-500" />
+                                  )}
+                                </div>
+                              </button>
+                            )
+                          })}
                         </div>
                       </motion.div>
                     )}
@@ -839,6 +1057,38 @@ export default function SoruBankasiPage() {
           </div>
         )}
 
+        {/* 🚀 Hızlı Başla Butonu */}
+        {totalGradeQuestions > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            onClick={quickStart}
+            className="w-full mb-6 p-4 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 rounded-2xl shadow-lg hover:shadow-xl transition-all text-white"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Zap className="h-8 w-8 text-yellow-300" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    🚀 Hızlı Başla
+                  </h3>
+                  <p className="text-white/80 text-sm">
+                    {totalGradeQuestions} sorudan rastgele çöz
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-xl">
+                <Play className="h-5 w-5" />
+                <span className="font-medium">Başla</span>
+              </div>
+            </div>
+          </motion.button>
+        )}
+
         {/* Sınıf Seçimi */}
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-6 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
@@ -873,47 +1123,74 @@ export default function SoruBankasiPage() {
         </h2>
 
         {gradeSubjects.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {gradeSubjects.map(gs => {
               const subject = gs.subject
               const colorClass = subjectColorMap[subject.code] || { bg: 'from-gray-500 to-gray-600', border: 'border-gray-300', text: 'text-gray-600' }
               const questionCount = getSubjectQuestionCount(subject.id)
 
               return (
-                <motion.button
+                <motion.div
                   key={gs.id}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    setSelectedSubject(gs)
-                    setViewMode('topics')
-                  }}
+                  whileHover={{ scale: 1.01 }}
                   className="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-lg transition-all border-2 border-transparent hover:border-indigo-200 dark:hover:border-indigo-800"
                 >
                   {/* Gradient Accent */}
                   <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${colorClass.bg}`} />
                   
                   <div className="p-5">
-                    <div className="text-4xl mb-3">{subject.icon || '📚'}</div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white text-left">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="text-4xl">{subject.icon || '📚'}</div>
+                      {gs.is_exam_subject && (
+                        <div className="flex items-center gap-1 text-xs text-amber-500 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded-full">
+                          <Star className="h-3 w-3" />
+                          Sınav
+                        </div>
+                      )}
+                    </div>
+                    
+                    <h3 className="font-semibold text-gray-900 dark:text-white text-left mb-1">
                       {subject.name}
                     </h3>
                     
-                    {gs.is_exam_subject && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-indigo-500">
-                        <Star className="h-3 w-3" />
-                        Sınav Dersi
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 mb-4">
+                      {countsLoading ? (
+                        <span className="text-sm text-gray-400 animate-pulse">Yükleniyor...</span>
+                      ) : (
+                        <span className="text-sm text-gray-500 flex items-center gap-1">
+                          <BookOpen className="h-3.5 w-3.5" />
+                          {questionCount} soru
+                        </span>
+                      )}
+                    </div>
 
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-sm text-gray-500">
-                        {questionCount} soru
-                      </span>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
+                    {/* Aksiyon Butonları */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedSubject(gs)
+                          setViewMode('topics')
+                        }}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                      >
+                        <Layers className="h-4 w-4" />
+                        Konular
+                      </button>
+                      {questionCount > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            quickStartSubject(gs)
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-gradient-to-r ${colorClass.bg} rounded-lg hover:opacity-90 transition-opacity shadow-sm`}
+                        >
+                          <Play className="h-4 w-4" />
+                          Başla
+                        </button>
+                      )}
                     </div>
                   </div>
-                </motion.button>
+                </motion.div>
               )
             })}
           </div>
