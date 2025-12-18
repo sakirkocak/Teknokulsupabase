@@ -7,8 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 import { 
   Clock, ChevronLeft, ChevronRight, Flag, CheckCircle, 
-  XCircle, AlertCircle, Home, BarChart3, Target
+  XCircle, AlertCircle, Home, BarChart3, Target, Volume2
 } from 'lucide-react'
+import SpeakButton from '@/components/SpeakButton'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Question {
@@ -605,8 +606,17 @@ export default function ExamPage() {
                 </button>
               </div>
 
-              <div className="text-white text-lg leading-relaxed mb-6">
-                {currentQuestion?.question_text}
+              <div className="flex items-start gap-3 mb-6">
+                <div className="text-white text-lg leading-relaxed flex-1">
+                  {currentQuestion?.question_text}
+                </div>
+                {currentQuestion?.question_text && (
+                  <SpeakButton 
+                    text={currentQuestion.question_text} 
+                    size="md"
+                    className="flex-shrink-0 mt-1"
+                  />
+                )}
               </div>
 
               {currentQuestion?.question_image_url && (

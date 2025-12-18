@@ -28,8 +28,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Layers
+  Layers,
+  Volume2
 } from 'lucide-react'
+import SpeakButton from '@/components/SpeakButton'
 
 interface Topic {
   id: string
@@ -965,7 +967,15 @@ export default function AIQuestionGeneratorPage() {
                             <div className="p-4 border-t border-gray-100">
                               {/* Question Text */}
                               <div className="mb-4">
-                                <label className="text-xs text-gray-500 uppercase tracking-wide">Soru</label>
+                                <div className="flex items-center justify-between">
+                                  <label className="text-xs text-gray-500 uppercase tracking-wide">Soru</label>
+                                  <SpeakButton 
+                                    text={question.question_text} 
+                                    size="sm"
+                                    variant="pill"
+                                    label="Soruyu Oku"
+                                  />
+                                </div>
                                 {editingIndex === index ? (
                                   <textarea
                                     value={question.question_text}

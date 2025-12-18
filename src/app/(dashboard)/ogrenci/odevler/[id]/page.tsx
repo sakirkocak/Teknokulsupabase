@@ -18,8 +18,10 @@ import {
   Clock,
   Target,
   RotateCcw,
-  HelpCircle
+  HelpCircle,
+  Volume2
 } from 'lucide-react'
+import SpeakButton from '@/components/SpeakButton'
 
 interface Question {
   id: string
@@ -571,9 +573,16 @@ export default function SolveAssignmentPage() {
             </div>
 
             {/* Question Text */}
-            <p className="text-lg text-surface-900 font-medium mb-6">
-              {currentQuestion.question_text}
-            </p>
+            <div className="flex items-start gap-3 mb-6">
+              <p className="text-lg text-surface-900 font-medium flex-1">
+                {currentQuestion.question_text}
+              </p>
+              <SpeakButton 
+                text={currentQuestion.question_text} 
+                size="md"
+                className="flex-shrink-0 mt-1"
+              />
+            </div>
 
             {/* Answer Options */}
             {currentQuestion.question_type === 'multiple_choice' && currentQuestion.options && (

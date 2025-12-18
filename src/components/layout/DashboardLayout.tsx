@@ -31,7 +31,8 @@ import {
   Award,
   Swords,
   UserCircle,
-  Wand2
+  Wand2,
+  Volume2
 } from 'lucide-react'
 
 type NavItem = {
@@ -60,6 +61,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Dashboard', href: '/ogrenci', icon: LayoutDashboard },
     { label: 'Koçum', href: '/ogrenci/kocum', icon: Target },
     { label: 'Sınıflarım', href: '/ogrenci/siniflarim', icon: BookOpen },
+    { label: 'Harf Öğrenme', href: '/ogrenci/harf-ogrenme', icon: Volume2 },
     { label: 'Soru Bankası', href: '/ogrenci/soru-bankasi', icon: GraduationCap },
     { label: 'Liderlik', href: '/ogrenci/liderlik', icon: Trophy },
     { label: 'Rozetlerim', href: '/ogrenci/rozetler', icon: Award },
