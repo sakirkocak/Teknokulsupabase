@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const prompt = `Sen deneyimli bir öğretmensin. Bir lise öğrencisi sana şu soruyu/konuyu sordu: "${topic}"
 

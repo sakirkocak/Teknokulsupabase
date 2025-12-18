@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     // Base64'ten veriyi ayır
     const base64Data = image.includes(',') ? image.split(',')[1] : image
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const prompt = `Sen çok yönlü bir eğitim asistanısın. Bu görseldeki soruyu analiz et ve çöz.
 

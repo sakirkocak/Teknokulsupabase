@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg'
 
     // Gemini Vision modeli
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     const prompt = `Sen bir eğitim analiz uzmanısın. Bu deneme sınavı sonuç karnesini detaylı analiz et.
 

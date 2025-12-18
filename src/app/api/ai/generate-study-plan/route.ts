@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { targetExam, targetDate, dailyHours, weakSubjects, strongSubjects, examStats, studentName } = body
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
     // Sınava kalan süreyi hesapla
     let daysLeft = 0

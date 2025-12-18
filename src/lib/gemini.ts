@@ -2,7 +2,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
-export const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+// Gemini 3 Flash - Ocak 2025 bilgi tabanı, gelişmiş akıl yürütme
+export const geminiModel = genAI.getGenerativeModel({ 
+  model: 'gemini-3-flash-preview'
+})
 
 // Soru tipleri
 export type QuestionType = 'multiple_choice' | 'true_false' | 'open_ended' | 'fill_blank'
