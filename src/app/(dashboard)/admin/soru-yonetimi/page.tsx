@@ -1,0 +1,876 @@
+'use client'
+
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import DashboardLayout from '@/components/layout/DashboardLayout'
+import MathRenderer from '@/components/MathRenderer'
+import { 
+  BookOpen, Search, Filter, Edit2, Trash2, 
+  CheckCircle, XCircle, Save, X, Eye, EyeOff,
+  ChevronDown, ChevronUp, Star, Zap, Crown, Sparkles,
+  AlertCircle, ChevronLeft, ChevronRight, RefreshCw,
+  GraduationCap, Layers, BarChart3, Clock, Plus
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
+
+interface Subject {
+  id: string
+  name: string
+  code: string
+  icon: string | null
+}
+
+interface Topic {
+  id: string
+  subject_id: string
+  grade: number
+  main_topic: string
+  sub_topic: string | null
+  learning_outcome: string | null
+  subject?: Subject
+}
+
+interface Question {
+  id: string
+  topic_id: string
+  difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
+  question_text: string
+  question_image_url: string | null
+  options: { A: string; B: string; C: string; D: string; E?: string }
+  correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
+  explanation: string | null
+  source: string | null
+  times_answered: number
+  times_correct: number
+  created_at: string
+  topic?: Topic
+}
+
+const difficultyConfig = {
+  easy: { label: 'Kolay', color: 'bg-green-500', textColor: 'text-green-600', bgLight: 'bg-green-100', emoji: '🟢' },
+  medium: { label: 'Orta', color: 'bg-yellow-500', textColor: 'text-yellow-600', bgLight: 'bg-yellow-100', emoji: '🟡' },
+  hard: { label: 'Zor', color: 'bg-orange-500', textColor: 'text-orange-600', bgLight: 'bg-orange-100', emoji: '🟠' },
+  legendary: { label: 'Efsane', color: 'bg-purple-500', textColor: 'text-purple-600', bgLight: 'bg-purple-100', emoji: '🔴' }
+}
+
+const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
+export default function AdminSoruYonetimiPage() {
+  const [questions, setQuestions] = useState<Question[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  
+  // Filtreler
+  const [filterGrade, setFilterGrade] = useState<number | ''>('')
+  const [filterSubject, setFilterSubject] = useState<string>('')
+  const [filterDifficulty, setFilterDifficulty] = useState<string>('')
+  const [filterTopic, setFilterTopic] = useState<string>('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState(true)
+  
+  // Sayfalama
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const pageSize = 20
+  
+  // Düzenleme
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
+  const [editForm, setEditForm] = useState<any>(null)
+  
+  // İstatistikler
+  const [stats, setStats] = useState({
+    total: 0,
+    easy: 0,
+    medium: 0,
+    hard: 0,
+    legendary: 0,
+    byGrade: {} as Record<number, number>
+  })
+  
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  
+  const supabase = createClient()
+
+  useEffect(() => {
+    loadSubjects()
+    loadStats()
+  }, [])
+
+  useEffect(() => {
+    loadQuestions()
+  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, currentPage])
+
+  useEffect(() => {
+    if (filterGrade) {
+      loadTopicsForGrade(filterGrade as number)
+    } else {
+      setTopics([])
+      setFilterTopic('')
+    }
+  }, [filterGrade, filterSubject])
+
+  const loadSubjects = async () => {
+    const { data } = await supabase
+      .from('subjects')
+      .select('id, name, code, icon')
+      .order('name')
+    
+    if (data) setSubjects(data)
+  }
+
+  const loadTopicsForGrade = async (grade: number) => {
+    let query = supabase
+      .from('topics')
+      .select('id, subject_id, grade, main_topic, sub_topic, learning_outcome, subject:subjects(id, name, code)')
+      .eq('grade', grade)
+      .order('main_topic')
+    
+    if (filterSubject) {
+      query = query.eq('subject_id', filterSubject)
+    }
+    
+    const { data } = await query
+    if (data) setTopics(data as any)
+  }
+
+  const loadStats = async () => {
+    // Toplam soru sayısı
+    const { count: total } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true })
+    
+    // Zorluk bazlı
+    const { data: diffData } = await supabase
+      .from('questions')
+      .select('difficulty')
+    
+    const diffCounts = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+    diffData?.forEach(q => {
+      if (q.difficulty in diffCounts) {
+        diffCounts[q.difficulty as keyof typeof diffCounts]++
+      }
+    })
+    
+    // Sınıf bazlı
+    const { data: gradeData } = await supabase
+      .from('questions')
+      .select('topic:topics(grade)')
+    
+    const gradeCounts: Record<number, number> = {}
+    gradeData?.forEach(q => {
+      const grade = (q.topic as any)?.grade
+      if (grade) {
+        gradeCounts[grade] = (gradeCounts[grade] || 0) + 1
+      }
+    })
+    
+    setStats({
+      total: total || 0,
+      ...diffCounts,
+      byGrade: gradeCounts
+    })
+  }
+
+  const loadQuestions = async () => {
+    setLoading(true)
+    
+    // Önce topic_id'leri filtrele
+    let topicIds: string[] | null = null
+    
+    if (filterGrade || filterSubject || filterTopic) {
+      let topicQuery = supabase.from('topics').select('id')
+      
+      if (filterGrade) {
+        topicQuery = topicQuery.eq('grade', filterGrade)
+      }
+      if (filterSubject) {
+        topicQuery = topicQuery.eq('subject_id', filterSubject)
+      }
+      if (filterTopic) {
+        topicQuery = topicQuery.eq('id', filterTopic)
+      }
+      
+      const { data: topicData } = await topicQuery
+      topicIds = topicData?.map(t => t.id) || []
+      
+      if (topicIds.length === 0) {
+        setQuestions([])
+        setTotalCount(0)
+        setLoading(false)
+        return
+      }
+    }
+    
+    // Toplam sayı
+    let countQuery = supabase.from('questions').select('*', { count: 'exact', head: true })
+    if (topicIds) {
+      countQuery = countQuery.in('topic_id', topicIds)
+    }
+    if (filterDifficulty) {
+      countQuery = countQuery.eq('difficulty', filterDifficulty)
+    }
+    if (searchQuery) {
+      countQuery = countQuery.ilike('question_text', `%${searchQuery}%`)
+    }
+    
+    const { count } = await countQuery
+    setTotalCount(count || 0)
+    
+    // Soruları yükle
+    let query = supabase
+      .from('questions')
+      .select(`
+        *,
+        topic:topics(
+          id, subject_id, grade, main_topic, sub_topic, learning_outcome,
+          subject:subjects(id, name, code, icon)
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .range((currentPage - 1) * pageSize, currentPage * pageSize - 1)
+    
+    if (topicIds) {
+      query = query.in('topic_id', topicIds)
+    }
+    if (filterDifficulty) {
+      query = query.eq('difficulty', filterDifficulty)
+    }
+    if (searchQuery) {
+      query = query.ilike('question_text', `%${searchQuery}%`)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Sorular yüklenirken hata:', error)
+      setMessage({ type: 'error', text: 'Sorular yüklenirken hata oluştu!' })
+    } else {
+      setQuestions(data || [])
+    }
+    
+    setLoading(false)
+  }
+
+  const handleSearch = () => {
+    setCurrentPage(1)
+    loadQuestions()
+  }
+
+  const handleEdit = (question: Question) => {
+    setEditingQuestion(question)
+    setEditForm({
+      difficulty: question.difficulty,
+      question_text: question.question_text,
+      options: { ...question.options },
+      correct_answer: question.correct_answer,
+      explanation: question.explanation || ''
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingQuestion || !editForm) return
+    
+    setSaving(true)
+    
+    const { error } = await supabase
+      .from('questions')
+      .update({
+        difficulty: editForm.difficulty,
+        question_text: editForm.question_text,
+        options: editForm.options,
+        correct_answer: editForm.correct_answer,
+        explanation: editForm.explanation || null
+      })
+      .eq('id', editingQuestion.id)
+    
+    if (error) {
+      setMessage({ type: 'error', text: 'Soru güncellenirken hata oluştu!' })
+    } else {
+      setMessage({ type: 'success', text: 'Soru başarıyla güncellendi!' })
+      setEditingQuestion(null)
+      setEditForm(null)
+      loadQuestions()
+    }
+    
+    setSaving(false)
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Bu soruyu silmek istediğinize emin misiniz?')) return
+    
+    const { error } = await supabase
+      .from('questions')
+      .delete()
+      .eq('id', id)
+    
+    if (error) {
+      setMessage({ type: 'error', text: 'Soru silinirken hata oluştu!' })
+    } else {
+      setMessage({ type: 'success', text: 'Soru silindi!' })
+      loadQuestions()
+      loadStats()
+    }
+    
+    setTimeout(() => setMessage(null), 3000)
+  }
+
+  const clearFilters = () => {
+    setFilterGrade('')
+    setFilterSubject('')
+    setFilterDifficulty('')
+    setFilterTopic('')
+    setSearchQuery('')
+    setCurrentPage(1)
+  }
+
+  const totalPages = Math.ceil(totalCount / pageSize)
+
+  return (
+    <DashboardLayout role="admin">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-surface-900 dark:text-white flex items-center gap-3">
+              <BookOpen className="h-8 w-8 text-primary-500" />
+              Soru Yönetimi
+            </h1>
+            <p className="text-surface-500 mt-1">Tüm soruları görüntüle, düzenle ve yönet</p>
+          </div>
+          <Link
+            href="/admin/ai-soru-uretici"
+            className="btn btn-primary flex items-center gap-2"
+          >
+            <Sparkles className="h-5 w-5" />
+            AI ile Soru Üret
+          </Link>
+        </div>
+
+        {/* İstatistikler */}
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+          <div className="card p-4 text-center">
+            <div className="text-3xl font-bold text-surface-900 dark:text-white">{stats.total}</div>
+            <div className="text-sm text-surface-500">Toplam Soru</div>
+          </div>
+          <div className="card p-4 text-center bg-green-50 dark:bg-green-900/20">
+            <div className="text-3xl font-bold text-green-600">{stats.easy}</div>
+            <div className="text-sm text-green-600">🟢 Kolay</div>
+          </div>
+          <div className="card p-4 text-center bg-yellow-50 dark:bg-yellow-900/20">
+            <div className="text-3xl font-bold text-yellow-600">{stats.medium}</div>
+            <div className="text-sm text-yellow-600">🟡 Orta</div>
+          </div>
+          <div className="card p-4 text-center bg-orange-50 dark:bg-orange-900/20">
+            <div className="text-3xl font-bold text-orange-600">{stats.hard}</div>
+            <div className="text-sm text-orange-600">🟠 Zor</div>
+          </div>
+          <div className="card p-4 text-center bg-purple-50 dark:bg-purple-900/20">
+            <div className="text-3xl font-bold text-purple-600">{stats.legendary}</div>
+            <div className="text-sm text-purple-600">🔴 Efsane</div>
+          </div>
+          <div className="card p-4 text-center">
+            <div className="text-3xl font-bold text-primary-600">{Object.keys(stats.byGrade).length}</div>
+            <div className="text-sm text-surface-500">Sınıf</div>
+          </div>
+        </div>
+
+        {/* Mesaj */}
+        <AnimatePresence>
+          {message && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className={`p-4 rounded-lg flex items-center gap-2 ${
+                message.type === 'success' 
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
+                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              }`}
+            >
+              {message.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+              {message.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Filtreler */}
+        <div className="card">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full p-4 flex items-center justify-between hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-primary-500" />
+              <span className="font-medium text-surface-900 dark:text-white">Filtreler</span>
+              {(filterGrade || filterSubject || filterDifficulty || filterTopic || searchQuery) && (
+                <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">
+                  Aktif
+                </span>
+              )}
+            </div>
+            {showFilters ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+          </button>
+          
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="p-4 pt-0 space-y-4 border-t border-surface-100 dark:border-surface-700">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Sınıf */}
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                        Sınıf
+                      </label>
+                      <select
+                        value={filterGrade}
+                        onChange={(e) => {
+                          setFilterGrade(e.target.value ? parseInt(e.target.value) : '')
+                          setFilterTopic('')
+                          setCurrentPage(1)
+                        }}
+                        className="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                      >
+                        <option value="">Tüm Sınıflar</option>
+                        {grades.map(g => (
+                          <option key={g} value={g}>
+                            {g}. Sınıf {stats.byGrade[g] ? `(${stats.byGrade[g]} soru)` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Ders */}
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                        Ders
+                      </label>
+                      <select
+                        value={filterSubject}
+                        onChange={(e) => {
+                          setFilterSubject(e.target.value)
+                          setFilterTopic('')
+                          setCurrentPage(1)
+                        }}
+                        className="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                      >
+                        <option value="">Tüm Dersler</option>
+                        {subjects.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.icon} {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Zorluk */}
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                        Zorluk
+                      </label>
+                      <select
+                        value={filterDifficulty}
+                        onChange={(e) => {
+                          setFilterDifficulty(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                      >
+                        <option value="">Tüm Zorluklar</option>
+                        {Object.entries(difficultyConfig).map(([key, { label, emoji }]) => (
+                          <option key={key} value={key}>
+                            {emoji} {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    {/* Konu */}
+                    <div>
+                      <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">
+                        Konu
+                      </label>
+                      <select
+                        value={filterTopic}
+                        onChange={(e) => {
+                          setFilterTopic(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        disabled={!filterGrade}
+                        className="w-full p-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800 disabled:opacity-50"
+                      >
+                        <option value="">{filterGrade ? 'Tüm Konular' : 'Önce sınıf seçin'}</option>
+                        {topics.map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.main_topic} {t.sub_topic ? `- ${t.sub_topic}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Arama ve Butonlar */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                        placeholder="Soru metninde ara..."
+                        className="w-full pl-10 pr-4 py-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                      />
+                    </div>
+                    <button
+                      onClick={handleSearch}
+                      className="btn btn-primary flex items-center gap-2"
+                    >
+                      <Search className="h-4 w-4" />
+                      Ara
+                    </button>
+                    <button
+                      onClick={clearFilters}
+                      className="btn btn-secondary flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Temizle
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Soru Listesi */}
+        <div className="card">
+          <div className="p-4 border-b border-surface-100 dark:border-surface-700 flex items-center justify-between">
+            <h3 className="font-semibold text-surface-900 dark:text-white">
+              {totalCount} soru bulundu
+            </h3>
+            <div className="flex items-center gap-2 text-sm text-surface-500">
+              Sayfa {currentPage} / {totalPages || 1}
+            </div>
+          </div>
+          
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
+            </div>
+          ) : questions.length === 0 ? (
+            <div className="p-12 text-center">
+              <BookOpen className="h-16 w-16 text-surface-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-surface-600 dark:text-surface-400 mb-2">
+                Soru bulunamadı
+              </h3>
+              <p className="text-surface-500">Farklı filtreler deneyin veya yeni sorular oluşturun.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-surface-100 dark:divide-surface-700">
+              {questions.map((question, idx) => (
+                <div key={question.id} className="p-4 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors">
+                  <div className="flex items-start gap-4">
+                    <div className="text-sm text-surface-400 font-medium w-8">
+                      {(currentPage - 1) * pageSize + idx + 1}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      {/* Meta Bilgiler */}
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        {question.topic && (
+                          <>
+                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-700 rounded-full text-surface-600 dark:text-surface-400">
+                              <GraduationCap className="h-3 w-3 inline mr-1" />
+                              {question.topic.grade}. Sınıf
+                            </span>
+                            <span className="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-full text-primary-600 dark:text-primary-400">
+                              {(question.topic.subject as any)?.icon} {(question.topic.subject as any)?.name}
+                            </span>
+                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-700 rounded-full text-surface-600 dark:text-surface-400">
+                              {question.topic.main_topic}
+                            </span>
+                          </>
+                        )}
+                        <span className={`text-xs px-2 py-1 rounded-full ${difficultyConfig[question.difficulty].bgLight} ${difficultyConfig[question.difficulty].textColor}`}>
+                          {difficultyConfig[question.difficulty].emoji} {difficultyConfig[question.difficulty].label}
+                        </span>
+                      </div>
+                      
+                      {/* Soru Metni */}
+                      <div className="text-surface-900 dark:text-white mb-3">
+                        <MathRenderer content={question.question_text} />
+                      </div>
+                      
+                      {/* Seçenekler */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                        {Object.entries(question.options).map(([key, value]) => (
+                          <div
+                            key={key}
+                            className={`p-2 rounded-lg text-sm ${
+                              key === question.correct_answer
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-300'
+                                : 'bg-surface-50 dark:bg-surface-700 text-surface-700 dark:text-surface-300'
+                            }`}
+                          >
+                            <span className="font-bold mr-2">{key})</span>
+                            <MathRenderer content={value as string} />
+                            {key === question.correct_answer && (
+                              <CheckCircle className="h-4 w-4 inline ml-2 text-green-500" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Açıklama */}
+                      {question.explanation && (
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-400 mb-3">
+                          <strong>Açıklama:</strong> <MathRenderer content={question.explanation} />
+                        </div>
+                      )}
+                      
+                      {/* İstatistikler */}
+                      <div className="flex items-center gap-4 text-xs text-surface-500">
+                        <span className="flex items-center gap-1">
+                          <BarChart3 className="h-3 w-3" />
+                          {question.times_answered} kez çözüldü
+                        </span>
+                        {question.times_answered > 0 && (
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3 text-green-500" />
+                            %{Math.round((question.times_correct / question.times_answered) * 100)} doğru
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(question.created_at).toLocaleDateString('tr-TR')}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Aksiyonlar */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEdit(question)}
+                        className="p-2 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg transition-colors"
+                        title="Düzenle"
+                      >
+                        <Edit2 className="h-5 w-5 text-primary-500" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(question.id)}
+                        className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                        title="Sil"
+                      >
+                        <Trash2 className="h-5 w-5 text-red-500" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Sayfalama */}
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-surface-100 dark:border-surface-700 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg disabled:opacity-50"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-10 h-10 rounded-lg font-medium ${
+                      currentPage === pageNum
+                        ? 'bg-primary-500 text-white'
+                        : 'hover:bg-surface-100 dark:hover:bg-surface-700'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              })}
+              
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg disabled:opacity-50"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Düzenleme Modal */}
+      <AnimatePresence>
+        {editingQuestion && editForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setEditingQuestion(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-surface-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-surface-900 dark:text-white">
+                  Soruyu Düzenle
+                </h2>
+                <button
+                  onClick={() => setEditingQuestion(null)}
+                  className="p-2 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              
+              <div className="p-6 space-y-4">
+                {/* Zorluk */}
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    Zorluk Seviyesi
+                  </label>
+                  <div className="flex gap-2">
+                    {Object.entries(difficultyConfig).map(([key, { label, emoji }]) => (
+                      <button
+                        key={key}
+                        onClick={() => setEditForm({ ...editForm, difficulty: key })}
+                        className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                          editForm.difficulty === key
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-surface-100 dark:bg-surface-700 hover:bg-surface-200'
+                        }`}
+                      >
+                        {emoji} {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Soru Metni */}
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    Soru Metni
+                  </label>
+                  <textarea
+                    value={editForm.question_text}
+                    onChange={(e) => setEditForm({ ...editForm, question_text: e.target.value })}
+                    rows={4}
+                    className="w-full p-3 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                  />
+                </div>
+                
+                {/* Seçenekler */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {['A', 'B', 'C', 'D', 'E'].map((key) => {
+                    if (key === 'E' && !editForm.options.E) return null
+                    return (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                          {key} Şıkkı {key === editForm.correct_answer && <span className="text-green-500">(Doğru)</span>}
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={editForm.options[key] || ''}
+                            onChange={(e) => setEditForm({
+                              ...editForm,
+                              options: { ...editForm.options, [key]: e.target.value }
+                            })}
+                            className="flex-1 p-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                          />
+                          <button
+                            onClick={() => setEditForm({ ...editForm, correct_answer: key })}
+                            className={`p-2 rounded-lg ${
+                              editForm.correct_answer === key
+                                ? 'bg-green-500 text-white'
+                                : 'bg-surface-100 dark:bg-surface-700 hover:bg-green-100'
+                            }`}
+                            title="Doğru cevap olarak işaretle"
+                          >
+                            <CheckCircle className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                
+                {/* Açıklama */}
+                <div>
+                  <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">
+                    Açıklama (Opsiyonel)
+                  </label>
+                  <textarea
+                    value={editForm.explanation}
+                    onChange={(e) => setEditForm({ ...editForm, explanation: e.target.value })}
+                    rows={3}
+                    className="w-full p-3 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                    placeholder="Sorunun çözümü veya açıklaması..."
+                  />
+                </div>
+              </div>
+              
+              <div className="p-6 border-t border-surface-200 dark:border-surface-700 flex justify-end gap-3">
+                <button
+                  onClick={() => setEditingQuestion(null)}
+                  className="btn btn-secondary"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  className="btn btn-primary flex items-center gap-2"
+                >
+                  {saving ? (
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Kaydet
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </DashboardLayout>
+  )
+}
+
