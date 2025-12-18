@@ -36,6 +36,7 @@ interface SubjectOption {
 const scopes = [
   { key: 'turkey', label: 'Türkiye', icon: Globe },
   { key: 'city', label: 'İl Bazlı', icon: MapPin },
+  { key: 'district', label: 'İlçe Bazlı', icon: Building2 },
   { key: 'school', label: 'Okul Bazlı', icon: School },
 ]
 
@@ -89,13 +90,21 @@ interface SchoolOption {
   district_id: string
 }
 
+interface DistrictOption {
+  id: string
+  name: string
+  city_id: string
+}
+
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('genel')
   const [activeScope, setActiveScope] = useState('turkey')
   const [selectedCity, setSelectedCity] = useState<string>('')
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('')
   const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedGrade, setSelectedGrade] = useState<string>('') // '' = tümü
   const [cities, setCities] = useState<TurkeyCity[]>([])
+  const [districts, setDistricts] = useState<DistrictOption[]>([])
   const [schools, setSchools] = useState<SchoolOption[]>([])
   const [subjects, setSubjects] = useState<SubjectOption[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
@@ -139,40 +148,54 @@ export default function LeaderboardPage() {
     loadSubjects()
   }, [])
 
-  // İl seçildiğinde okulları yükle
+  // İl seçildiğinde ilçeleri yükle
   useEffect(() => {
-    async function loadSchools() {
+    async function loadDistricts() {
       if (!selectedCity) {
+        setDistricts([])
+        setSelectedDistrict('')
         setSchools([])
         setSelectedSchool('')
         return
       }
       
-      // Önce ilçeleri bul
-      const { data: districts } = await supabase
+      const { data } = await supabase
         .from('turkey_districts')
-        .select('id')
+        .select('id, name, city_id')
         .eq('city_id', selectedCity)
+        .order('name')
       
-      if (districts && districts.length > 0) {
-        const districtIds = districts.map(d => d.id)
-        const { data: schoolsData } = await supabase
-          .from('schools')
-          .select('id, name, district_id')
-          .in('district_id', districtIds)
-          .order('name')
-          .limit(500)
-        
-        if (schoolsData) setSchools(schoolsData)
+      if (data) setDistricts(data)
+    }
+    
+    loadDistricts()
+  }, [selectedCity])
+
+  // İlçe seçildiğinde okulları yükle
+  useEffect(() => {
+    async function loadSchools() {
+      if (!selectedDistrict) {
+        setSchools([])
+        setSelectedSchool('')
+        return
       }
+      
+      const { data: schoolsData } = await supabase
+        .from('schools')
+        .select('id, name, district_id')
+        .eq('district_id', selectedDistrict)
+        .order('name')
+        .limit(500)
+      
+      if (schoolsData) setSchools(schoolsData)
     }
     
     loadSchools()
-  }, [selectedCity])
+  }, [selectedDistrict])
 
   useEffect(() => {
     loadLeaderboard()
-  }, [activeTab, activeScope, selectedCity, selectedSchool, selectedGrade])
+  }, [activeTab, activeScope, selectedCity, selectedDistrict, selectedSchool, selectedGrade])
 
   const loadLeaderboard = async () => {
     setLoading(true)
@@ -265,6 +288,67 @@ export default function LeaderboardPage() {
         if (data) {
           // İl'e göre filtrele
           let filteredData = data.filter((item: any) => item.student?.city_id === selectedCity)
+          
+          // Sınıf filtrelemesi uygula
+          if (selectedGrade !== '') {
+            const gradeNum = parseInt(selectedGrade)
+            if (!isNaN(gradeNum)) {
+              filteredData = filteredData.filter((item: any) => item.student?.grade === gradeNum)
+            }
+          }
+
+          const formatted: LeaderboardEntry[] = filteredData.map((item: any, index: number) => ({
+            student_id: item.student_id,
+            full_name: item.student?.profile?.full_name || 'Anonim',
+            avatar_url: item.student?.profile?.avatar_url,
+            grade: item.student?.grade,
+            city_name: item.student?.city?.name,
+            district_name: item.student?.district?.name,
+            school_name: item.student?.school?.name,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            total_wrong: item.total_wrong,
+            max_streak: item.max_streak,
+            success_rate: item.total_questions > 0 
+              ? Math.round((item.total_correct / item.total_questions) * 100) 
+              : 0,
+            rank: index + 1
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
+      } else if (activeScope === 'district' && selectedDistrict) {
+        // İlçe liderliği
+        const { data } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            total_wrong,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              city_id,
+              district_id,
+              school_id,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
+              city:turkey_cities!student_profiles_city_id_fkey(name),
+              district:turkey_districts!student_profiles_district_id_fkey(name),
+              school:schools!student_profiles_school_id_fkey(name)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(500)
+
+        if (data) {
+          // İlçeye göre filtrele
+          let filteredData = data.filter((item: any) => item.student?.district_id === selectedDistrict)
           
           // Sınıf filtrelemesi uygula
           if (selectedGrade !== '') {
@@ -626,15 +710,19 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Scope ve Tab Seçimi */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex flex-col gap-4 mb-8">
           {/* Scope */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {scopes.map((scope) => (
               <button
                 key={scope.key}
                 onClick={() => {
                   setActiveScope(scope.key)
-                  if (scope.key === 'turkey') setSelectedCity('')
+                  if (scope.key === 'turkey') {
+                    setSelectedCity('')
+                    setSelectedDistrict('')
+                    setSelectedSchool('')
+                  }
                 }}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                   activeScope === scope.key
@@ -648,35 +736,77 @@ export default function LeaderboardPage() {
             ))}
           </div>
 
-          {/* İl Seçimi */}
-          {(activeScope === 'city' || activeScope === 'school') && (
-            <select
-              value={selectedCity}
-              onChange={(e) => {
-                setSelectedCity(e.target.value)
-                setSelectedSchool('')
-              }}
-              className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500"
-            >
-              <option value="" className="bg-gray-900">İl Seçin</option>
-              {cities.map(city => (
-                <option key={city.id} value={city.id} className="bg-gray-900">{city.name}</option>
-              ))}
-            </select>
-          )}
+          {/* Kademeli Seçim: İl → İlçe → Okul */}
+          {(activeScope === 'city' || activeScope === 'district' || activeScope === 'school') && (
+            <div className="flex flex-wrap gap-3 items-center bg-white/5 rounded-xl p-4 border border-white/10">
+              {/* İl Seçimi */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-white/50 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> İl
+                </label>
+                <select
+                  value={selectedCity}
+                  onChange={(e) => {
+                    setSelectedCity(e.target.value)
+                    setSelectedDistrict('')
+                    setSelectedSchool('')
+                  }}
+                  className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[160px]"
+                >
+                  <option value="" className="bg-gray-900">İl Seçin</option>
+                  {cities.map(city => (
+                    <option key={city.id} value={city.id} className="bg-gray-900">{city.name}</option>
+                  ))}
+                </select>
+              </div>
 
-          {/* Okul Seçimi */}
-          {activeScope === 'school' && selectedCity && (
-            <select
-              value={selectedSchool}
-              onChange={(e) => setSelectedSchool(e.target.value)}
-              className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[250px]"
-            >
-              <option value="" className="bg-gray-900">Okul Seçin ({schools.length} okul)</option>
-              {schools.map(school => (
-                <option key={school.id} value={school.id} className="bg-gray-900">{school.name}</option>
-              ))}
-            </select>
+              {/* İlçe Seçimi */}
+              {(activeScope === 'district' || activeScope === 'school') && selectedCity && (
+                <>
+                  <ChevronRight className="h-5 w-5 text-white/30 hidden sm:block" />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-white/50 flex items-center gap-1">
+                      <Building2 className="h-3 w-3" /> İlçe
+                    </label>
+                    <select
+                      value={selectedDistrict}
+                      onChange={(e) => {
+                        setSelectedDistrict(e.target.value)
+                        setSelectedSchool('')
+                      }}
+                      className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[180px]"
+                    >
+                      <option value="" className="bg-gray-900">İlçe Seçin ({districts.length} ilçe)</option>
+                      {districts.map(district => (
+                        <option key={district.id} value={district.id} className="bg-gray-900">{district.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {/* Okul Seçimi */}
+              {activeScope === 'school' && selectedDistrict && (
+                <>
+                  <ChevronRight className="h-5 w-5 text-white/30 hidden sm:block" />
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-white/50 flex items-center gap-1">
+                      <School className="h-3 w-3" /> Okul
+                    </label>
+                    <select
+                      value={selectedSchool}
+                      onChange={(e) => setSelectedSchool(e.target.value)}
+                      className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[280px]"
+                    >
+                      <option value="" className="bg-gray-900">Okul Seçin ({schools.length} okul)</option>
+                      {schools.map(school => (
+                        <option key={school.id} value={school.id} className="bg-gray-900">{school.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -757,9 +887,19 @@ export default function LeaderboardPage() {
           </h2>
         )}
 
+        {activeScope === 'district' && selectedDistrict && (
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <Building2 className="h-6 w-6 text-green-400" />
+            {districts.find(d => d.id === selectedDistrict)?.name} İlçe Liderliği
+            <span className="text-sm font-normal text-white/50 ml-2">
+              ({cities.find(c => c.id === selectedCity)?.name})
+            </span>
+          </h2>
+        )}
+
         {activeScope === 'school' && selectedSchool && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <School className="h-6 w-6 text-primary-400" />
+            <School className="h-6 w-6 text-purple-400" />
             {schools.find(s => s.id === selectedSchool)?.name} Okul Liderliği
           </h2>
         )}
@@ -937,6 +1077,10 @@ export default function LeaderboardPage() {
                 <h3 className="text-xl font-medium text-white/60 mb-2">
                   {activeScope === 'city' && !selectedCity 
                     ? 'Lütfen bir il seçin' 
+                    : activeScope === 'district' && !selectedDistrict
+                    ? 'Lütfen bir ilçe seçin'
+                    : activeScope === 'school' && !selectedSchool
+                    ? 'Lütfen bir okul seçin'
                     : activeTab !== 'genel' && !['matematik', 'turkce', 'fen_bilimleri', 'inkilap_tarihi', 'din_kulturu', 'ingilizce'].includes(activeTab)
                     ? 'Bu ders için henüz liderlik tablosu oluşturulmadı'
                     : 'Henüz veri yok'}
@@ -944,6 +1088,12 @@ export default function LeaderboardPage() {
                 <p className="text-white/40">
                   {activeTab !== 'genel' && !['matematik', 'turkce', 'fen_bilimleri', 'inkilap_tarihi', 'din_kulturu', 'ingilizce'].includes(activeTab)
                     ? 'Yakında bu ders için de liderlik tablosu eklenecek!'
+                    : activeScope === 'city' && !selectedCity 
+                    ? '81 il arasından seçim yapın'
+                    : activeScope === 'district' && !selectedDistrict
+                    ? 'Önce il seçin, sonra ilçe seçin'
+                    : activeScope === 'school' && !selectedSchool
+                    ? 'Önce il ve ilçe seçin, sonra okul seçin'
                     : 'İlk soru çözen sen ol!'}
                 </p>
               </div>
