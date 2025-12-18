@@ -124,3 +124,4 @@ COMMENT ON TABLE turkey_districts IS 'Türkiye ilçeleri - 1071 ilçe';
 COMMENT ON TABLE schools IS 'Türkiye okulları - 62725+ okul';
 COMMENT ON VIEW school_hierarchy IS 'İl > İlçe > Okul hiyerarşisi';
 
+

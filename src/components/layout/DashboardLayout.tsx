@@ -216,7 +216,7 @@ export default function DashboardLayout({
                     <div className="text-sm font-medium text-surface-900">
                       {profile?.full_name || 'Yükleniyor...'}
                     </div>
-                    <div className="text-xs text-surface-500">{roleLabels[role]}</div>
+                    <div className="text-xs text-surface-500">{roleLabels[profile?.role || role]}</div>
                   </div>
                   <ChevronDown className="w-4 h-4 text-surface-400 hidden sm:block" />
                 </button>

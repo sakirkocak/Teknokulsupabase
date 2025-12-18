@@ -91,3 +91,4 @@ COMMENT ON TABLE units IS 'Sınıf ve ders bazlı üniteler';
 COMMENT ON VIEW curriculum_view IS 'Ünite-Konu-Kazanım detaylı görünümü';
 COMMENT ON VIEW curriculum_summary_view IS 'Sınıf bazlı müfredat özeti';
 
+

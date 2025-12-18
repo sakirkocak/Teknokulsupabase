@@ -213,3 +213,4 @@ function normalizeCity(name) {
 
 main().catch(console.error)
 
+

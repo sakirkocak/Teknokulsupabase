@@ -18,3 +18,4 @@ ALTER TABLE lgs_questions ADD CONSTRAINT lgs_questions_correct_answer_check
 -- Yorum ekle
 COMMENT ON TABLE questions IS 'Sorular tablosu - İlkokul/Ortaokul 4 şık (A-D), Lise 5 şık (A-E)';
 
+

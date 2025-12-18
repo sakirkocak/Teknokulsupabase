@@ -569,3 +569,4 @@ JOIN grades g ON t.grade = g.id
 GROUP BY g.name, s.name, g.id
 ORDER BY g.id, s.name;
 
+

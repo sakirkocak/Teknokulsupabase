@@ -845,8 +845,41 @@ export default function AIQuestionGeneratorPage() {
                 </div>
               )}
 
-              {/* Empty State */}
-              {!generating && generatedQuestions.length === 0 && (
+              {/* Success State - After Save */}
+              {!generating && generatedQuestions.length === 0 && saveStatus && saveStatus.success > 0 && (
+                <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-12 text-center">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                    Sorular başarıyla kaydedildi!
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    {saveStatus.success} soru soru bankasına eklendi.
+                  </p>
+                  <div className="flex gap-4 justify-center">
+                    <button
+                      onClick={() => {
+                        setSaveStatus(null)
+                        setCurrentStep(3)
+                      }}
+                      className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+                    >
+                      Farklı Konu Seç
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSaveStatus(null)
+                        handleGenerate()
+                      }}
+                      className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"
+                    >
+                      Aynı Konuda Yeni Sorular Üret
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty State - Error */}
+              {!generating && generatedQuestions.length === 0 && !saveStatus && (
                 <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-12 text-center">
                   <div className="text-6xl mb-4">🤔</div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">
