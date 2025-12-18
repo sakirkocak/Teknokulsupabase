@@ -641,7 +641,7 @@ export default function AdminSoruYonetimiPage() {
                       
                       {/* Soru Metni */}
                       <div className="text-surface-900 dark:text-white mb-3">
-                        <MathRenderer content={question.question_text} />
+                        <MathRenderer text={question.question_text || ''} />
                       </div>
                       
                       {/* Seçenekler */}
@@ -656,7 +656,7 @@ export default function AdminSoruYonetimiPage() {
                             }`}
                           >
                             <span className="font-bold mr-2">{key})</span>
-                            <MathRenderer content={value as string} />
+                            <MathRenderer text={(value as string) || ''} />
                             {key === question.correct_answer && (
                               <CheckCircle className="h-4 w-4 inline ml-2 text-green-500" />
                             )}
@@ -667,7 +667,7 @@ export default function AdminSoruYonetimiPage() {
                       {/* Açıklama */}
                       {question.explanation && (
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-400 mb-3">
-                          <strong>Açıklama:</strong> <MathRenderer content={question.explanation} />
+                          <strong>Açıklama:</strong> <MathRenderer text={question.explanation || ''} />
                         </div>
                       )}
                       
