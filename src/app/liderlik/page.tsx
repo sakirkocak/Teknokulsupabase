@@ -36,6 +36,7 @@ interface SubjectOption {
 const scopes = [
   { key: 'turkey', label: 'Türkiye', icon: Globe },
   { key: 'city', label: 'İl Bazlı', icon: MapPin },
+  { key: 'school', label: 'Okul Bazlı', icon: School },
 ]
 
 // Renk haritası
@@ -82,12 +83,20 @@ const gradeSubjectsMap: Record<string, string[]> = {
   '12': ['edebiyat', 'matematik', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
 }
 
+interface SchoolOption {
+  id: string
+  name: string
+  district_id: string
+}
+
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('genel')
   const [activeScope, setActiveScope] = useState('turkey')
   const [selectedCity, setSelectedCity] = useState<string>('')
+  const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedGrade, setSelectedGrade] = useState<string>('') // '' = tümü
   const [cities, setCities] = useState<TurkeyCity[]>([])
+  const [schools, setSchools] = useState<SchoolOption[]>([])
   const [subjects, setSubjects] = useState<SubjectOption[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [subjectLeaders, setSubjectLeaders] = useState<SubjectLeader[]>([])
@@ -130,9 +139,40 @@ export default function LeaderboardPage() {
     loadSubjects()
   }, [])
 
+  // İl seçildiğinde okulları yükle
+  useEffect(() => {
+    async function loadSchools() {
+      if (!selectedCity) {
+        setSchools([])
+        setSelectedSchool('')
+        return
+      }
+      
+      // Önce ilçeleri bul
+      const { data: districts } = await supabase
+        .from('turkey_districts')
+        .select('id')
+        .eq('city_id', selectedCity)
+      
+      if (districts && districts.length > 0) {
+        const districtIds = districts.map(d => d.id)
+        const { data: schoolsData } = await supabase
+          .from('schools')
+          .select('id, name, district_id')
+          .in('district_id', districtIds)
+          .order('name')
+          .limit(500)
+        
+        if (schoolsData) setSchools(schoolsData)
+      }
+    }
+    
+    loadSchools()
+  }, [selectedCity])
+
   useEffect(() => {
     loadLeaderboard()
-  }, [activeTab, activeScope, selectedCity, selectedGrade])
+  }, [activeTab, activeScope, selectedCity, selectedSchool, selectedGrade])
 
   const loadLeaderboard = async () => {
     setLoading(true)
@@ -225,6 +265,65 @@ export default function LeaderboardPage() {
         if (data) {
           // İl'e göre filtrele
           let filteredData = data.filter((item: any) => item.student?.city_id === selectedCity)
+          
+          // Sınıf filtrelemesi uygula
+          if (selectedGrade !== '') {
+            const gradeNum = parseInt(selectedGrade)
+            if (!isNaN(gradeNum)) {
+              filteredData = filteredData.filter((item: any) => item.student?.grade === gradeNum)
+            }
+          }
+
+          const formatted: LeaderboardEntry[] = filteredData.map((item: any, index: number) => ({
+            student_id: item.student_id,
+            full_name: item.student?.profile?.full_name || 'Anonim',
+            avatar_url: item.student?.profile?.avatar_url,
+            grade: item.student?.grade,
+            city_name: item.student?.city?.name,
+            district_name: item.student?.district?.name,
+            school_name: item.student?.school?.name,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            total_wrong: item.total_wrong,
+            max_streak: item.max_streak,
+            success_rate: item.total_questions > 0 
+              ? Math.round((item.total_correct / item.total_questions) * 100) 
+              : 0,
+            rank: index + 1
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        }
+      } else if (activeScope === 'school' && selectedSchool) {
+        // Okul liderliği
+        const { data } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            total_wrong,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              school_id,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
+              city:turkey_cities!student_profiles_city_id_fkey(name),
+              district:turkey_districts!student_profiles_district_id_fkey(name),
+              school:schools!student_profiles_school_id_fkey(name)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(500)
+
+        if (data) {
+          // Okula göre filtrele
+          let filteredData = data.filter((item: any) => item.student?.school_id === selectedSchool)
           
           // Sınıf filtrelemesi uygula
           if (selectedGrade !== '') {
@@ -550,15 +649,32 @@ export default function LeaderboardPage() {
           </div>
 
           {/* İl Seçimi */}
-          {activeScope === 'city' && (
+          {(activeScope === 'city' || activeScope === 'school') && (
             <select
               value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
+              onChange={(e) => {
+                setSelectedCity(e.target.value)
+                setSelectedSchool('')
+              }}
               className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500"
             >
               <option value="" className="bg-gray-900">İl Seçin</option>
               {cities.map(city => (
                 <option key={city.id} value={city.id} className="bg-gray-900">{city.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Okul Seçimi */}
+          {activeScope === 'school' && selectedCity && (
+            <select
+              value={selectedSchool}
+              onChange={(e) => setSelectedSchool(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[250px]"
+            >
+              <option value="" className="bg-gray-900">Okul Seçin ({schools.length} okul)</option>
+              {schools.map(school => (
+                <option key={school.id} value={school.id} className="bg-gray-900">{school.name}</option>
               ))}
             </select>
           )}
@@ -637,7 +753,14 @@ export default function LeaderboardPage() {
         {activeScope === 'city' && selectedCity && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <MapPin className="h-6 w-6 text-primary-400" />
-            {getSelectedCityName()} İl Liderliği
+            {cities.find(c => c.id === selectedCity)?.name} İl Liderliği
+          </h2>
+        )}
+
+        {activeScope === 'school' && selectedSchool && (
+          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+            <School className="h-6 w-6 text-primary-400" />
+            {schools.find(s => s.id === selectedSchool)?.name} Okul Liderliği
           </h2>
         )}
 
