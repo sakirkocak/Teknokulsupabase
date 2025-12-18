@@ -33,8 +33,7 @@ import {
   UserCircle,
   Wand2,
   Volume2,
-  Flag,
-  BookOpen
+  Flag
 } from 'lucide-react'
 
 type NavItem = {

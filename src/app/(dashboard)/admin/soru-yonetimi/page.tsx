@@ -97,7 +97,7 @@ export default function AdminSoruYonetimiPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    loadSubjects()
+    loadAllSubjects()
     loadStats()
   }, [])
 
@@ -107,20 +107,52 @@ export default function AdminSoruYonetimiPage() {
 
   useEffect(() => {
     if (filterGrade) {
+      loadSubjectsForGrade(filterGrade as number)
       loadTopicsForGrade(filterGrade as number)
     } else {
+      loadAllSubjects()
       setTopics([])
       setFilterTopic('')
     }
-  }, [filterGrade, filterSubject])
+  }, [filterGrade])
 
-  const loadSubjects = async () => {
+  useEffect(() => {
+    if (filterGrade && filterSubject) {
+      loadTopicsForGrade(filterGrade as number)
+    }
+  }, [filterSubject])
+
+  // Tüm dersleri yükle (sınıf seçilmediğinde)
+  const loadAllSubjects = async () => {
     const { data } = await supabase
       .from('subjects')
       .select('id, name, code, icon')
       .order('name')
     
     if (data) setSubjects(data)
+  }
+
+  // Seçilen sınıfa göre dersleri yükle
+  const loadSubjectsForGrade = async (grade: number) => {
+    const { data } = await supabase
+      .from('grade_subjects')
+      .select(`
+        subject:subjects(id, name, code, icon)
+      `)
+      .eq('grade_id', grade)
+    
+    if (data) {
+      const subjectList = data
+        .map((item: any) => item.subject)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name, 'tr'))
+      setSubjects(subjectList)
+      
+      // Eğer seçili ders bu sınıfta yoksa temizle
+      if (filterSubject && !subjectList.find((s: any) => s.id === filterSubject)) {
+        setFilterSubject('')
+      }
+    }
   }
 
   const loadTopicsForGrade = async (grade: number) => {
