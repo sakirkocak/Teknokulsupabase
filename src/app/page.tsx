@@ -4,10 +4,15 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+
+// Hydration-safe number formatter (sunucu ve istemci aynı sonuç verir)
+const formatNumber = (num: number): string => {
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
-import { stats, testimonials, activityMessages, universities, demoCoaches } from '@/lib/demoData'
+import { testimonials, activityMessages, universities, demoCoaches } from '@/lib/demoData'
 import { 
   GraduationCap, 
   Users, 
@@ -17,9 +22,7 @@ import {
   CheckCircle,
   ArrowRight,
   Sparkles,
-  BookOpen,
   Clock,
-  Award,
   Play,
   ChevronRight,
   Menu,
@@ -29,38 +32,120 @@ import {
   Target,
   UserPlus,
   FileText,
-  Trophy
+  Trophy,
+  Flame,
+  Medal,
+  BarChart3,
+  Rocket,
+  Calculator,
+  BookOpen,
+  Microscope,
+  Globe,
+  Palette,
+  Music,
+  Heart,
+  ChevronDown,
+  Bot,
+  Camera,
+  PieChart,
+  Award
 } from 'lucide-react'
 
+// Yeni Features Array
 const features = [
   {
-    icon: Users,
-    title: 'Koç Eşleşmesi',
-    description: 'Sana en uygun eğitim koçunu bul, başvur ve kişisel rehberlik al.',
-    color: 'text-primary-500',
-    bg: 'bg-primary-50',
+    icon: Target,
+    title: 'Binlerce Soru',
+    description: '1-12. sınıf MEB müfredatına uygun, zorluk seviyelerine göre ayrılmış binlerce soru.',
+    color: 'text-orange-500',
+    bg: 'bg-gradient-to-br from-orange-50 to-amber-50',
+    stat: '10,000+',
+    statLabel: 'soru'
+  },
+  {
+    icon: Trophy,
+    title: 'Liderlik Yarışı',
+    description: 'Sınıf, okul, ilçe, il ve Türkiye genelinde arkadaşlarınla yarış.',
+    color: 'text-purple-500',
+    bg: 'bg-gradient-to-br from-purple-50 to-indigo-50',
+    stat: '500+',
+    statLabel: 'yarışmacı'
+  },
+  {
+    icon: Flame,
+    title: 'Günlük Seri',
+    description: 'Her gün soru çöz, serini koru, bonus XP ve rozetler kazan.',
+    color: 'text-red-500',
+    bg: 'bg-gradient-to-br from-red-50 to-orange-50',
+    stat: '30+',
+    statLabel: 'rozet'
   },
   {
     icon: Brain,
-    title: 'AI Destekli Öneriler',
-    description: 'Yapay zeka eksiklerini tespit eder, sana özel öneriler sunar.',
-    color: 'text-accent-500',
-    bg: 'bg-accent-50',
+    title: 'AI Öğretmen',
+    description: 'Yapay zeka eksiklerini tespit eder, konu anlatır, soru çözer.',
+    color: 'text-blue-500',
+    bg: 'bg-gradient-to-br from-blue-50 to-cyan-50',
+    stat: '7/24',
+    statLabel: 'destek'
   },
   {
-    icon: TrendingUp,
-    title: 'Gelişim Takibi',
-    description: 'Deneme sonuçları, görevler ve ilerlemen tek panelde.',
-    color: 'text-secondary-500',
-    bg: 'bg-secondary-50',
+    icon: Users,
+    title: 'Kişisel Koç',
+    description: 'Deneyimli eğitim koçlarıyla birebir çalış, hedeflerine ulaş.',
+    color: 'text-green-500',
+    bg: 'bg-gradient-to-br from-green-50 to-emerald-50',
+    stat: '50+',
+    statLabel: 'koç'
   },
+  {
+    icon: BarChart3,
+    title: 'Detaylı Analiz',
+    description: 'Performansını takip et, güçlü ve zayıf yönlerini keşfet.',
+    color: 'text-teal-500',
+    bg: 'bg-gradient-to-br from-teal-50 to-cyan-50',
+    stat: '%100',
+    statLabel: 'şeffaflık'
+  },
+]
+
+// Ders kartları
+const subjectCards = [
+  { name: 'Matematik', icon: Calculator, color: 'from-blue-500 to-indigo-600', bgLight: 'bg-blue-50' },
+  { name: 'Türkçe', icon: BookOpen, color: 'from-red-500 to-pink-600', bgLight: 'bg-red-50' },
+  { name: 'Fen Bilimleri', icon: Microscope, color: 'from-green-500 to-emerald-600', bgLight: 'bg-green-50' },
+  { name: 'Sosyal Bilgiler', icon: Globe, color: 'from-amber-500 to-orange-600', bgLight: 'bg-amber-50' },
+  { name: 'İngilizce', icon: Globe, color: 'from-purple-500 to-violet-600', bgLight: 'bg-purple-50' },
+  { name: 'Din Kültürü', icon: BookOpen, color: 'from-teal-500 to-cyan-600', bgLight: 'bg-teal-50' },
+]
+
+// Rozet listesi
+const badges = [
+  { name: 'İlk Adım', icon: '🌟', description: 'İlk soruyu çöz', unlocked: true },
+  { name: '7 Gün Seri', icon: '🔥', description: '7 gün üst üste çöz', unlocked: true },
+  { name: 'Hız Şeytanı', icon: '⚡', description: '30sn altında 10 soru çöz', unlocked: false },
+  { name: '100 Soru', icon: '📚', description: '100 soru çöz', unlocked: true },
+  { name: '%90 Başarı', icon: '🎯', description: '%90 üzeri başarı oranı', unlocked: false },
+  { name: 'İlk 10', icon: '🏆', description: 'Liderlikte ilk 10a gir', unlocked: false },
+]
+
+// Seviye sistemi
+const levels = [
+  { level: 1, name: 'Çaylak', xp: 0, icon: '🌱' },
+  { level: 5, name: 'Öğrenci', xp: 500, icon: '📖' },
+  { level: 10, name: 'Usta', xp: 1500, icon: '⭐' },
+  { level: 20, name: 'Efsane', xp: 5000, icon: '🔥' },
+  { level: 50, name: 'Dahi', xp: 20000, icon: '🧠' },
+  { level: 100, name: 'GOAT', xp: 100000, icon: '🐐' },
 ]
 
 // Activity Feed Component
 function ActivityFeed() {
+  const [mounted, setMounted] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
 
   useEffect(() => {
+    setMounted(true)
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % activityMessages.length)
     }, 3000)
@@ -80,6 +165,8 @@ function ActivityFeed() {
       default: return <Zap className="w-4 h-4" />
     }
   }
+
+  if (!mounted) return null
 
   return (
     <div className="fixed bottom-6 left-6 z-40 hidden lg:block">
@@ -110,18 +197,169 @@ function ActivityFeed() {
   )
 }
 
+// Floating Math Symbols Component
+function FloatingSymbols() {
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  if (!mounted) return null
+  
+  const symbols = [
+    { char: '∑', x: 10, y: 20 },
+    { char: '∫', x: 25, y: 40 },
+    { char: 'π', x: 45, y: 15 },
+    { char: '√', x: 60, y: 35 },
+    { char: '∞', x: 75, y: 25 },
+    { char: 'Δ', x: 85, y: 45 },
+    { char: 'θ', x: 15, y: 60 },
+    { char: 'α', x: 35, y: 75 },
+    { char: 'β', x: 55, y: 55 },
+    { char: '±', x: 70, y: 70 },
+    { char: '÷', x: 90, y: 15 },
+    { char: '×', x: 5, y: 85 },
+  ]
+  
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {symbols.map((symbol, i) => (
+        <motion.div
+          key={i}
+          className="absolute text-4xl text-primary-200/30 font-bold select-none"
+          style={{ left: `${symbol.x}%`, top: `${symbol.y}%` }}
+          animate={{ 
+            y: [0, -50, 100],
+            opacity: [0, 0.5, 0],
+            scale: [0.5, 1, 0.5],
+            rotate: [0, 360]
+          }}
+          transition={{
+            duration: 15 + (i % 5) * 2,
+            repeat: Infinity,
+            delay: i * 1.5,
+            ease: 'linear'
+          }}
+        >
+          {symbol.char}
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
+// Live Stats Banner Component
+function LiveStatsBanner() {
+  const [mounted, setMounted] = useState(false)
+  const [stats, setStats] = useState({
+    todayQuestions: 0,
+    activeStudents: 0,
+    totalQuestions: 0
+  })
+  const supabase = createClient()
+
+  useEffect(() => {
+    setMounted(true)
+    loadStats()
+  }, [])
+
+  async function loadStats() {
+    // Bugün çözülen sorular (son 24 saat)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const { count: todayCount } = await supabase
+      .from('student_points')
+      .select('*', { count: 'exact', head: true })
+      .gte('last_activity_at', today.toISOString())
+
+    // Toplam soru sayısı
+    const { count: totalQuestions } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true })
+
+    // Aktif öğrenci sayısı
+    const { count: activeStudents } = await supabase
+      .from('student_points')
+      .select('*', { count: 'exact', head: true })
+      .gt('total_questions', 0)
+
+    setStats({
+      todayQuestions: (todayCount || 0) * 15, // Estimated daily questions
+      activeStudents: activeStudents || 0,
+      totalQuestions: totalQuestions || 0
+    })
+  }
+
+  // Hydration uyumluluğu için başlangıç değerleri
+  const displayStats = mounted ? stats : { todayQuestions: 0, activeStudents: 0, totalQuestions: 0 }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      className="flex flex-wrap justify-center gap-4 sm:gap-8 mt-8"
+    >
+      <div className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm border border-surface-100">
+        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+        <span className="text-surface-600 text-sm">
+          <span className="font-bold text-surface-900">{displayStats.todayQuestions > 0 ? formatNumber(displayStats.todayQuestions) : '45'}+</span> soru bugün çözüldü
+        </span>
+      </div>
+      <div className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm border border-surface-100">
+        <Trophy className="w-4 h-4 text-yellow-500" />
+        <span className="text-surface-600 text-sm">
+          <span className="font-bold text-surface-900">{displayStats.activeStudents > 0 ? formatNumber(displayStats.activeStudents) : '5'}+</span> öğrenci yarışıyor
+        </span>
+      </div>
+      <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg">
+        <Zap className="w-4 h-4" />
+        <span className="text-sm font-medium">Sen de katıl!</span>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function HomePage() {
   const [coaches, setCoaches] = useState<any[]>([])
   const [loadingCoaches, setLoadingCoaches] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [testimonialIndex, setTestimonialIndex] = useState(0)
   const [topLeaders, setTopLeaders] = useState<any[]>([])
+  const [selectedGrade, setSelectedGrade] = useState(8)
+  const [subjectQuestionCounts, setSubjectQuestionCounts] = useState<Record<string, number>>({})
+  const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('weekly')
   const supabase = createClient()
 
   useEffect(() => {
     loadFeaturedCoaches()
     loadTopLeaders()
-  }, [])
+    loadSubjectQuestionCounts()
+  }, [selectedGrade])
+
+  async function loadSubjectQuestionCounts() {
+    const { data: subjects } = await supabase
+      .from('subjects')
+      .select('id, name')
+
+    if (!subjects) return
+
+    const counts: Record<string, number> = {}
+    
+    for (const subject of subjects) {
+      const { count } = await supabase
+        .from('questions')
+        .select('*, topic:topics!inner(grade, subject_id)', { count: 'exact', head: true })
+        .eq('topic.subject_id', subject.id)
+        .eq('topic.grade', selectedGrade)
+
+      counts[subject.name] = count || 0
+    }
+    
+    setSubjectQuestionCounts(counts)
+  }
 
   async function loadTopLeaders() {
     const { data } = await supabase
@@ -134,12 +372,13 @@ export default function HomePage() {
         max_streak,
         student:student_profiles!student_points_student_id_fkey(
           user_id,
+          grade,
           profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
         )
       `)
       .gt('total_questions', 0)
       .order('total_points', { ascending: false })
-      .limit(5)
+      .limit(10)
 
     if (data) {
       setTopLeaders(data.map((item: any, index: number) => ({
@@ -149,7 +388,8 @@ export default function HomePage() {
         points: item.total_points,
         questions: item.total_questions,
         correct: item.total_correct,
-        streak: item.max_streak
+        streak: item.max_streak,
+        grade: item.student?.grade
       })))
     }
   }
@@ -191,7 +431,6 @@ export default function HomePage() {
 
       setCoaches(coachesWithReviews)
     } else {
-      // Veritabanında koç yoksa demo koçları göster
       setCoaches(demoCoaches.slice(0, 6).map((coach, i) => ({
         id: `demo-${i}`,
         ...coach,
@@ -209,6 +448,15 @@ export default function HomePage() {
       {/* Activity Feed */}
       <ActivityFeed />
 
+      {/* Mobile Floating Action Button */}
+      <Link 
+        href="/kayit"
+        className="fixed bottom-6 right-6 z-50 md:hidden flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg shadow-orange-500/30 font-semibold"
+      >
+        <Target className="w-5 h-5" />
+        Soru Çöz
+      </Link>
+
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -224,15 +472,19 @@ export default function HomePage() {
             
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-6">
+              <Link href="/kayit" className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
+                <Target className="w-4 h-4" />
+                Soru Çöz
+              </Link>
+              <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                <Trophy className="w-4 h-4" />
+                Liderlik
+              </Link>
               <Link href="/koclar" className="text-surface-600 hover:text-primary-500 font-medium transition-colors">
                 Koçlar
               </Link>
               <Link href="/materyaller" className="text-surface-600 hover:text-primary-500 font-medium transition-colors">
                 Materyaller
-              </Link>
-              <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
-                <Trophy className="w-4 h-4" />
-                Liderlik
               </Link>
             </div>
 
@@ -264,6 +516,22 @@ export default function HomePage() {
           >
             <div className="space-y-3">
               <Link 
+                href="/kayit" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 bg-orange-50 text-orange-600 rounded-xl font-medium"
+              >
+                <Target className="w-5 h-5" />
+                Soru Çöz
+              </Link>
+              <Link 
+                href="/liderlik" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
+              >
+                <Trophy className="w-4 h-4" />
+                Liderlik
+              </Link>
+              <Link 
                 href="/koclar" 
                 onClick={() => setMobileMenuOpen(false)}
                 className="block px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
@@ -276,14 +544,6 @@ export default function HomePage() {
                 className="block px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
               >
                 Materyaller
-              </Link>
-              <Link 
-                href="/liderlik" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
-              >
-                <Trophy className="w-4 h-4" />
-                Liderlik
               </Link>
               <div className="pt-3 border-t border-surface-100 space-y-2">
                 <Link href="/giris" className="btn btn-ghost btn-md w-full">
@@ -298,231 +558,575 @@ export default function HomePage() {
         )}
       </nav>
 
-      {/* Hero */}
-      <section className="pt-32 pb-16 px-4">
-        <div className="max-w-7xl mx-auto text-center">
+      {/* Hero - YENİ TASARIM */}
+      <section className="pt-28 pb-12 px-4 relative overflow-hidden">
+        <FloatingSymbols />
+        
+        <div className="max-w-7xl mx-auto text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-600 rounded-full text-sm font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-600 rounded-full text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4" />
-              AI Destekli Eğitim Koçluğu
+              AI Destekli Soru Bankası & Liderlik Yarışı
             </div>
             
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-surface-900 mb-6 leading-tight">
-              Eğitim Yolculuğunda
-              <br />
-              <span className="text-primary-500">Koçun Yanında</span>
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-surface-900 mb-6 leading-tight">
+              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 bg-clip-text text-transparent">Öğren.</span>{' '}
+              <span className="bg-gradient-to-r from-purple-500 via-violet-500 to-purple-600 bg-clip-text text-transparent">Yarış.</span>{' '}
+              <span className="bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 bg-clip-text text-transparent">Kazan.</span>
             </h1>
             
-            <p className="text-lg sm:text-xl text-surface-600 max-w-2xl mx-auto mb-8">
-              Kişisel eğitim koçunla hedeflerine ulaş. AI destekli öneriler, 
-              görev takibi ve gelişim raporları ile fark yarat.
+            <p className="text-lg sm:text-xl text-surface-600 max-w-3xl mx-auto mb-8">
+              Binlerce soruyla pratik yap, Türkiye sıralamasında yüksel, 
+              <span className="font-semibold text-surface-800"> AI destekli öğrenme</span> ile fark yarat.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/kayit" className="btn btn-primary btn-lg">
-                Ücretsiz Başla
-                <ArrowRight className="w-5 h-5" />
+              <Link href="/kayit" className="group relative btn btn-lg px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/30 transition-all hover:shadow-xl hover:shadow-orange-500/40 hover:scale-105">
+                <Target className="w-5 h-5" />
+                Hemen Soru Çöz
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link href="/koclar" className="btn btn-outline btn-lg">
-                Koçları Keşfet
+              <Link href="/liderlik" className="btn btn-outline btn-lg border-purple-300 text-purple-600 hover:bg-purple-50">
+                <Trophy className="w-5 h-5" />
+                Liderlik Tablosu
+              </Link>
+              <Link href="/koclar" className="btn btn-ghost btn-lg text-surface-600">
+                Koçunu Bul
+                <ChevronRight className="w-4 h-4" />
               </Link>
             </div>
+
+            {/* Live Stats Banner */}
+            <LiveStatsBanner />
           </motion.div>
         </div>
       </section>
 
-      {/* Stats Band */}
-      <section className="py-8 px-4">
-        <div className="max-w-5xl mx-auto">
-          <motion.div 
+      {/* HIZLI BAŞLA KARTLARI - YENİ BÖLÜM */}
+      <section className="py-12 px-4">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="bg-white rounded-3xl shadow-xl border border-surface-100 p-6 sm:p-8"
           >
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-              {stats.map((stat, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                  className="text-center"
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-surface-900 flex items-center gap-2">
+                  <Zap className="w-6 h-6 text-orange-500" />
+                  Hızlı Başla
+                </h2>
+                <p className="text-surface-500 mt-1">Sınıfını seç, hemen pratik yapmaya başla!</p>
+              </div>
+              <div className="relative">
+                <select
+                  value={selectedGrade}
+                  onChange={(e) => setSelectedGrade(Number(e.target.value))}
+                  className="appearance-none px-4 py-2 pr-10 bg-surface-100 border border-surface-200 rounded-xl font-medium text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  <div className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent">
-                    {stat.value}
-                  </div>
-                  <div className="text-surface-500 text-sm sm:text-base mt-1">{stat.label}</div>
-                </motion.div>
-              ))}
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(grade => (
+                    <option key={grade} value={grade}>{grade}. Sınıf</option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Ders Kartları */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+              {subjectCards.map((subject, index) => {
+                const questionCount = subjectQuestionCounts[subject.name] || 0
+                return (
+                  <motion.div
+                    key={subject.name}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.05 }}
+                    viewport={{ once: true }}
+                    whileHover={{ scale: 1.05, y: -5 }}
+                    className="relative group cursor-pointer"
+                  >
+                    <Link href="/kayit">
+                      <div className={`${subject.bgLight} rounded-2xl p-4 text-center transition-all duration-300 group-hover:shadow-lg border border-transparent group-hover:border-surface-200`}>
+                        <div className={`w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br ${subject.color} flex items-center justify-center shadow-lg`}>
+                          <subject.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <h3 className="font-semibold text-surface-900 text-sm mb-1">{subject.name}</h3>
+                        <p className="text-xs text-surface-500">{formatNumber(questionCount)} soru</p>
+                        <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-xs font-medium text-primary-600">Çöz →</span>
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                )
+              })}
+            </div>
+
+            {/* Alt Butonlar */}
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link href="/kayit" className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-all">
+                <Zap className="w-4 h-4" />
+                Rastgele Soru
+              </Link>
+              <Link href="/kayit" className="flex items-center gap-2 px-4 py-2 bg-surface-100 text-surface-700 rounded-xl text-sm font-medium hover:bg-surface-200 transition-all">
+                <Target className="w-4 h-4" />
+                Eksik Konular
+              </Link>
+              <Link href="/kayit" className="flex items-center gap-2 px-4 py-2 bg-surface-100 text-surface-700 rounded-xl text-sm font-medium hover:bg-surface-200 transition-all">
+                <FileText className="w-4 h-4" />
+                Deneme Sınavı
+              </Link>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Leaderboard Section */}
-      {topLeaders.length > 0 && (
-        <section className="py-16 px-4 bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-900 relative overflow-hidden">
-          {/* Background decorations */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjAyIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
-          
-          <div className="max-w-5xl mx-auto relative">
-            <div className="text-center mb-10">
-              <motion.div
-                initial={{ scale: 0 }}
-                whileInView={{ scale: 1 }}
-                viewport={{ once: true }}
-                className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-yellow-500/30"
-              >
-                <Trophy className="w-8 h-8 text-white" />
-              </motion.div>
-              <h2 className="text-3xl font-bold text-white mb-2">
-                🏆 Haftanın Liderleri
-              </h2>
-              <p className="text-white/60">
-                En çok soru çözen ve en yüksek puana sahip öğrenciler
+      {/* GAMİFİCATİON HUB - YENİ BÖLÜM */}
+      <section className="py-16 px-4 bg-gradient-to-br from-indigo-900 via-purple-900 to-violet-900 relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjAyIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
+        
+        <div className="max-w-6xl mx-auto relative z-10">
+          <div className="text-center mb-10">
+            <motion.div
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur rounded-full text-white/80 text-sm font-medium mb-4"
+            >
+              <Flame className="w-4 h-4 text-orange-400" />
+              Oyunlaştırılmış Öğrenme
+            </motion.div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+              XP Kazan, Seviye Atla, Rozet Topla!
+            </h2>
+            <p className="text-white/60 max-w-2xl mx-auto">
+              Her doğru cevap seni bir adım öne taşır. Arkadaşlarınla yarış, rozetleri aç!
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Günlük Meydan Okuma */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/10"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Target className="w-5 h-5 text-orange-400" />
+                  Günlük Görev
+                </h3>
+                <span className="text-xs text-white/50 bg-white/10 px-2 py-1 rounded-full">23:45:12</span>
+              </div>
+              <p className="text-white/80 mb-4">
+                "Bugün <span className="font-bold text-orange-400">20 matematik</span> sorusu çöz!"
               </p>
-            </div>
+              <div className="relative h-3 bg-white/10 rounded-full overflow-hidden mb-3">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  whileInView={{ width: '60%' }}
+                  transition={{ duration: 1, delay: 0.5 }}
+                  className="absolute h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
+                />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/60">12/20 soru</span>
+                <span className="text-orange-400 font-medium">+50 XP</span>
+              </div>
+              <Link href="/kayit" className="mt-4 w-full btn bg-white/20 hover:bg-white/30 text-white border-0">
+                Göreve Katıl
+              </Link>
+            </motion.div>
 
-            {/* Top 3 */}
-            <div className="flex flex-col md:flex-row items-end justify-center gap-4 mb-8">
-              {/* 2nd Place */}
-              {topLeaders[1] && (
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  viewport={{ once: true }}
-                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center w-full md:w-48 border border-white/10"
-                >
-                  <div className="text-3xl mb-2">🥈</div>
-                  <div className="w-14 h-14 bg-gray-500 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-lg overflow-hidden">
-                    {topLeaders[1].avatar ? (
-                      <img src={topLeaders[1].avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      getInitials(topLeaders[1].name)
-                    )}
-                  </div>
-                  <div className="font-semibold text-white truncate">{topLeaders[1].name}</div>
-                  <div className="text-2xl font-bold text-gray-300">{topLeaders[1].points}</div>
-                  <div className="text-xs text-white/50">puan</div>
-                </motion.div>
-              )}
-
-              {/* 1st Place */}
-              {topLeaders[0] && (
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  className="bg-gradient-to-br from-yellow-500/20 to-amber-500/20 backdrop-blur-sm rounded-2xl p-6 text-center w-full md:w-56 border border-yellow-500/30 relative"
-                >
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-yellow-500 text-yellow-900 text-xs font-bold rounded-full">
-                    ŞAMPİYON
-                  </div>
-                  <div className="text-4xl mb-2">👑</div>
-                  <div className="w-18 h-18 w-[72px] h-[72px] bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 text-white font-bold text-xl shadow-lg shadow-yellow-500/30 overflow-hidden">
-                    {topLeaders[0].avatar ? (
-                      <img src={topLeaders[0].avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      getInitials(topLeaders[0].name)
-                    )}
-                  </div>
-                  <div className="text-lg font-bold text-white truncate">{topLeaders[0].name}</div>
-                  <div className="text-3xl font-bold text-yellow-400">{topLeaders[0].points}</div>
-                  <div className="text-sm text-white/50">puan</div>
-                  <div className="mt-2 text-xs text-white/60">
-                    {topLeaders[0].correct} doğru • {topLeaders[0].questions} soru
-                  </div>
-                </motion.div>
-              )}
-
-              {/* 3rd Place */}
-              {topLeaders[2] && (
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
-                  viewport={{ once: true }}
-                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-5 text-center w-full md:w-48 border border-white/10"
-                >
-                  <div className="text-3xl mb-2">🥉</div>
-                  <div className="w-14 h-14 bg-amber-700 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-lg overflow-hidden">
-                    {topLeaders[2].avatar ? (
-                      <img src={topLeaders[2].avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      getInitials(topLeaders[2].name)
-                    )}
-                  </div>
-                  <div className="font-semibold text-white truncate">{topLeaders[2].name}</div>
-                  <div className="text-2xl font-bold text-amber-500">{topLeaders[2].points}</div>
-                  <div className="text-xs text-white/50">puan</div>
-                </motion.div>
-              )}
-            </div>
-
-            {/* 4th and 5th */}
-            {topLeaders.slice(3, 5).length > 0 && (
-              <div className="flex justify-center gap-3 mb-8">
-                {topLeaders.slice(3, 5).map((leader, index) => (
-                  <motion.div
-                    key={leader.rank}
-                    initial={{ opacity: 0 }}
-                    whileInView={{ opacity: 1 }}
-                    transition={{ delay: 0.3 + index * 0.1 }}
-                    viewport={{ once: true }}
-                    className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2 border border-white/10"
-                  >
-                    <span className="text-white/60 font-bold">{leader.rank}.</span>
-                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-bold overflow-hidden">
-                      {leader.avatar ? (
-                        <img src={leader.avatar} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        getInitials(leader.name)
-                      )}
+            {/* XP ve Seviye */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              viewport={{ once: true }}
+              className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/10"
+            >
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-yellow-400" />
+                Seviye Sistemi
+              </h3>
+              <div className="space-y-3">
+                {levels.slice(0, 4).map((level, i) => (
+                  <div key={level.level} className="flex items-center gap-3">
+                    <span className="text-2xl">{level.icon}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white font-medium text-sm">Lv.{level.level} {level.name}</span>
+                        <span className="text-white/50 text-xs">{formatNumber(level.xp)} XP</span>
+                      </div>
                     </div>
-                    <span className="text-white font-medium">{leader.name}</span>
-                    <span className="text-white/60">{leader.points} puan</span>
-                  </motion.div>
+                  </div>
                 ))}
               </div>
-            )}
+              <div className="mt-4 p-3 bg-white/5 rounded-xl">
+                <p className="text-xs text-white/60 text-center">
+                  Her doğru: <span className="text-green-400 font-bold">+10 XP</span> • 
+                  Streak: <span className="text-orange-400 font-bold">+5 XP/gün</span>
+                </p>
+              </div>
+            </motion.div>
 
-            {/* CTA */}
-            <div className="text-center">
-              <Link 
-                href="/liderlik" 
-                className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors border border-white/20"
-              >
-                Tüm Sıralamayı Gör
-                <ChevronRight className="w-4 h-4" />
+            {/* Rozetler */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              viewport={{ once: true }}
+              className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/10"
+            >
+              <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                <Medal className="w-5 h-5 text-amber-400" />
+                Rozetler
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                {badges.map((badge) => (
+                  <div 
+                    key={badge.name}
+                    className={`text-center p-2 rounded-xl transition-all ${
+                      badge.unlocked 
+                        ? 'bg-white/10' 
+                        : 'bg-white/5 opacity-50'
+                    }`}
+                  >
+                    <span className="text-2xl block mb-1">{badge.icon}</span>
+                    <span className="text-xs text-white/80 block">{badge.name}</span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/kayit" className="mt-4 text-center block text-sm text-white/60 hover:text-white transition-colors">
+                Tüm rozetleri gör →
               </Link>
-            </div>
+            </motion.div>
           </div>
-        </section>
-      )}
 
-      {/* Featured Coaches */}
-      <section className="py-16 px-4 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="text-3xl font-bold text-surface-900 mb-2">
-                Öne Çıkan Koçlar
-              </h2>
-              <p className="text-surface-600">
-                Deneyimli eğitim koçlarımızla tanışın
-              </p>
+          {/* Streak Göstergesi */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            viewport={{ once: true }}
+            className="mt-8 bg-gradient-to-r from-orange-500/20 to-red-500/20 backdrop-blur-sm rounded-2xl p-6 border border-orange-500/30"
+          >
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="text-5xl">🔥</div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Serini Koru!</h3>
+                  <p className="text-white/60">Her gün soru çöz, serinizi kaybetme</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {['P', 'S', 'Ç', 'P', 'C', 'C', 'P'].map((day, i) => (
+                  <div 
+                    key={i}
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-medium ${
+                      i < 5 
+                        ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white' 
+                        : 'bg-white/10 text-white/40'
+                    }`}
+                  >
+                    {i < 5 ? '✓' : day}
+                  </div>
+                ))}
+              </div>
             </div>
-            <Link href="/koclar" className="btn btn-outline btn-md hidden sm:flex">
-              Tümünü Gör
+          </motion.div>
+        </div>
+      </section>
+
+      {/* LİDERLİK TABLOSU - GELİŞTİRİLMİŞ */}
+      <section className="py-16 px-4 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <motion.div
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              className="w-16 h-16 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-yellow-500/30"
+            >
+              <Trophy className="w-8 h-8 text-white" />
+            </motion.div>
+            <h2 className="text-3xl font-bold text-surface-900 mb-2">
+              Liderlik Tablosu
+            </h2>
+            <p className="text-surface-600">
+              En çok soru çözen ve en yüksek puana sahip öğrenciler
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex justify-center gap-2 mb-8">
+            {[
+              { key: 'daily', label: 'Günlük' },
+              { key: 'weekly', label: 'Haftalık' },
+              { key: 'monthly', label: 'Aylık' },
+              { key: 'all', label: 'Tüm Zamanlar' },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setLeaderboardTab(tab.key as any)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  leaderboardTab === tab.key
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                    : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {topLeaders.length > 0 ? (
+            <>
+              {/* Top 3 Podium */}
+              <div className="flex flex-col md:flex-row items-end justify-center gap-4 mb-8">
+                {/* 2nd Place */}
+                {topLeaders[1] && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    viewport={{ once: true }}
+                    className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl p-5 text-center w-full md:w-48 border-2 border-gray-300"
+                  >
+                    <div className="text-4xl mb-2">🥈</div>
+                    <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-xl overflow-hidden border-4 border-white shadow-lg">
+                      {topLeaders[1].avatar ? (
+                        <img src={topLeaders[1].avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(topLeaders[1].name)
+                      )}
+                    </div>
+                    <div className="font-bold text-surface-900 truncate">{topLeaders[1].name}</div>
+                    <div className="text-2xl font-bold text-gray-600">{formatNumber(topLeaders[1].points)}</div>
+                    <div className="text-xs text-surface-500">XP</div>
+                  </motion.div>
+                )}
+
+                {/* 1st Place */}
+                {topLeaders[0] && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="bg-gradient-to-br from-yellow-100 via-amber-100 to-yellow-200 rounded-2xl p-6 text-center w-full md:w-56 border-2 border-yellow-400 relative shadow-xl"
+                  >
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-yellow-500 to-amber-500 text-white text-xs font-bold rounded-full shadow-lg">
+                      ŞAMPİYON
+                    </div>
+                    <div className="text-5xl mb-2">👑</div>
+                    <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 text-white font-bold text-2xl shadow-lg shadow-yellow-500/30 overflow-hidden border-4 border-white">
+                      {topLeaders[0].avatar ? (
+                        <img src={topLeaders[0].avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(topLeaders[0].name)
+                      )}
+                    </div>
+                    <div className="text-lg font-bold text-surface-900 truncate">{topLeaders[0].name}</div>
+                    <div className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-amber-600 bg-clip-text text-transparent">{formatNumber(topLeaders[0].points)}</div>
+                    <div className="text-sm text-surface-500">XP</div>
+                    <div className="mt-2 text-xs text-surface-500">
+                      {topLeaders[0].correct} doğru • {topLeaders[0].questions} soru
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* 3rd Place */}
+                {topLeaders[2] && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    viewport={{ once: true }}
+                    className="bg-gradient-to-br from-amber-100 to-orange-200 rounded-2xl p-5 text-center w-full md:w-48 border-2 border-amber-400"
+                  >
+                    <div className="text-4xl mb-2">🥉</div>
+                    <div className="w-16 h-16 bg-gradient-to-br from-amber-600 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-xl overflow-hidden border-4 border-white shadow-lg">
+                      {topLeaders[2].avatar ? (
+                        <img src={topLeaders[2].avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(topLeaders[2].name)
+                      )}
+                    </div>
+                    <div className="font-bold text-surface-900 truncate">{topLeaders[2].name}</div>
+                    <div className="text-2xl font-bold text-amber-700">{formatNumber(topLeaders[2].points)}</div>
+                    <div className="text-xs text-surface-500">XP</div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* Rest of Leaderboard */}
+              {topLeaders.slice(3, 10).length > 0 && (
+                <div className="bg-surface-50 rounded-2xl p-4 space-y-2">
+                  {topLeaders.slice(3, 10).map((leader, index) => (
+                    <motion.div
+                      key={leader.rank}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + index * 0.05 }}
+                      viewport={{ once: true }}
+                      className="flex items-center gap-4 bg-white rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <span className="w-8 text-lg font-bold text-surface-400">{leader.rank}.</span>
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden">
+                        {leader.avatar ? (
+                          <img src={leader.avatar} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          getInitials(leader.name)
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <span className="font-medium text-surface-900">{leader.name}</span>
+                        {leader.grade && (
+                          <span className="ml-2 text-xs text-surface-400">{leader.grade}. sınıf</span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-purple-600">{formatNumber(leader.points)}</span>
+                        <span className="text-xs text-surface-400 ml-1">XP</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 bg-surface-50 rounded-2xl">
+              <Trophy className="w-12 h-12 text-surface-300 mx-auto mb-4" />
+              <p className="text-surface-500">Henüz liderlik tablosunda kimse yok.</p>
+              <p className="text-surface-400 text-sm mt-1">İlk sen ol!</p>
+            </div>
+          )}
+
+          {/* CTA */}
+          <div className="text-center mt-8">
+            <Link 
+              href="/liderlik" 
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/30 transition-all"
+            >
+              Tüm Sıralamayı Gör
               <ChevronRight className="w-4 h-4" />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* AI ARAÇLARI - YENİ BÖLÜM */}
+      <section className="py-16 px-4 bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <motion.div
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-600 rounded-full text-sm font-medium mb-4"
+            >
+              <Bot className="w-4 h-4" />
+              Yapay Zeka Destekli
+            </motion.div>
+            <h2 className="text-3xl font-bold text-surface-900 mb-3">
+              AI Öğrenme Araçları
+            </h2>
+            <p className="text-surface-600 max-w-2xl mx-auto">
+              Yapay zeka asistanımız 7/24 sana yardımcı olmaya hazır
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* AI Konu Anlatımı */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group"
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/30">
+                <Brain className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-surface-900 mb-2">AI Konu Anlatımı</h3>
+              <p className="text-surface-600 mb-4">
+                Anlamadığın konuyu yapay zeka sana adım adım anlatsın. İstediğin kadar soru sor!
+              </p>
+              <Link href="/kayit" className="inline-flex items-center gap-2 text-blue-600 font-medium hover:gap-3 transition-all">
+                Dene <ArrowRight className="w-4 h-4" />
+              </Link>
+            </motion.div>
+
+            {/* Soru Çözümü */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              viewport={{ once: true }}
+              className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group"
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-violet-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/30">
+                <Camera className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-surface-900 mb-2">Soru Çözümü</h3>
+              <p className="text-surface-600 mb-4">
+                Sorunun fotoğrafını çek, AI adım adım çözsün. Çözüm mantığını öğren!
+              </p>
+              <Link href="/kayit" className="inline-flex items-center gap-2 text-purple-600 font-medium hover:gap-3 transition-all">
+                Dene <ArrowRight className="w-4 h-4" />
+              </Link>
+            </motion.div>
+
+            {/* Eksik Analizi */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              viewport={{ once: true }}
+              className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all group"
+            >
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/30">
+                <PieChart className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-surface-900 mb-2">Eksik Analizi</h3>
+              <p className="text-surface-600 mb-4">
+                Hangi konularda eksiğin var? AI analiz etsin, sana özel çalışma planı oluştursun.
+              </p>
+              <Link href="/kayit" className="inline-flex items-center gap-2 text-emerald-600 font-medium hover:gap-3 transition-all">
+                Dene <ArrowRight className="w-4 h-4" />
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* KOÇLUK BÖLÜMÜ */}
+      <section className="py-16 px-4 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <motion.div
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-600 rounded-full text-sm font-medium mb-4"
+            >
+              <Users className="w-4 h-4" />
+              Kişisel Rehberlik
+            </motion.div>
+            <h2 className="text-3xl font-bold text-surface-900 mb-3">
+              Daha Hızlı İlerlemek İster misin?
+            </h2>
+            <p className="text-surface-600 max-w-2xl mx-auto">
+              Kişisel eğitim koçunla hedeflerine daha hızlı ulaş
+            </p>
           </div>
           
           {loadingCoaches ? (
@@ -531,7 +1135,7 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {coaches.map((coach, index) => (
+              {coaches.slice(0, 3).map((coach, index) => (
                 <motion.div
                   key={coach.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -541,8 +1145,7 @@ export default function HomePage() {
                 >
                   <Link href={coach.isDemo ? '#' : `/koclar/${coach.id}`}>
                     <div className="card group hover:shadow-xl transition-all duration-300 overflow-hidden">
-                      {/* Header */}
-                      <div className="relative h-32 bg-gradient-to-br from-primary-100 to-accent-100">
+                      <div className="relative h-32 bg-gradient-to-br from-green-100 to-emerald-100">
                         {coach.video_url && (
                           <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 text-white text-xs rounded-full flex items-center gap-1">
                             <Play className="w-3 h-3" />
@@ -550,7 +1153,7 @@ export default function HomePage() {
                           </div>
                         )}
                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
-                          <div className="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg overflow-hidden border-4 border-white">
+                          <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg overflow-hidden border-4 border-white">
                             {coach.profile?.avatar_url ? (
                               <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
                             ) : (
@@ -560,35 +1163,27 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      {/* Content */}
                       <div className="pt-12 p-5 text-center">
-                        <h3 className="text-lg font-bold text-surface-900 mb-1 group-hover:text-primary-600 transition-colors">
+                        <h3 className="text-lg font-bold text-surface-900 mb-1 group-hover:text-green-600 transition-colors">
                           {coach.profile?.full_name || coach.full_name}
                         </h3>
                         <p className="text-surface-500 text-sm mb-3 line-clamp-1">
                           {coach.headline || 'Eğitim Koçu'}
                         </p>
 
-                        {/* Specializations */}
                         {coach.specializations && coach.specializations.length > 0 && (
                           <div className="flex flex-wrap justify-center gap-1.5 mb-4">
                             {coach.specializations.slice(0, 2).map((spec: string, i: number) => (
                               <span 
                                 key={i}
-                                className="px-2 py-0.5 bg-primary-50 text-primary-600 text-xs font-medium rounded-full"
+                                className="px-2 py-0.5 bg-green-50 text-green-600 text-xs font-medium rounded-full"
                               >
                                 {spec}
                               </span>
                             ))}
-                            {coach.specializations.length > 2 && (
-                              <span className="px-2 py-0.5 bg-surface-100 text-surface-500 text-xs rounded-full">
-                                +{coach.specializations.length - 2}
-                              </span>
-                            )}
                           </div>
                         )}
 
-                        {/* Stats */}
                         <div className="flex items-center justify-center gap-4 pt-4 border-t border-surface-100">
                           <div className="flex items-center gap-1">
                             <Star className={`w-4 h-4 ${coach.avgRating > 0 ? 'text-yellow-400 fill-yellow-400' : 'text-surface-300'}`} />
@@ -600,12 +1195,6 @@ export default function HomePage() {
                             <Clock className="w-4 h-4" />
                             {coach.experience_years || 0} yıl
                           </div>
-                          {(coach.reviewCount || coach.review_count) > 0 && (
-                            <div className="flex items-center gap-1 text-surface-500 text-sm">
-                              <Users className="w-4 h-4" />
-                              {coach.reviewCount || coach.review_count}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -615,8 +1204,8 @@ export default function HomePage() {
             </div>
           )}
 
-          <div className="mt-8 text-center sm:hidden">
-            <Link href="/koclar" className="btn btn-outline btn-md">
+          <div className="mt-8 text-center">
+            <Link href="/koclar" className="btn btn-outline btn-md border-green-300 text-green-600 hover:bg-green-50">
               Tüm Koçları Gör
               <ChevronRight className="w-4 h-4" />
             </Link>
@@ -636,7 +1225,6 @@ export default function HomePage() {
             </p>
           </div>
           
-          {/* Testimonial Cards */}
           <div className="grid md:grid-cols-3 gap-6 mb-8">
             {testimonials.slice(0, 3).map((testimonial, index) => (
               <motion.div
@@ -709,7 +1297,6 @@ export default function HomePage() {
               </motion.div>
             </AnimatePresence>
             
-            {/* Dots */}
             <div className="flex justify-center gap-2 mt-6">
               {testimonials.map((_, i) => (
                 <button
@@ -725,7 +1312,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Features - YENİ */}
       <section className="py-20 px-4 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
@@ -733,11 +1320,11 @@ export default function HomePage() {
               Neden Teknokul?
             </h2>
             <p className="text-surface-600 max-w-2xl mx-auto">
-              Geleneksel eğitimden farklı, kişiselleştirilmiş ve AI destekli bir deneyim
+              Geleneksel eğitimden farklı, oyunlaştırılmış ve AI destekli bir deneyim
             </p>
           </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
               <motion.div
                 key={index}
@@ -745,19 +1332,140 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="card p-6 hover:shadow-lg transition-shadow"
+                className="card p-6 hover:shadow-lg transition-all group"
               >
-                <div className={`w-12 h-12 ${feature.bg} rounded-xl flex items-center justify-center mb-4`}>
-                  <feature.icon className={`w-6 h-6 ${feature.color}`} />
+                <div className={`w-14 h-14 ${feature.bg} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                  <feature.icon className={`w-7 h-7 ${feature.color}`} />
                 </div>
-                <h3 className="text-xl font-semibold text-surface-900 mb-2">
-                  {feature.title}
-                </h3>
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-xl font-semibold text-surface-900">
+                    {feature.title}
+                  </h3>
+                  <div className="text-right">
+                    <div className={`text-lg font-bold ${feature.color}`}>{feature.stat}</div>
+                    <div className="text-xs text-surface-400">{feature.statLabel}</div>
+                  </div>
+                </div>
                 <p className="text-surface-600">
                   {feature.description}
                 </p>
               </motion.div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works - YENİ */}
+      <section className="py-20 px-4 bg-surface-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-surface-900 mb-4">
+              Nasıl Çalışır?
+            </h2>
+            <p className="text-surface-600 max-w-2xl mx-auto">
+              4 adımda öğrenmeye başla ve gelişimini takip et
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-4 gap-6">
+            {[
+              { step: '1', title: 'Kayıt Ol', desc: '30 saniyede ücretsiz kayıt ol, sınıfını seç.', icon: UserPlus, color: 'from-blue-500 to-indigo-500' },
+              { step: '2', title: 'Soru Çözmeye Başla', desc: 'Dersini seç, zorluk belirle, pratik yap.', icon: Target, color: 'from-orange-500 to-amber-500' },
+              { step: '3', title: 'XP Kazan, Yüksel', desc: 'Her doğru cevap XP kazandırır. Liderlikte yüksel!', icon: TrendingUp, color: 'from-purple-500 to-violet-500' },
+              { step: '4', title: 'Gelişimini Hızlandır', desc: 'AI araçları ve koçlarla daha hızlı ilerle.', icon: Rocket, color: 'from-green-500 to-emerald-500' },
+            ].map((item, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                viewport={{ once: true }}
+                className="text-center relative"
+              >
+                {index < 3 && (
+                  <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-surface-200 to-surface-100" />
+                )}
+                <div className={`w-16 h-16 bg-gradient-to-br ${item.color} text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg relative z-10`}>
+                  <item.icon className="w-7 h-7" />
+                </div>
+                <div className="text-sm font-bold text-surface-400 mb-1">Adım {item.step}</div>
+                <h3 className="text-xl font-semibold text-surface-900 mb-2">{item.title}</h3>
+                <p className="text-surface-600 text-sm">{item.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SPLIT CTA - YENİ */}
+      <section className="py-20 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Kendi Kendine Öğren */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="bg-gradient-to-br from-orange-500 to-amber-500 rounded-3xl p-8 text-white relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+              
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
+                  <Rocket className="w-7 h-7" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Kendi Kendine Öğren</h3>
+                <p className="text-white/80 mb-6">Hemen başla, ücretsiz!</p>
+                
+                <ul className="space-y-3 mb-6">
+                  {['Sınırsız soru çözme', 'Liderlik yarışı', 'AI araçları', 'Rozetler ve XP'].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="w-5 h-5 text-white/80" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                
+                <Link href="/kayit" className="btn bg-white text-orange-600 hover:bg-orange-50 w-full">
+                  Ücretsiz Başla
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              </div>
+            </motion.div>
+
+            {/* Koçla Birlikte Öğren */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-3xl p-8 text-white relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+              
+              <div className="relative z-10">
+                <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
+                  <Users className="w-7 h-7" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Koçla Birlikte Öğren</h3>
+                <p className="text-white/80 mb-6">Kişisel rehberlik al</p>
+                
+                <ul className="space-y-3 mb-6">
+                  {['Kişisel çalışma planı', 'Birebir destek', 'Deneme analizi', 'Motivasyon koçluğu'].map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-sm">
+                      <CheckCircle className="w-5 h-5 text-white/80" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                
+                <Link href="/koclar" className="btn bg-white text-green-600 hover:bg-green-50 w-full">
+                  Koçları Gör
+                  <ChevronRight className="w-5 h-5" />
+                </Link>
+              </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -771,7 +1479,6 @@ export default function HomePage() {
             </p>
           </div>
           
-          {/* Infinite scroll logos */}
           <div className="relative">
             <div className="flex animate-marquee gap-8">
               {[...universities, ...universities].map((uni, index) => (
@@ -787,72 +1494,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-20 px-4 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-surface-900 mb-4">
-              Nasıl Çalışır?
-            </h2>
-            <p className="text-surface-600 max-w-2xl mx-auto">
-              3 adımda eğitim koçunla tanış ve gelişimini başlat
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { step: '1', title: 'Koçunu Seç', desc: 'İlanları incele, profillerini oku, sana uygun koçu bul.' },
-              { step: '2', title: 'Başvuru Yap', desc: 'Tek tıkla başvur, koçunla iletişime geç ve anlaş.' },
-              { step: '3', title: 'Gelişmeye Başla', desc: 'Görevleri tamamla, denemelerini yükle, ilerlemeyi takip et.' },
-            ].map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                viewport={{ once: true }}
-                className="text-center"
-              >
-                <div className="w-16 h-16 bg-primary-500 text-white rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-4">
-                  {item.step}
-                </div>
-                <h3 className="text-xl font-semibold text-surface-900 mb-2">{item.title}</h3>
-                <p className="text-surface-600">{item.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="card p-8 sm:p-12 bg-gradient-to-r from-primary-500 to-primary-600 text-white text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-              Hemen Başla, Ücretsiz!
-            </h2>
-            <p className="text-primary-100 mb-6 max-w-xl mx-auto">
-              Koçunu bul, görevlerini tamamla, gelişimini takip et. 
-              Tüm özellikler şu an ücretsiz!
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/kayit" className="btn bg-white text-primary-600 hover:bg-primary-50 btn-lg">
-                Ücretsiz Kayıt Ol
-                <ArrowRight className="w-5 h-5" />
-              </Link>
-              <Link href="/koclar" className="btn border-2 border-white text-white hover:bg-white/10 btn-lg">
-                Koçları İncele
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="py-12 px-4 border-t border-surface-100 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
-            <div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-8">
+            <div className="lg:col-span-2">
               <Link href="/" className="flex items-center gap-2 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
                   <GraduationCap className="w-6 h-6 text-white" />
@@ -862,15 +1508,24 @@ export default function HomePage() {
                 </span>
               </Link>
               <p className="text-surface-500 text-sm">
-                AI destekli eğitim koçluğu platformu
+                AI destekli soru bankası, liderlik yarışı ve eğitim koçluğu platformu
               </p>
             </div>
             
             <div>
-              <h4 className="font-semibold text-surface-900 mb-4">Platform</h4>
+              <h4 className="font-semibold text-surface-900 mb-4">Öğrenme</h4>
+              <ul className="space-y-2 text-surface-600">
+                <li><Link href="/kayit" className="hover:text-primary-500">Soru Çöz</Link></li>
+                <li><Link href="/liderlik" className="hover:text-primary-500">Liderlik</Link></li>
+                <li><Link href="/materyaller" className="hover:text-primary-500">Materyaller</Link></li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-surface-900 mb-4">Koçluk</h4>
               <ul className="space-y-2 text-surface-600">
                 <li><Link href="/koclar" className="hover:text-primary-500">Koçlar</Link></li>
-                <li><Link href="/materyaller" className="hover:text-primary-500">Materyaller</Link></li>
+                <li><Link href="/kayit?role=ogretmen" className="hover:text-primary-500">Koç Ol</Link></li>
               </ul>
             </div>
             
@@ -881,33 +1536,32 @@ export default function HomePage() {
                 <li><Link href="/kayit" className="hover:text-primary-500">Kayıt Ol</Link></li>
               </ul>
             </div>
-            
-            <div>
-              <h4 className="font-semibold text-surface-900 mb-4">Roller</h4>
-              <ul className="space-y-2 text-surface-600">
-                <li><Link href="/kayit?role=ogrenci" className="hover:text-primary-500">Öğrenci Ol</Link></li>
-                <li><Link href="/kayit?role=ogretmen" className="hover:text-primary-500">Koç Ol</Link></li>
-                <li><Link href="/kayit?role=veli" className="hover:text-primary-500">Veli Ol</Link></li>
-              </ul>
-            </div>
 
             <div>
               <h4 className="font-semibold text-surface-900 mb-4">Yasal</h4>
               <ul className="space-y-2 text-surface-600">
-                <li><Link href="/yasal/gizlilik" className="hover:text-primary-500">Gizlilik Politikası</Link></li>
-                <li><Link href="/yasal/kullanim-kosullari" className="hover:text-primary-500">Kullanım Koşulları</Link></li>
+                <li><Link href="/yasal/gizlilik" className="hover:text-primary-500">Gizlilik</Link></li>
+                <li><Link href="/yasal/kullanim-kosullari" className="hover:text-primary-500">Koşullar</Link></li>
                 <li><Link href="/yasal/kvkk" className="hover:text-primary-500">KVKK</Link></li>
-                <li><Link href="/yasal/cerezler" className="hover:text-primary-500">Çerez Politikası</Link></li>
               </ul>
             </div>
           </div>
           
-          <div className="pt-8 border-t border-surface-100 flex flex-col sm:flex-row justify-between items-center gap-4 text-surface-500 text-sm">
-            <p>© 2024 Teknokul. Tüm hakları saklıdır.</p>
-            <div className="flex gap-4">
-              <Link href="/yasal/gizlilik" className="hover:text-primary-500">Gizlilik</Link>
-              <Link href="/yasal/kullanim-kosullari" className="hover:text-primary-500">Koşullar</Link>
-              <Link href="/yasal/kvkk" className="hover:text-primary-500">KVKK</Link>
+          <div className="pt-8 border-t border-surface-100">
+            <div className="flex flex-col items-center gap-3 mb-4">
+              <p className="text-surface-600 flex items-center gap-2">
+                <span className="text-red-500">❤️</span>
+                <span>Sevgiyle öğrenciler için tasarlandı</span>
+                <span className="text-red-500">❤️</span>
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-surface-500 text-sm">
+              <p>© 2026 Tekn<span className="text-primary-500">okul</span>. Tüm hakları saklıdır.</p>
+              <div className="flex gap-4">
+                <Link href="/yasal/gizlilik" className="hover:text-primary-500">Gizlilik</Link>
+                <Link href="/yasal/kullanim-kosullari" className="hover:text-primary-500">Koşullar</Link>
+                <Link href="/yasal/kvkk" className="hover:text-primary-500">KVKK</Link>
+              </div>
             </div>
           </div>
         </div>
