@@ -596,7 +596,7 @@ export default function LeaderboardPage() {
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-bold text-white">
-              Tekno<span className="text-primary-400">kul</span>
+              Tekn<span className="text-primary-400">okul</span>
             </span>
           </Link>
           <div className="flex items-center gap-3">

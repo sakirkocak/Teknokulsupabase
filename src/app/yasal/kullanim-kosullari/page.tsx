@@ -13,7 +13,7 @@ export default function KullanimKosullari() {
               <span className="text-white text-xl">🎓</span>
             </div>
             <span className="text-xl font-bold">
-              Tekno<span className="text-orange-500">kul</span>
+              Tekn<span className="text-orange-500">okul</span>
             </span>
           </Link>
         </div>
