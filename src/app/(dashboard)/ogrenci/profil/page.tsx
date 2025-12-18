@@ -121,11 +121,30 @@ export default function StudentProfilePage() {
       if (!studentProfile?.id) return
 
       // Puanları al
-      const { data: points } = await supabase
+      let { data: points } = await supabase
         .from('student_points')
         .select('*')
         .eq('student_id', studentProfile.id)
         .single()
+      
+      // Kayıt yoksa oluştur (liderlik tablosunda görünmek için)
+      if (!points) {
+        const { data: newPoints } = await supabase
+          .from('student_points')
+          .insert({
+            student_id: studentProfile.id,
+            total_points: 0,
+            total_questions: 0,
+            total_correct: 0,
+            total_wrong: 0,
+            current_streak: 0,
+            max_streak: 0
+          })
+          .select()
+          .single()
+        
+        points = newPoints
+      }
       
       if (points) {
         setStudentPoints(points)
@@ -170,6 +189,29 @@ export default function StudentProfilePage() {
         school_id: formData.school_id || null,
       })
       .eq('user_id', profile?.id)
+
+    // student_points kaydı yoksa oluştur (liderlik tablosunda görünmek için)
+    if (studentProfile?.id) {
+      const { data: existingPoints } = await supabase
+        .from('student_points')
+        .select('id')
+        .eq('student_id', studentProfile.id)
+        .single()
+
+      if (!existingPoints) {
+        await supabase
+          .from('student_points')
+          .insert({
+            student_id: studentProfile.id,
+            total_points: 0,
+            total_questions: 0,
+            total_correct: 0,
+            total_wrong: 0,
+            current_streak: 0,
+            max_streak: 0
+          })
+      }
+    }
 
     if (!profileError && !studentError) {
       setSaved(true)
@@ -260,10 +302,15 @@ export default function StudentProfilePage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl flex items-center gap-2"
+            className="p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-xl"
           >
-            <CheckCircle className="w-5 h-5" />
-            Profil başarıyla güncellendi!
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-medium">Profil başarıyla güncellendi!</span>
+            </div>
+            <p className="text-sm text-green-600 dark:text-green-500">
+              Liderlik tablolarındaki sıralamaların güncel profil bilgilerine göre yenilendi.
+            </p>
           </motion.div>
         )}
 

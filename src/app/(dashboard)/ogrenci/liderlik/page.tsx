@@ -55,7 +55,17 @@ const scopes = [
 // Sınıf filtreleri
 const gradeFilters = [
   { label: 'Tümü', value: 0 },
+  { label: '1. Sınıf', value: 1 },
+  { label: '2. Sınıf', value: 2 },
+  { label: '3. Sınıf', value: 3 },
+  { label: '4. Sınıf', value: 4 },
+  { label: '5. Sınıf', value: 5 },
+  { label: '6. Sınıf', value: 6 },
+  { label: '7. Sınıf', value: 7 },
   { label: '8. Sınıf (LGS)', value: 8 },
+  { label: '9. Sınıf', value: 9 },
+  { label: '10. Sınıf', value: 10 },
+  { label: '11. Sınıf', value: 11 },
   { label: '12. Sınıf (YKS)', value: 12 },
 ]
 
@@ -226,9 +236,14 @@ export default function StudentLeaderboardPage() {
       query = query.eq(filterColumn, filterValue)
     }
 
-    // Sınıf scope'u için grade filtresi de ekle
+    // Sınıf scope'u için kendi sınıfını göster
     if (activeScope === 'class' && studentProfile.grade) {
       query = query.eq('grade', studentProfile.grade)
+    }
+
+    // Genel sınıf filtresi - tüm scope'larda çalışır
+    if (selectedGradeFilter > 0) {
+      query = query.eq('grade', selectedGradeFilter)
     }
 
     const { data, error } = await query
