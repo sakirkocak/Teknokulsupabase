@@ -93,11 +93,16 @@ export default function StudentLeaderboardPage() {
 
   // Öğrenci profili yüklendiğinde varsayılan sınıf filtresini ayarla
   useEffect(() => {
-    if (studentProfile?.grade && selectedGradeFilter === null) {
-      setSelectedGradeFilter(studentProfile.grade)
-      loadSubjectsForGrade(studentProfile.grade)
+    if (selectedGradeFilter === null) {
+      if (studentProfile?.grade) {
+        setSelectedGradeFilter(studentProfile.grade)
+        loadSubjectsForGrade(studentProfile.grade)
+      } else if (studentProfile !== undefined) {
+        // Profil yüklendi ama sınıf yok - tümünü göster
+        setSelectedGradeFilter(0)
+      }
     }
-  }, [studentProfile?.grade])
+  }, [studentProfile?.grade, studentProfile])
 
   // Sınıf değiştiğinde dersleri yükle
   useEffect(() => {
@@ -423,7 +428,8 @@ export default function StudentLeaderboardPage() {
     }
   }
 
-  if ((loading && !myStats) || selectedGradeFilter === null) {
+  // Profil henüz yüklenmemişse veya sınıf filtresi belirlenmemişse loading göster
+  if (studentProfile === undefined || (loading && !myStats && selectedGradeFilter === null)) {
     return (
       <DashboardLayout role="ogrenci">
         <div className="flex items-center justify-center h-64">
