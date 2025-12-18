@@ -708,6 +708,14 @@ ${subjectGuidelines}
 • "Hiçbiri" veya "Hepsi" şıkkı
 • Aynı harfin sürekli doğru cevap olması
 
+🚫 MEDYA KISITLAMASI (ÇOK ÖNEMLİ):
+• Resim, görsel, fotoğraf, tablo, grafik içeren sorular ÜRETME
+• Ses, dinleme, video içeren sorular ÜRETME
+• "Resimde ne görüyorsun?", "Aşağıdaki tabloya göre...", "Grafiğe bak..." gibi ifadeler KULLANMA
+• "Dinlediğin metne göre...", "Videoda gördüğün..." gibi ifadeler KULLANMA
+• Tüm sorular SADECE METİN tabanlı olmalı
+• Görsel materyal gerektiren kazanımlar için metin açıklaması yap (örn: "Ali'nin boyu 150 cm, ayakkabısı 40 numara..." şeklinde)
+
 ✅ ZORUNLU:
 • correct_answer: ${isHighSchool ? 'A, B, C, D veya E' : 'A, B, C veya D'}
 • bloom_level: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme
