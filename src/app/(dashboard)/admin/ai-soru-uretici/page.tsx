@@ -29,9 +29,39 @@ import {
   ArrowRight,
   Check,
   Layers,
-  Volume2
+  Volume2,
+  Play,
+  Pause,
+  Square,
+  Zap,
+  Clock,
+  BarChart3,
+  Settings2
 } from 'lucide-react'
 import SpeakButton from '@/components/SpeakButton'
+
+// Otomatik üretim yapılandırması
+const AUTO_GEN_CONFIG = {
+  DELAY_BETWEEN_REQUESTS: 5000,  // 5 saniye
+  ERROR_RETRY_DELAY: 30000,      // 30 saniye
+  MAX_RETRIES: 3,
+  MAX_QUESTIONS_PER_TOPIC: 10,
+  DAILY_LIMIT: 1000,
+}
+
+// Toplu üretim durumu
+interface BatchProgress {
+  currentTopicIndex: number
+  totalTopics: number
+  completedTopics: string[]
+  failedTopics: string[]
+  totalQuestionsGenerated: number
+  totalQuestionsSaved: number
+  startTime: Date | null
+  currentTopic: Topic | null
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'error'
+  lastError: string | null
+}
 
 interface Topic {
   id: string
@@ -132,6 +162,27 @@ export default function AIQuestionGeneratorPage() {
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
+
+  // ========== TOPLU ÜRETİM MODÜ ==========
+  const [generationMode, setGenerationMode] = useState<'single' | 'batch'>('single')
+  const [batchSelectedSubjects, setBatchSelectedSubjects] = useState<string[]>([])
+  const [batchSelectedDifficulties, setBatchSelectedDifficulties] = useState<string[]>(['medium'])
+  const [batchQuestionsPerTopic, setBatchQuestionsPerTopic] = useState(5)
+  const [batchProgress, setBatchProgress] = useState<BatchProgress>({
+    currentTopicIndex: 0,
+    totalTopics: 0,
+    completedTopics: [],
+    failedTopics: [],
+    totalQuestionsGenerated: 0,
+    totalQuestionsSaved: 0,
+    startTime: null,
+    currentTopic: null,
+    status: 'idle',
+    lastError: null,
+  })
+  const [batchTopics, setBatchTopics] = useState<Topic[]>([])
+  const [shouldStopBatch, setShouldStopBatch] = useState(false)
+  const [batchLogs, setBatchLogs] = useState<{ time: Date; message: string; type: 'info' | 'success' | 'error' | 'warning' }[]>([])
 
   // Group topics by main_topic for better organization
   const groupedTopics = topics.reduce((acc, topic) => {
@@ -350,6 +401,227 @@ export default function AIQuestionGeneratorPage() {
     }
   }
 
+  // ========== TOPLU ÜRETİM FONKSİYONLARI ==========
+  
+  const addBatchLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+    setBatchLogs(prev => [...prev.slice(-49), { time: new Date(), message, type }])
+  }
+
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+  const loadBatchTopics = async () => {
+    if (!selectedGrade || batchSelectedSubjects.length === 0) return
+    
+    addBatchLog(`${selectedGrade}. sınıf için konular yükleniyor...`, 'info')
+    
+    const { data, error } = await supabase
+      .from('topics')
+      .select('*')
+      .eq('grade', selectedGrade)
+      .in('subject_id', batchSelectedSubjects)
+      .eq('is_active', true)
+      .order('subject_id')
+      .order('unit_number')
+    
+    if (error) {
+      addBatchLog(`Konular yüklenirken hata: ${error.message}`, 'error')
+      return
+    }
+    
+    setBatchTopics(data || [])
+    addBatchLog(`${data?.length || 0} konu bulundu`, 'success')
+  }
+
+  useEffect(() => {
+    if (generationMode === 'batch' && selectedGrade && batchSelectedSubjects.length > 0) {
+      loadBatchTopics()
+    }
+  }, [generationMode, selectedGrade, batchSelectedSubjects])
+
+  const generateQuestionsForTopic = async (topic: Topic, difficulty: string): Promise<GeneratedQuestion[]> => {
+    const subject = subjects.find(s => s.id === topic.subject_id)
+    if (!subject) throw new Error('Ders bulunamadı')
+
+    const response = await fetch('/api/ai/generate-curriculum-questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grade: selectedGrade,
+        subject: subject.name,
+        topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
+        learningOutcome: topic.learning_outcome || topic.main_topic,
+        difficulty: difficulty,
+        count: batchQuestionsPerTopic
+      })
+    })
+
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Soru üretme hatası')
+    return data.questions || []
+  }
+
+  const saveQuestionsToDb = async (questions: GeneratedQuestion[], topicId: string): Promise<{ success: number; failed: number }> => {
+    let success = 0
+    let failed = 0
+
+    for (const question of questions) {
+      const { error } = await supabase
+        .from('questions')
+        .insert({
+          topic_id: topicId,
+          difficulty: question.difficulty,
+          question_text: question.question_text,
+          options: question.options,
+          correct_answer: question.correct_answer,
+          explanation: question.explanation,
+          source: 'AI Generated (Batch)',
+          is_active: true,
+          created_by: profile?.id
+        })
+
+      if (error) {
+        failed++
+      } else {
+        success++
+      }
+    }
+
+    return { success, failed }
+  }
+
+  const startBatchGeneration = async () => {
+    if (batchTopics.length === 0) {
+      addBatchLog('Üretilecek konu bulunamadı!', 'error')
+      return
+    }
+
+    setShouldStopBatch(false)
+    setBatchProgress({
+      currentTopicIndex: 0,
+      totalTopics: batchTopics.length * batchSelectedDifficulties.length,
+      completedTopics: [],
+      failedTopics: [],
+      totalQuestionsGenerated: 0,
+      totalQuestionsSaved: 0,
+      startTime: new Date(),
+      currentTopic: null,
+      status: 'running',
+      lastError: null,
+    })
+    setBatchLogs([])
+    addBatchLog('🚀 Toplu üretim başlatıldı', 'info')
+
+    let totalGenerated = 0
+    let totalSaved = 0
+    let processedCount = 0
+    const completedTopics: string[] = []
+    const failedTopics: string[] = []
+
+    for (const topic of batchTopics) {
+      for (const difficulty of batchSelectedDifficulties) {
+        // Durdurma kontrolü
+        if (shouldStopBatch) {
+          addBatchLog('⏹️ Üretim kullanıcı tarafından durduruldu', 'warning')
+          setBatchProgress(prev => ({ ...prev, status: 'paused' }))
+          return
+        }
+
+        const topicKey = `${topic.id}-${difficulty}`
+        const subject = subjects.find(s => s.id === topic.subject_id)
+        
+        setBatchProgress(prev => ({
+          ...prev,
+          currentTopicIndex: processedCount,
+          currentTopic: topic,
+        }))
+
+        addBatchLog(`📝 ${subject?.icon || '📖'} ${topic.main_topic.substring(0, 40)}... (${difficultyLabels[difficulty]?.label})`, 'info')
+
+        let retries = 0
+        let success = false
+
+        while (retries < AUTO_GEN_CONFIG.MAX_RETRIES && !success) {
+          try {
+            // Soru üret
+            const questions = await generateQuestionsForTopic(topic, difficulty)
+            totalGenerated += questions.length
+
+            // Veritabanına kaydet
+            const saveResult = await saveQuestionsToDb(questions, topic.id)
+            totalSaved += saveResult.success
+
+            completedTopics.push(topicKey)
+            addBatchLog(`✅ ${questions.length} soru üretildi, ${saveResult.success} kaydedildi`, 'success')
+            success = true
+
+            setBatchProgress(prev => ({
+              ...prev,
+              totalQuestionsGenerated: totalGenerated,
+              totalQuestionsSaved: totalSaved,
+              completedTopics: [...completedTopics],
+            }))
+
+          } catch (error: any) {
+            retries++
+            const isRateLimit = error.message?.includes('429') || error.message?.includes('rate')
+            
+            if (isRateLimit) {
+              addBatchLog(`⚠️ Rate limit! ${AUTO_GEN_CONFIG.ERROR_RETRY_DELAY / 1000} saniye bekleniyor...`, 'warning')
+              await sleep(AUTO_GEN_CONFIG.ERROR_RETRY_DELAY)
+            } else if (retries < AUTO_GEN_CONFIG.MAX_RETRIES) {
+              addBatchLog(`⚠️ Hata: ${error.message}. Tekrar deneniyor (${retries}/${AUTO_GEN_CONFIG.MAX_RETRIES})...`, 'warning')
+              await sleep(5000)
+            } else {
+              failedTopics.push(topicKey)
+              addBatchLog(`❌ ${topic.main_topic.substring(0, 30)}... başarısız: ${error.message}`, 'error')
+              setBatchProgress(prev => ({
+                ...prev,
+                failedTopics: [...failedTopics],
+                lastError: error.message,
+              }))
+            }
+          }
+        }
+
+        processedCount++
+
+        // Rate limit koruması - istekler arası bekleme
+        if (!shouldStopBatch && processedCount < batchTopics.length * batchSelectedDifficulties.length) {
+          await sleep(AUTO_GEN_CONFIG.DELAY_BETWEEN_REQUESTS)
+        }
+      }
+    }
+
+    setBatchProgress(prev => ({
+      ...prev,
+      status: 'completed',
+      currentTopic: null,
+    }))
+    addBatchLog(`🎉 Toplu üretim tamamlandı! ${totalSaved} soru kaydedildi.`, 'success')
+  }
+
+  const pauseBatchGeneration = () => {
+    setShouldStopBatch(true)
+    addBatchLog('⏸️ Üretim duraklatılıyor...', 'warning')
+  }
+
+  const getElapsedTime = () => {
+    if (!batchProgress.startTime) return '0 dk'
+    const elapsed = Math.floor((Date.now() - batchProgress.startTime.getTime()) / 1000)
+    const minutes = Math.floor(elapsed / 60)
+    const seconds = elapsed % 60
+    return `${minutes} dk ${seconds} sn`
+  }
+
+  const getEstimatedTime = () => {
+    if (!batchProgress.startTime || batchProgress.currentTopicIndex === 0) return 'Hesaplanıyor...'
+    const elapsed = Date.now() - batchProgress.startTime.getTime()
+    const perTopic = elapsed / batchProgress.currentTopicIndex
+    const remaining = (batchProgress.totalTopics - batchProgress.currentTopicIndex) * perTopic
+    const minutes = Math.floor(remaining / 60000)
+    return `~${minutes} dk`
+  }
+
   const selectedSubjectData = subjects.find(s => s.id === selectedSubject)
   const selectedTopicData = topics.find(t => t.id === selectedTopic)
   const isHighSchool = selectedGrade !== null && selectedGrade >= 9
@@ -385,21 +657,52 @@ export default function AIQuestionGeneratorPage() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-6"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg">
-              <Wand2 className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg">
+                <Wand2 className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                  AI Soru Üretici
+                </h1>
+                <p className="text-gray-600">
+                  MEB müfredatına uygun sorular üretin
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                AI Soru Üretici
-              </h1>
-              <p className="text-gray-600">
-                MEB müfredatına uygun sorular üretin
-              </p>
+
+            {/* Mode Toggle */}
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => setGenerationMode('single')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  generationMode === 'single'
+                    ? 'bg-white text-purple-600 shadow'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Wand2 className="w-4 h-4" />
+                Tekli Üretim
+              </button>
+              <button
+                onClick={() => setGenerationMode('batch')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  generationMode === 'batch'
+                    ? 'bg-white text-orange-600 shadow'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Zap className="w-4 h-4" />
+                Toplu Üretim
+              </button>
             </div>
           </div>
         </motion.div>
 
+        {/* ========== TEKLİ ÜRETİM MODU ========== */}
+        {generationMode === 'single' && (
+          <>
         {/* Breadcrumb Navigation */}
         {(selectedGrade || selectedSubjectData || selectedTopicData) && (
           <motion.div 
@@ -1075,6 +1378,308 @@ export default function AIQuestionGeneratorPage() {
             </motion.div>
           )}
         </AnimatePresence>
+          </>
+        )}
+
+        {/* ========== TOPLU ÜRETİM MODU ========== */}
+        {generationMode === 'batch' && (
+          <div className="space-y-6">
+            {/* Yapılandırma Kartı */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6"
+            >
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Settings2 className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-800">Toplu Üretim Yapılandırması</h2>
+                  <p className="text-sm text-gray-500">Seçilen konular için otomatik soru üretimi</p>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Sınıf Seçimi */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">📚 Sınıf Seçin</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(grade => (
+                      <button
+                        key={grade}
+                        onClick={() => {
+                          setSelectedGrade(grade)
+                          setBatchSelectedSubjects([])
+                        }}
+                        className={`p-2 rounded-lg text-center transition-all ${
+                          selectedGrade === grade
+                            ? 'bg-orange-500 text-white shadow-lg'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <div className="font-bold">{grade}</div>
+                        <div className="text-xs opacity-75">{gradeInfo[grade].level.charAt(0)}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ders Seçimi */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    📖 Dersler ({batchSelectedSubjects.length} seçili)
+                  </label>
+                  {loadingSubjects ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                    </div>
+                  ) : subjects.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                      {selectedGrade ? 'Ders bulunamadı' : 'Önce sınıf seçin'}
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded-lg">
+                      <button
+                        onClick={() => {
+                          if (batchSelectedSubjects.length === subjects.length) {
+                            setBatchSelectedSubjects([])
+                          } else {
+                            setBatchSelectedSubjects(subjects.map(s => s.id))
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          batchSelectedSubjects.length === subjects.length
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-white text-gray-700 border border-gray-200'
+                        }`}
+                      >
+                        {batchSelectedSubjects.length === subjects.length ? '✓ Tümü' : 'Tümünü Seç'}
+                      </button>
+                      {subjects.map(subject => (
+                        <button
+                          key={subject.id}
+                          onClick={() => {
+                            setBatchSelectedSubjects(prev => 
+                              prev.includes(subject.id)
+                                ? prev.filter(id => id !== subject.id)
+                                : [...prev, subject.id]
+                            )
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1 ${
+                            batchSelectedSubjects.includes(subject.id)
+                              ? 'bg-orange-500 text-white'
+                              : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
+                          }`}
+                        >
+                          <span>{subject.icon}</span>
+                          <span>{subject.name}</span>
+                          {batchSelectedSubjects.includes(subject.id) && <Check className="w-3 h-3" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Zorluk Seçimi */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">🎯 Zorluk Seviyeleri</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(difficultyLabels).map(([key, { label, emoji }]) => (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setBatchSelectedDifficulties(prev =>
+                            prev.includes(key)
+                              ? prev.filter(d => d !== key)
+                              : [...prev, key]
+                          )
+                        }}
+                        className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                          batchSelectedDifficulties.includes(key)
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <span>{emoji}</span>
+                        <span>{label}</span>
+                        {batchSelectedDifficulties.includes(key) && <Check className="w-4 h-4" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Soru Sayısı */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">📝 Her Konu İçin Soru Sayısı</label>
+                  <div className="flex gap-2">
+                    {[3, 5, 10].map(count => (
+                      <button
+                        key={count}
+                        onClick={() => setBatchQuestionsPerTopic(count)}
+                        className={`flex-1 py-3 rounded-lg font-bold transition-all ${
+                          batchQuestionsPerTopic === count
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Özet ve Başlat */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-xl border border-orange-100">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="space-y-1">
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">{batchTopics.length}</span> konu × <span className="font-medium">{batchSelectedDifficulties.length}</span> zorluk × <span className="font-medium">{batchQuestionsPerTopic}</span> soru = 
+                      <span className="text-orange-600 font-bold ml-1">
+                        ~{batchTopics.length * batchSelectedDifficulties.length * batchQuestionsPerTopic} soru
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      ⏱️ Tahmini süre: ~{Math.ceil((batchTopics.length * batchSelectedDifficulties.length * AUTO_GEN_CONFIG.DELAY_BETWEEN_REQUESTS) / 60000)} dakika
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    {batchProgress.status === 'idle' || batchProgress.status === 'completed' || batchProgress.status === 'paused' ? (
+                      <button
+                        onClick={startBatchGeneration}
+                        disabled={batchTopics.length === 0 || batchSelectedDifficulties.length === 0}
+                        className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <Play className="w-5 h-5" />
+                        {batchProgress.status === 'paused' ? 'Devam Et' : 'Üretimi Başlat'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={pauseBatchGeneration}
+                        className="px-6 py-3 bg-red-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
+                      >
+                        <Square className="w-5 h-5" />
+                        Durdur
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* İlerleme Kartı */}
+            {batchProgress.status !== 'idle' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`p-2 rounded-lg ${
+                    batchProgress.status === 'running' ? 'bg-blue-100' :
+                    batchProgress.status === 'completed' ? 'bg-green-100' :
+                    batchProgress.status === 'paused' ? 'bg-yellow-100' : 'bg-red-100'
+                  }`}>
+                    <BarChart3 className={`w-6 h-6 ${
+                      batchProgress.status === 'running' ? 'text-blue-600' :
+                      batchProgress.status === 'completed' ? 'text-green-600' :
+                      batchProgress.status === 'paused' ? 'text-yellow-600' : 'text-red-600'
+                    }`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-bold text-gray-800">
+                        {batchProgress.status === 'running' ? '🔄 Üretim Devam Ediyor...' :
+                         batchProgress.status === 'completed' ? '✅ Üretim Tamamlandı!' :
+                         batchProgress.status === 'paused' ? '⏸️ Üretim Duraklatıldı' : '❌ Hata Oluştu'}
+                      </h3>
+                      <div className="text-sm text-gray-500">
+                        {batchProgress.status === 'running' && (
+                          <span className="flex items-center gap-1">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            {batchProgress.currentTopicIndex + 1} / {batchProgress.totalTopics}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Progress Bar */}
+                    <div className="mt-2 h-3 bg-gray-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        className={`h-full rounded-full ${
+                          batchProgress.status === 'running' ? 'bg-gradient-to-r from-blue-500 to-cyan-500' :
+                          batchProgress.status === 'completed' ? 'bg-gradient-to-r from-green-500 to-emerald-500' :
+                          'bg-gradient-to-r from-yellow-500 to-amber-500'
+                        }`}
+                        initial={{ width: 0 }}
+                        animate={{ 
+                          width: `${batchProgress.totalTopics > 0 ? (batchProgress.currentTopicIndex / batchProgress.totalTopics) * 100 : 0}%` 
+                        }}
+                        transition={{ duration: 0.5 }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* İstatistikler */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="bg-blue-50 rounded-xl p-3">
+                    <div className="text-2xl font-bold text-blue-600">{batchProgress.totalQuestionsGenerated}</div>
+                    <div className="text-xs text-blue-600/70">Üretilen Soru</div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-3">
+                    <div className="text-2xl font-bold text-green-600">{batchProgress.totalQuestionsSaved}</div>
+                    <div className="text-xs text-green-600/70">Kaydedilen Soru</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-xl p-3">
+                    <div className="text-2xl font-bold text-purple-600">{batchProgress.completedTopics.length}</div>
+                    <div className="text-xs text-purple-600/70">Tamamlanan Konu</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-xl p-3">
+                    <div className="text-lg font-bold text-orange-600">{getElapsedTime()}</div>
+                    <div className="text-xs text-orange-600/70">Geçen Süre</div>
+                  </div>
+                </div>
+
+                {/* Mevcut İşlem */}
+                {batchProgress.currentTopic && batchProgress.status === 'running' && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="font-medium">Şu an:</span>
+                      <span>{batchProgress.currentTopic.main_topic}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Log */}
+                <div className="bg-gray-900 rounded-xl p-4 max-h-60 overflow-y-auto font-mono text-sm">
+                  {batchLogs.length === 0 ? (
+                    <div className="text-gray-500">Henüz log yok...</div>
+                  ) : (
+                    batchLogs.map((log, i) => (
+                      <div 
+                        key={i} 
+                        className={`py-1 ${
+                          log.type === 'error' ? 'text-red-400' :
+                          log.type === 'success' ? 'text-green-400' :
+                          log.type === 'warning' ? 'text-yellow-400' : 'text-gray-300'
+                        }`}
+                      >
+                        <span className="text-gray-500 mr-2">
+                          {log.time.toLocaleTimeString('tr-TR')}
+                        </span>
+                        {log.message}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   )
