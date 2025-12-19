@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -103,12 +103,51 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { profile, loading } = useProfile()
 
   const items = navItems[role] || navItems.ogrenci
+
+  // Sayfa değiştiğinde menüyü kapat
+  useEffect(() => {
+    setUserMenuOpen(false)
+    setSidebarOpen(false)
+  }, [pathname])
+
+  // Dışarı tıklandığında menüyü kapat
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+
+    if (userMenuOpen) {
+      // Biraz gecikmeyle ekle, böylece açılışta hemen kapanmaz
+      const timer = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside)
+      }, 100)
+      return () => {
+        clearTimeout(timer)
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [userMenuOpen])
+
+  // ESC tuşuyla menüyü kapat
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setUserMenuOpen(false)
+        setSidebarOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -204,7 +243,7 @@ export default function DashboardLayout({
               {profile?.id && <NotificationBell userId={profile.id} />}
 
               {/* User Menu */}
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-3 p-2 hover:bg-surface-100 rounded-xl transition-colors"
@@ -222,34 +261,30 @@ export default function DashboardLayout({
                     </div>
                     <div className="text-xs text-surface-500">{roleLabels[profile?.role || role]}</div>
                   </div>
-                  <ChevronDown className="w-4 h-4 text-surface-400 hidden sm:block" />
+                  <ChevronDown className={`w-4 h-4 text-surface-400 hidden sm:block transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {userMenuOpen && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-10 cursor-default"
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 z-50 py-1">
+                    <Link
+                      href={`/${role}/profil`}
                       onClick={() => setUserMenuOpen(false)}
-                      onPointerDown={() => setUserMenuOpen(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 z-20 py-1">
-                      <Link
-                        href={`/${role}/profil`}
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-surface-600 hover:bg-surface-50"
-                      >
-                        <Settings className="w-4 h-4" />
-                        Profil
-                      </Link>
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 w-full px-4 py-2 text-red-600 hover:bg-red-50"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Çıkış Yap
-                      </button>
-                    </div>
-                  </>
+                      className="flex items-center gap-2 px-4 py-2 text-surface-600 hover:bg-surface-50"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Profil
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        handleLogout()
+                      }}
+                      className="flex items-center gap-2 w-full px-4 py-2 text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Çıkış Yap
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

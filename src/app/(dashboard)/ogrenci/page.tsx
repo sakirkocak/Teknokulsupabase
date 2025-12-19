@@ -30,10 +30,7 @@ import {
   Trophy,
   BookOpen
 } from 'lucide-react'
-import GamificationPanel from '@/components/gamification/GamificationPanel'
-import { XPCard, StreakCard, DailyChallengesCard } from '@/components/gamification'
 import { useGamification } from '@/hooks/useGamification'
-import { useDailyChallenge } from '@/hooks/useDailyChallenge'
 
 export default function StudentDashboard() {
   const { profile, loading: profileLoading } = useProfile()
@@ -50,7 +47,6 @@ export default function StudentDashboard() {
   
   // Gamification hooks
   const gamification = useGamification(profile?.id || null)
-  const dailyChallenge = useDailyChallenge(profile?.id || null)
 
   useEffect(() => {
     if (studentProfile?.id) {
@@ -549,43 +545,70 @@ export default function StudentDashboard() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
-            {/* Gamification Widgets */}
+            {/* Gamification Widgets - Basitleştirilmiş */}
             {gamification.initialized && !gamification.loading && (
               <div className="space-y-4">
-                {/* XP Card - Compact */}
-                <XPCard
-                  totalXP={gamification.totalXP}
-                  level={gamification.level}
-                  xpProgress={gamification.xpProgress}
-                  compact
-                />
+                {/* XP Card - Basit versiyon */}
+                <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-4 text-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{gamification.level.icon}</span>
+                      <div>
+                        <div className="text-xs text-purple-200">Seviye {gamification.level.level}</div>
+                        <div className="font-bold">{gamification.level.name}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xl font-bold">{gamification.totalXP}</div>
+                      <div className="text-xs text-purple-200">XP</div>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-white rounded-full transition-all duration-500"
+                      style={{ width: `${gamification.xpProgress.progress}%` }}
+                    />
+                  </div>
+                  <Link href="/ogrenci/basarimlar" className="mt-2 text-xs text-purple-200 hover:text-white block">
+                    Başarımlarımı gör →
+                  </Link>
+                </div>
                 
-                {/* Streak Card - Compact */}
-                <StreakCard
-                  currentStreak={gamification.currentStreak}
-                  maxStreak={gamification.maxStreak}
-                  streakActive={gamification.streakActive}
-                  activityToday={gamification.activityToday}
-                  compact
-                />
-                
-                {/* Daily Challenges - Compact */}
-                {dailyChallenge.challenges && dailyChallenge.challenges.length > 0 && !dailyChallenge.loading && (
-                  <DailyChallengesCard
-                    challenges={dailyChallenge.challenges}
-                    progress={dailyChallenge.progress}
-                    compact
-                  />
-                )}
+                {/* Streak Card - Basit versiyon */}
+                <div className={`rounded-2xl p-4 text-white ${
+                  gamification.currentStreak >= 7 
+                    ? 'bg-gradient-to-br from-orange-500 to-red-600'
+                    : gamification.currentStreak >= 3
+                    ? 'bg-gradient-to-br from-amber-500 to-orange-600'
+                    : 'bg-gradient-to-br from-gray-500 to-gray-600'
+                }`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Flame className="w-6 h-6" />
+                      <div>
+                        <div className="text-xs opacity-80">Günlük Seri</div>
+                        <div className="font-bold text-xl">{gamification.currentStreak} gün</div>
+                      </div>
+                    </div>
+                  </div>
+                  <Link href="/ogrenci/basarimlar" className="text-xs opacity-80 hover:opacity-100 block">
+                    Detayları gör →
+                  </Link>
+                </div>
               </div>
             )}
             
-            {/* GamificationPanel */}
+            {/* GamificationPanel - Basitleştirilmiş */}
             {studentProfile?.id && (
-              <GamificationPanel 
-                studentId={studentProfile.id} 
-                grade={studentProfile.grade || null}
-              />
+              <div className="card p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Trophy className="w-6 h-6 text-yellow-500" />
+                  <h3 className="font-semibold">Liderlik</h3>
+                </div>
+                <Link href="/ogrenci/liderlik" className="btn btn-primary btn-sm w-full justify-center">
+                  Sıralamayı Gör
+                </Link>
+              </div>
             )}
 
             {/* Soru Bankası Hızlı Erişim */}
