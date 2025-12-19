@@ -741,7 +741,7 @@ export default function HomePage() {
                 <span className="text-white/60">12/20 soru</span>
                 <span className="text-orange-400 font-medium">+50 XP</span>
               </div>
-              <Link href="/kayit" className="mt-4 w-full btn bg-white/20 hover:bg-white/30 text-white border-0">
+              <Link href="/ogrenci/basarimlar" className="mt-4 w-full btn bg-white/20 hover:bg-white/30 text-white border-0">
                 Göreve Katıl
               </Link>
             </motion.div>
@@ -806,7 +806,7 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-              <Link href="/kayit" className="mt-4 text-center block text-sm text-white/60 hover:text-white transition-colors">
+              <Link href="/rozetler" className="mt-4 text-center block text-sm text-white/60 hover:text-white transition-colors">
                 Tüm rozetleri gör →
               </Link>
             </motion.div>

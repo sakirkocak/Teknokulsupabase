@@ -31,6 +31,9 @@ import {
   BookOpen
 } from 'lucide-react'
 import GamificationPanel from '@/components/gamification/GamificationPanel'
+import { XPCard, StreakCard, DailyChallengesCard } from '@/components/gamification'
+import { useGamification } from '@/hooks/useGamification'
+import { useDailyChallenge } from '@/hooks/useDailyChallenge'
 
 export default function StudentDashboard() {
   const { profile, loading: profileLoading } = useProfile()
@@ -44,6 +47,10 @@ export default function StudentDashboard() {
   const [approvedParents, setApprovedParents] = useState<any[]>([])
   const [processingRequest, setProcessingRequest] = useState<string | null>(null)
   const supabase = createClient()
+  
+  // Gamification hooks
+  const gamification = useGamification(profile?.id || null)
+  const dailyChallenge = useDailyChallenge(profile?.id || null)
 
   useEffect(() => {
     if (studentProfile?.id) {
@@ -542,7 +549,36 @@ export default function StudentDashboard() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
-            {/* Gamification Panel */}
+            {/* Compact Gamification Widgets */}
+            {profile?.id && !gamification.loading && (
+              <div className="space-y-4">
+                {/* XP Card - Compact */}
+                <XPCard
+                  totalXP={gamification.totalXP}
+                  level={gamification.level}
+                  xpProgress={gamification.xpProgress}
+                  compact
+                />
+                
+                {/* Streak Card - Compact */}
+                <StreakCard
+                  currentStreak={gamification.currentStreak}
+                  maxStreak={gamification.maxStreak}
+                  streakActive={gamification.streakActive}
+                  activityToday={gamification.activityToday}
+                  compact
+                />
+                
+                {/* Daily Challenges - Compact */}
+                <DailyChallengesCard
+                  challenges={dailyChallenge.challenges}
+                  progress={dailyChallenge.progress}
+                  compact
+                />
+              </div>
+            )}
+            
+            {/* Original Gamification Panel */}
             {studentProfile?.id && (
               <GamificationPanel 
                 studentId={studentProfile.id} 

@@ -10,10 +10,18 @@ import {
   ChevronRight, Trophy, Target, Zap, Crown, Star,
   BarChart3, ArrowRight, Clock, Brain, GraduationCap,
   ChevronDown, ChevronUp, Layers, Sparkles, ArrowLeft,
-  TrendingUp, Award, Flame, Home, Flag
+  TrendingUp, Award, Flame, Home, Flag, Medal
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import MathRenderer from '@/components/MathRenderer'
+import { CelebrationModal, BadgeToast } from '@/components/gamification'
+import { 
+  XP_REWARDS, 
+  calculateStreakBonus, 
+  checkEarnableBadges,
+  type Badge,
+  type UserStats 
+} from '@/lib/gamification'
 
 interface Subject {
   id: string
@@ -145,6 +153,15 @@ export default function SoruBankasiPage() {
   const [reportReason, setReportReason] = useState('')
   const [reportSubmitting, setReportSubmitting] = useState(false)
   const [reportSuccess, setReportSuccess] = useState(false)
+  
+  // Gamification state
+  const [newBadges, setNewBadges] = useState<Badge[]>([])
+  const [showBadgeToast, setShowBadgeToast] = useState(false)
+  const [celebrationType, setCelebrationType] = useState<'badge' | 'level' | null>(null)
+  const [celebrationBadge, setCelebrationBadge] = useState<Badge | null>(null)
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[]>([])
+  const [earnedXP, setEarnedXP] = useState<number>(0)
+  const [userId, setUserId] = useState<string | null>(null)
 
   // İlk yükleme
   useEffect(() => {
@@ -173,6 +190,16 @@ export default function SoruBankasiPage() {
       router.push('/giris')
       return
     }
+
+    setUserId(user.id)
+
+    // Kazanılmış rozetleri al
+    const { data: userBadges } = await supabase
+      .from('user_badges')
+      .select('badge_id')
+      .eq('user_id', user.id)
+    
+    setEarnedBadgeIds(userBadges?.map(b => b.badge_id) || [])
 
     // Öğrenci profili
     const { data: profile } = await supabase
@@ -562,8 +589,10 @@ export default function SoruBankasiPage() {
     setIsCorrect(correct)
     setShowResult(true)
 
-    const points = correct ? 2 : -1
-    setEarnedPoints(points)
+    // XP hesapla
+    const baseXP = correct ? XP_REWARDS.CORRECT_ANSWER : XP_REWARDS.WRONG_ANSWER
+    setEarnedXP(baseXP)
+    setEarnedPoints(baseXP)
 
     setSessionStats(prev => ({
       correct: prev.correct + (correct ? 1 : 0),
@@ -580,7 +609,7 @@ export default function SoruBankasiPage() {
       .eq('id', currentQuestion.id)
 
     // Öğrenci puanlarını güncelle
-    if (studentProfile) {
+    if (studentProfile && userId) {
       const subjectCode = currentQuestion.topic?.subject?.code || 'turkce'
       
       const { data: existingPoints } = await supabase
@@ -601,25 +630,36 @@ export default function SoruBankasiPage() {
       }
       
       // Ders kodu bulunamazsa yine de total puanlar güncellenir
-      console.log('Soru çözüldü - Ders kodu:', subjectCode, 'Puan:', points, 'Doğru:', correct)
+      console.log('Soru çözüldü - Ders kodu:', subjectCode, 'XP:', baseXP, 'Doğru:', correct)
+
+      // Streak hesabı
+      const newStreak = correct ? (existingPoints?.current_streak || 0) + 1 : 0
+      const newMaxStreak = Math.max(newStreak, existingPoints?.max_streak || 0)
+      
+      // Streak bonusu
+      let streakBonus = 0
+      if (newStreak > 0 && newStreak % 5 === 0) {
+        streakBonus = calculateStreakBonus(newStreak)
+      }
+
+      const totalXPGain = baseXP + streakBonus
 
       if (existingPoints) {
         const updateData: any = {
-          total_points: Math.max(0, (existingPoints.total_points || 0) + points),
+          total_points: Math.max(0, (existingPoints.total_points || 0) + totalXPGain),
+          total_xp: Math.max(0, (existingPoints.total_xp || existingPoints.total_points || 0) + totalXPGain),
           total_questions: (existingPoints.total_questions || 0) + 1,
           total_correct: (existingPoints.total_correct || 0) + (correct ? 1 : 0),
           total_wrong: (existingPoints.total_wrong || 0) + (correct ? 0 : 1),
-          current_streak: correct ? (existingPoints.current_streak || 0) + 1 : 0,
-          max_streak: correct && (existingPoints.current_streak || 0) + 1 > (existingPoints.max_streak || 0)
-            ? (existingPoints.current_streak || 0) + 1 
-            : (existingPoints.max_streak || 0),
+          current_streak: newStreak,
+          max_streak: newMaxStreak,
           last_activity_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
 
         if (subjectMap[subjectCode]) {
           const cols = subjectMap[subjectCode]
-          updateData[cols.points] = Math.max(0, (existingPoints[cols.points] || 0) + points)
+          updateData[cols.points] = Math.max(0, (existingPoints[cols.points] || 0) + totalXPGain)
           updateData[cols.correct] = (existingPoints[cols.correct] || 0) + (correct ? 1 : 0)
           updateData[cols.wrong] = (existingPoints[cols.wrong] || 0) + (correct ? 0 : 1)
         }
@@ -633,12 +673,64 @@ export default function SoruBankasiPage() {
           console.error('Puan güncelleme hatası:', updateError)
         } else {
           setStudentPoints({ ...existingPoints, ...updateData })
+          
+          // XP geçmişine ekle
+          await supabase.from('xp_history').insert({
+            user_id: userId,
+            xp_amount: baseXP,
+            source_type: correct ? 'question_correct' : 'question_wrong',
+            description: correct ? 'Doğru cevap' : 'Soru çözme katılımı'
+          })
+          
+          // Streak bonusu XP geçmişi
+          if (streakBonus > 0) {
+            await supabase.from('xp_history').insert({
+              user_id: userId,
+              xp_amount: streakBonus,
+              source_type: 'streak_bonus',
+              description: `${newStreak} seri bonusu`
+            })
+          }
+          
+          // Rozet kontrolü
+          const newStats: UserStats = {
+            total_questions: updateData.total_questions,
+            total_correct: updateData.total_correct,
+            current_streak: newStreak,
+            max_streak: newMaxStreak,
+          }
+          
+          const newlyEarnedBadges = checkEarnableBadges(newStats, earnedBadgeIds)
+          
+          if (newlyEarnedBadges.length > 0) {
+            // Rozetleri kaydet
+            for (const badge of newlyEarnedBadges) {
+              await supabase.from('user_badges').insert({
+                user_id: userId,
+                badge_id: badge.id
+              })
+              
+              // Rozet XP ödülü
+              await supabase.from('xp_history').insert({
+                user_id: userId,
+                xp_amount: badge.xp_reward,
+                source_type: 'badge_earned',
+                description: `Rozet kazanıldı: ${badge.name}`
+              })
+            }
+            
+            // State güncelle
+            setEarnedBadgeIds(prev => [...prev, ...newlyEarnedBadges.map(b => b.id)])
+            setNewBadges(newlyEarnedBadges)
+            setShowBadgeToast(true)
+          }
         }
       } else {
         // Yeni kayıt oluştur
         const insertData: any = {
           student_id: studentProfile.id,
-          total_points: Math.max(0, points),
+          total_points: Math.max(0, baseXP),
+          total_xp: Math.max(0, baseXP),
           total_questions: 1,
           total_correct: correct ? 1 : 0,
           total_wrong: correct ? 0 : 1,
@@ -653,6 +745,33 @@ export default function SoruBankasiPage() {
           console.error('Puan ekleme hatası:', insertError)
         } else {
           setStudentPoints(insertData)
+          
+          // XP geçmişine ekle
+          await supabase.from('xp_history').insert({
+            user_id: userId,
+            xp_amount: baseXP,
+            source_type: correct ? 'question_correct' : 'question_wrong',
+            description: correct ? 'Doğru cevap' : 'Soru çözme katılımı'
+          })
+          
+          // İlk soru rozeti kontrolü
+          if (correct) {
+            const firstBadge = checkEarnableBadges({ total_questions: 1, total_correct: 1, current_streak: 1, max_streak: 1 }, earnedBadgeIds)
+            if (firstBadge.length > 0) {
+              for (const badge of firstBadge) {
+                await supabase.from('user_badges').insert({ user_id: userId, badge_id: badge.id })
+                await supabase.from('xp_history').insert({
+                  user_id: userId,
+                  xp_amount: badge.xp_reward,
+                  source_type: 'badge_earned',
+                  description: `Rozet kazanıldı: ${badge.name}`
+                })
+              }
+              setEarnedBadgeIds(prev => [...prev, ...firstBadge.map(b => b.id)])
+              setNewBadges(firstBadge)
+              setShowBadgeToast(true)
+            }
+          }
         }
       }
 
@@ -672,7 +791,7 @@ export default function SoruBankasiPage() {
           await supabase
             .from('student_subject_points')
             .update({
-              points: Math.max(0, (existingSubjectPoints.points || 0) + points),
+              points: Math.max(0, (existingSubjectPoints.points || 0) + baseXP),
               correct_count: (existingSubjectPoints.correct_count || 0) + (correct ? 1 : 0),
               wrong_count: (existingSubjectPoints.wrong_count || 0) + (correct ? 0 : 1),
               last_activity_at: new Date().toISOString(),
@@ -686,14 +805,14 @@ export default function SoruBankasiPage() {
             .insert({
               student_id: studentProfile.id,
               subject_id: subjectId,
-              points: Math.max(0, points),
+              points: Math.max(0, baseXP),
               correct_count: correct ? 1 : 0,
               wrong_count: correct ? 0 : 1,
               last_activity_at: new Date().toISOString()
             })
         }
 
-        console.log('Ders puanı güncellendi:', subjectId, 'Puan:', points)
+        console.log('Ders puanı güncellendi:', subjectId, 'XP:', baseXP)
       }
     }
   }
@@ -1583,6 +1702,27 @@ export default function SoruBankasiPage() {
           </div>
         )}
       </div>
+
+      {/* Badge Toast */}
+      {showBadgeToast && newBadges.length > 0 && (
+        <BadgeToast
+          badges={newBadges}
+          onDismiss={() => {
+            setShowBadgeToast(false)
+            setNewBadges([])
+          }}
+        />
+      )}
+
+      {/* Celebration Modal */}
+      <CelebrationModal
+        type={celebrationType}
+        badge={celebrationBadge}
+        onClose={() => {
+          setCelebrationType(null)
+          setCelebrationBadge(null)
+        }}
+      />
     </div>
   )
 }
