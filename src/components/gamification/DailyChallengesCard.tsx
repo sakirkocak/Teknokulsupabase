@@ -51,6 +51,11 @@ export default function DailyChallengesCard({
     return total + (challengeProgress?.is_completed ? challenge.xp_reward : 0)
   }, 0)
   const totalXPAvailable = challenges.reduce((total, c) => total + c.xp_reward, 0)
+  
+  // Eğer görev yoksa hiçbir şey gösterme
+  if (challenges.length === 0) {
+    return null
+  }
 
   if (compact) {
     return (
@@ -74,7 +79,7 @@ export default function DailyChallengesCard({
           <div className="h-2 bg-white/20 rounded-full overflow-hidden mb-2">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${(completedCount / challenges.length) * 100}%` }}
+              animate={{ width: `${challenges.length > 0 ? (completedCount / challenges.length) * 100 : 0}%` }}
               transition={{ duration: 0.5 }}
               className="h-full bg-white rounded-full"
             />

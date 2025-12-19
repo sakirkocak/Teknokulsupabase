@@ -206,7 +206,7 @@ function RegisterForm() {
           <GraduationCap className="w-6 h-6 text-white" />
         </div>
         <span className="text-xl font-bold">
-          Tekn<span className="text-primary-500">okul</span>
+          Tekno<span className="text-primary-500">kul</span>
         </span>
       </Link>
 

@@ -549,8 +549,8 @@ export default function StudentDashboard() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
-            {/* Compact Gamification Widgets */}
-            {profile?.id && !gamification.loading && (
+            {/* Compact Gamification Widgets - Sadece yükleme tamamlandıysa ve veriler varsa göster */}
+            {profile?.id && gamification.initialized && (
               <div className="space-y-4">
                 {/* XP Card - Compact */}
                 <XPCard
@@ -570,11 +570,13 @@ export default function StudentDashboard() {
                 />
                 
                 {/* Daily Challenges - Compact */}
-                <DailyChallengesCard
-                  challenges={dailyChallenge.challenges}
-                  progress={dailyChallenge.progress}
-                  compact
-                />
+                {dailyChallenge.challenges.length > 0 && (
+                  <DailyChallengesCard
+                    challenges={dailyChallenge.challenges}
+                    progress={dailyChallenge.progress}
+                    compact
+                  />
+                )}
               </div>
             )}
             

@@ -57,9 +57,9 @@ export default function AdminUsersPage() {
     try {
       // 1. Ana profil tablosunu güncelle
       const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId)
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', userId)
 
       if (profileError) {
         console.error('Profil güncelleme hatası:', profileError)
