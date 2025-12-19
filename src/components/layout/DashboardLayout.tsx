@@ -228,8 +228,9 @@ export default function DashboardLayout({
                 {userMenuOpen && (
                   <>
                     <div 
-                      className="fixed inset-0 z-10"
+                      className="fixed inset-0 z-10 cursor-default"
                       onClick={() => setUserMenuOpen(false)}
+                      onPointerDown={() => setUserMenuOpen(false)}
                     />
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 z-20 py-1">
                       <Link

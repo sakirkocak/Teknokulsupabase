@@ -33,8 +33,13 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
 
   // Günlük görevleri ve ilerlemeyi yükle
   const loadChallenges = useCallback(async () => {
-    // Günlük görevleri oluştur
-    const dailyChallenges = generateDailyChallenges()
+    // Günlük görevleri oluştur (hata işleme ile)
+    let dailyChallenges: DailyChallenge[] = []
+    try {
+      dailyChallenges = generateDailyChallenges()
+    } catch (e) {
+      console.error('Günlük görev oluşturma hatası:', e)
+    }
     setChallenges(dailyChallenges)
 
     if (!userId) {

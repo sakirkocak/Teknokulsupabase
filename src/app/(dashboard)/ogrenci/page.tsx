@@ -30,10 +30,11 @@ import {
   Trophy,
   BookOpen
 } from 'lucide-react'
-import GamificationPanel from '@/components/gamification/GamificationPanel'
-import { XPCard, StreakCard, DailyChallengesCard } from '@/components/gamification'
-import { useGamification } from '@/hooks/useGamification'
-import { useDailyChallenge } from '@/hooks/useDailyChallenge'
+// Gamification geçici olarak devre dışı - tıklama sorunu
+// import GamificationPanel from '@/components/gamification/GamificationPanel'
+// import { XPCard, StreakCard, DailyChallengesCard } from '@/components/gamification'
+// import { useGamification } from '@/hooks/useGamification'
+// import { useDailyChallenge } from '@/hooks/useDailyChallenge'
 
 export default function StudentDashboard() {
   const { profile, loading: profileLoading } = useProfile()
@@ -48,9 +49,9 @@ export default function StudentDashboard() {
   const [processingRequest, setProcessingRequest] = useState<string | null>(null)
   const supabase = createClient()
   
-  // Gamification hooks
-  const gamification = useGamification(profile?.id || null)
-  const dailyChallenge = useDailyChallenge(profile?.id || null)
+  // Gamification hooks - DEVRE DIŞI
+  // const gamification = useGamification(profile?.id || null)
+  // const dailyChallenge = useDailyChallenge(profile?.id || null)
 
   useEffect(() => {
     if (studentProfile?.id) {
@@ -549,44 +550,9 @@ export default function StudentDashboard() {
 
           {/* Right Column - Sidebar */}
           <div className="space-y-6">
-            {/* Compact Gamification Widgets - Sadece yükleme tamamlandıysa ve veriler varsa göster */}
-            {profile?.id && gamification.initialized && (
-              <div className="space-y-4">
-                {/* XP Card - Compact */}
-                <XPCard
-                  totalXP={gamification.totalXP}
-                  level={gamification.level}
-                  xpProgress={gamification.xpProgress}
-                  compact
-                />
-                
-                {/* Streak Card - Compact */}
-                <StreakCard
-                  currentStreak={gamification.currentStreak}
-                  maxStreak={gamification.maxStreak}
-                  streakActive={gamification.streakActive}
-                  activityToday={gamification.activityToday}
-                  compact
-                />
-                
-                {/* Daily Challenges - Compact */}
-                {dailyChallenge.challenges.length > 0 && (
-                  <DailyChallengesCard
-                    challenges={dailyChallenge.challenges}
-                    progress={dailyChallenge.progress}
-                    compact
-                  />
-                )}
-              </div>
-            )}
+            {/* Gamification Widgets - DEVRE DIŞI */}
             
-            {/* Original Gamification Panel */}
-            {studentProfile?.id && (
-              <GamificationPanel 
-                studentId={studentProfile.id} 
-                grade={studentProfile.grade || null}
-              />
-            )}
+            {/* GamificationPanel - DEVRE DIŞI */}
 
             {/* Soru Bankası Hızlı Erişim */}
             <Link href="/ogrenci/soru-bankasi" className="card p-4 flex items-center gap-4 bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:shadow-lg transition-shadow">

@@ -55,11 +55,26 @@ interface UseGamificationReturn extends GamificationState {
   isBadgeEarned: (badgeId: string) => boolean
 }
 
+// Güvenli başlangıç değerleri
+const DEFAULT_LEVEL: Level = { level: 1, name: 'Çaylak', minXP: 0, maxXP: 99, icon: '🌱', color: 'text-green-500' }
+const DEFAULT_XP_PROGRESS: { needed: number; progress: number; nextLevel: Level | null } = { needed: 100, progress: 0, nextLevel: null }
+
 export function useGamification(userId: string | null): UseGamificationReturn {
+  // Güvenli başlangıç hesaplamaları
+  let initialLevel: Level = DEFAULT_LEVEL
+  let initialXpProgress: { needed: number; progress: number; nextLevel: Level | null } = DEFAULT_XP_PROGRESS
+  
+  try {
+    initialLevel = calculateLevel(0)
+    initialXpProgress = getXPForNextLevel(0)
+  } catch (e) {
+    console.error('Gamification başlangıç hesaplama hatası:', e)
+  }
+
   const [state, setState] = useState<GamificationState>({
     totalXP: 0,
-    level: calculateLevel(0),
-    xpProgress: getXPForNextLevel(0),
+    level: initialLevel,
+    xpProgress: initialXpProgress,
     currentStreak: 0,
     maxStreak: 0,
     streakActive: false,
@@ -153,7 +168,7 @@ export function useGamification(userId: string | null): UseGamificationReturn {
       })
     } catch (error) {
       console.error('Gamification verisi yüklenirken hata:', error)
-      setState(prev => ({ ...prev, loading: false }))
+      setState(prev => ({ ...prev, loading: false, initialized: true }))
     }
   }, [userId, supabase])
 
