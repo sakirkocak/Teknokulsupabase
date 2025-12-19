@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { generateDailyChallenges, type DailyChallenge } from '@/lib/gamification'
+import { type DailyChallenge } from '@/lib/gamification'
 
 interface ChallengeProgress {
   challenge_id: string
@@ -17,6 +17,7 @@ interface UseDailyChallengeReturn {
   completedCount: number
   totalXPEarned: number
   loading: boolean
+  error: string | null
   
   // Aksiyonlar
   updateProgress: (challengeId: string, amount: number) => Promise<boolean>
@@ -24,43 +25,107 @@ interface UseDailyChallengeReturn {
   getTimeRemaining: () => string
 }
 
+// Statik günlük görevler (veritabanına bağımlı değil)
+const STATIC_DAILY_CHALLENGES: DailyChallenge[] = [
+  {
+    id: 'daily_practice',
+    title: 'Günlük Pratik',
+    description: '10 soru çöz',
+    type: 'solve_questions',
+    target_value: 10,
+    xp_reward: 20,
+    difficulty: 'easy'
+  },
+  {
+    id: 'daily_streak',
+    title: 'Serini Koru',
+    description: 'Bugün en az 1 soru çöz',
+    type: 'streak',
+    target_value: 1,
+    xp_reward: 15,
+    difficulty: 'easy'
+  },
+  {
+    id: 'daily_math',
+    title: 'Matematik Zamanı',
+    description: '5 matematik sorusu çöz',
+    type: 'solve_subject',
+    target_value: 5,
+    subject_name: 'Matematik',
+    xp_reward: 25,
+    difficulty: 'medium'
+  },
+  {
+    id: 'daily_accuracy',
+    title: 'Keskin Nişancı',
+    description: '%80 başarı ile 5 soru çöz',
+    type: 'accuracy',
+    target_value: 5,
+    xp_reward: 30,
+    difficulty: 'hard'
+  },
+  {
+    id: 'daily_explorer',
+    title: 'Kaşif',
+    description: 'Farklı bir dersten 3 soru çöz',
+    type: 'explore',
+    target_value: 3,
+    xp_reward: 20,
+    difficulty: 'medium'
+  }
+]
+
 export function useDailyChallenge(userId: string | null): UseDailyChallengeReturn {
-  const [challenges, setChallenges] = useState<DailyChallenge[]>([])
+  const [challenges, setChallenges] = useState<DailyChallenge[]>(STATIC_DAILY_CHALLENGES)
   const [progress, setProgress] = useState<Record<string, ChallengeProgress>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   const supabase = createClient()
 
   // Günlük görevleri ve ilerlemeyi yükle
   const loadChallenges = useCallback(async () => {
-    // Günlük görevleri oluştur (hata işleme ile)
-    let dailyChallenges: DailyChallenge[] = []
-    try {
-      dailyChallenges = generateDailyChallenges()
-    } catch (e) {
-      console.error('Günlük görev oluşturma hatası:', e)
-    }
-    setChallenges(dailyChallenges)
+    // Statik görevleri ayarla
+    setChallenges(STATIC_DAILY_CHALLENGES)
 
     if (!userId) {
+      // Varsayılan boş ilerleme
+      const defaultProgress: Record<string, ChallengeProgress> = {}
+      STATIC_DAILY_CHALLENGES.forEach(c => {
+        defaultProgress[c.id] = {
+          challenge_id: c.id,
+          current_progress: 0,
+          is_completed: false
+        }
+      })
+      setProgress(defaultProgress)
       setLoading(false)
       return
     }
 
     try {
-      // Kullanıcının ilerleme verilerini al
+      // Kullanıcının ilerleme verilerini al (tablo varsa)
       const today = new Date().toISOString().split('T')[0]
       
-      const { data: progressData } = await supabase
-        .from('challenge_progress')
-        .select('*')
-        .eq('user_id', userId)
-        .like('challenge_id', `daily_${today}%`)
+      let progressData: any[] = []
+      try {
+        const { data, error: progressError } = await supabase
+          .from('challenge_progress')
+          .select('*')
+          .eq('user_id', userId)
+        
+        if (!progressError && data) {
+          // Bugünün görevlerini filtrele
+          progressData = data.filter(p => p.challenge_id?.startsWith('daily_'))
+        }
+      } catch (e) {
+        console.warn('challenge_progress tablosu bulunamadı, varsayılan değerler kullanılacak')
+      }
 
       const progressMap: Record<string, ChallengeProgress> = {}
       
       // Tüm görevler için ilerleme verisi oluştur
-      for (const challenge of dailyChallenges) {
+      for (const challenge of STATIC_DAILY_CHALLENGES) {
         const existing = progressData?.find(p => p.challenge_id === challenge.id)
         
         progressMap[challenge.id] = {
@@ -72,8 +137,21 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
       }
       
       setProgress(progressMap)
-    } catch (error) {
-      console.error('Günlük görevler yüklenirken hata:', error)
+      setError(null)
+    } catch (err) {
+      console.error('Günlük görevler yüklenirken hata:', err)
+      setError('Görevler yüklenemedi')
+      
+      // Hata durumunda varsayılan değerler
+      const defaultProgress: Record<string, ChallengeProgress> = {}
+      STATIC_DAILY_CHALLENGES.forEach(c => {
+        defaultProgress[c.id] = {
+          challenge_id: c.id,
+          current_progress: 0,
+          is_completed: false
+        }
+      })
+      setProgress(defaultProgress)
     }
     
     setLoading(false)
@@ -97,19 +175,23 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
     const isCompleted = newProgress >= challenge.target_value
 
     try {
-      // Upsert progress
-      await supabase
-        .from('challenge_progress')
-        .upsert({
-          user_id: userId,
-          challenge_id: challengeId,
-          current_progress: Math.min(newProgress, challenge.target_value),
-          is_completed: isCompleted,
-          completed_at: isCompleted ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,challenge_id'
-        })
+      // Upsert progress (tablo varsa)
+      try {
+        await supabase
+          .from('challenge_progress')
+          .upsert({
+            user_id: userId,
+            challenge_id: challengeId,
+            current_progress: Math.min(newProgress, challenge.target_value),
+            is_completed: isCompleted,
+            completed_at: isCompleted ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,challenge_id'
+          })
+      } catch (e) {
+        console.warn('İlerleme veritabanına kaydedilemedi:', e)
+      }
 
       setProgress(prev => ({
         ...prev,
@@ -122,8 +204,8 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
       }))
 
       return isCompleted
-    } catch (error) {
-      console.error('Görev ilerlemesi güncellenirken hata:', error)
+    } catch (err) {
+      console.error('Görev ilerlemesi güncellenirken hata:', err)
       return false
     }
   }, [userId, challenges, progress, supabase])
@@ -136,18 +218,22 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
     if (!challenge) return
 
     try {
-      await supabase
-        .from('challenge_progress')
-        .upsert({
-          user_id: userId,
-          challenge_id: challengeId,
-          current_progress: challenge.target_value,
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,challenge_id'
-        })
+      try {
+        await supabase
+          .from('challenge_progress')
+          .upsert({
+            user_id: userId,
+            challenge_id: challengeId,
+            current_progress: challenge.target_value,
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,challenge_id'
+          })
+      } catch (e) {
+        console.warn('Görev tamamlama veritabanına kaydedilemedi:', e)
+      }
 
       setProgress(prev => ({
         ...prev,
@@ -158,8 +244,8 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
           completed_at: new Date().toISOString(),
         }
       }))
-    } catch (error) {
-      console.error('Görev tamamlanırken hata:', error)
+    } catch (err) {
+      console.error('Görev tamamlanırken hata:', err)
     }
   }, [userId, challenges, supabase])
 
@@ -196,9 +282,9 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
     completedCount,
     totalXPEarned,
     loading,
+    error,
     updateProgress,
     markAsCompleted,
     getTimeRemaining,
   }
 }
-

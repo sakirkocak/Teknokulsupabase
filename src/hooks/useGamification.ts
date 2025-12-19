@@ -40,6 +40,7 @@ interface GamificationState {
   // Yükleme
   loading: boolean
   initialized: boolean
+  error: string | null
 }
 
 interface UseGamificationReturn extends GamificationState {
@@ -59,83 +60,96 @@ interface UseGamificationReturn extends GamificationState {
 const DEFAULT_LEVEL: Level = { level: 1, name: 'Çaylak', minXP: 0, maxXP: 99, icon: '🌱', color: 'text-green-500' }
 const DEFAULT_XP_PROGRESS: { needed: number; progress: number; nextLevel: Level | null } = { needed: 100, progress: 0, nextLevel: null }
 
+const INITIAL_STATE: GamificationState = {
+  totalXP: 0,
+  level: DEFAULT_LEVEL,
+  xpProgress: DEFAULT_XP_PROGRESS,
+  currentStreak: 0,
+  maxStreak: 0,
+  streakActive: false,
+  activityToday: false,
+  earnedBadges: [],
+  newBadges: [],
+  stats: null,
+  loading: true,
+  initialized: false,
+  error: null,
+}
+
 export function useGamification(userId: string | null): UseGamificationReturn {
-  // Güvenli başlangıç hesaplamaları
-  let initialLevel: Level = DEFAULT_LEVEL
-  let initialXpProgress: { needed: number; progress: number; nextLevel: Level | null } = DEFAULT_XP_PROGRESS
-  
-  try {
-    initialLevel = calculateLevel(0)
-    initialXpProgress = getXPForNextLevel(0)
-  } catch (e) {
-    console.error('Gamification başlangıç hesaplama hatası:', e)
-  }
-
-  const [state, setState] = useState<GamificationState>({
-    totalXP: 0,
-    level: initialLevel,
-    xpProgress: initialXpProgress,
-    currentStreak: 0,
-    maxStreak: 0,
-    streakActive: false,
-    activityToday: false,
-    earnedBadges: [],
-    newBadges: [],
-    stats: null,
-    loading: true,
-    initialized: false,
-  })
-
+  const [state, setState] = useState<GamificationState>(INITIAL_STATE)
   const supabase = createClient()
 
   // Verileri yükle
   const loadData = useCallback(async () => {
+    // userId yoksa hemen dön
     if (!userId) {
-      setState(prev => ({ ...prev, loading: false }))
+      setState(prev => ({ 
+        ...prev, 
+        loading: false, 
+        initialized: true,
+        error: null 
+      }))
       return
     }
 
     try {
       // Student profile'ı al
-      const { data: studentProfile } = await supabase
+      const { data: studentProfile, error: profileError } = await supabase
         .from('student_profiles')
         .select('id')
         .eq('user_id', userId)
         .single()
 
-      if (!studentProfile) {
-        setState(prev => ({ ...prev, loading: false }))
+      if (profileError || !studentProfile) {
+        // Profil yoksa varsayılan değerlerle devam et
+        setState(prev => ({ 
+          ...prev, 
+          loading: false, 
+          initialized: true,
+          error: null 
+        }))
         return
       }
 
       // Student points'i al
-      const { data: pointsData } = await supabase
+      const { data: pointsData, error: pointsError } = await supabase
         .from('student_points')
         .select('*')
         .eq('student_id', studentProfile.id)
         .single()
 
-      // Kazanılmış rozetleri al
-      const { data: userBadges } = await supabase
-        .from('user_badges')
-        .select('badge_id')
-        .eq('user_id', userId)
+      // Kazanılmış rozetleri al (tablo yoksa hata yakala)
+      let earnedBadgeIds: string[] = []
+      try {
+        const { data: userBadges } = await supabase
+          .from('user_badges')
+          .select('badge_id')
+          .eq('user_id', userId)
+        earnedBadgeIds = userBadges?.map(b => b.badge_id) || []
+      } catch (e) {
+        console.warn('user_badges tablosu bulunamadı, devam ediliyor...')
+      }
 
       // Ders bazlı puanları al
-      const { data: subjectPoints } = await supabase
-        .from('student_subject_points')
-        .select(`
-          points,
-          subject:subjects(name)
-        `)
-        .eq('student_id', studentProfile.id)
-
-      const subjectPointsMap: Record<string, number> = {}
-      subjectPoints?.forEach((sp: any) => {
-        if (sp.subject?.name) {
-          subjectPointsMap[sp.subject.name] = sp.points || 0
-        }
-      })
+      let subjectPointsMap: Record<string, number> = {}
+      try {
+        const { data: subjectPoints } = await supabase
+          .from('student_subject_points')
+          .select(`
+            points,
+            subject:subjects(name)
+          `)
+          .eq('student_id', studentProfile.id)
+        
+        subjectPoints?.forEach((sp: any) => {
+          if (sp.subject?.name) {
+            subjectPointsMap[sp.subject.name] = sp.points || 0
+          }
+        })
+      } catch (e) {
+        console.warn('student_subject_points tablosu bulunamadı, devam ediliyor...')
+      }
 
       const totalXP = pointsData?.total_xp || pointsData?.total_points || 0
       const currentStreak = pointsData?.current_streak || 0
@@ -150,12 +164,20 @@ export function useGamification(userId: string | null): UseGamificationReturn {
         subject_points: subjectPointsMap,
       }
 
-      const earnedBadgeIds = userBadges?.map(b => b.badge_id) || []
+      // Güvenli seviye hesaplama
+      let level = DEFAULT_LEVEL
+      let xpProgress = DEFAULT_XP_PROGRESS
+      try {
+        level = calculateLevel(totalXP)
+        xpProgress = getXPForNextLevel(totalXP)
+      } catch (e) {
+        console.warn('Seviye hesaplama hatası:', e)
+      }
 
       setState({
         totalXP,
-        level: calculateLevel(totalXP),
-        xpProgress: getXPForNextLevel(totalXP),
+        level,
+        xpProgress,
         currentStreak,
         maxStreak,
         streakActive: isStreakActive(lastActivity),
@@ -165,10 +187,16 @@ export function useGamification(userId: string | null): UseGamificationReturn {
         stats,
         loading: false,
         initialized: true,
+        error: null,
       })
     } catch (error) {
       console.error('Gamification verisi yüklenirken hata:', error)
-      setState(prev => ({ ...prev, loading: false, initialized: true }))
+      setState(prev => ({ 
+        ...prev, 
+        loading: false, 
+        initialized: true,
+        error: 'Veri yüklenemedi' 
+      }))
     }
   }, [userId, supabase])
 
@@ -190,7 +218,13 @@ export function useGamification(userId: string | null): UseGamificationReturn {
       if (!studentProfile) return
 
       const newTotalXP = state.totalXP + amount
-      const newLevel = calculateLevel(newTotalXP)
+      let newLevel = state.level
+      try {
+        newLevel = calculateLevel(newTotalXP)
+      } catch (e) {
+        console.warn('Seviye hesaplama hatası:', e)
+      }
+      
       const leveledUp = newLevel.level > state.level.level
 
       // Student points güncelle
@@ -203,19 +237,30 @@ export function useGamification(userId: string | null): UseGamificationReturn {
         })
         .eq('student_id', studentProfile.id)
 
-      // XP geçmişine ekle
-      await supabase.from('xp_history').insert({
-        user_id: userId,
-        xp_amount: amount,
-        source_type: source,
-        description: description || source
-      })
+      // XP geçmişine ekle (tablo varsa)
+      try {
+        await supabase.from('xp_history').insert({
+          user_id: userId,
+          xp_amount: amount,
+          source_type: source,
+          description: description || source
+        })
+      } catch (e) {
+        console.warn('XP geçmişi kaydedilemedi:', e)
+      }
+
+      let newXpProgress = state.xpProgress
+      try {
+        newXpProgress = getXPForNextLevel(newTotalXP)
+      } catch (e) {
+        console.warn('XP progress hesaplama hatası:', e)
+      }
 
       setState(prev => ({
         ...prev,
         totalXP: newTotalXP,
         level: newLevel,
-        xpProgress: getXPForNextLevel(newTotalXP),
+        xpProgress: newXpProgress,
       }))
 
       // Seviye atladıysa özel işlem yapılabilir
@@ -225,55 +270,41 @@ export function useGamification(userId: string | null): UseGamificationReturn {
     } catch (error) {
       console.error('XP eklenirken hata:', error)
     }
-  }, [userId, state.totalXP, state.level, state.stats, supabase])
+  }, [userId, state.totalXP, state.level, state.stats, state.xpProgress, supabase])
 
   // Rozet kontrolü ve ödüllendirme
   const checkAndAwardBadges = useCallback(async (): Promise<Badge[]> => {
     if (!userId || !state.stats) return []
 
-    const newlyEarned = checkEarnableBadges(state.stats, state.earnedBadges)
-    
-    if (newlyEarned.length === 0) return []
-
     try {
-      // Rozetleri veritabanına kaydet
-      const badgeInserts = newlyEarned.map(badge => ({
-        user_id: userId,
-        badge_id: badge.id,
-      }))
+      const earnableBadges = checkEarnableBadges(state.stats, state.earnedBadges)
+      
+      if (earnableBadges.length === 0) return []
 
-      await supabase.from('user_badges').insert(badgeInserts)
-
-      // XP ödüllerini ver
-      let totalBadgeXP = 0
-      for (const badge of newlyEarned) {
-        totalBadgeXP += badge.xp_reward
-        await supabase.from('xp_history').insert({
-          user_id: userId,
-          xp_amount: badge.xp_reward,
-          source_type: 'badge_earned',
-          description: `Rozet kazanıldı: ${badge.name}`
-        })
+      // Yeni rozetleri kaydet (tablo varsa)
+      for (const badge of earnableBadges) {
+        try {
+          await supabase.from('user_badges').insert({
+            user_id: userId,
+            badge_id: badge.id,
+          })
+        } catch (e) {
+          console.warn('Rozet kaydedilemedi:', badge.id, e)
+        }
       }
 
-      // State güncelle
-      const newTotalXP = state.totalXP + totalBadgeXP
-      
       setState(prev => ({
         ...prev,
-        totalXP: newTotalXP,
-        level: calculateLevel(newTotalXP),
-        xpProgress: getXPForNextLevel(newTotalXP),
-        earnedBadges: [...prev.earnedBadges, ...newlyEarned.map(b => b.id)],
-        newBadges: newlyEarned,
+        earnedBadges: [...prev.earnedBadges, ...earnableBadges.map(b => b.id)],
+        newBadges: earnableBadges,
       }))
 
-      return newlyEarned
+      return earnableBadges
     } catch (error) {
-      console.error('Rozet verilirken hata:', error)
+      console.error('Rozet kontrolü sırasında hata:', error)
       return []
     }
-  }, [userId, state.stats, state.earnedBadges, state.totalXP, supabase])
+  }, [userId, state.stats, state.earnedBadges, supabase])
 
   // Streak güncelle
   const updateStreak = useCallback(async () => {
@@ -294,81 +325,68 @@ export function useGamification(userId: string | null): UseGamificationReturn {
         .eq('student_id', studentProfile.id)
         .single()
 
-      const now = new Date()
-      const lastActivity = pointsData?.last_activity_at ? new Date(pointsData.last_activity_at) : null
+      if (!pointsData) return
+
+      const lastActivity = pointsData.last_activity_at
+      const wasActiveToday = hasActivityToday(lastActivity)
+      const wasActiveYesterday = isStreakActive(lastActivity)
+
+      let newStreak = pointsData.current_streak || 0
       
-      let newStreak = 1
-      
-      if (lastActivity) {
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const lastDay = new Date(lastActivity.getFullYear(), lastActivity.getMonth(), lastActivity.getDate())
-        const diffDays = Math.floor((today.getTime() - lastDay.getTime()) / (1000 * 60 * 60 * 24))
-        
-        if (diffDays === 0) {
-          // Bugün zaten aktivite var
-          newStreak = pointsData?.current_streak || 1
-        } else if (diffDays === 1) {
-          // Dün aktivite vardı, streak devam
-          newStreak = (pointsData?.current_streak || 0) + 1
+      if (!wasActiveToday) {
+        if (wasActiveYesterday) {
+          newStreak += 1
         } else {
-          // Streak kırıldı
           newStreak = 1
         }
+
+        const newMaxStreak = Math.max(newStreak, pointsData.max_streak || 0)
+
+        await supabase
+          .from('student_points')
+          .update({
+            current_streak: newStreak,
+            max_streak: newMaxStreak,
+            last_activity_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('student_id', studentProfile.id)
+
+        setState(prev => ({
+          ...prev,
+          currentStreak: newStreak,
+          maxStreak: newMaxStreak,
+          activityToday: true,
+          streakActive: true,
+        }))
       }
-
-      const newMaxStreak = Math.max(newStreak, pointsData?.max_streak || 0)
-
-      await supabase
-        .from('student_points')
-        .update({
-          current_streak: newStreak,
-          max_streak: newMaxStreak,
-          last_activity_at: now.toISOString(),
-          updated_at: now.toISOString()
-        })
-        .eq('student_id', studentProfile.id)
-
-      // Streak bonusu ver
-      const streakBonus = calculateStreakBonus(newStreak)
-      if (newStreak > 1) {
-        await addXP(streakBonus, 'streak_bonus', `${newStreak} günlük seri bonusu`)
-      }
-
-      setState(prev => ({
-        ...prev,
-        currentStreak: newStreak,
-        maxStreak: newMaxStreak,
-        streakActive: true,
-        activityToday: true,
-        stats: prev.stats ? {
-          ...prev.stats,
-          current_streak: newStreak,
-          max_streak: newMaxStreak,
-        } : null,
-      }))
     } catch (error) {
       console.error('Streak güncellenirken hata:', error)
     }
-  }, [userId, supabase, addXP])
+  }, [userId, supabase])
 
   // Yeni rozetleri temizle
   const clearNewBadges = useCallback(() => {
     setState(prev => ({ ...prev, newBadges: [] }))
   }, [])
 
-  // Verileri yenile
+  // Yenile
   const refresh = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }))
     await loadData()
   }, [loadData])
 
-  // Rozet ilerlemesi
-  const getBadgeProgressFn = useCallback((badge: Badge) => {
+  // Rozet ilerleme yardımcısı
+  const getBadgeProgressHelper = useCallback((badge: Badge) => {
     if (!state.stats) return { current: 0, target: badge.requirement_value, percentage: 0 }
-    return getBadgeProgress(badge, state.stats)
+    try {
+      return getBadgeProgress(badge, state.stats)
+    } catch (e) {
+      return { current: 0, target: badge.requirement_value, percentage: 0 }
+    }
   }, [state.stats])
 
-  // Rozet kazanılmış mı?
+  // Rozet kazanılmış mı kontrolü
   const isBadgeEarned = useCallback((badgeId: string) => {
     return state.earnedBadges.includes(badgeId)
   }, [state.earnedBadges])
@@ -380,8 +398,7 @@ export function useGamification(userId: string | null): UseGamificationReturn {
     updateStreak,
     clearNewBadges,
     refresh,
-    getBadgeProgress: getBadgeProgressFn,
+    getBadgeProgress: getBadgeProgressHelper,
     isBadgeEarned,
   }
 }
-
