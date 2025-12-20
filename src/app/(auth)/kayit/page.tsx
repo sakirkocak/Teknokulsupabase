@@ -96,16 +96,26 @@ function RegisterForm() {
     }
   }, [redirectUrl])
 
-  // Google ile kayıt
+  // Google ile kayıt - rol ve sınıf bilgisini de gönder
   async function handleGoogleRegister() {
     setGoogleLoading(true)
     setError('')
 
     try {
+      // Rol ve sınıf bilgisini callback'e gönder
+      const params = new URLSearchParams()
+      params.set('role', role)
+      if (role === 'ogrenci') {
+        params.set('grade', grade.toString())
+      }
+      if (redirectUrl) {
+        params.set('next', redirectUrl)
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback${redirectUrl ? `?next=${encodeURIComponent(redirectUrl)}` : ''}`,
+          redirectTo: `${window.location.origin}/auth/callback?${params.toString()}`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -253,7 +263,7 @@ function RegisterForm() {
           <GraduationCap className="w-6 h-6 text-white" />
         </div>
         <span className="text-xl font-bold">
-          Tekno<span className="text-primary-500">kul</span>
+          Tekn<span className="text-primary-500">okul</span>
         </span>
       </Link>
 
@@ -280,33 +290,6 @@ function RegisterForm() {
 
       {step === 1 ? (
         <div className="space-y-4">
-          {/* Google ile Hızlı Kayıt */}
-          <button
-            type="button"
-            onClick={handleGoogleRegister}
-            disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 border-2 border-surface-200 rounded-xl font-medium text-surface-700 hover:bg-surface-50 hover:border-surface-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {googleLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <GoogleIcon />
-                Google ile Hızlı Kayıt
-              </>
-            )}
-          </button>
-
-          {/* Ayırıcı */}
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-surface-200"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-surface-500">veya e-posta ile</span>
-            </div>
-          </div>
-
           <p className="text-sm text-surface-600 mb-4">Rolünü seç:</p>
           {roles.map((r) => (
             <button
@@ -422,81 +405,131 @@ function RegisterForm() {
           </div>
         </div>
       ) : (
-        <form onSubmit={handleRegister} className="space-y-5">
-          <div>
-            <label className="label">Ad Soyad</label>
-            <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="input pl-12"
-                placeholder="Adınız Soyadınız"
-                required
-              />
+        <div className="space-y-5">
+          {/* Seçilen rol ve sınıf bilgisi */}
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary-500 text-white flex items-center justify-center">
+                {role === 'ogrenci' ? <User className="w-5 h-5" /> : role === 'ogretmen' ? <UserCheck className="w-5 h-5" /> : <Users2 className="w-5 h-5" />}
+              </div>
+              <div>
+                <div className="font-medium text-primary-900">
+                  {role === 'ogrenci' ? 'Öğrenci' : role === 'ogretmen' ? 'Öğretmen / Koç' : 'Veli'}
+                  {role === 'ogrenci' && <span className="text-primary-600"> • {grade}. Sınıf</span>}
+                </div>
+                <button 
+                  onClick={() => setStep(1)} 
+                  className="text-xs text-primary-600 hover:underline"
+                >
+                  Değiştir
+                </button>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="label">E-posta</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input pl-12"
-                placeholder="ornek@email.com"
-                required
-              />
+          {/* Google ile Hızlı Kayıt */}
+          <button
+            type="button"
+            onClick={handleGoogleRegister}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border-2 border-surface-200 rounded-xl font-medium text-surface-700 hover:bg-surface-50 hover:border-surface-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {googleLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <GoogleIcon />
+                Google ile Hızlı Kayıt
+              </>
+            )}
+          </button>
+
+          {/* Ayırıcı */}
+          <div className="relative my-2">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-surface-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white text-surface-500">veya e-posta ile</span>
             </div>
           </div>
 
-          <div>
-            <label className="label">Şifre</label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input pl-12 pr-12"
-                placeholder="En az 6 karakter"
-                minLength={6}
-                required
-              />
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div>
+              <label className="label">Ad Soyad</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="input pl-12"
+                  placeholder="Adınız Soyadınız"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">E-posta</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input pl-12"
+                  placeholder="ornek@email.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Şifre</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input pl-12 pr-12"
+                  placeholder="En az 6 karakter"
+                  minLength={6}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
+                onClick={() => setStep(role === 'ogrenci' ? 2 : 1)}
+                className="btn btn-ghost btn-lg flex-1"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                Geri
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-primary btn-lg flex-1"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  'Kayıt Ol'
+                )}
               </button>
             </div>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setStep(role === 'ogrenci' ? 2 : 1)}
-              className="btn btn-ghost btn-lg flex-1"
-            >
-              Geri
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-primary btn-lg flex-1"
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                'Kayıt Ol'
-              )}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
       <p className="text-center text-surface-600 mt-6">
