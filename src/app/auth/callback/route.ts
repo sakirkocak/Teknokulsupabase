@@ -109,8 +109,8 @@ export async function GET(request: Request) {
         admin: '/admin',
       }
 
-      const redirectPath = routes[profile.role] || next
-      return NextResponse.redirect(`${origin}${redirectPath}`)
+      const redirectPath = profile?.role ? routes[profile.role] : next
+      return NextResponse.redirect(`${origin}${redirectPath || '/'}`)
     }
   }
 
