@@ -167,6 +167,7 @@ export default function SoruBankasiPage() {
   const [questionIndex, setQuestionIndex] = useState(0)
   const [sessionStats, setSessionStats] = useState({ correct: 0, wrong: 0 })
   const [earnedPoints, setEarnedPoints] = useState<number | null>(null)
+  const [practiceLoading, setPracticeLoading] = useState(false) // Soru yüklenirken
   
   // Oturum özeti ve bildirim state
   const [showSessionSummary, setShowSessionSummary] = useState(false)
@@ -574,7 +575,9 @@ export default function SoruBankasiPage() {
     setSessionStreak(0)
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
+    setPracticeLoading(true)
     await loadNextQuestion(topic)
+    setPracticeLoading(false)
   }
 
   // Hızlı Başla - Rastgele soru çöz (tüm derslerden)
@@ -588,7 +591,9 @@ export default function SoruBankasiPage() {
     setSessionStreak(0)
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
+    setPracticeLoading(true)
     await loadRandomQuestion()
+    setPracticeLoading(false)
   }
 
   // Ders bazlı hızlı başla
@@ -602,7 +607,9 @@ export default function SoruBankasiPage() {
     setSessionStreak(0)
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
+    setPracticeLoading(true)
     await loadRandomQuestionFromSubject(gs.subject_id)
+    setPracticeLoading(false)
   }
 
   // Tüm sınıftan rastgele soru yükle
@@ -1098,22 +1105,83 @@ export default function SoruBankasiPage() {
 
   // Soru Çözme Modu
   if (viewMode === 'practice') {
+    // Yüklenirken güzel bir animasyon göster
+    if (practiceLoading) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            {/* Animated Brain Icon */}
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, 5, -5, 0]
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="w-24 h-24 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-purple-500/30"
+            >
+              <Brain className="h-12 w-12 text-white" />
+            </motion.div>
+            
+            {/* Loading Text */}
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Mükemmel Sorular Hazırlanıyor
+            </h2>
+            <p className="text-white/60 mb-6">
+              Senin için en uygun soruları seçiyoruz...
+            </p>
+            
+            {/* Loading Dots */}
+            <div className="flex items-center justify-center gap-2">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  animate={{ 
+                    y: [0, -10, 0],
+                    opacity: [0.5, 1, 0.5]
+                  }}
+                  transition={{ 
+                    duration: 0.8, 
+                    repeat: Infinity,
+                    delay: i * 0.2
+                  }}
+                  className="w-3 h-3 bg-purple-500 rounded-full"
+                />
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      )
+    }
+
+    // Soru bulunamadı (yükleme bittikten sonra)
     if (!currentQuestion) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex items-center justify-center p-4">
-          <div className="text-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center"
+          >
             <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <BookOpen className="h-10 w-10 text-white/60" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Soru Bulunamadı</h2>
-            <p className="text-white/60 mb-6">Bu konu için henüz soru eklenmemiş.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Bu Konuda Soru Yok</h2>
+            <p className="text-white/60 mb-6">Bu konu için henüz soru eklenmemiş. Farklı bir konu seçebilirsin.</p>
             <button
               onClick={goBack}
-              className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all"
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white rounded-xl transition-all font-medium"
             >
-              Geri Dön
+              Başka Konu Seç
             </button>
-          </div>
+          </motion.div>
         </div>
       )
     }
