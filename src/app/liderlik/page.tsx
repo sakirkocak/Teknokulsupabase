@@ -112,8 +112,46 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [totalStudents, setTotalStudents] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
+  
+  // Auth state
+  const [user, setUser] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
 
   const supabase = createClient()
+
+  // Auth durumunu kontrol et
+  useEffect(() => {
+    async function checkAuth() {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        setUserProfile(profile)
+      }
+    }
+    
+    checkAuth()
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user || null)
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        setUserProfile(profile)
+      } else {
+        setUserProfile(null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   // İlleri ve dersleri yükle
   useEffect(() => {
@@ -600,12 +638,30 @@ export default function LeaderboardPage() {
             </span>
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/giris" className="px-4 py-2 text-white/70 hover:text-white transition-colors">
-              Giriş Yap
-            </Link>
-            <Link href="/kayit" className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors">
-              Kayıt Ol
-            </Link>
+            {user && userProfile ? (
+              <Link 
+                href={userProfile.role === 'admin' ? '/admin' : userProfile.role === 'ogretmen' ? '/koc' : userProfile.role === 'veli' ? '/veli' : '/ogrenci'}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+              >
+                {userProfile.avatar_url ? (
+                  <img src={userProfile.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                    {getInitials(userProfile.full_name)}
+                  </div>
+                )}
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link href="/giris" className="px-4 py-2 text-white/70 hover:text-white transition-colors">
+                  Giriş Yap
+                </Link>
+                <Link href="/kayit" className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors">
+                  Kayıt Ol
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>

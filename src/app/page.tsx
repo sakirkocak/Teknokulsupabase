@@ -331,7 +331,52 @@ export default function HomePage() {
   const [selectedGrade, setSelectedGrade] = useState(8)
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState<Record<string, number>>({})
   const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('weekly')
+  
+  // Auth state
+  const [user, setUser] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  
   const supabase = createClient()
+
+  // Auth durumunu kontrol et
+  useEffect(() => {
+    checkAuth()
+    
+    // Auth değişikliklerini dinle
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null)
+      if (session?.user) {
+        loadUserProfile(session.user.id)
+      } else {
+        setUserProfile(null)
+        setAuthLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function checkAuth() {
+    const { data: { user } } = await supabase.auth.getUser()
+    setUser(user)
+    if (user) {
+      await loadUserProfile(user.id)
+    } else {
+      setAuthLoading(false)
+    }
+  }
+
+  async function loadUserProfile(userId: string) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    
+    setUserProfile(profile)
+    setAuthLoading(false)
+  }
 
   useEffect(() => {
     loadFeaturedCoaches()
@@ -489,12 +534,34 @@ export default function HomePage() {
             </div>
 
             <div className="hidden md:flex items-center gap-4">
-              <Link href="/giris" className="btn btn-ghost btn-md">
-                Giriş Yap
-              </Link>
-              <Link href="/kayit" className="btn btn-primary btn-md">
-                Ücretsiz Başla
-              </Link>
+              {authLoading ? (
+                <div className="w-8 h-8 rounded-full bg-surface-100 animate-pulse" />
+              ) : user && userProfile ? (
+                <>
+                  <Link 
+                    href={userProfile.role === 'admin' ? '/admin' : userProfile.role === 'ogretmen' ? '/koc' : userProfile.role === 'veli' ? '/veli' : '/ogrenci'}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                  >
+                    {userProfile.avatar_url ? (
+                      <img src={userProfile.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                        {getInitials(userProfile.full_name)}
+                      </div>
+                    )}
+                    Dashboard
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/giris" className="btn btn-ghost btn-md">
+                    Giriş Yap
+                  </Link>
+                  <Link href="/kayit" className="btn btn-primary btn-md">
+                    Ücretsiz Başla
+                  </Link>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -546,12 +613,31 @@ export default function HomePage() {
                 Materyaller
               </Link>
               <div className="pt-3 border-t border-surface-100 space-y-2">
-                <Link href="/giris" className="btn btn-ghost btn-md w-full">
-                  Giriş Yap
-                </Link>
-                <Link href="/kayit" className="btn btn-primary btn-md w-full">
-                  Ücretsiz Başla
-                </Link>
+                {user && userProfile ? (
+                  <Link 
+                    href={userProfile.role === 'admin' ? '/admin' : userProfile.role === 'ogretmen' ? '/koc' : userProfile.role === 'veli' ? '/veli' : '/ogrenci'}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium"
+                  >
+                    {userProfile.avatar_url ? (
+                      <img src={userProfile.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                        {getInitials(userProfile.full_name)}
+                      </div>
+                    )}
+                    Dashboard'a Git
+                  </Link>
+                ) : (
+                  <>
+                    <Link href="/giris" className="btn btn-ghost btn-md w-full">
+                      Giriş Yap
+                    </Link>
+                    <Link href="/kayit" className="btn btn-primary btn-md w-full">
+                      Ücretsiz Başla
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
