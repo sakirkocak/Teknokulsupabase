@@ -20,6 +20,7 @@ import {
   TrendingUp, 
   Star, 
   CheckCircle,
+  Check,
   ArrowRight,
   Sparkles,
   Clock,
@@ -773,6 +774,211 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ✨ PREMIUM KOÇLUK BÖLÜMÜ - YENİ KONUM */}
+      <section className="py-20 px-4 bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 relative overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-500/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-teal-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-green-500/10 rounded-full blur-3xl"></div>
+        </div>
+        
+        {/* Decorative Pattern */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHptMCAzMmMtNy43MzIgMC0xNC02LjI2OC0xNC0xNHM2LjI2OC0xNCAxNC0xNCAxNCA2LjI2OCAxNCAxNC02LjI2OCAxNC0xNCAxNHoiIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjAyIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          {/* Header */}
+          <div className="text-center mb-16">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-white text-sm font-medium mb-6"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
+              Birebir Koçluk Desteği
+            </motion.div>
+            
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              viewport={{ once: true }}
+              className="text-4xl sm:text-5xl font-extrabold text-white mb-4"
+            >
+              Uzman Koçlarla{' '}
+              <span className="bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 bg-clip-text text-transparent">
+                Hedefe Ulaş
+              </span>
+            </motion.h2>
+            
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              viewport={{ once: true }}
+              className="text-lg text-emerald-100/80 max-w-2xl mx-auto"
+            >
+              LGS ve YKS'de başarıya giden en kısa yol: Deneyimli koçlarla birebir çalış, 
+              kişisel çalışma planınla fark yarat
+            </motion.p>
+          </div>
+
+          {/* Stats Bar */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            viewport={{ once: true }}
+            className="flex flex-wrap justify-center gap-8 mb-12"
+          >
+            {[
+              { value: '50+', label: 'Uzman Koç', icon: '👨‍🏫' },
+              { value: '%95', label: 'Memnuniyet', icon: '⭐' },
+              { value: '1000+', label: 'Başarılı Öğrenci', icon: '🎓' },
+              { value: '24/7', label: 'Destek', icon: '💬' },
+            ].map((stat, index) => (
+              <div key={index} className="flex items-center gap-3 px-6 py-3 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
+                <span className="text-2xl">{stat.icon}</span>
+                <div>
+                  <div className="text-2xl font-bold text-white">{stat.value}</div>
+                  <div className="text-xs text-emerald-200/70">{stat.label}</div>
+                </div>
+              </div>
+            ))}
+          </motion.div>
+
+          {/* Coaches Grid */}
+          {loadingCoaches ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin w-10 h-10 border-4 border-emerald-400 border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {coaches.slice(0, 3).map((coach, index) => (
+                <motion.div
+                  key={coach.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  viewport={{ once: true }}
+                >
+                  <Link href={coach.isDemo ? '#' : `/koclar/${coach.id}`}>
+                    <div className="group relative bg-white/10 backdrop-blur-md rounded-3xl overflow-hidden border border-white/20 hover:border-emerald-400/50 transition-all duration-500 hover:shadow-2xl hover:shadow-emerald-500/20 hover:-translate-y-2">
+                      {/* Top Gradient Banner */}
+                      <div className="h-28 bg-gradient-to-br from-emerald-500/30 to-teal-500/30 relative">
+                        {/* Floating Badge */}
+                        {coach.video_url && (
+                          <div className="absolute top-4 right-4 px-3 py-1.5 bg-white/20 backdrop-blur-sm text-white text-xs font-medium rounded-full flex items-center gap-1.5 border border-white/20">
+                            <Play className="w-3 h-3" />
+                            Video Tanıtım
+                          </div>
+                        )}
+                        
+                        {/* Avatar */}
+                        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2">
+                          <div className="relative">
+                            <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl rotate-3 absolute inset-0 opacity-50 blur-sm group-hover:rotate-6 transition-transform"></div>
+                            <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl overflow-hidden border-4 border-white/30 relative group-hover:scale-105 transition-transform">
+                              {coach.profile?.avatar_url ? (
+                                <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                getInitials(coach.profile?.full_name || coach.full_name)
+                              )}
+                            </div>
+                            {/* Online Indicator */}
+                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-400 rounded-full border-2 border-white flex items-center justify-center">
+                              <Check className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="pt-14 pb-6 px-6 text-center">
+                        <h3 className="text-xl font-bold text-white mb-1 group-hover:text-emerald-300 transition-colors">
+                          {coach.profile?.full_name || coach.full_name}
+                        </h3>
+                        <p className="text-emerald-200/70 text-sm mb-4 line-clamp-1">
+                          {coach.headline || 'Eğitim Koçu'}
+                        </p>
+
+                        {/* Specializations */}
+                        {coach.specializations && coach.specializations.length > 0 && (
+                          <div className="flex flex-wrap justify-center gap-2 mb-5">
+                            {coach.specializations.slice(0, 3).map((spec: string, i: number) => (
+                              <span 
+                                key={i}
+                                className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-medium rounded-full border border-emerald-500/30"
+                              >
+                                {spec}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Stats */}
+                        <div className="flex items-center justify-center gap-6 pt-5 border-t border-white/10">
+                          <div className="flex items-center gap-1.5">
+                            <Star className={`w-5 h-5 ${coach.avgRating > 0 ? 'text-yellow-400 fill-yellow-400' : 'text-white/30'}`} />
+                            <span className="font-bold text-white">
+                              {coach.avgRating > 0 ? coach.avgRating.toFixed(1) : '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-emerald-200/70 text-sm">
+                            <Clock className="w-4 h-4" />
+                            {coach.experience_years || 0} yıl deneyim
+                          </div>
+                        </div>
+
+                        {/* CTA Button */}
+                        <button className="mt-5 w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/30">
+                          Koçla Tanış
+                        </button>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Bottom CTA Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            viewport={{ once: true }}
+            className="mt-16 text-center"
+          >
+            <div className="inline-flex flex-col sm:flex-row items-center gap-4">
+              <Link 
+                href="/koclar" 
+                className="group px-8 py-4 bg-white text-emerald-900 font-bold rounded-2xl hover:shadow-2xl hover:shadow-white/20 transition-all duration-300 flex items-center gap-2"
+              >
+                <Users className="w-5 h-5" />
+                Tüm Koçları Keşfet
+                <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link 
+                href="/kayit?role=ogretmen" 
+                className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-semibold rounded-2xl border border-white/20 hover:bg-white/20 transition-all flex items-center gap-2"
+              >
+                <GraduationCap className="w-5 h-5" />
+                Koç Olarak Katıl
+              </Link>
+            </div>
+            
+            <p className="mt-6 text-emerald-200/60 text-sm">
+              💡 İlk görüşme ücretsiz! Koçunla tanış, hedeflerini paylaş.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
       {/* GAMİFİCATİON HUB - YENİ BÖLÜM */}
       <section className="py-16 px-4 bg-gradient-to-br from-indigo-900 via-purple-900 to-violet-900 relative overflow-hidden">
         {/* Background Pattern */}
@@ -1190,111 +1396,6 @@ export default function HomePage() {
                 Dene <ArrowRight className="w-4 h-4" />
               </Link>
             </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* KOÇLUK BÖLÜMÜ */}
-      <section className="py-16 px-4 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12">
-            <motion.div
-              initial={{ scale: 0 }}
-              whileInView={{ scale: 1 }}
-              viewport={{ once: true }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-600 rounded-full text-sm font-medium mb-4"
-            >
-              <Users className="w-4 h-4" />
-              Kişisel Rehberlik
-            </motion.div>
-            <h2 className="text-3xl font-bold text-surface-900 mb-3">
-              Daha Hızlı İlerlemek İster misin?
-            </h2>
-            <p className="text-surface-600 max-w-2xl mx-auto">
-              Kişisel eğitim koçunla hedeflerine daha hızlı ulaş
-            </p>
-          </div>
-          
-          {loadingCoaches ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
-            </div>
-          ) : (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {coaches.slice(0, 3).map((coach, index) => (
-                <motion.div
-                  key={coach.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                >
-                  <Link href={coach.isDemo ? '#' : `/koclar/${coach.id}`}>
-                    <div className="card group hover:shadow-xl transition-all duration-300 overflow-hidden">
-                      <div className="relative h-32 bg-gradient-to-br from-green-100 to-emerald-100">
-                        {coach.video_url && (
-                          <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 text-white text-xs rounded-full flex items-center gap-1">
-                            <Play className="w-3 h-3" />
-                            Video
-                          </div>
-                        )}
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
-                          <div className="w-20 h-20 bg-gradient-to-br from-green-400 to-emerald-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg overflow-hidden border-4 border-white">
-                            {coach.profile?.avatar_url ? (
-                              <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              getInitials(coach.profile?.full_name || coach.full_name)
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-12 p-5 text-center">
-                        <h3 className="text-lg font-bold text-surface-900 mb-1 group-hover:text-green-600 transition-colors">
-                          {coach.profile?.full_name || coach.full_name}
-                        </h3>
-                        <p className="text-surface-500 text-sm mb-3 line-clamp-1">
-                          {coach.headline || 'Eğitim Koçu'}
-                        </p>
-
-                        {coach.specializations && coach.specializations.length > 0 && (
-                          <div className="flex flex-wrap justify-center gap-1.5 mb-4">
-                            {coach.specializations.slice(0, 2).map((spec: string, i: number) => (
-                              <span 
-                                key={i}
-                                className="px-2 py-0.5 bg-green-50 text-green-600 text-xs font-medium rounded-full"
-                              >
-                                {spec}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-center gap-4 pt-4 border-t border-surface-100">
-                          <div className="flex items-center gap-1">
-                            <Star className={`w-4 h-4 ${coach.avgRating > 0 ? 'text-yellow-400 fill-yellow-400' : 'text-surface-300'}`} />
-                            <span className="font-medium text-surface-900">
-                              {coach.avgRating > 0 ? coach.avgRating.toFixed(1) : '-'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1 text-surface-500 text-sm">
-                            <Clock className="w-4 h-4" />
-                            {coach.experience_years || 0} yıl
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-8 text-center">
-            <Link href="/koclar" className="btn btn-outline btn-md border-green-300 text-green-600 hover:bg-green-50">
-              Tüm Koçları Gör
-              <ChevronRight className="w-4 h-4" />
-            </Link>
           </div>
         </div>
       </section>
