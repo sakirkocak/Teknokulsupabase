@@ -106,29 +106,45 @@ export default function AdminDashboard() {
         .from('questions')
         .select('*', { count: 'exact', head: true })
 
-      // Ders bazlı soru sayıları - topics üzerinden join
-      const { data: questionsWithTopics } = await supabase
-        .from('questions')
-        .select(`
-          id,
-          difficulty,
-          topic:topics(
-            grade,
-            subject:subjects(
-              name,
-              code,
-              icon,
-              color
+      // Ders bazlı soru sayıları - tüm soruları sayfalı olarak çek
+      const PAGE_SIZE = 1000
+      let allQuestions: any[] = []
+      let page = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: questionsPage } = await supabase
+          .from('questions')
+          .select(`
+            id,
+            difficulty,
+            topic:topics(
+              grade,
+              subject:subjects(
+                name,
+                code,
+                icon,
+                color
+              )
             )
-          )
-        `)
+          `)
+          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+        if (questionsPage && questionsPage.length > 0) {
+          allQuestions = [...allQuestions, ...questionsPage]
+          hasMore = questionsPage.length === PAGE_SIZE
+          page++
+        } else {
+          hasMore = false
+        }
+      }
 
       // Ders bazlı grupla
       const subjectMap = new Map<string, SubjectStats>()
       const gradeMap = new Map<number, number>()
       const difficultyCount = { easy: 0, medium: 0, hard: 0, legendary: 0 }
 
-      questionsWithTopics?.forEach((q: any) => {
+      allQuestions.forEach((q: any) => {
         // Zorluk sayısı
         if (q.difficulty && difficultyCount.hasOwnProperty(q.difficulty)) {
           difficultyCount[q.difficulty as keyof typeof difficultyCount]++

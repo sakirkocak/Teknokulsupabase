@@ -176,25 +176,38 @@ export default function AdminSoruYonetimiPage() {
       .from('questions')
       .select('*', { count: 'exact', head: true })
     
-    // Zorluk bazlı
-    const { data: diffData } = await supabase
-      .from('questions')
-      .select('difficulty')
+    // Tüm soruları sayfalı olarak çek (pagination)
+    const PAGE_SIZE = 1000
+    let allQuestions: any[] = []
+    let page = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const { data: questionsPage } = await supabase
+        .from('questions')
+        .select('difficulty, topic:topics(grade)')
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+      if (questionsPage && questionsPage.length > 0) {
+        allQuestions = [...allQuestions, ...questionsPage]
+        hasMore = questionsPage.length === PAGE_SIZE
+        page++
+      } else {
+        hasMore = false
+      }
+    }
     
+    // Zorluk bazlı
     const diffCounts = { easy: 0, medium: 0, hard: 0, legendary: 0 }
-    diffData?.forEach(q => {
+    allQuestions.forEach(q => {
       if (q.difficulty in diffCounts) {
         diffCounts[q.difficulty as keyof typeof diffCounts]++
       }
     })
     
     // Sınıf bazlı
-    const { data: gradeData } = await supabase
-      .from('questions')
-      .select('topic:topics(grade)')
-    
     const gradeCounts: Record<number, number> = {}
-    gradeData?.forEach(q => {
+    allQuestions.forEach(q => {
       const grade = (q.topic as any)?.grade
       if (grade) {
         gradeCounts[grade] = (gradeCounts[grade] || 0) + 1

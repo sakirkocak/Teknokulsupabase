@@ -517,3 +517,319 @@ export function getCategoryIcon(category: BadgeCategory): string {
   return icons[category]
 }
 
+// =====================================================
+// COMBO VE GÜNLÜK HEDEF SİSTEMİ
+// =====================================================
+
+export const COMBO_SETTINGS = {
+  COMBO_THRESHOLD: 5, // Her 5 doğru cevapta bonus
+  COMBO_BONUS_XP: 10, // Combo başına bonus XP
+  FAST_ANSWER_THRESHOLD: 30, // 30 saniye altında hızlı cevap
+  FAST_ANSWER_BONUS: 5, // Hızlı cevap bonusu
+} as const
+
+export const DAILY_TARGET_SETTINGS = {
+  DEFAULT_TARGET: 20, // Varsayılan günlük hedef
+  MIN_TARGET: 5,
+  MAX_TARGET: 100,
+} as const
+
+export const TIMER_SETTINGS = {
+  DEFAULT_DURATION: 60, // Varsayılan süre (saniye)
+  MIN_DURATION: 15,
+  MAX_DURATION: 120,
+} as const
+
+// =====================================================
+// MOTİVASYON MESAJLARI SİSTEMİ
+// =====================================================
+
+export type MotivationContext = 
+  | 'streak_3'
+  | 'streak_5'
+  | 'streak_10'
+  | 'streak_15'
+  | 'streak_20'
+  | 'combo_bonus'
+  | 'wrong_after_streak'
+  | 'first_correct'
+  | 'first_wrong'
+  | 'daily_goal_quarter'
+  | 'daily_goal_half'
+  | 'daily_goal_almost'
+  | 'daily_goal_complete'
+  | 'fast_answer'
+  | 'perfect_session'
+  | 'comeback'
+  | 'keep_going'
+
+interface MotivationMessage {
+  text: string
+  emoji: string
+  color: string
+}
+
+const MOTIVATION_MESSAGES: Record<MotivationContext, MotivationMessage[]> = {
+  streak_3: [
+    { text: '3 seri! Devam et!', emoji: '🔥', color: 'text-orange-500' },
+    { text: 'Üçleme! Harika gidiyorsun!', emoji: '🎯', color: 'text-orange-500' },
+  ],
+  streak_5: [
+    { text: '5 SERİ! COMBO BONUS!', emoji: '⚡', color: 'text-yellow-500' },
+    { text: 'Beşleme! Muhteşem!', emoji: '🌟', color: 'text-yellow-500' },
+  ],
+  streak_10: [
+    { text: '10 SERİ! EFSANE!', emoji: '🚀', color: 'text-purple-500' },
+    { text: 'Onluk! Sen bir makinasın!', emoji: '💪', color: 'text-purple-500' },
+  ],
+  streak_15: [
+    { text: '15 SERİ! DURDURULAMIYORSUN!', emoji: '🔥', color: 'text-red-500' },
+    { text: 'İnanılmaz! 15 üst üste!', emoji: '👑', color: 'text-red-500' },
+  ],
+  streak_20: [
+    { text: '20 SERİ! GOAT!', emoji: '🐐', color: 'text-rose-500' },
+    { text: 'Efsane! 20 seri doğru!', emoji: '🏆', color: 'text-rose-500' },
+  ],
+  combo_bonus: [
+    { text: 'COMBO BONUS +10 XP!', emoji: '💥', color: 'text-amber-500' },
+    { text: 'Bonus kazandın!', emoji: '🎁', color: 'text-amber-500' },
+  ],
+  wrong_after_streak: [
+    { text: 'Olur böyle şeyler, devam!', emoji: '💪', color: 'text-blue-500' },
+    { text: 'Kafayı takma, yeniden başla!', emoji: '🔄', color: 'text-blue-500' },
+    { text: 'Bu sefer olmadı, bir dahakine!', emoji: '✊', color: 'text-blue-500' },
+  ],
+  first_correct: [
+    { text: 'İlk adım! Harika başladın!', emoji: '🌟', color: 'text-green-500' },
+    { text: 'Güzel başlangıç!', emoji: '👏', color: 'text-green-500' },
+  ],
+  first_wrong: [
+    { text: 'Problem değil, devam et!', emoji: '💪', color: 'text-blue-500' },
+    { text: 'Herkes hata yapar, önemli olan devam etmek!', emoji: '🎯', color: 'text-blue-500' },
+  ],
+  daily_goal_quarter: [
+    { text: 'Çeyrek yol tamam!', emoji: '🏃', color: 'text-blue-500' },
+    { text: '%25 ilerleme!', emoji: '📈', color: 'text-blue-500' },
+  ],
+  daily_goal_half: [
+    { text: 'Yarı yoldasın!', emoji: '💪', color: 'text-indigo-500' },
+    { text: '%50! Yarısı bitti!', emoji: '🎯', color: 'text-indigo-500' },
+  ],
+  daily_goal_almost: [
+    { text: 'Neredeyse tamam! Son hamle!', emoji: '🔥', color: 'text-orange-500' },
+    { text: 'Az kaldı! Bitir şunu!', emoji: '🏁', color: 'text-orange-500' },
+  ],
+  daily_goal_complete: [
+    { text: 'GÜNLÜK HEDEF TAMAM!', emoji: '🎉', color: 'text-green-500' },
+    { text: 'Tebrikler! Bugünkü hedefini tamamladın!', emoji: '🏆', color: 'text-green-500' },
+    { text: 'Süpersin! Günlük görev bitti!', emoji: '⭐', color: 'text-green-500' },
+  ],
+  fast_answer: [
+    { text: 'HIZLI CEVAP!', emoji: '⚡', color: 'text-cyan-500' },
+    { text: 'Şimşek hızı!', emoji: '💨', color: 'text-cyan-500' },
+  ],
+  perfect_session: [
+    { text: 'MÜKEMMEL OTURUM!', emoji: '💎', color: 'text-purple-500' },
+    { text: 'Tek hata yok! Harikasın!', emoji: '👑', color: 'text-purple-500' },
+  ],
+  comeback: [
+    { text: 'Geri döndün!', emoji: '🔥', color: 'text-orange-500' },
+    { text: 'İşte bu! Devam!', emoji: '💪', color: 'text-orange-500' },
+  ],
+  keep_going: [
+    { text: 'Devam et!', emoji: '👊', color: 'text-blue-500' },
+    { text: 'Her adım önemli!', emoji: '🎯', color: 'text-blue-500' },
+    { text: 'İyi gidiyorsun!', emoji: '👍', color: 'text-blue-500' },
+  ],
+}
+
+/**
+ * Motivasyon mesajı al
+ */
+export function getMotivationalMessage(context: MotivationContext): MotivationMessage {
+  const messages = MOTIVATION_MESSAGES[context]
+  const randomIndex = Math.floor(Math.random() * messages.length)
+  return messages[randomIndex]
+}
+
+/**
+ * Streak'e göre motivasyon context'i belirle
+ */
+export function getStreakMotivationContext(streak: number): MotivationContext | null {
+  if (streak >= 20) return 'streak_20'
+  if (streak >= 15) return 'streak_15'
+  if (streak >= 10) return 'streak_10'
+  if (streak >= 5) return 'streak_5'
+  if (streak >= 3) return 'streak_3'
+  return null
+}
+
+/**
+ * Günlük ilerlemeye göre motivasyon context'i belirle
+ */
+export function getDailyProgressMotivationContext(solved: number, target: number): MotivationContext | null {
+  const progress = solved / target
+  if (progress >= 1) return 'daily_goal_complete'
+  if (progress >= 0.9) return 'daily_goal_almost'
+  if (progress >= 0.5 && solved === Math.floor(target * 0.5)) return 'daily_goal_half'
+  if (progress >= 0.25 && solved === Math.floor(target * 0.25)) return 'daily_goal_quarter'
+  return null
+}
+
+/**
+ * Combo bonusu hesapla
+ */
+export function calculateComboBonus(streak: number): number {
+  if (streak > 0 && streak % COMBO_SETTINGS.COMBO_THRESHOLD === 0) {
+    return COMBO_SETTINGS.COMBO_BONUS_XP
+  }
+  return 0
+}
+
+/**
+ * Combo seviyesini hesapla (kaç kez combo yapıldı)
+ */
+export function getComboLevel(streak: number): number {
+  return Math.floor(streak / COMBO_SETTINGS.COMBO_THRESHOLD)
+}
+
+// =====================================================
+// LOCALSTORAGE YARDIMCI FONKSİYONLARI
+// =====================================================
+
+export interface TeknokulSettings {
+  timerEnabled: boolean
+  timerDuration: number
+  dailyTarget: number
+  soundEnabled: boolean
+}
+
+export interface DailyProgress {
+  date: string
+  solved: number
+  correct: number
+  wrong: number
+  targetCompleted: boolean
+  xpEarned: number
+}
+
+const SETTINGS_KEY = 'teknokul_settings'
+const DAILY_PROGRESS_KEY = 'teknokul_daily_progress'
+
+/**
+ * Ayarları localStorage'dan al
+ */
+export function getSettings(): TeknokulSettings {
+  if (typeof window === 'undefined') {
+    return {
+      timerEnabled: false,
+      timerDuration: TIMER_SETTINGS.DEFAULT_DURATION,
+      dailyTarget: DAILY_TARGET_SETTINGS.DEFAULT_TARGET,
+      soundEnabled: true,
+    }
+  }
+  
+  try {
+    const stored = localStorage.getItem(SETTINGS_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (e) {
+    console.error('Settings parse error:', e)
+  }
+  
+  return {
+    timerEnabled: false,
+    timerDuration: TIMER_SETTINGS.DEFAULT_DURATION,
+    dailyTarget: DAILY_TARGET_SETTINGS.DEFAULT_TARGET,
+    soundEnabled: true,
+  }
+}
+
+/**
+ * Ayarları localStorage'a kaydet
+ */
+export function saveSettings(settings: Partial<TeknokulSettings>): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const current = getSettings()
+    const updated = { ...current, ...settings }
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated))
+  } catch (e) {
+    console.error('Settings save error:', e)
+  }
+}
+
+/**
+ * Günlük ilerlemeyi localStorage'dan al
+ */
+export function getDailyProgress(): DailyProgress {
+  const today = new Date().toISOString().split('T')[0]
+  
+  if (typeof window === 'undefined') {
+    return {
+      date: today,
+      solved: 0,
+      correct: 0,
+      wrong: 0,
+      targetCompleted: false,
+      xpEarned: 0,
+    }
+  }
+  
+  try {
+    const stored = localStorage.getItem(DAILY_PROGRESS_KEY)
+    if (stored) {
+      const progress = JSON.parse(stored) as DailyProgress
+      // Farklı bir gün ise sıfırla
+      if (progress.date !== today) {
+        const newProgress: DailyProgress = {
+          date: today,
+          solved: 0,
+          correct: 0,
+          wrong: 0,
+          targetCompleted: false,
+          xpEarned: 0,
+        }
+        localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(newProgress))
+        return newProgress
+      }
+      return progress
+    }
+  } catch (e) {
+    console.error('Daily progress parse error:', e)
+  }
+  
+  return {
+    date: today,
+    solved: 0,
+    correct: 0,
+    wrong: 0,
+    targetCompleted: false,
+    xpEarned: 0,
+  }
+}
+
+/**
+ * Günlük ilerlemeyi güncelle
+ */
+export function updateDailyProgress(updates: Partial<Omit<DailyProgress, 'date'>>): DailyProgress {
+  if (typeof window === 'undefined') {
+    return getDailyProgress()
+  }
+  
+  try {
+    const current = getDailyProgress()
+    const updated: DailyProgress = {
+      ...current,
+      ...updates,
+    }
+    localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(updated))
+    return updated
+  } catch (e) {
+    console.error('Daily progress update error:', e)
+    return getDailyProgress()
+  }
+}
+

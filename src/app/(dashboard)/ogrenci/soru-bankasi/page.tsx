@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { 
@@ -10,17 +10,38 @@ import {
   ChevronRight, Trophy, Target, Zap, Crown, Star,
   BarChart3, ArrowRight, Clock, Brain, GraduationCap,
   ChevronDown, ChevronUp, Layers, Sparkles, ArrowLeft,
-  TrendingUp, Award, Flame, Home, Flag, Medal
+  TrendingUp, Award, Flame, Home, Flag, Medal, Settings,
+  Gift, Timer, Keyboard
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import confetti from 'canvas-confetti'
 import MathRenderer from '@/components/MathRenderer'
 import { CelebrationModal, BadgeToast } from '@/components/gamification'
+import { SingleXPFloat, MotivationFloat } from '@/components/XPFloatingAnimation'
+import ComboIndicator from '@/components/ComboIndicator'
+import DailyProgressBar, { SessionStats, MiniProgress } from '@/components/DailyProgressBar'
+import QuestionTimer, { useQuestionTimer, TimerSettings } from '@/components/QuestionTimer'
 import { 
   XP_REWARDS, 
   calculateStreakBonus, 
   checkEarnableBadges,
   type Badge,
-  type UserStats 
+  type UserStats,
+  COMBO_SETTINGS,
+  DAILY_TARGET_SETTINGS,
+  TIMER_SETTINGS,
+  getSettings,
+  saveSettings,
+  getDailyProgress,
+  updateDailyProgress,
+  getMotivationalMessage,
+  getStreakMotivationContext,
+  getDailyProgressMotivationContext,
+  calculateComboBonus,
+  getComboLevel,
+  type TeknokulSettings,
+  type DailyProgress,
+  type MotivationContext
 } from '@/lib/gamification'
 
 interface Subject {
@@ -163,10 +184,110 @@ export default function SoruBankasiPage() {
   const [earnedXP, setEarnedXP] = useState<number>(0)
   const [userId, setUserId] = useState<string | null>(null)
 
+  // Yeni Gamification State - Combo ve Günlük Hedef
+  const [settings, setSettings] = useState<TeknokulSettings>(() => ({
+    timerEnabled: false,
+    timerDuration: TIMER_SETTINGS.DEFAULT_DURATION,
+    dailyTarget: DAILY_TARGET_SETTINGS.DEFAULT_TARGET,
+    soundEnabled: true,
+  }))
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress>(() => ({
+    date: new Date().toISOString().split('T')[0],
+    solved: 0,
+    correct: 0,
+    wrong: 0,
+    targetCompleted: false,
+    xpEarned: 0,
+  }))
+  const [sessionStreak, setSessionStreak] = useState(0)
+  const [showXPFloat, setShowXPFloat] = useState(false)
+  const [floatXPAmount, setFloatXPAmount] = useState(0)
+  const [floatXPType, setFloatXPType] = useState<'correct' | 'wrong' | 'combo' | 'streak' | 'fast'>('correct')
+  const [showMotivation, setShowMotivation] = useState(false)
+  const [motivationMessage, setMotivationMessage] = useState({ text: '', emoji: '', color: '' })
+  const [showComboBonus, setShowComboBonus] = useState(false)
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [questionStartTime, setQuestionStartTime] = useState<number>(0)
+  const [timerKey, setTimerKey] = useState(0) // Timer reset için
+  const questionContainerRef = useRef<HTMLDivElement>(null)
+
   // İlk yükleme
   useEffect(() => {
     loadInitialData()
   }, [])
+
+  // localStorage'dan ayarları ve günlük ilerlemeyi yükle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setSettings(getSettings())
+      setDailyProgress(getDailyProgress())
+    }
+  }, [])
+
+  // Confetti efekti fonksiyonu
+  const triggerConfetti = useCallback((type: 'small' | 'medium' | 'large' | 'celebration') => {
+    const config = {
+      small: { particleCount: 30, spread: 50, origin: { y: 0.6 } },
+      medium: { particleCount: 60, spread: 80, origin: { y: 0.5 } },
+      large: { particleCount: 100, spread: 100, origin: { y: 0.4 } },
+      celebration: { particleCount: 150, spread: 360, origin: { y: 0.5 }, colors: ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1'] }
+    }
+    
+    confetti({
+      ...config[type],
+      gravity: 1.2,
+      ticks: 200,
+    })
+  }, [])
+
+  // Motivasyon mesajı göster
+  const showMotivationMessage = useCallback((context: MotivationContext) => {
+    const msg = getMotivationalMessage(context)
+    setMotivationMessage(msg)
+    setShowMotivation(true)
+    setTimeout(() => setShowMotivation(false), 2500)
+  }, [])
+
+  // XP Float animasyonu göster
+  const showXPAnimation = useCallback((amount: number, type: 'correct' | 'wrong' | 'combo' | 'streak' | 'fast') => {
+    setFloatXPAmount(amount)
+    setFloatXPType(type)
+    setShowXPFloat(true)
+    setTimeout(() => setShowXPFloat(false), 1500)
+  }, [])
+
+  // Klavye kısayolları - viewMode practice olduğunda
+  useEffect(() => {
+    if (viewMode !== 'practice') return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Eğer bir input veya textarea odaklıysa, işlemi atla
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      
+      const key = e.key.toUpperCase()
+      
+      // A, B, C, D, E tuşları ile seçim
+      if (['A', 'B', 'C', 'D', 'E'].includes(key) && !showResult && currentQuestion) {
+        const options = Object.keys(currentQuestion.options)
+        if (options.includes(key)) {
+          handleAnswer(key)
+        }
+      }
+      
+      // Enter ile sonraki soru
+      if (e.key === 'Enter' && showResult) {
+        loadNextQuestion()
+      }
+      
+      // ESC ile oturumu bitir
+      if (e.key === 'Escape') {
+        endSession()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [viewMode, showResult, currentQuestion])
 
   // Sınıf değiştiğinde
   useEffect(() => {
@@ -450,6 +571,9 @@ export default function SoruBankasiPage() {
     setViewMode('practice')
     setQuestionIndex(0)
     setSessionStats({ correct: 0, wrong: 0 })
+    setSessionStreak(0)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
     await loadNextQuestion(topic)
   }
 
@@ -461,6 +585,9 @@ export default function SoruBankasiPage() {
     setViewMode('practice')
     setQuestionIndex(0)
     setSessionStats({ correct: 0, wrong: 0 })
+    setSessionStreak(0)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
     await loadRandomQuestion()
   }
 
@@ -472,6 +599,9 @@ export default function SoruBankasiPage() {
     setViewMode('practice')
     setQuestionIndex(0)
     setSessionStats({ correct: 0, wrong: 0 })
+    setSessionStreak(0)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
     await loadRandomQuestionFromSubject(gs.subject_id)
   }
 
@@ -480,6 +610,8 @@ export default function SoruBankasiPage() {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
 
     // Bu sınıftaki tüm topic'leri al
     const { data: allTopics } = await supabase
@@ -515,6 +647,8 @@ export default function SoruBankasiPage() {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
 
     const { data: subjectTopics } = await supabase
       .from('topics')
@@ -549,6 +683,8 @@ export default function SoruBankasiPage() {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
 
     const topicToUse = topic || selectedTopic
 
@@ -589,15 +725,86 @@ export default function SoruBankasiPage() {
     setIsCorrect(correct)
     setShowResult(true)
 
+    // Hızlı cevap kontrolü
+    const answerTime = (Date.now() - questionStartTime) / 1000
+    const isFastAnswer = answerTime <= COMBO_SETTINGS.FAST_ANSWER_THRESHOLD
+
     // XP hesapla
-    const baseXP = correct ? XP_REWARDS.CORRECT_ANSWER : XP_REWARDS.WRONG_ANSWER
+    let baseXP = correct ? XP_REWARDS.CORRECT_ANSWER : XP_REWARDS.WRONG_ANSWER
+    
+    // Hızlı cevap bonusu
+    if (correct && isFastAnswer) {
+      baseXP += COMBO_SETTINGS.FAST_ANSWER_BONUS
+    }
+    
     setEarnedXP(baseXP)
     setEarnedPoints(baseXP)
+
+    // Session streak güncelle
+    const newSessionStreak = correct ? sessionStreak + 1 : 0
+    const prevSessionStreak = sessionStreak
+    setSessionStreak(newSessionStreak)
 
     setSessionStats(prev => ({
       correct: prev.correct + (correct ? 1 : 0),
       wrong: prev.wrong + (correct ? 0 : 1)
     }))
+
+    // Combo bonus hesapla
+    let comboBonus = 0
+    if (correct && newSessionStreak > 0 && newSessionStreak % COMBO_SETTINGS.COMBO_THRESHOLD === 0) {
+      comboBonus = COMBO_SETTINGS.COMBO_BONUS_XP
+      setShowComboBonus(true)
+      setTimeout(() => setShowComboBonus(false), 2000)
+    }
+
+    // XP animasyonu göster
+    if (correct) {
+      showXPAnimation(baseXP + comboBonus, comboBonus > 0 ? 'combo' : (isFastAnswer ? 'fast' : 'correct'))
+      triggerConfetti(newSessionStreak >= 10 ? 'medium' : (newSessionStreak >= 5 ? 'small' : 'small'))
+    } else {
+      showXPAnimation(baseXP, 'wrong')
+    }
+
+    // Motivasyon mesajı kontrolü
+    const streakContext = getStreakMotivationContext(newSessionStreak)
+    if (streakContext) {
+      setTimeout(() => showMotivationMessage(streakContext), 300)
+    } else if (!correct && prevSessionStreak >= 3) {
+      setTimeout(() => showMotivationMessage('wrong_after_streak'), 300)
+    } else if (correct && questionIndex === 1) {
+      setTimeout(() => showMotivationMessage('first_correct'), 300)
+    }
+
+    // Günlük ilerleme güncelle
+    const newSolved = dailyProgress.solved + 1
+    const newCorrect = dailyProgress.correct + (correct ? 1 : 0)
+    const newWrong = dailyProgress.wrong + (correct ? 0 : 1)
+    const newXPEarned = dailyProgress.xpEarned + baseXP + comboBonus
+    const targetCompleted = newSolved >= settings.dailyTarget && !dailyProgress.targetCompleted
+    
+    const updatedProgress = updateDailyProgress({
+      solved: newSolved,
+      correct: newCorrect,
+      wrong: newWrong,
+      xpEarned: newXPEarned,
+      targetCompleted: newSolved >= settings.dailyTarget,
+    })
+    setDailyProgress(updatedProgress)
+
+    // Günlük hedef tamamlandı mı?
+    if (targetCompleted) {
+      setTimeout(() => {
+        triggerConfetti('celebration')
+        showMotivationMessage('daily_goal_complete')
+      }, 500)
+    } else {
+      // Yarı yol veya çeyrek yol kontrolü
+      const progressContext = getDailyProgressMotivationContext(newSolved, settings.dailyTarget)
+      if (progressContext && progressContext !== 'daily_goal_complete') {
+        setTimeout(() => showMotivationMessage(progressContext), 1000)
+      }
+    }
 
     // Soru istatistiklerini güncelle
     await supabase
@@ -636,13 +843,13 @@ export default function SoruBankasiPage() {
       const newStreak = correct ? (existingPoints?.current_streak || 0) + 1 : 0
       const newMaxStreak = Math.max(newStreak, existingPoints?.max_streak || 0)
       
-      // Streak bonusu
+      // Streak bonusu (günlük seri için)
       let streakBonus = 0
       if (newStreak > 0 && newStreak % 5 === 0) {
         streakBonus = calculateStreakBonus(newStreak)
       }
 
-      const totalXPGain = baseXP + streakBonus
+      const totalXPGain = baseXP + streakBonus + comboBonus
 
       if (existingPoints) {
         const updateData: any = {
@@ -893,7 +1100,7 @@ export default function SoruBankasiPage() {
   if (viewMode === 'practice') {
     if (!currentQuestion) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
               <BookOpen className="h-10 w-10 text-white/60" />
@@ -912,114 +1119,218 @@ export default function SoruBankasiPage() {
     }
 
     const DiffIcon = difficultyConfig[currentQuestion.difficulty].icon
+    const dailyProgressPercent = Math.min(100, Math.round((dailyProgress.solved / settings.dailyTarget) * 100))
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900 p-4 md:p-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Üst Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2 sm:gap-4">
-              <button
-                onClick={endSession}
-                className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
-                title="Bitir"
-              >
-                <XCircle className="h-5 w-5" />
-              </button>
-              <span className="text-white/70 text-sm sm:text-base">Soru {questionIndex}</span>
-              <div className={`${difficultyConfig[currentQuestion.difficulty].color} px-2 sm:px-3 py-1 rounded-full text-white text-xs sm:text-sm flex items-center gap-1`}>
-                <DiffIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline">{difficultyConfig[currentQuestion.difficulty].label}</span>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 p-4 md:p-6 relative overflow-hidden">
+        {/* Dekoratif arka plan elementleri */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="max-w-4xl mx-auto relative z-10" ref={questionContainerRef}>
+          {/* Üst Bar - Yenilenmiş */}
+          <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 mb-6 border border-white/10">
+            {/* Üst Satır - Kontroller ve İstatistikler */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                {/* Bitir Butonu */}
+                <button
+                  onClick={endSession}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl transition-all border border-red-500/30"
+                  title="Oturumu Bitir (ESC)"
+                >
+                  <XCircle className="h-5 w-5" />
+                  <span className="hidden sm:inline font-medium">Bitir</span>
+                </button>
+
+                {/* Soru Numarası */}
+                <div className="flex items-center gap-2 bg-white/10 px-4 py-2 rounded-xl">
+                  <Target className="h-4 w-4 text-indigo-400" />
+                  <span className="text-white font-medium">Soru {questionIndex}</span>
+                </div>
+
+                {/* Zorluk */}
+                <div className={`${difficultyConfig[currentQuestion.difficulty].color} px-3 py-2 rounded-xl text-white text-sm flex items-center gap-2 shadow-lg`}>
+                  <DiffIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline font-medium">{difficultyConfig[currentQuestion.difficulty].label}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Combo Göstergesi */}
+                {sessionStreak >= 3 && (
+                  <ComboIndicator 
+                    streak={sessionStreak} 
+                    showBonus={showComboBonus}
+                    size="md"
+                  />
+                )}
+
+                {/* Timer (Opsiyonel) */}
+                {settings.timerEnabled && (
+                  <QuestionTimer
+                    key={timerKey}
+                    duration={settings.timerDuration}
+                    isRunning={!showResult}
+                    variant="compact"
+                    className="hidden sm:flex"
+                  />
+                )}
+
+                {/* Session İstatistikleri */}
+                <SessionStats
+                  correct={sessionStats.correct}
+                  wrong={sessionStats.wrong}
+                  total={questionIndex}
+                  className="hidden sm:flex"
+                />
+
+                {/* Ayarlar Butonu */}
+                <button
+                  onClick={() => setShowSettingsModal(true)}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all text-white/70 hover:text-white"
+                  title="Ayarlar"
+                >
+                  <Settings className="h-5 w-5" />
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              {/* Session Stats */}
-              <div className="flex items-center gap-2 sm:gap-3 bg-white/10 px-2 sm:px-4 py-2 rounded-xl">
-                <span className="text-green-400 flex items-center gap-1">
-                  <CheckCircle className="h-4 w-4" />
-                  {sessionStats.correct}
+
+            {/* Günlük İlerleme Barı */}
+            <div className="relative">
+              <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+                <span className="flex items-center gap-1">
+                  <Trophy className="h-3 w-3" />
+                  Günlük Hedef: {dailyProgress.solved}/{settings.dailyTarget}
                 </span>
-                <span className="text-red-400 flex items-center gap-1">
-                  <XCircle className="h-4 w-4" />
-                  {sessionStats.wrong}
-                </span>
+                <span className="font-medium text-white/80">{dailyProgressPercent}%</span>
               </div>
-              {/* Streak */}
-              {studentPoints?.current_streak > 0 && (
-                <div className="hidden sm:flex items-center gap-1 bg-orange-500/20 px-3 py-2 rounded-xl text-orange-400">
-                  <Flame className="h-4 w-4" />
-                  {studentPoints.current_streak}
-                </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${dailyProgressPercent}%` }}
+                  transition={{ duration: 0.5 }}
+                  className={`h-full rounded-full ${
+                    dailyProgressPercent >= 100 
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                      : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                  }`}
+                />
+              </div>
+            </div>
+
+            {/* Mobil için İstatistikler */}
+            <div className="flex items-center justify-between mt-3 sm:hidden">
+              <SessionStats
+                correct={sessionStats.correct}
+                wrong={sessionStats.wrong}
+                total={questionIndex}
+              />
+              {settings.timerEnabled && (
+                <QuestionTimer
+                  key={timerKey}
+                  duration={settings.timerDuration}
+                  isRunning={!showResult}
+                  variant="compact"
+                />
               )}
             </div>
           </div>
 
-          {/* Soru Kartı */}
+          {/* Soru Kartı - Glass Morphism */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 md:p-8"
+            className="bg-white/10 backdrop-blur-xl rounded-3xl p-6 md:p-8 border border-white/20 shadow-2xl relative"
           >
             {/* Konu Bilgisi */}
-            <div className="text-indigo-300 text-sm mb-4 flex items-center gap-2">
-              <span>{currentQuestion.topic?.subject?.icon || '📚'}</span>
-              <span>{currentQuestion.topic?.subject?.name}</span>
-              <ChevronRight className="h-4 w-4" />
-              <span>{currentQuestion.topic?.main_topic}</span>
+            <div className="flex items-center gap-2 text-sm mb-4">
+              <span className="text-2xl">{currentQuestion.topic?.subject?.icon || '📚'}</span>
+              <span className="text-indigo-300 font-medium">{currentQuestion.topic?.subject?.name}</span>
+              <ChevronRight className="h-4 w-4 text-white/40" />
+              <span className="text-white/60">{currentQuestion.topic?.main_topic}</span>
             </div>
 
             {/* Soru Metni */}
-            <div className="text-white text-lg md:text-xl mb-6 leading-relaxed">
+            <div className="text-white text-lg md:text-xl mb-8 leading-relaxed font-medium">
               <MathRenderer text={currentQuestion.question_text} />
             </div>
 
             {/* Görsel */}
             {currentQuestion.question_image_url && (
-              <div className="mb-6">
+              <div className="mb-8 rounded-xl overflow-hidden border border-white/10">
                 <img 
                   src={currentQuestion.question_image_url} 
                   alt="Soru görseli"
-                  className="max-w-full rounded-lg"
+                  className="max-w-full"
                 />
               </div>
             )}
 
-            {/* Şıklar */}
+            {/* Şıklar - Yenilenmiş Tasarım */}
             <div className="space-y-3">
               {Object.entries(currentQuestion.options).map(([key, value]) => {
                 if (!value) return null
                 
-                let buttonClass = 'bg-white/5 hover:bg-white/10 border-white/20'
+                let buttonClass = 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-white/30'
+                let iconClass = 'bg-white/10 text-white'
                 
                 if (showResult) {
                   if (key === currentQuestion.correct_answer) {
-                    buttonClass = 'bg-green-500/30 border-green-500'
+                    buttonClass = 'bg-green-500/20 border-green-500/50 ring-2 ring-green-500/30'
+                    iconClass = 'bg-green-500 text-white'
                   } else if (key === selectedAnswer && !isCorrect) {
-                    buttonClass = 'bg-red-500/30 border-red-500'
+                    buttonClass = 'bg-red-500/20 border-red-500/50 ring-2 ring-red-500/30'
+                    iconClass = 'bg-red-500 text-white'
+                  } else {
+                    buttonClass = 'opacity-50'
                   }
                 } else if (selectedAnswer === key) {
-                  buttonClass = 'bg-indigo-500/30 border-indigo-500'
+                  buttonClass = 'bg-indigo-500/20 border-indigo-500/50 ring-2 ring-indigo-500/30'
+                  iconClass = 'bg-indigo-500 text-white'
                 }
 
                 return (
-                  <button
+                  <motion.button
                     key={key}
                     onClick={() => handleAnswer(key)}
                     disabled={showResult}
-                    className={`w-full p-4 rounded-xl border-2 text-left transition-all ${buttonClass} ${
+                    whileHover={!showResult ? { scale: 1.01, x: 4 } : {}}
+                    whileTap={!showResult ? { scale: 0.99 } : {}}
+                    className={`w-full p-4 md:p-5 rounded-2xl border-2 text-left transition-all duration-200 ${buttonClass} ${
                       showResult ? 'cursor-default' : 'cursor-pointer'
                     }`}
                   >
-                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/10 text-white font-bold mr-3">
-                      {key}
-                    </span>
-                    <span className="text-white">
-                      <MathRenderer text={value} />
-                    </span>
-                  </button>
+                    <div className="flex items-start gap-4">
+                      <span className={`flex-shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl font-bold transition-colors ${iconClass}`}>
+                        {key}
+                      </span>
+                      <span className="text-white text-base md:text-lg flex-1 pt-1">
+                        <MathRenderer text={value} />
+                      </span>
+                    </div>
+                  </motion.button>
                 )
               })}
             </div>
+
+            {/* Klavye Kısayolu İpucu */}
+            {!showResult && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-white/40 text-sm">
+                <Keyboard className="h-4 w-4" />
+                <span>A, B, C, D tuşlarıyla seç</span>
+              </div>
+            )}
+
+            {/* XP Float Animasyonu */}
+            <SingleXPFloat 
+              amount={floatXPAmount} 
+              type={floatXPType}
+              show={showXPFloat} 
+              className="top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            />
 
             {/* Sonuç ve Açıklama */}
             <AnimatePresence>
@@ -1028,74 +1339,93 @@ export default function SoruBankasiPage() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mt-6"
+                  className="mt-8"
                 >
-                  {/* Sonuç Mesajı */}
-                  <div className={`flex items-center justify-between p-4 rounded-xl ${
-                    isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'
+                  {/* Sonuç Mesajı - Yenilenmiş */}
+                  <div className={`flex items-center justify-between p-5 rounded-2xl ${
+                    isCorrect 
+                      ? 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30' 
+                      : 'bg-gradient-to-r from-red-500/20 to-rose-500/20 border border-red-500/30'
                   }`}>
-                    <div className="flex items-center gap-3">
-                      {isCorrect ? (
-                        <>
-                          <CheckCircle className="h-6 w-6 text-green-400" />
-                          <span className="text-green-400 font-medium">Doğru Cevap!</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-6 w-6 text-red-400" />
-                          <span className="text-red-400 font-medium">
-                            Yanlış! Doğru: {currentQuestion.correct_answer}
-                          </span>
-                        </>
-                      )}
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                        isCorrect ? 'bg-green-500' : 'bg-red-500'
+                      }`}>
+                        {isCorrect ? (
+                          <CheckCircle className="h-6 w-6 text-white" />
+                        ) : (
+                          <XCircle className="h-6 w-6 text-white" />
+                        )}
+                      </div>
+                      <div>
+                        <span className={`font-bold text-lg ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
+                          {isCorrect ? 'Doğru Cevap!' : 'Yanlış Cevap'}
+                        </span>
+                        {!isCorrect && (
+                          <p className="text-white/60 text-sm">
+                            Doğru cevap: <span className="font-bold text-white">{currentQuestion.correct_answer}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className={`flex items-center gap-1 px-3 py-1 rounded-full font-bold ${
-                        isCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      initial={{ scale: 0, rotate: -10 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-lg ${
+                        isCorrect 
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30' 
+                          : 'bg-gradient-to-r from-red-500 to-rose-500 text-white shadow-lg shadow-red-500/30'
                       }`}
                     >
-                      <Trophy className="h-4 w-4" />
-                      {isCorrect ? '+2' : '-1'} puan
+                      <Zap className="h-5 w-5" />
+                      {earnedPoints && earnedPoints > 0 ? `+${earnedPoints}` : earnedPoints} XP
                     </motion.div>
                   </div>
 
                   {/* Açıklama */}
                   {currentQuestion.explanation && (
-                    <div className="mt-4 p-4 rounded-xl bg-white/5">
-                      <h4 className="text-indigo-300 font-medium mb-2 flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
+                    <div className="mt-4 p-5 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20">
+                      <h4 className="text-indigo-300 font-semibold mb-3 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5" />
                         Açıklama
                       </h4>
-                      <p className="text-white/80">
+                      <p className="text-white/80 leading-relaxed">
                         <MathRenderer text={currentQuestion.explanation} />
                       </p>
                     </div>
                   )}
 
-                  {/* Butonlar */}
+                  {/* Alt Butonlar */}
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={() => setShowReportModal(true)}
-                      className="px-4 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 px-5 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-xl transition-colors border border-amber-500/30"
                       title="Hatalı Soru Bildir"
                     >
                       <Flag className="h-5 w-5" />
-                      <span className="hidden sm:inline">Bildir</span>
+                      <span className="hidden sm:inline font-medium">Bildir</span>
                     </button>
                     <button
                       onClick={() => loadNextQuestion()}
-                      className="flex-1 py-4 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50"
                     >
                       Sonraki Soru
                       <ArrowRight className="h-5 w-5" />
+                      <span className="text-white/60 text-sm hidden sm:inline">(Enter)</span>
                     </button>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </motion.div>
+
+          {/* Motivasyon Mesajı */}
+          <MotivationFloat 
+            message={motivationMessage.text}
+            emoji={motivationMessage.emoji}
+            color={motivationMessage.color}
+            show={showMotivation}
+          />
 
           {/* Oturum Özeti Modal */}
           <AnimatePresence>
@@ -1263,6 +1593,138 @@ export default function SoruBankasiPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Ayarlar Modal */}
+          <AnimatePresence>
+            {showSettingsModal && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+                onClick={() => setShowSettingsModal(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center">
+                      <Settings className="h-5 w-5 text-indigo-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        Soru Çözme Ayarları
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Deneyimini özelleştir
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Timer Ayarı */}
+                    <TimerSettings
+                      enabled={settings.timerEnabled}
+                      duration={settings.timerDuration}
+                      onEnabledChange={(enabled) => {
+                        const newSettings = { ...settings, timerEnabled: enabled }
+                        setSettings(newSettings)
+                        saveSettings(newSettings)
+                      }}
+                      onDurationChange={(duration) => {
+                        const newSettings = { ...settings, timerDuration: duration }
+                        setSettings(newSettings)
+                        saveSettings(newSettings)
+                      }}
+                    />
+
+                    {/* Günlük Hedef Ayarı */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Target className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium text-gray-900 dark:text-white">Günlük Hedef</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {[10, 15, 20, 30, 50].map((target) => (
+                          <button
+                            key={target}
+                            onClick={() => {
+                              const newSettings = { ...settings, dailyTarget: target }
+                              setSettings(newSettings)
+                              saveSettings(newSettings)
+                            }}
+                            className={`
+                              px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                              ${settings.dailyTarget === target
+                                ? 'bg-indigo-500 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                              }
+                            `}
+                          >
+                            {target} soru
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Klavye Kısayolları Bilgisi */}
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Keyboard className="w-5 h-5 text-gray-500" />
+                        <span className="font-medium text-gray-900 dark:text-white">Klavye Kısayolları</span>
+                      </div>
+                      <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex justify-between">
+                          <span>Şık seç</span>
+                          <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs font-mono">A B C D E</kbd>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Sonraki soru</span>
+                          <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs font-mono">Enter</kbd>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Oturumu bitir</span>
+                          <kbd className="px-2 py-1 bg-gray-200 dark:bg-gray-600 rounded text-xs font-mono">ESC</kbd>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowSettingsModal(false)}
+                    className="w-full mt-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-colors"
+                  >
+                    Tamam
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Celebration Modal */}
+          <CelebrationModal
+            type={celebrationType}
+            badge={celebrationBadge}
+            onClose={() => {
+              setCelebrationType(null)
+              setCelebrationBadge(null)
+            }}
+          />
+
+          {/* Badge Toast */}
+          {showBadgeToast && newBadges.length > 0 && (
+            <BadgeToast
+              badges={newBadges}
+              onDismiss={() => {
+                setShowBadgeToast(false)
+                setNewBadges([])
+              }}
+            />
+          )}
         </div>
       </div>
     )
