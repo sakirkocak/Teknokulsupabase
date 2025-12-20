@@ -1943,15 +1943,24 @@ export default function SoruBankasiPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl shadow-lg">
-              <BookOpen className="h-8 w-8 text-white" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Soru Bankası</h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                {studentProfile?.grade ? `${studentProfile.grade}. Sınıf` : 'Sınıfını seç'} • Soru çöz, puan kazan!
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => router.push('/ogrenci')}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                title="Dashboard'a Dön"
+              >
+                <ArrowLeft className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+              </button>
+              <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl shadow-lg">
+                <BookOpen className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Soru Bankası</h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                  {studentProfile?.grade ? `${studentProfile.grade}. Sınıf` : 'Sınıfını seç'} • Soru çöz, puan kazan!
+                </p>
+              </div>
             </div>
           </div>
         </div>

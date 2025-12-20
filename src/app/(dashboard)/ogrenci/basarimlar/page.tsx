@@ -34,12 +34,15 @@ import {
   Filter,
   History,
   Calendar,
-  BarChart3
+  BarChart3,
+  ArrowLeft
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 const categories: (BadgeCategory | 'all')[] = ['all', 'soru', 'streak', 'basari', 'hiz', 'liderlik', 'ders']
 
 export default function AchievementsPage() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<BadgeCategory | 'all'>('all')
@@ -116,9 +119,18 @@ export default function AchievementsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-surface-900">Başarımlarım</h1>
-          <p className="text-surface-500">XP, rozetler ve günlük görevlerin</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/ogrenci')}
+            className="p-2 hover:bg-surface-100 rounded-lg transition-colors"
+            title="Dashboard'a Dön"
+          >
+            <ArrowLeft className="h-6 w-6 text-surface-600" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-surface-900">Başarımlarım</h1>
+            <p className="text-surface-500">XP, rozetler ve günlük görevlerin</p>
+          </div>
         </div>
         <Link 
           href="/rozetler" 
