@@ -1,10 +1,10 @@
 /**
  * Google Ads & Analytics Dönüşüm İzleme
- * Tag ID: AW-16918605673
+ * Tag ID: AW-17821953417
  */
 
 // Google Ads ID
-export const GA_ADS_ID = 'AW-16918605673'
+export const GA_ADS_ID = 'AW-17821953417'
 
 // Dönüşüm etiketleri - Google Ads'ten alındı
 export const CONVERSION_LABELS = {
