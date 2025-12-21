@@ -182,11 +182,11 @@ export default function CoachDetailPage() {
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center">
               <img 
                 src="/images/logo.png" 
-                alt="Teknokul" 
-                className="h-10 object-contain"
+                alt="Teknokul - Eğitimin Dijital Üssü" 
+                className="h-12 object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none'
                   const fallback = document.getElementById('koc-detay-logo-fallback')

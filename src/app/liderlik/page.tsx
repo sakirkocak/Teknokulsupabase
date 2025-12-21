@@ -629,11 +629,11 @@ export default function LeaderboardPage() {
       {/* Header */}
       <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center">
             <img 
-              src="/images/logo-white.png" 
-              alt="Teknokul" 
-              className="h-10 object-contain"
+              src="/images/logo.png" 
+              alt="Teknokul - Eğitimin Dijital Üssü" 
+              className="h-12 object-contain"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none'
                 const fallback = document.getElementById('liderlik-logo-fallback')

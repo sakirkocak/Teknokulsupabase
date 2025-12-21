@@ -179,11 +179,11 @@ export default function DashboardLayout({
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-4 border-b border-surface-100">
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center">
               <img 
                 src="/images/logo.png" 
-                alt="Teknokul" 
-                className="h-10 object-contain"
+                alt="Teknokul - Eğitimin Dijital Üssü" 
+                className="h-12 object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none'
                   const fallback = document.getElementById('sidebar-logo-fallback')

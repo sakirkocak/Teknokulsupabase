@@ -189,11 +189,11 @@ function RegisterForm() {
 
   return (
     <div className="w-full max-w-md">
-      <Link href="/" className="flex flex-col items-start gap-1 mb-8">
+      <Link href="/" className="flex flex-col items-start mb-8">
         <img 
           src="/images/logo.png" 
-          alt="Teknokul" 
-          className="h-12 object-contain"
+          alt="Teknokul - Eğitimin Dijital Üssü" 
+          className="h-16 object-contain"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = 'none'
             const fallback = document.getElementById('register-logo-fallback')
@@ -208,7 +208,6 @@ function RegisterForm() {
             Tekn<span className="text-primary-500">okul</span>
           </span>
         </div>
-        <span className="text-xs text-surface-500 font-medium ml-1">Eğitimin Dijital Üssü</span>
       </Link>
 
       <h1 className="text-2xl font-bold text-surface-900 mb-2">
