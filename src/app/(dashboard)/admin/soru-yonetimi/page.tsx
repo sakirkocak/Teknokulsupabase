@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import DashboardLayout from '@/components/layout/DashboardLayout'
+
 import MathRenderer from '@/components/MathRenderer'
 import { 
   BookOpen, Search, Filter, Edit2, Trash2, 
@@ -377,7 +377,7 @@ export default function AdminSoruYonetimiPage() {
   const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -915,7 +915,7 @@ export default function AdminSoruYonetimiPage() {
           </motion.div>
         )}
       </AnimatePresence>
-    </DashboardLayout>
+    </>
   )
 }
 

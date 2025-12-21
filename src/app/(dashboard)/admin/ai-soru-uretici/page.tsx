@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback } from 'react'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -628,29 +627,24 @@ export default function AIQuestionGeneratorPage() {
 
   if (profileLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
     )
   }
 
   if (profile?.role !== 'admin') {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
-          <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800">Erişim Engellendi</h2>
-          <p className="text-gray-600 mt-2">Bu sayfaya erişim yetkiniz bulunmamaktadır.</p>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-12">
+        <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800">Erişim Engellendi</h2>
+        <p className="text-gray-600 mt-2">Bu sayfaya erişim yetkiniz bulunmamaktadır.</p>
+      </div>
     )
   }
 
   return (
-    <DashboardLayout>
-      <div className="max-w-6xl mx-auto">
+    <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -1681,6 +1675,5 @@ export default function AIQuestionGeneratorPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   )
 }

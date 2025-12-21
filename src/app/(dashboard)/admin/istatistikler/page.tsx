@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import DashboardLayout from '@/components/layout/DashboardLayout'
+
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
 import { motion } from 'framer-motion'
@@ -117,11 +117,11 @@ export default function AdminStatsPage() {
 
   if (profileLoading || loading) {
     return (
-      <DashboardLayout role="admin">
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
         </div>
-      </DashboardLayout>
+      </>
     )
   }
 
@@ -137,7 +137,7 @@ export default function AdminStatsPage() {
   ]
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -221,7 +221,7 @@ export default function AdminStatsPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
+    </>
   )
 }
 
