@@ -77,6 +77,8 @@ interface Question {
   difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
   question_text: string
   question_image_url: string | null
+  image_data: string | null  // SVG veya Chart.js config
+  image_type: 'svg' | 'chart' | null  // Görsel türü
   options: { A: string; B: string; C: string; D: string; E?: string }
   correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
   explanation: string | null
@@ -1326,13 +1328,23 @@ export default function SoruBankasiPage() {
               <MathRenderer text={currentQuestion.question_text} />
             </div>
 
-            {/* Görsel */}
+            {/* Görsel - Resim URL */}
             {currentQuestion.question_image_url && (
               <div className="mb-8 rounded-xl overflow-hidden border border-white/10">
                 <img 
                   src={currentQuestion.question_image_url} 
                   alt="Soru görseli"
                   className="max-w-full"
+                />
+              </div>
+            )}
+            
+            {/* Görsel - SVG/Chart */}
+            {currentQuestion.image_data && currentQuestion.image_type === 'svg' && (
+              <div className="mb-8 rounded-xl overflow-hidden border border-white/10 bg-white p-4">
+                <div 
+                  dangerouslySetInnerHTML={{ __html: currentQuestion.image_data }}
+                  className="flex items-center justify-center [&_svg]:max-w-full [&_svg]:h-auto"
                 />
               </div>
             )}

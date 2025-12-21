@@ -33,7 +33,8 @@ import {
   UserCircle,
   Wand2,
   Volume2,
-  Flag
+  Flag,
+  Shapes
 } from 'lucide-react'
 
 type NavItem = {
@@ -87,6 +88,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
+    { label: 'Görsel Soru Üretici', href: '/admin/gorsel-soru-uretici', icon: Shapes },
     { label: 'Soru Bildirimleri', href: '/admin/soru-bildirimleri', icon: Flag },
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
