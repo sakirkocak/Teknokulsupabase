@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft, School } from 'lucide-react'
+import { trackSignup, trackGoogleSignup } from '@/lib/gtag'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -162,6 +163,9 @@ function RegisterForm() {
       }
 
       if (data.success) {
+        // 📊 Google Ads dönüşüm izleme
+        trackSignup(role)
+        
         // Supabase oturumunu senkronize et
         await supabase.auth.signInWithPassword({ email, password })
         

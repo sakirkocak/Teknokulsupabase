@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { Suspense } from 'react'
+import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -30,6 +32,9 @@ export default function RootLayout({
         </Script>
       </head>
       <body className="font-sans">
+        <Suspense fallback={null}>
+          <GoogleAdsTracker />
+        </Suspense>
         {children}
       </body>
     </html>

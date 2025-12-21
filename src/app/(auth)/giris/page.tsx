@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react'
+import { trackLogin } from '@/lib/gtag'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -92,6 +93,9 @@ function LoginForm() {
         throw new Error(data.error || 'Giriş yapılamadı')
       }
 
+      // 📊 Google Ads giriş dönüşümü izleme
+      trackLogin('email')
+      
       // Supabase client tarafında da oturum aç
       await supabase.auth.signInWithPassword({ email, password })
 

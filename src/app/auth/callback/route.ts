@@ -65,14 +65,15 @@ export async function GET(request: Request) {
             .insert({
               user_id: data.user.id,
               grade: userGrade,
+              trust_level: 'new',
             })
 
           if (studentError && !studentError.message.includes('duplicate')) {
             console.error('Öğrenci profili oluşturma hatası:', studentError)
           }
 
-          // Yeni öğrenciyi profil tamamlama sayfasına yönlendir
-          return NextResponse.redirect(`${origin}/ogrenci/profil?welcome=true`)
+          // Yeni öğrenciyi profil tamamlama sayfasına yönlendir (Google kayıt izleme için parametre)
+          return NextResponse.redirect(`${origin}/ogrenci/profil?welcome=true&google_signup=ogrenci`)
         } else if (userRole === 'ogretmen') {
           const { error: teacherError } = await supabase
             .from('teacher_profiles')
@@ -85,7 +86,7 @@ export async function GET(request: Request) {
             console.error('Öğretmen profili oluşturma hatası:', teacherError)
           }
 
-          return NextResponse.redirect(`${origin}/koc/profil?welcome=true`)
+          return NextResponse.redirect(`${origin}/koc/profil?welcome=true&google_signup=ogretmen`)
         } else if (userRole === 'veli') {
           const { error: parentError } = await supabase
             .from('parent_profiles')
@@ -97,11 +98,11 @@ export async function GET(request: Request) {
             console.error('Veli profili oluşturma hatası:', parentError)
           }
 
-          return NextResponse.redirect(`${origin}/veli?welcome=true`)
+          return NextResponse.redirect(`${origin}/veli?welcome=true&google_signup=veli`)
         }
       }
 
-      // Mevcut kullanıcıyı rolüne göre yönlendir
+      // Mevcut kullanıcıyı rolüne göre yönlendir (Google giriş izleme için parametre)
       const routes: Record<string, string> = {
         ogretmen: '/koc',
         ogrenci: '/ogrenci',
@@ -110,7 +111,8 @@ export async function GET(request: Request) {
       }
 
       const redirectPath = profile?.role ? routes[profile.role] : next
-      return NextResponse.redirect(`${origin}${redirectPath || '/'}`)
+      const separator = redirectPath?.includes('?') ? '&' : '?'
+      return NextResponse.redirect(`${origin}${redirectPath || '/'}${separator}google_login=true`)
     }
   }
 
