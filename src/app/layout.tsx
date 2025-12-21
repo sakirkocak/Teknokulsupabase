@@ -35,6 +35,9 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <head>
+        {/* Google Search Console Verification */}
+        <meta name="google-site-verification" content="WzuPyvuTXOhcUAQKmvXXqJMOa3WIWXF5MlMmDruO7zs" />
+        
         {/* Google AdSense Meta Tag */}
         <meta name="google-adsense-account" content="ca-pub-2370010010396512" />
         
