@@ -767,28 +767,69 @@ ${subjectGuidelines}
       throw new Error('AI yanıtında JSON bulunamadı')
     }
     
-    // JSON temizleme
+    // JSON temizleme - Geliştirilmiş versiyon (özellikle ileri matematik için)
     jsonStr = jsonStr
       .replace(/,(\s*[}\]])/g, '$1') // Trailing commas
       .replace(/[\x00-\x1F\x7F]/g, ' ') // Control characters
+      .replace(/\r\n/g, ' ')
       .replace(/\n/g, ' ')
       .replace(/\r/g, '')
       .replace(/\t/g, ' ')
     
-    // LaTeX backslash'lerini düzelt - JSON'da tek \ geçersiz
-    // \frac, \sqrt, \cdot, \times, \div gibi LaTeX komutlarını çift \\ yap
-    jsonStr = jsonStr.replace(/\\([a-zA-Z]+)/g, (match, cmd) => {
-      // Zaten valid JSON escape sequence ise dokunma
-      const validEscapes = ['n', 'r', 't', 'b', 'f', 'u']
-      if (validEscapes.includes(cmd) || cmd.startsWith('u')) {
-        return match
-      }
-      // LaTeX komutu ise çift backslash yap
-      return '\\\\' + cmd
+    // İleri matematik için özel LaTeX komutları (türev, integral, limit vb.)
+    const advancedMathCommands = [
+      'frac', 'dfrac', 'tfrac', 'cfrac',  // Kesirler
+      'sqrt', 'root', 'nthroot',           // Kökler
+      'lim', 'limsup', 'liminf',           // Limitler
+      'int', 'iint', 'iiint', 'oint',      // İntegraller
+      'sum', 'prod', 'coprod',             // Toplam/Çarpım
+      'partial', 'nabla', 'grad',          // Kısmi türev
+      'infty', 'infinity',                 // Sonsuz
+      'to', 'rightarrow', 'leftarrow', 'Rightarrow', 'Leftarrow',
+      'sin', 'cos', 'tan', 'cot', 'sec', 'csc',  // Trigonometri
+      'arcsin', 'arccos', 'arctan',
+      'sinh', 'cosh', 'tanh',              // Hiperbolik
+      'log', 'ln', 'lg', 'exp',            // Logaritma
+      'left', 'right', 'big', 'Big', 'bigg', 'Bigg',
+      'cdot', 'times', 'div', 'pm', 'mp',
+      'leq', 'geq', 'neq', 'approx', 'equiv',
+      'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'theta', 'lambda', 'mu', 'pi', 'sigma', 'omega',
+      'Delta', 'Gamma', 'Lambda', 'Sigma', 'Omega', 'Pi',
+      'prime', 'degree',
+      'text', 'mathrm', 'mathbf', 'mathit',
+      'begin', 'end', 'array', 'matrix', 'pmatrix', 'bmatrix',
+      'overline', 'underline', 'hat', 'bar', 'vec', 'dot', 'ddot'
+    ]
+    
+    // Önce bilinen LaTeX komutlarını güvenli hale getir
+    advancedMathCommands.forEach(cmd => {
+      // Hem küçük hem büyük harfli versiyonları kontrol et
+      const regex = new RegExp(`\\\\${cmd}(?![a-zA-Z])`, 'g')
+      jsonStr = jsonStr.replace(regex, `\\\\\\\\${cmd}`)
     })
     
-    // Tek kalan backslash'leri de düzelt (örn: \$ gibi)
-    jsonStr = jsonStr.replace(/\\([^\\nrtbfu"])/g, '\\\\$1')
+    // Kalan LaTeX komutlarını da yakala (yukarıda olmayanlar)
+    jsonStr = jsonStr.replace(/\\([a-zA-Z]{2,})(?![a-zA-Z])/g, (match, cmd) => {
+      // Zaten çift backslash ise dokunma
+      if (match.startsWith('\\\\\\\\')) return match
+      // Valid JSON escape ise dokunma
+      const validEscapes = ['n', 'r', 't', 'b', 'f']
+      if (validEscapes.includes(cmd)) return match
+      // Unicode escape ise dokunma
+      if (cmd.match(/^u[0-9a-fA-F]{4}/)) return match
+      return '\\\\\\\\' + cmd
+    })
+    
+    // Tek karakterli escape'leri düzelt (\$ \# \& vb.)
+    jsonStr = jsonStr.replace(/\\([^\\nrtbfu"a-zA-Z])/g, '\\\\\\\\$1')
+    
+    // Çift backslash'lerin fazlasını temizle (\\\\\\\ → \\)
+    jsonStr = jsonStr.replace(/\\{4,}/g, '\\\\')
+    
+    // Son kontrol: Hala sorunlu escape var mı?
+    // \x ve \0-\9 gibi geçersizleri düzelt
+    jsonStr = jsonStr.replace(/\\([0-9])/g, '\\\\$1')
+    jsonStr = jsonStr.replace(/\\x(?![0-9a-fA-F]{2})/g, '\\\\x')
     
     try {
       const data = JSON.parse(jsonStr)
@@ -813,21 +854,75 @@ ${subjectGuidelines}
       })) as CurriculumQuestion[]
       
     } catch (parseError: any) {
-      console.error('JSON Parse Hatası:', parseError.message)
-      console.error('Temizlenmiş JSON:', jsonStr.substring(0, 500))
+      console.error('JSON Parse Hatası (1. deneme):', parseError.message)
       
-      // Son çare: Regex ile soruları çıkarmayı dene
+      // 2. Deneme: Daha agresif temizleme
       try {
-        const questionMatches = jsonStr.match(/"question_text"\s*:\s*"([^"]+)"/g)
-        if (questionMatches && questionMatches.length > 0) {
-          console.log('Regex ile soru bulundu, manuel parse deneniyor...')
-          // Manuel parse çok karmaşık, hata fırlat
+        // Tüm backslash'leri geçici olarak placeholder'a çevir
+        let cleanJson = jsonStr
+          .replace(/\\\\/g, '##DOUBLE_BACKSLASH##')
+          .replace(/\\"/g, '##ESCAPED_QUOTE##')
+          .replace(/\\/g, '##SINGLE_BACKSLASH##') // Kalan tek backslash'ler
+          .replace(/##DOUBLE_BACKSLASH##/g, '\\\\')
+          .replace(/##ESCAPED_QUOTE##/g, '\\"')
+          .replace(/##SINGLE_BACKSLASH##/g, '\\\\') // Tek backslash'leri çifte çevir
+        
+        const data = JSON.parse(cleanJson)
+        const questions = data.questions || []
+        console.log(`2. deneme başarılı: ${questions.length} soru parse edildi`)
+        
+        return questions.map((q: any) => ({
+          question_text: q.question_text || q.question || '',
+          options: {
+            A: q.options?.A || q.options?.a || '',
+            B: q.options?.B || q.options?.b || '',
+            C: q.options?.C || q.options?.c || '',
+            D: q.options?.D || q.options?.d || '',
+            ...(isHighSchool && { E: q.options?.E || q.options?.e || '' })
+          },
+          correct_answer: (q.correct_answer || q.answer || 'A').toUpperCase(),
+          explanation: q.explanation || '',
+          difficulty: q.difficulty || difficulty,
+          bloom_level: q.bloom_level || 'kavrama'
+        })) as CurriculumQuestion[]
+        
+      } catch (secondError: any) {
+        console.error('JSON Parse Hatası (2. deneme):', secondError.message)
+        
+        // 3. Deneme: String içindeki tüm backslash'leri kaldır
+        try {
+          // JSON string değerleri içindeki backslash'leri temizle
+          let ultraCleanJson = jsonStr.replace(/"([^"]*?)"/g, (match, content) => {
+            // String içeriğindeki backslash'leri çift yap
+            const cleaned = content.replace(/\\/g, '\\\\')
+            return `"${cleaned}"`
+          })
+          
+          const data = JSON.parse(ultraCleanJson)
+          const questions = data.questions || []
+          console.log(`3. deneme başarılı: ${questions.length} soru parse edildi`)
+          
+          return questions.map((q: any) => ({
+            question_text: q.question_text || q.question || '',
+            options: {
+              A: q.options?.A || q.options?.a || '',
+              B: q.options?.B || q.options?.b || '',
+              C: q.options?.C || q.options?.c || '',
+              D: q.options?.D || q.options?.d || '',
+              ...(isHighSchool && { E: q.options?.E || q.options?.e || '' })
+            },
+            correct_answer: (q.correct_answer || q.answer || 'A').toUpperCase(),
+            explanation: q.explanation || '',
+            difficulty: q.difficulty || difficulty,
+            bloom_level: q.bloom_level || 'kavrama'
+          })) as CurriculumQuestion[]
+          
+        } catch (thirdError: any) {
+          console.error('JSON Parse Hatası (3. deneme):', thirdError.message)
+          console.error('Ham JSON (ilk 1000 karakter):', jsonStr.substring(0, 1000))
+          throw new Error(`JSON parse hatası: ${parseError.message}. Lütfen tekrar deneyin.`)
         }
-      } catch (e) {
-        // Ignore
       }
-      
-      throw new Error(`JSON parse hatası: ${parseError.message}. Lütfen tekrar deneyin.`)
     }
   } catch (error: any) {
     console.error('Müfredat sorusu üretme hatası:', error)
