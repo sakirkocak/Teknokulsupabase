@@ -118,13 +118,26 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      <Link href="/" className="flex items-center gap-2 mb-8">
-        <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-          <GraduationCap className="w-6 h-6 text-white" />
+      <Link href="/" className="flex flex-col items-start gap-1 mb-8">
+        <img 
+          src="/images/logo.png" 
+          alt="Teknokul" 
+          className="h-12 object-contain"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none'
+            const fallback = document.getElementById('login-logo-fallback')
+            if (fallback) fallback.style.display = 'flex'
+          }}
+        />
+        <div id="login-logo-fallback" className="hidden items-center gap-2">
+          <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+            <GraduationCap className="w-6 h-6 text-white" />
+          </div>
+          <span className="text-xl font-bold">
+            Tekn<span className="text-primary-500">okul</span>
+          </span>
         </div>
-        <span className="text-xl font-bold">
-          Tekn<span className="text-primary-500">okul</span>
-        </span>
+        <span className="text-xs text-surface-500 font-medium ml-1">Eğitimin Dijital Üssü</span>
       </Link>
 
       <h1 className="text-2xl font-bold text-surface-900 mb-2">
@@ -264,15 +277,37 @@ export default function LoginPage() {
       </div>
 
       {/* Sağ Panel - Görsel */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary-500 to-primary-700 items-center justify-center p-12">
-        <div className="text-white text-center max-w-md">
-          <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <GraduationCap className="w-10 h-10" />
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary-500 to-primary-700 items-center justify-center p-12 relative overflow-hidden">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 w-64 h-64 bg-white rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-80 h-80 bg-white rounded-full blur-3xl"></div>
+        </div>
+        
+        <div className="text-white text-center max-w-md relative z-10">
+          <img 
+            src="/images/logo-white.png" 
+            alt="Teknokul" 
+            className="h-24 object-contain mx-auto mb-6"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none'
+              const fallback = document.getElementById('login-panel-fallback')
+              if (fallback) fallback.style.display = 'flex'
+            }}
+          />
+          <div id="login-panel-fallback" className="hidden flex-col items-center mb-6">
+            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
+              <GraduationCap className="w-10 h-10" />
+            </div>
+            <span className="text-3xl font-bold">Tekn<span className="text-primary-200">okul</span></span>
           </div>
-          <h2 className="text-3xl font-bold mb-4">
-            Eğitimde Yeni Nesil
+          <h2 className="text-3xl font-bold mb-2">
+            Eğitimin Dijital Üssü
           </h2>
-          <p className="text-primary-100">
+          <p className="text-lg text-primary-100 mb-4">
+            Öğren. Yarış. Kazan.
+          </p>
+          <p className="text-primary-200">
             Kişisel koçunla birlikte hedeflerine ulaş. 
             AI destekli öneriler ve gelişim takibi ile fark yarat.
           </p>

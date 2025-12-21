@@ -5,8 +5,26 @@ import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Teknokul - Akıllı Eğitim Koçluğu Platformu',
-  description: 'Öğrenciler için kişiselleştirilmiş eğitim koçluğu, AI destekli öğrenme araçları ve gelişim takibi.',
+  title: 'Teknokul - Eğitimin Dijital Üssü',
+  description: 'Öğren. Yarış. Kazan! AI destekli soru bankası, liderlik yarışı, kişisel eğitim koçluğu ve gelişim takibi platformu.',
+  keywords: ['eğitim', 'soru bankası', 'LGS', 'YKS', 'koçluk', 'öğrenme', 'yapay zeka', 'liderlik', 'yarış'],
+  authors: [{ name: 'Teknokul' }],
+  openGraph: {
+    title: 'Teknokul - Eğitimin Dijital Üssü',
+    description: 'Öğren. Yarış. Kazan! AI destekli soru bankası ve liderlik yarışı platformu.',
+    siteName: 'Teknokul',
+    locale: 'tr_TR',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Teknokul - Eğitimin Dijital Üssü',
+    description: 'Öğren. Yarış. Kazan! AI destekli soru bankası ve liderlik yarışı platformu.',
+  },
+  icons: {
+    icon: '/images/favicon.ico',
+    apple: '/images/logo-icon.png',
+  },
 }
 
 export default function RootLayout({

@@ -630,12 +630,24 @@ export default function LeaderboardPage() {
       <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-              <GraduationCap className="w-6 h-6 text-white" />
+            <img 
+              src="/images/logo-white.png" 
+              alt="Teknokul" 
+              className="h-10 object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none'
+                const fallback = document.getElementById('liderlik-logo-fallback')
+                if (fallback) fallback.style.display = 'flex'
+              }}
+            />
+            <div id="liderlik-logo-fallback" className="hidden items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-xl font-bold text-white">
+                Tekn<span className="text-primary-400">okul</span>
+              </span>
             </div>
-            <span className="text-xl font-bold text-white">
-              Tekn<span className="text-primary-400">okul</span>
-            </span>
           </Link>
           <div className="flex items-center gap-3">
             {user && userProfile ? (

@@ -180,12 +180,24 @@ export default function DashboardLayout({
           {/* Logo */}
           <div className="p-4 border-b border-surface-100">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
+              <img 
+                src="/images/logo.png" 
+                alt="Teknokul" 
+                className="h-10 object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none'
+                  const fallback = document.getElementById('sidebar-logo-fallback')
+                  if (fallback) fallback.style.display = 'flex'
+                }}
+              />
+              <div id="sidebar-logo-fallback" className="hidden items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-xl font-bold">
+                  Tekn<span className="text-primary-500">okul</span>
+                </span>
               </div>
-              <span className="text-xl font-bold">
-                Tekn<span className="text-primary-500">okul</span>
-              </span>
             </Link>
           </div>
 

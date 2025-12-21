@@ -508,12 +508,25 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
+              <img 
+                src="/images/logo.png" 
+                alt="Teknokul" 
+                className="h-10 object-contain"
+                onError={(e) => {
+                  // Resim yüklenemezse fallback göster
+                  (e.target as HTMLImageElement).style.display = 'none'
+                  const fallback = document.getElementById('navbar-logo-fallback')
+                  if (fallback) fallback.style.display = 'flex'
+                }}
+              />
+              <div id="navbar-logo-fallback" className="hidden items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-xl font-bold">
+                  Tekn<span className="text-primary-500">okul</span>
+                </span>
               </div>
-              <span className="text-xl font-bold">
-                Tekn<span className="text-primary-500">okul</span>
-              </span>
             </Link>
             
             {/* Desktop Navigation */}
@@ -1686,16 +1699,31 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto">
           <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-8">
             <div className="lg:col-span-2">
-              <Link href="/" className="flex items-center gap-2 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
+              <Link href="/" className="flex items-center gap-3 mb-4">
+                <img 
+                  src="/images/logo.png" 
+                  alt="Teknokul" 
+                  className="h-12 object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                    const fallback = document.getElementById('footer-logo-fallback')
+                    if (fallback) fallback.style.display = 'flex'
+                  }}
+                />
+                <div id="footer-logo-fallback" className="hidden items-center gap-2">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                    <GraduationCap className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold">
+                      Tekn<span className="text-primary-500">okul</span>
+                    </span>
+                    <span className="text-xs text-surface-500 font-medium">Eğitimin Dijital Üssü</span>
+                  </div>
                 </div>
-                <span className="text-xl font-bold">
-                  Tekn<span className="text-primary-500">okul</span>
-                </span>
               </Link>
               <p className="text-surface-500 text-sm">
-                AI destekli soru bankası, liderlik yarışı ve eğitim koçluğu platformu
+                <span className="font-semibold text-surface-700">Eğitimin Dijital Üssü</span> - AI destekli soru bankası, liderlik yarışı ve eğitim koçluğu platformu
               </p>
             </div>
             
