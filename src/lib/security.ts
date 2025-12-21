@@ -126,11 +126,11 @@ const rateLimitStore = new Map<string, RateLimitEntry>()
 // Periyodik temizlik
 setInterval(() => {
   const oneHourAgo = Date.now() - 60 * 60 * 1000
-  for (const [key, entry] of rateLimitStore.entries()) {
+  Array.from(rateLimitStore.entries()).forEach(([key, entry]) => {
     if (entry.lastAttempt < oneHourAgo) {
       rateLimitStore.delete(key)
     }
-  }
+  })
 }, 5 * 60 * 1000) // Her 5 dakikada temizle
 
 /**
