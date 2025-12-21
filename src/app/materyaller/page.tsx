@@ -85,7 +85,7 @@ export default function MaterialsPage() {
               <img 
                 src="/images/logo.png" 
                 alt="Teknokul - Eğitimin Dijital Üssü" 
-                className="h-12 object-contain"
+                className="h-16 object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none'
                   const fallback = document.getElementById('materyaller-logo-fallback')

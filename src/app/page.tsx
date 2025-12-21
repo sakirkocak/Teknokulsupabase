@@ -506,12 +506,12 @@ export default function HomePage() {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-20 lg:h-24">
             <Link href="/" className="flex items-center">
               <img 
                 src="/images/logo.png" 
                 alt="Teknokul - Eğitimin Dijital Üssü" 
-                className="h-12 sm:h-14 object-contain"
+                className="h-14 sm:h-16 lg:h-20 object-contain"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = 'none'
                   const fallback = document.getElementById('navbar-logo-fallback')

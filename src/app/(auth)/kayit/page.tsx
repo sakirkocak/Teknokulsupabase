@@ -193,7 +193,7 @@ function RegisterForm() {
         <img 
           src="/images/logo.png" 
           alt="Teknokul - Eğitimin Dijital Üssü" 
-          className="h-16 object-contain"
+          className="h-20 object-contain"
           onError={(e) => {
             (e.target as HTMLImageElement).style.display = 'none'
             const fallback = document.getElementById('register-logo-fallback')
