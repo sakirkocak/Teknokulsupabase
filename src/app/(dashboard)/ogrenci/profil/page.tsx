@@ -21,7 +21,10 @@ import {
   Building2,
   Trophy,
   Medal,
-  Sparkles
+  Sparkles,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { TurkeyCity, TurkeyDistrict, School as SchoolType, League } from '@/types/database'
 
@@ -30,6 +33,14 @@ export default function StudentProfilePage() {
   const { studentProfile, loading: studentLoading, refetch: refetchStudent } = useStudentProfile(profile?.id || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  
+  // Şifre değiştirme state'leri
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPasswords, setShowPasswords] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
   
   // Location states
   const [cities, setCities] = useState<TurkeyCity[]>([])
@@ -255,6 +266,43 @@ export default function StudentProfilePage() {
     if (grade <= 4) return 'ilkokul'
     if (grade <= 8) return 'ortaokul'
     return 'lise'
+  }
+
+  // Şifre değiştirme fonksiyonu
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    setChangingPassword(true)
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Şifreler eşleşmiyor')
+      setChangingPassword(false)
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('Şifre en az 6 karakter olmalıdır')
+      setChangingPassword(false)
+      return
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (error) throw error
+
+      setPasswordSuccess('Şifre başarıyla değiştirildi!')
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => setPasswordSuccess(''), 3000)
+    } catch (err: any) {
+      setPasswordError(err.message || 'Şifre değiştirilirken hata oluştu')
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
   const pageLoading = profileLoading || studentLoading
@@ -575,6 +623,81 @@ export default function StudentProfilePage() {
                 <>
                   <Save className="w-5 h-5" />
                   Kaydet
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Şifre Değiştirme */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+            <Lock className="w-5 h-5 text-primary-500" />
+            Şifre Değiştir
+          </h3>
+
+          {passwordError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl mb-4 text-sm">
+              {passwordError}
+            </div>
+          )}
+
+          {passwordSuccess && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 px-4 py-3 rounded-xl mb-4 text-sm flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              {passwordSuccess}
+            </div>
+          )}
+
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div>
+              <label className="label">Yeni Şifre</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input pl-12 pr-12"
+                  placeholder="En az 6 karakter"
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasswords(!showPasswords)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
+                >
+                  {showPasswords ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Yeni Şifre Tekrar</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                <input
+                  type={showPasswords ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input pl-12"
+                  placeholder="Şifreyi tekrar girin"
+                  minLength={6}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={changingPassword || !newPassword || !confirmPassword}
+              className="btn btn-primary"
+            >
+              {changingPassword ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <>
+                  <Lock className="w-4 h-4" />
+                  Şifreyi Değiştir
                 </>
               )}
             </button>
