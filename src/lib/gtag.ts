@@ -6,9 +6,9 @@
 // Google Ads ID
 export const GA_ADS_ID = 'AW-16918605673'
 
-// Dönüşüm etiketleri - Google Ads'te oluşturulduktan sonra güncelle
+// Dönüşüm etiketleri - Google Ads'ten alındı
 export const CONVERSION_LABELS = {
-  SIGNUP: 'signup', // Kayıt dönüşümü
+  SIGNUP: '__BGCL-u99QbEOnetYM_', // Kayıt dönüşümü (Google Ads'ten)
   LOGIN: 'login', // Giriş dönüşümü
   QUESTION_SOLVED: 'question_solved', // Soru çözme
   COACH_APPLICATION: 'coach_application', // Koç başvurusu
@@ -82,7 +82,8 @@ export function trackSignup(role: 'ogrenci' | 'ogretmen' | 'veli') {
     method: 'email',
     role: role,
   })
-  trackConversion(CONVERSION_LABELS.SIGNUP)
+  // Google Ads kayıt dönüşümü - değer: 1 TRY
+  trackConversion(CONVERSION_LABELS.SIGNUP, 1.0, 'TRY')
 }
 
 /**
@@ -93,7 +94,8 @@ export function trackGoogleSignup(role: 'ogrenci' | 'ogretmen' | 'veli') {
     method: 'google',
     role: role,
   })
-  trackConversion(CONVERSION_LABELS.SIGNUP)
+  // Google Ads kayıt dönüşümü - değer: 1 TRY
+  trackConversion(CONVERSION_LABELS.SIGNUP, 1.0, 'TRY')
 }
 
 /**
