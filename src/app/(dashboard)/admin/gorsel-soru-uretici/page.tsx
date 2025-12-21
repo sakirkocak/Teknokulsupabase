@@ -36,14 +36,6 @@ import {
 } from '@/lib/visualGenerators'
 import Link from 'next/link'
 
-// Chart.js için dinamik import
-import dynamic from 'next/dynamic'
-
-const ChartComponent = dynamic(
-  () => import('react-chartjs-2').then((mod) => mod.Line),
-  { ssr: false }
-)
-
 interface GeneratedVisualQuestion extends VisualQuestion {
   id?: string
   saved?: boolean
