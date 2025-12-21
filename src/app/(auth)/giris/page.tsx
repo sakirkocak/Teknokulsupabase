@@ -79,12 +79,21 @@ function LoginForm() {
     setError('')
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // 🔒 API üzerinden güvenli giriş (rate limiting)
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
 
-      if (error) throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Giriş yapılamadı')
+      }
+
+      // Supabase client tarafında da oturum aç
+      await supabase.auth.signInWithPassword({ email, password })
 
       // Redirect URL varsa oraya git
       if (redirectUrl) {
@@ -93,27 +102,11 @@ function LoginForm() {
         return
       }
 
-      // Yoksa kullanıcı rolüne göre yönlendir
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single()
-
-      if (profile) {
-        const routes: Record<string, string> = {
-          ogretmen: '/koc',
-          ogrenci: '/ogrenci',
-          veli: '/veli',
-          admin: '/admin',
-        }
-        router.push(routes[profile.role] || '/')
-        router.refresh()
-      }
+      // API'den gelen yönlendirmeyi kullan
+      router.push(data.redirectTo || '/')
+      router.refresh()
     } catch (err: any) {
-      setError(err.message === 'Invalid login credentials' 
-        ? 'E-posta veya şifre hatalı' 
-        : err.message)
+      setError(err.message || 'Giriş yapılamadı')
     } finally {
       setLoading(false)
     }

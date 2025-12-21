@@ -86,6 +86,10 @@ function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  
+  // 🔒 Güvenlik state'leri
+  const [honeypot, setHoneypot] = useState('') // Bot tuzağı
+  const [formLoadTime] = useState(Date.now()) // Form yüklenme zamanı
 
   const redirectUrl = searchParams.get('redirect')
 
@@ -136,99 +140,31 @@ function RegisterForm() {
     setError('')
 
     try {
-      // 1. Kullanıcı oluştur
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: role,
-          },
-        },
+      // 🔒 API üzerinden güvenli kayıt
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          role,
+          grade: role === 'ogrenci' ? grade : undefined,
+          honeypot, // Bot tuzağı (boş olmalı)
+          formLoadTime, // Form yüklenme zamanı
+        }),
       })
 
-      if (authError) throw authError
+      const data = await response.json()
 
-      if (authData.user) {
-        // 2. Trigger çalışmayabilir, manuel olarak profil oluştur
-        // Önce profil var mı kontrol et
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', authData.user.id)
-          .single()
+      if (!response.ok) {
+        throw new Error(data.error || 'Kayıt sırasında bir hata oluştu')
+      }
 
-        if (!existingProfile) {
-          // Profile oluştur
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: authData.user.id,
-              email: email,
-              full_name: fullName,
-              role: role,
-            })
-
-          if (profileError && !profileError.message.includes('duplicate')) {
-            console.error('Profil oluşturma hatası:', profileError)
-          }
-        }
-
-        // 3. Role göre ek profil oluştur
-        if (role === 'ogrenci') {
-          const { data: existingStudentProfile } = await supabase
-            .from('student_profiles')
-            .select('id')
-            .eq('user_id', authData.user.id)
-            .single()
-
-          if (!existingStudentProfile) {
-            const { error: studentError } = await supabase
-              .from('student_profiles')
-              .insert({ 
-                user_id: authData.user.id,
-                grade: grade // Sınıf bilgisi
-              })
-
-            if (studentError && !studentError.message.includes('duplicate')) {
-              console.error('Öğrenci profili oluşturma hatası:', studentError)
-            }
-          }
-        } else if (role === 'ogretmen') {
-          const { data: existingTeacherProfile } = await supabase
-            .from('teacher_profiles')
-            .select('id')
-            .eq('user_id', authData.user.id)
-            .single()
-
-          if (!existingTeacherProfile) {
-            const { error: teacherError } = await supabase
-              .from('teacher_profiles')
-              .insert({ user_id: authData.user.id, is_coach: true })
-
-            if (teacherError && !teacherError.message.includes('duplicate')) {
-              console.error('Öğretmen profili oluşturma hatası:', teacherError)
-            }
-          }
-        } else if (role === 'veli') {
-          const { data: existingParentProfile } = await supabase
-            .from('parent_profiles')
-            .select('id')
-            .eq('user_id', authData.user.id)
-            .single()
-
-          if (!existingParentProfile) {
-            const { error: parentError } = await supabase
-              .from('parent_profiles')
-              .insert({ user_id: authData.user.id })
-
-            if (parentError && !parentError.message.includes('duplicate')) {
-              console.error('Veli profili oluşturma hatası:', parentError)
-            }
-          }
-        }
-
+      if (data.success) {
+        // Supabase oturumunu senkronize et
+        await supabase.auth.signInWithPassword({ email, password })
+        
         // Redirect URL varsa oraya git
         if (redirectUrl) {
           router.push(redirectUrl)
@@ -236,21 +172,12 @@ function RegisterForm() {
           return
         }
 
-        // Yoksa role göre yönlendir
-        const routes: Record<string, string> = {
-          ogretmen: '/koc',
-          ogrenci: '/ogrenci',
-          veli: '/veli',
-        }
-        router.push(routes[role] || '/')
+        // Yoksa API'den gelen yönlendirmeyi kullan
+        router.push(data.redirectTo || '/')
         router.refresh()
       }
     } catch (err: any) {
-      if (err.message.includes('already registered')) {
-        setError('Bu e-posta adresi zaten kayıtlı')
-      } else {
-        setError(err.message)
-      }
+      setError(err.message || 'Kayıt sırasında bir hata oluştu')
     } finally {
       setLoading(false)
     }
@@ -455,6 +382,32 @@ function RegisterForm() {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
+            {/* 🔒 Honeypot - Bot tuzağı (kullanıcıya görünmez) */}
+            <div 
+              aria-hidden="true" 
+              style={{ 
+                position: 'absolute', 
+                left: '-9999px', 
+                top: '-9999px',
+                opacity: 0, 
+                height: 0, 
+                width: 0,
+                overflow: 'hidden',
+                pointerEvents: 'none'
+              }}
+            >
+              <label htmlFor="website">Website</label>
+              <input
+                type="text"
+                id="website"
+                name="website"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
+
             <div>
               <label className="label">Ad Soyad</label>
               <div className="relative">
