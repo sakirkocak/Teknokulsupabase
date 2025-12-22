@@ -132,122 +132,135 @@ export default function HizliCozPage() {
   const [promptType, setPromptType] = useState<'milestone' | 'streak' | 'session'>('milestone')
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   
-  // URL parametreleri - REF olarak tutulacak (state gecikmesi olmasın)
-  const urlGradeRef = useRef<number | null>(null)
-  const urlSubjectIdRef = useRef<string | null>(null)
-  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false)
-  const [shouldAutoStart, setShouldAutoStart] = useState(false)
-  const [subjectsLoaded, setSubjectsLoaded] = useState(false)
-  const [autoStartSubjectId, setAutoStartSubjectId] = useState<string | null>(null)
+  // Soru havuzu - zorluğa göre sıralı
+  const [questionPool, setQuestionPool] = useState<Question[]>([])
+  const [poolIndex, setPoolIndex] = useState(0)
+  
+  // URL parametreleri için flag'ler
+  const [isInitialized, setIsInitialized] = useState(false)
+  const initRef = useRef(false) // Double-call prevention
 
-  // 1. İlk yükleme - URL parametrelerini oku ve REF'lere kaydet
+  // TEK useEffect - Sayfa yüklendiğinde HER ŞEYİ sırayla yap
   useEffect(() => {
-    const nicknameParam = searchParams.get('nickname')
-    const sinifParam = searchParams.get('sinif')
-    const dersIdParam = searchParams.get('dersId') // Subject ID
-    const autostartParam = searchParams.get('autostart')
+    // Strict mode double-call prevention
+    if (initRef.current) return
+    initRef.current = true
     
-    // URL'den okunan değerleri REF'lere kaydet (anlık erişim için)
-    if (sinifParam) {
-      const grade = parseInt(sinifParam) || 8
-      urlGradeRef.current = grade
-      setSelectedGrade(grade)
-    }
-    if (dersIdParam) {
-      urlSubjectIdRef.current = dersIdParam
-      setAutoStartSubjectId(dersIdParam)
-    }
-    if (nicknameParam) setNickname(nicknameParam)
-    if (autostartParam === 'true' && nicknameParam) {
-      setShouldAutoStart(true)
-    }
-    
-    setUrlParamsProcessed(true)
-  }, []) // Sadece ilk mount'ta çalış
-
-  // 2. Sınıf değiştiğinde dersleri yükle
-  useEffect(() => {
-    if (urlParamsProcessed) {
-      loadGradeSubjects()
-    }
-  }, [selectedGrade, urlParamsProcessed])
-
-  // 3. İlk yüklemede session kontrolü
-  useEffect(() => {
-    checkExistingSession()
-  }, [])
-
-  // 4. Autostart - her şey hazır olduğunda başlat
-  useEffect(() => {
-    if (!shouldAutoStart || !subjectsLoaded || !nickname || loading) return
-    
-    // URL'den gelen sınıf değerini kullan (REF'ten, state'ten değil!)
-    const gradeToUse = urlGradeRef.current ?? selectedGrade
-    const subjectIdToUse = urlSubjectIdRef.current
-    
-    // Ders ID'si varsa, subject'i bul
-    let subjectToUse: Subject | null = null
-    if (subjectIdToUse) {
-      const matchingSubject = subjects.find(s => s.id === subjectIdToUse)
-      if (matchingSubject) {
-        console.log('Ders eşleşti:', matchingSubject.name)
-        subjectToUse = matchingSubject
-        setSelectedSubject(matchingSubject)
-      } else {
-        console.log('Ders bulunamadı, karışık devam ediliyor. ID:', subjectIdToUse)
+    const initializePage = async () => {
+      console.log('🚀 Sayfa başlatılıyor...')
+      
+      // 1. URL parametrelerini oku
+      const nicknameParam = searchParams.get('nickname')
+      const sinifParam = searchParams.get('sinif')
+      const dersIdParam = searchParams.get('dersId')
+      const autostartParam = searchParams.get('autostart')
+      
+      // Değerleri belirle
+      const gradeFromUrl = sinifParam ? parseInt(sinifParam) : null
+      const finalGrade = gradeFromUrl || 8
+      const finalNickname = nicknameParam || ''
+      const shouldAuto = autostartParam === 'true' && !!nicknameParam
+      
+      console.log('📋 URL parametreleri:', { finalNickname, finalGrade, dersIdParam, shouldAuto })
+      
+      // 2. State'leri güncelle
+      setSelectedGrade(finalGrade)
+      if (finalNickname) setNickname(finalNickname)
+      
+      // 3. Session kontrolü
+      const sessionToken = localStorage.getItem('guest_session_token')
+      if (sessionToken) {
+        const { data } = await supabase
+          .from('guest_sessions')
+          .select('*')
+          .eq('session_token', sessionToken)
+          .gt('expires_at', new Date().toISOString())
+          .single()
+        
+        if (data) {
+          setGuestSession(data)
+          if (!finalNickname) setNickname(data.nickname)
+        }
+      }
+      
+      // 4. Dersleri yükle (finalGrade ile!)
+      console.log('📚 Dersler yükleniyor - Sınıf:', finalGrade)
+      const { data: gradeSubjectsData } = await supabase
+        .from('grade_subjects')
+        .select(`
+          id,
+          grade_id,
+          is_exam_subject,
+          subject:subjects(id, name, code, icon)
+        `)
+        .eq('grade_id', finalGrade)
+        .order('is_exam_subject', { ascending: false })
+      
+      let loadedSubjects: Subject[] = []
+      if (gradeSubjectsData) {
+        loadedSubjects = gradeSubjectsData
+          .filter((gs: any) => gs.subject)
+          .map((gs: any) => ({
+            id: gs.subject.id,
+            name: gs.subject.name,
+            code: gs.subject.code,
+            icon: gs.subject.icon,
+            isExamSubject: gs.is_exam_subject
+          }))
+        setSubjects(loadedSubjects)
+        console.log('✅ Dersler yüklendi:', loadedSubjects.length, 'adet')
+      }
+      
+      // 5. Ders eşleştir (varsa)
+      let matchedSubject: Subject | null = null
+      if (dersIdParam && loadedSubjects.length > 0) {
+        matchedSubject = loadedSubjects.find(s => s.id === dersIdParam) || null
+        if (matchedSubject) {
+          setSelectedSubject(matchedSubject)
+          console.log('🎯 Ders eşleşti:', matchedSubject.name)
+        } else {
+          console.log('⚠️ Ders bulunamadı, karışık devam:', dersIdParam)
+        }
+      }
+      
+      setLoading(false)
+      setIsInitialized(true)
+      
+      // 6. Autostart varsa başlat!
+      if (shouldAuto && finalNickname) {
+        console.log('🎬 Autostart tetikleniyor!', { finalGrade, matchedSubject: matchedSubject?.name })
+        
+        // Küçük gecikme - UI'ın hazır olmasını bekle
+        setTimeout(async () => {
+          await startPracticeDirectly(finalNickname, finalGrade, matchedSubject)
+        }, 100)
       }
     }
     
-    // Her şey hazır, başlat!
-    console.log('Autostart tetikleniyor:', { nickname, gradeToUse, subject: subjectToUse?.name || 'Karışık' })
-    setShouldAutoStart(false)
+    initializePage()
+  }, []) // Sadece mount'ta bir kez çalış
+  
+  // Sınıf değiştiğinde dersleri yükle (sadece kullanıcı UI'dan değiştirirse)
+  useEffect(() => {
+    if (!isInitialized) return // İlk yükleme tamamlanmadan çalışmasın
     
-    // REF değerlerini temizle (bir kez kullanıldı)
-    urlGradeRef.current = null
-    urlSubjectIdRef.current = null
-    setAutoStartSubjectId(null)
-    
-    // Direkt parametrelerle başlat (state'e güvenme!)
-    startPracticeWithParams(gradeToUse, subjectToUse)
-  }, [shouldAutoStart, subjectsLoaded, nickname, loading, subjects])
+    loadGradeSubjects(selectedGrade)
+  }, [selectedGrade, isInitialized])
   
   // Load topics when subject/grade changes
   useEffect(() => {
-    if (selectedSubject && selectedGrade) {
+    if (selectedSubject && selectedGrade && isInitialized) {
       loadTopics()
     }
-  }, [selectedSubject, selectedGrade])
+  }, [selectedSubject, selectedGrade, isInitialized])
 
-  const checkExistingSession = async () => {
-    // Check localStorage for existing session
-    const sessionToken = localStorage.getItem('guest_session_token')
-    if (sessionToken) {
-      const { data } = await supabase
-        .from('guest_sessions')
-        .select('*')
-        .eq('session_token', sessionToken)
-        .gt('expires_at', new Date().toISOString())
-        .single()
-      
-      if (data) {
-        setGuestSession(data)
-        setNickname(data.nickname)
-        setSelectedGrade(data.grade)
-      }
-    }
-    setLoading(false)
-  }
-
-  const loadGradeSubjects = async () => {
-    setSubjectsLoaded(false)
+  // Dersleri yükle - PARAMETRE İLE (state'e güvenme!)
+  const loadGradeSubjects = async (grade: number) => {
+    console.log('📚 loadGradeSubjects çağrıldı - Sınıf:', grade)
     
-    // Autostart değilse ve sınıf değiştiyse ders seçimini sıfırla
-    if (!shouldAutoStart) {
-      setSelectedSubject(null)
-    }
+    setSelectedSubject(null) // Sınıf değişince ders seçimini sıfırla
     setTopics([])
     
-    // Sınıfa göre müfredattaki dersleri getir
     const { data } = await supabase
       .from('grade_subjects')
       .select(`
@@ -256,13 +269,12 @@ export default function HizliCozPage() {
         is_exam_subject,
         subject:subjects(id, name, code, icon)
       `)
-      .eq('grade_id', selectedGrade)
+      .eq('grade_id', grade)
       .order('is_exam_subject', { ascending: false })
     
     if (data) {
-      // Subject verilerini düzleştir
       const formattedSubjects = data
-        .filter((gs: any) => gs.subject) // null olanları filtrele
+        .filter((gs: any) => gs.subject)
         .map((gs: any) => ({
           id: gs.subject.id,
           name: gs.subject.name,
@@ -271,11 +283,10 @@ export default function HizliCozPage() {
           isExamSubject: gs.is_exam_subject
         }))
       setSubjects(formattedSubjects)
+      console.log('✅ Dersler güncellendi:', formattedSubjects.length, 'adet')
     } else {
       setSubjects([])
     }
-    
-    setSubjectsLoaded(true)
   }
 
   const loadTopics = async () => {
@@ -292,130 +303,186 @@ export default function HizliCozPage() {
     if (data) setTopics(data)
   }
 
-  // Create or update guest session
-  const startGuestSession = async () => {
-    if (!nickname.trim()) return
+  // Guest session oluştur
+  const createGuestSession = async (nick: string, grade: number) => {
+    if (guestSession) return guestSession
     
-    let session = guestSession
+    const { data, error } = await supabase
+      .from('guest_sessions')
+      .insert({
+        nickname: nick.trim(),
+        grade: grade
+      })
+      .select()
+      .single()
     
-    if (!session) {
-      const { data, error } = await supabase
-        .from('guest_sessions')
-        .insert({
-          nickname: nickname.trim(),
-          grade: selectedGrade
-        })
-        .select()
-        .single()
-      
-      if (error) {
-        console.error('Session creation error:', error)
-        return
-      }
-      
-      session = data
-      setGuestSession(data)
-      localStorage.setItem('guest_session_token', data.session_token)
+    if (error) {
+      console.error('Session creation error:', error)
+      return null
     }
     
-    return session
+    setGuestSession(data)
+    localStorage.setItem('guest_session_token', data.session_token)
+    return data
   }
 
-  // Start practice with explicit parameters (for autostart from URL)
-  const startPracticeWithParams = async (grade: number, subject: Subject | null) => {
-    if (!nickname.trim()) {
-      alert('Lütfen bir takma ad girin')
-      return
+  // SORU HAVUZU OLUŞTUR - Zorluğa göre sıralı (easy → medium → hard → legendary)
+  const loadQuestionPool = async (grade: number, subject: Subject | null): Promise<Question[]> => {
+    console.log('🎯 Soru havuzu yükleniyor - Sınıf:', grade, 'Ders:', subject?.name || 'Karışık')
+    
+    // 1. Topic'leri bul
+    let topicQuery = supabase
+      .from('topics')
+      .select('id')
+      .eq('grade', grade)
+      .eq('is_active', true)
+
+    if (subject) {
+      topicQuery = topicQuery.eq('subject_id', subject.id)
+    }
+
+    const { data: topics } = await topicQuery
+
+    if (!topics || topics.length === 0) {
+      console.log('❌ Topic bulunamadı')
+      return []
+    }
+
+    const topicIds = topics.map(t => t.id)
+    console.log('📋 Topic sayısı:', topicIds.length)
+
+    // 2. TÜM soruları çek
+    const { data: questions } = await supabase
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
+      .eq('is_active', true)
+      .in('topic_id', topicIds)
+
+    if (!questions || questions.length === 0) {
+      console.log('❌ Soru bulunamadı')
+      return []
+    }
+
+    console.log('📊 Toplam soru sayısı:', questions.length)
+
+    // 3. Zorluğa göre sırala: easy → medium → hard → legendary
+    const difficultyOrder: Record<string, number> = {
+      'easy': 1,
+      'medium': 2,
+      'hard': 3,
+      'legendary': 4
+    }
+
+    const sortedQuestions = [...questions].sort((a, b) => {
+      const orderA = difficultyOrder[a.difficulty] || 2
+      const orderB = difficultyOrder[b.difficulty] || 2
+      
+      // Aynı zorluktakiler arasında rastgele sırala
+      if (orderA === orderB) {
+        return Math.random() - 0.5
+      }
+      
+      return orderA - orderB
+    })
+
+    // Debug: Zorluk dağılımı
+    const easyCount = sortedQuestions.filter(q => q.difficulty === 'easy').length
+    const mediumCount = sortedQuestions.filter(q => q.difficulty === 'medium').length
+    const hardCount = sortedQuestions.filter(q => q.difficulty === 'hard').length
+    console.log('📈 Zorluk dağılımı:', { easy: easyCount, medium: mediumCount, hard: hardCount })
+
+    return sortedQuestions as Question[]
+  }
+
+  // Havuzdan sonraki soruyu al
+  const getNextFromPool = () => {
+    if (questionPool.length === 0) return null
+    
+    // Havuzun sonuna geldiyse başa dön (ama karıştır)
+    if (poolIndex >= questionPool.length) {
+      // Havuzu tekrar karıştır ama zorluk sırasını koru
+      const shuffled = [...questionPool].sort(() => Math.random() - 0.5)
+      setQuestionPool(shuffled)
+      setPoolIndex(0)
+      return shuffled[0]
     }
     
-    // Grade'i güncelle
+    const question = questionPool[poolIndex]
+    setPoolIndex(prev => prev + 1)
+    return question
+  }
+
+  // ✨ ANA FONKSİYON: Direkt başlat (autostart için)
+  const startPracticeDirectly = async (nick: string, grade: number, subject: Subject | null) => {
+    console.log('🎬 startPracticeDirectly:', { nick, grade, subject: subject?.name })
+    
+    // Session oluştur
+    await createGuestSession(nick, grade)
+    
+    // State'leri ayarla
     setSelectedGrade(grade)
     if (subject) setSelectedSubject(subject)
-    
-    await startGuestSession()
-    
     setViewMode('practice')
     setQuestionIndex(0)
     setSessionStats({ correct: 0, wrong: 0 })
     setSessionStreak(0)
-    setQuestionStartTime(Date.now())
     setPracticeLoading(true)
-    // Parametreleri direkt geç (state'e güvenme!)
-    await loadNextQuestion(grade, subject)
+    
+    // Soru havuzunu yükle
+    const pool = await loadQuestionPool(grade, subject)
+    
+    if (pool.length === 0) {
+      setPracticeLoading(false)
+      setCurrentQuestion(null)
+      return
+    }
+    
+    setQuestionPool(pool)
+    setPoolIndex(1) // İlk soruyu aldık, index 1'den devam
+    setCurrentQuestion(pool[0])
+    setQuestionIndex(1)
+    setQuestionStartTime(Date.now())
     setPracticeLoading(false)
+    
+    console.log('✅ Başladı! İlk soru:', pool[0]?.difficulty, '-', pool[0]?.topic?.subject?.name)
   }
 
-  // Start practice from UI (uses current state)
+  // UI'dan başlat
   const startPractice = async () => {
     if (!nickname.trim()) {
       alert('Lütfen bir takma ad girin')
       return
     }
     
-    await startGuestSession()
-    
-    setViewMode('practice')
-    setQuestionIndex(0)
-    setSessionStats({ correct: 0, wrong: 0 })
-    setSessionStreak(0)
-    setQuestionStartTime(Date.now())
-    setPracticeLoading(true)
-    // UI'dan başlatıldığında state değerlerini kullan
-    await loadNextQuestion(selectedGrade, selectedSubject)
-    setPracticeLoading(false)
+    await startPracticeDirectly(nickname.trim(), selectedGrade, selectedSubject)
   }
 
-  // Load next question - grade ve subject parametreleri opsiyonel (sonraki sorular için state'ten alınır)
-  const loadNextQuestion = async (gradeParam?: number, subjectParam?: Subject | null) => {
+  // Sonraki soruyu yükle
+  const loadNextQuestion = async () => {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
     setQuestionStartTime(Date.now())
 
-    // Parametre verilmişse onu kullan, yoksa state'ten al
-    const currentGrade = gradeParam ?? selectedGrade
-    const currentSubject = subjectParam !== undefined ? subjectParam : selectedSubject
-
-    console.log('Soru yükleniyor - Sınıf:', currentGrade, 'Ders:', currentSubject?.name || 'Karışık')
-
-    // Önce uygun topic'leri bul
-    let topicQuery = supabase
-      .from('topics')
-      .select('id')
-      .eq('grade', currentGrade)
-      .eq('is_active', true)
-
-    // Ders seçiliyse sadece o dersin topic'lerini al
-    if (currentSubject) {
-      topicQuery = topicQuery.eq('subject_id', currentSubject.id)
-    }
-
-    const { data: relevantTopics } = await topicQuery
-
-    console.log('Bulunan topic sayısı:', relevantTopics?.length || 0)
-
-    if (!relevantTopics || relevantTopics.length === 0) {
-      setCurrentQuestion(null)
-      return
-    }
-
-    const topicIds = relevantTopics.map(t => t.id)
-
-    // Soruları getir
-    const { data } = await supabase
-      .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
-      .eq('is_active', true)
-      .in('topic_id', topicIds)
-
-    console.log('Bulunan soru sayısı:', data?.length || 0)
-
-    if (data && data.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex] as any)
+    // Havuzdan al
+    const nextQuestion = getNextFromPool()
+    
+    if (nextQuestion) {
+      setCurrentQuestion(nextQuestion)
       setQuestionIndex(prev => prev + 1)
+      console.log('➡️ Sonraki soru:', nextQuestion.difficulty, '-', nextQuestion.topic?.main_topic)
     } else {
-      setCurrentQuestion(null)
+      // Havuz boş - tekrar yükle
+      console.log('🔄 Havuz bitti, yeniden yükleniyor...')
+      const pool = await loadQuestionPool(selectedGrade, selectedSubject)
+      if (pool.length > 0) {
+        setQuestionPool(pool)
+        setPoolIndex(1)
+        setCurrentQuestion(pool[0])
+        setQuestionIndex(prev => prev + 1)
+      } else {
+        setCurrentQuestion(null)
+      }
     }
   }
 
