@@ -424,6 +424,7 @@ export default function HomePage() {
     const params = new URLSearchParams()
     params.set('nickname', quickStartNickname.trim())
     params.set('sinif', selectedGrade.toString())
+    params.set('autostart', 'true') // Direkt soru çözmeye başla
     if (quickStartSubject) {
       params.set('ders', quickStartSubject)
     }

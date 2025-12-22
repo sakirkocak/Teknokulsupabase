@@ -133,15 +133,23 @@ export default function HizliCozPage() {
   const [promptType, setPromptType] = useState<'milestone' | 'streak' | 'session'>('milestone')
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   
-  // URL parametrelerini oku
+  // URL parametrelerini oku ve autostart kontrolü
+  const [shouldAutoStart, setShouldAutoStart] = useState(false)
+  const [paramsLoaded, setParamsLoaded] = useState(false)
+  
   useEffect(() => {
     const nicknameParam = searchParams.get('nickname')
     const sinifParam = searchParams.get('sinif')
     const dersParam = searchParams.get('ders')
+    const autostartParam = searchParams.get('autostart')
     
     if (nicknameParam) setNickname(nicknameParam)
     if (sinifParam) setSelectedGrade(parseInt(sinifParam) || 8)
     if (dersParam) setInitialSubjectCode(dersParam)
+    if (autostartParam === 'true' && nicknameParam) {
+      setShouldAutoStart(true)
+    }
+    setParamsLoaded(true)
   }, [searchParams])
 
   // Load subjects when grade changes
@@ -149,6 +157,18 @@ export default function HizliCozPage() {
     loadGradeSubjects()
     checkExistingSession()
   }, [selectedGrade])
+
+  // Autostart - parametreler ve dersler yüklendikten sonra otomatik başlat
+  useEffect(() => {
+    if (shouldAutoStart && paramsLoaded && nickname && !loading) {
+      // Küçük bir delay ile başlat (subjects yüklensin)
+      const timer = setTimeout(() => {
+        startPractice()
+        setShouldAutoStart(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [shouldAutoStart, paramsLoaded, nickname, loading, subjects])
   
   // Load topics when subject/grade changes
   useEffect(() => {
