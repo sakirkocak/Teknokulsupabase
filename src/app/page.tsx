@@ -348,7 +348,7 @@ export default function HomePage() {
   const [selectedGrade, setSelectedGrade] = useState(8)
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState<Record<string, number>>({})
   const [subjectCountsLoading, setSubjectCountsLoading] = useState(false)
-  const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('weekly')
+  const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('all')
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   
   // Quick Start form state
