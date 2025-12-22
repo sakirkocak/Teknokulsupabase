@@ -318,30 +318,39 @@ export default function HizliCozPage() {
     setSessionStreak(0)
     setQuestionStartTime(Date.now())
     setPracticeLoading(true)
-    await loadNextQuestion()
+    // Mevcut state değerlerini parametre olarak geç
+    await loadNextQuestion(selectedGrade, selectedSubject)
     setPracticeLoading(false)
   }
 
-  // Load next question
-  const loadNextQuestion = async () => {
+  // Load next question - grade ve subject parametreleri opsiyonel (sonraki sorular için state'ten alınır)
+  const loadNextQuestion = async (gradeParam?: number, subjectParam?: Subject | null) => {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
     setQuestionStartTime(Date.now())
 
+    // Parametre verilmişse onu kullan, yoksa state'ten al
+    const currentGrade = gradeParam ?? selectedGrade
+    const currentSubject = subjectParam !== undefined ? subjectParam : selectedSubject
+
+    console.log('Soru yükleniyor - Sınıf:', currentGrade, 'Ders:', currentSubject?.name || 'Karışık')
+
     // Önce uygun topic'leri bul
     let topicQuery = supabase
       .from('topics')
       .select('id')
-      .eq('grade', selectedGrade)
+      .eq('grade', currentGrade)
       .eq('is_active', true)
 
     // Ders seçiliyse sadece o dersin topic'lerini al
-    if (selectedSubject) {
-      topicQuery = topicQuery.eq('subject_id', selectedSubject.id)
+    if (currentSubject) {
+      topicQuery = topicQuery.eq('subject_id', currentSubject.id)
     }
 
     const { data: relevantTopics } = await topicQuery
+
+    console.log('Bulunan topic sayısı:', relevantTopics?.length || 0)
 
     if (!relevantTopics || relevantTopics.length === 0) {
       setCurrentQuestion(null)
@@ -356,6 +365,8 @@ export default function HizliCozPage() {
       .select('*, topic:topics(*, subject:subjects(*))')
       .eq('is_active', true)
       .in('topic_id', topicIds)
+
+    console.log('Bulunan soru sayısı:', data?.length || 0)
 
     if (data && data.length > 0) {
       const randomIndex = Math.floor(Math.random() * data.length)
