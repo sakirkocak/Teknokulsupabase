@@ -349,6 +349,7 @@ export default function HomePage() {
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState<Record<string, number>>({})
   const [subjectCountsLoading, setSubjectCountsLoading] = useState(false)
   const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('weekly')
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   
   // Quick Start form state
   const [quickStartNickname, setQuickStartNickname] = useState('')
@@ -406,6 +407,11 @@ export default function HomePage() {
     loadTopLeaders()
     loadGradeSubjectsForQuickStart()
   }, [selectedGrade])
+
+  // Leaderboard tab değiştiğinde yeniden yükle
+  useEffect(() => {
+    loadTopLeaders()
+  }, [leaderboardTab])
 
   // Load grade subjects for quick start dropdown - ve soru sayılarını da yükle
   async function loadGradeSubjectsForQuickStart() {
@@ -493,35 +499,123 @@ export default function HomePage() {
   }
 
   async function loadTopLeaders() {
-    const { data } = await supabase
-      .from('student_points')
-      .select(`
-        student_id,
-        total_points,
-        total_questions,
-        total_correct,
-        max_streak,
-        student:student_profiles!student_points_student_id_fkey(
-          user_id,
-          grade,
-          profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
-        )
-      `)
-      .gt('total_questions', 0)
-      .order('total_points', { ascending: false })
-      .limit(10)
+    setLeaderboardLoading(true)
+    
+    try {
+      // Tarih filtrelerini hesapla
+      const now = new Date()
+      let startDate: Date | null = null
+      
+      switch (leaderboardTab) {
+        case 'daily':
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+          break
+        case 'weekly':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          break
+        case 'monthly':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          break
+        case 'all':
+        default:
+          startDate = null
+      }
 
-    if (data) {
-      setTopLeaders(data.map((item: any, index: number) => ({
-        rank: index + 1,
-        name: item.student?.profile?.full_name || 'Anonim',
-        avatar: item.student?.profile?.avatar_url,
-        points: item.total_points,
-        questions: item.total_questions,
-        correct: item.total_correct,
-        streak: item.max_streak,
-        grade: item.student?.grade
-      })))
+      if (startDate) {
+        // Tarih bazlı - xp_history'den çek
+        const { data: xpData } = await supabase
+          .from('xp_history')
+          .select('user_id, xp_amount')
+          .gte('created_at', startDate.toISOString())
+        
+        if (xpData && xpData.length > 0) {
+          // user_id bazlı gruplama
+          const userXpMap: Record<string, number> = {}
+          xpData.forEach(item => {
+            if (item.user_id) {
+              userXpMap[item.user_id] = (userXpMap[item.user_id] || 0) + (item.xp_amount || 0)
+            }
+          })
+          
+          // En yüksek XP'ye göre sırala ve top 10 al
+          const sortedUsers = Object.entries(userXpMap)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+          
+          if (sortedUsers.length > 0) {
+            // Kullanıcı bilgilerini çek
+            const userIds = sortedUsers.map(([userId]) => userId)
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('id, full_name, avatar_url')
+              .in('id', userIds)
+            
+            // Student profiles'dan grade bilgisini çek
+            const { data: studentData } = await supabase
+              .from('student_profiles')
+              .select('user_id, grade')
+              .in('user_id', userIds)
+            
+            const profileMap: Record<string, any> = {}
+            profilesData?.forEach(p => { profileMap[p.id] = p })
+            
+            const gradeMap: Record<string, number> = {}
+            studentData?.forEach(s => { gradeMap[s.user_id] = s.grade })
+            
+            setTopLeaders(sortedUsers.map(([userId, xp], index) => ({
+              rank: index + 1,
+              name: profileMap[userId]?.full_name || 'Anonim',
+              avatar: profileMap[userId]?.avatar_url,
+              points: xp,
+              questions: 0, // Tarih bazlı sorguda yok
+              correct: 0,
+              streak: 0,
+              grade: gradeMap[userId]
+            })))
+          } else {
+            setTopLeaders([])
+          }
+        } else {
+          setTopLeaders([])
+        }
+      } else {
+        // Tüm zamanlar - mevcut sorgu
+        const { data } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(10)
+
+        if (data) {
+          setTopLeaders(data.map((item: any, index: number) => ({
+            rank: index + 1,
+            name: item.student?.profile?.full_name || 'Anonim',
+            avatar: item.student?.profile?.avatar_url,
+            points: item.total_points,
+            questions: item.total_questions,
+            correct: item.total_correct,
+            streak: item.max_streak,
+            grade: item.student?.grade
+          })))
+        }
+      }
+    } catch (error) {
+      console.error('Liderlik tablosu yüklenirken hata:', error)
+      setTopLeaders([])
+    } finally {
+      setLeaderboardLoading(false)
     }
   }
 
@@ -1388,7 +1482,19 @@ export default function HomePage() {
             ))}
           </div>
 
-          {topLeaders.length > 0 ? (
+          {leaderboardLoading ? (
+            // Loading skeleton
+            <div className="flex flex-col md:flex-row items-end justify-center gap-4 mb-8">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className={`bg-gray-100 rounded-2xl p-5 text-center w-full md:w-48 animate-pulse ${i === 2 ? 'md:order-first' : ''}`}>
+                  <div className="w-12 h-12 bg-gray-200 rounded-full mx-auto mb-2" />
+                  <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-2" />
+                  <div className="h-4 bg-gray-200 rounded w-24 mx-auto mb-2" />
+                  <div className="h-6 bg-gray-200 rounded w-16 mx-auto" />
+                </div>
+              ))}
+            </div>
+          ) : topLeaders.length > 0 ? (
             <>
               {/* Top 3 Podium */}
               <div className="flex flex-col md:flex-row items-end justify-center gap-4 mb-8">
