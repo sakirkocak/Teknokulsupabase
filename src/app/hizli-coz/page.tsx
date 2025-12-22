@@ -160,15 +160,20 @@ export default function HizliCozPage() {
 
   // Autostart - parametreler ve dersler yüklendikten sonra otomatik başlat
   useEffect(() => {
-    if (shouldAutoStart && paramsLoaded && nickname && !loading) {
-      // Küçük bir delay ile başlat (subjects yüklensin)
+    // subjects yüklendi ve autostart aktif ise başlat
+    if (shouldAutoStart && paramsLoaded && nickname && !loading && subjects.length > 0) {
+      // initialSubjectCode varsa ve henüz selectedSubject set edilmediyse bekle
+      if (initialSubjectCode && !selectedSubject) {
+        return // selectedSubject set edilene kadar bekle
+      }
+      
       const timer = setTimeout(() => {
         startPractice()
         setShouldAutoStart(false)
-      }, 500)
+      }, 100)
       return () => clearTimeout(timer)
     }
-  }, [shouldAutoStart, paramsLoaded, nickname, loading, subjects])
+  }, [shouldAutoStart, paramsLoaded, nickname, loading, subjects, selectedSubject, initialSubjectCode])
   
   // Load topics when subject/grade changes
   useEffect(() => {
@@ -311,32 +316,33 @@ export default function HizliCozPage() {
     setEarnedPoints(null)
     setQuestionStartTime(Date.now())
 
-    let query = supabase
-      .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
-      .eq('is_active', true)
-
-    // Build topic filter
-    const { data: gradeTopics } = await supabase
+    // Önce uygun topic'leri bul
+    let topicQuery = supabase
       .from('topics')
       .select('id')
       .eq('grade', selectedGrade)
       .eq('is_active', true)
-      .eq(selectedSubject ? 'subject_id' : 'grade', selectedSubject ? selectedSubject.id : selectedGrade)
 
-    if (gradeTopics && gradeTopics.length > 0) {
-      const topicIds = selectedTopic 
-        ? [selectedTopic.id]
-        : selectedSubject 
-          ? topics.map(t => t.id)
-          : gradeTopics.map(t => t.id)
-      
-      if (topicIds.length > 0) {
-        query = query.in('topic_id', topicIds)
-      }
+    // Ders seçiliyse sadece o dersin topic'lerini al
+    if (selectedSubject) {
+      topicQuery = topicQuery.eq('subject_id', selectedSubject.id)
     }
 
-    const { data } = await query
+    const { data: relevantTopics } = await topicQuery
+
+    if (!relevantTopics || relevantTopics.length === 0) {
+      setCurrentQuestion(null)
+      return
+    }
+
+    const topicIds = relevantTopics.map(t => t.id)
+
+    // Soruları getir
+    const { data } = await supabase
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
+      .eq('is_active', true)
+      .in('topic_id', topicIds)
 
     if (data && data.length > 0) {
       const randomIndex = Math.floor(Math.random() * data.length)
