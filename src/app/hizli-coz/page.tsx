@@ -136,18 +136,18 @@ export default function HizliCozPage() {
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false)
   const [shouldAutoStart, setShouldAutoStart] = useState(false)
   const [subjectsLoaded, setSubjectsLoaded] = useState(false)
-  const [autoStartSubjectCode, setAutoStartSubjectCode] = useState<string | null>(null)
+  const [autoStartSubjectId, setAutoStartSubjectId] = useState<string | null>(null)
 
   // 1. İlk yükleme - URL parametrelerini oku
   useEffect(() => {
     const nicknameParam = searchParams.get('nickname')
     const sinifParam = searchParams.get('sinif')
-    const dersParam = searchParams.get('ders')
+    const dersIdParam = searchParams.get('dersId') // Subject ID
     const autostartParam = searchParams.get('autostart')
     
     if (nicknameParam) setNickname(nicknameParam)
     if (sinifParam) setSelectedGrade(parseInt(sinifParam) || 8)
-    if (dersParam) setAutoStartSubjectCode(dersParam)
+    if (dersIdParam) setAutoStartSubjectId(dersIdParam)
     if (autostartParam === 'true' && nicknameParam) {
       setShouldAutoStart(true)
     }
@@ -171,23 +171,27 @@ export default function HizliCozPage() {
   useEffect(() => {
     if (!shouldAutoStart || !subjectsLoaded || !nickname || loading) return
     
-    // Ders seçiliyse, subject'in yüklenmesini bekle
-    if (autoStartSubjectCode) {
-      const matchingSubject = subjects.find(
-        s => s.code === autoStartSubjectCode || s.name === autoStartSubjectCode
-      )
+    // Ders ID'si varsa, subject'i bul ve seç
+    if (autoStartSubjectId) {
+      const matchingSubject = subjects.find(s => s.id === autoStartSubjectId)
       if (matchingSubject && !selectedSubject) {
+        console.log('Ders eşleşti:', matchingSubject.name)
         setSelectedSubject(matchingSubject)
         return // selectedSubject set edildi, bir sonraki render'da devam edecek
+      }
+      // Eşleşen ders bulunamadıysa, ID'yi temizle ve karışık devam et
+      if (!matchingSubject) {
+        console.log('Ders bulunamadı, karışık devam ediliyor. ID:', autoStartSubjectId)
+        setAutoStartSubjectId(null)
       }
     }
     
     // Her şey hazır, başlat!
-    console.log('Autostart tetikleniyor:', { nickname, selectedGrade, selectedSubject })
+    console.log('Autostart tetikleniyor:', { nickname, selectedGrade, selectedSubject: selectedSubject?.name })
     setShouldAutoStart(false)
-    setAutoStartSubjectCode(null)
+    setAutoStartSubjectId(null)
     startPractice()
-  }, [shouldAutoStart, subjectsLoaded, nickname, loading, subjects, selectedSubject, autoStartSubjectCode])
+  }, [shouldAutoStart, subjectsLoaded, nickname, loading, subjects, selectedSubject, autoStartSubjectId])
   
   // Load topics when subject/grade changes
   useEffect(() => {

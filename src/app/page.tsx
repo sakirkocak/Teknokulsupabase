@@ -426,7 +426,7 @@ export default function HomePage() {
     params.set('sinif', selectedGrade.toString())
     params.set('autostart', 'true') // Direkt soru çözmeye başla
     if (quickStartSubject) {
-      params.set('ders', quickStartSubject)
+      params.set('dersId', quickStartSubject) // Subject ID gönder
     }
     
     window.location.href = `/hizli-coz?${params.toString()}`
@@ -813,7 +813,7 @@ export default function HomePage() {
                     >
                       <option value="" className="bg-purple-800 text-white">Karışık</option>
                       {gradeSubjectsForQuickStart.map(subject => (
-                        <option key={subject.id} value={subject.code} className="bg-purple-800 text-white">
+                        <option key={subject.id} value={subject.id} className="bg-purple-800 text-white">
                           {subject.icon} {subject.name}
                         </option>
                       ))}
