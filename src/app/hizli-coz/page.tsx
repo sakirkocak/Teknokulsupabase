@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { 
   BookOpen, Play, CheckCircle, XCircle, 
@@ -89,14 +89,16 @@ type ViewMode = 'setup' | 'practice'
 
 export default function HizliCozPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('setup')
   
-  // Setup state
+  // Setup state - URL parametrelerinden başlangıç değerlerini al
   const [nickname, setNickname] = useState('')
   const [selectedGrade, setSelectedGrade] = useState<number>(8)
+  const [initialSubjectCode, setInitialSubjectCode] = useState<string | null>(null)
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [topics, setTopics] = useState<Topic[]>([])
@@ -131,6 +133,17 @@ export default function HizliCozPage() {
   const [promptType, setPromptType] = useState<'milestone' | 'streak' | 'session'>('milestone')
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   
+  // URL parametrelerini oku
+  useEffect(() => {
+    const nicknameParam = searchParams.get('nickname')
+    const sinifParam = searchParams.get('sinif')
+    const dersParam = searchParams.get('ders')
+    
+    if (nicknameParam) setNickname(nicknameParam)
+    if (sinifParam) setSelectedGrade(parseInt(sinifParam) || 8)
+    if (dersParam) setInitialSubjectCode(dersParam)
+  }, [searchParams])
+
   // Load subjects when grade changes
   useEffect(() => {
     loadGradeSubjects()
@@ -165,8 +178,10 @@ export default function HizliCozPage() {
   }
 
   const loadGradeSubjects = async () => {
-    // Sınıf değiştiğinde ders seçimini sıfırla
-    setSelectedSubject(null)
+    // Sınıf değiştiğinde ders seçimini sıfırla (initialSubjectCode yoksa)
+    if (!initialSubjectCode) {
+      setSelectedSubject(null)
+    }
     setTopics([])
     
     // Sınıfa göre müfredattaki dersleri getir
@@ -193,6 +208,17 @@ export default function HizliCozPage() {
           isExamSubject: gs.is_exam_subject
         }))
       setSubjects(formattedSubjects)
+      
+      // URL'den gelen ders koduna göre seç
+      if (initialSubjectCode) {
+        const matchingSubject = formattedSubjects.find(
+          (s: Subject) => s.code === initialSubjectCode || s.name === initialSubjectCode
+        )
+        if (matchingSubject) {
+          setSelectedSubject(matchingSubject)
+        }
+        setInitialSubjectCode(null) // Sadece ilk yüklemede kullan
+      }
     }
   }
 

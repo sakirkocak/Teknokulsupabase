@@ -49,7 +49,8 @@ import {
   Bot,
   Camera,
   PieChart,
-  Award
+  Award,
+  User
 } from 'lucide-react'
 
 // Yeni Features Array
@@ -333,6 +334,11 @@ export default function HomePage() {
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState<Record<string, number>>({})
   const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('weekly')
   
+  // Quick Start form state
+  const [quickStartNickname, setQuickStartNickname] = useState('')
+  const [quickStartSubject, setQuickStartSubject] = useState('')
+  const [gradeSubjectsForQuickStart, setGradeSubjectsForQuickStart] = useState<{id: string, name: string, code: string, icon: string}[]>([])
+  
   // Auth state
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
@@ -383,7 +389,47 @@ export default function HomePage() {
     loadFeaturedCoaches()
     loadTopLeaders()
     loadSubjectQuestionCounts()
+    loadGradeSubjectsForQuickStart()
   }, [selectedGrade])
+
+  // Load grade subjects for quick start dropdown
+  async function loadGradeSubjectsForQuickStart() {
+    const { data } = await supabase
+      .from('grade_subjects')
+      .select(`
+        id,
+        is_exam_subject,
+        subject:subjects(id, name, code, icon)
+      `)
+      .eq('grade_id', selectedGrade)
+      .order('is_exam_subject', { ascending: false })
+    
+    if (data) {
+      const subjects = data
+        .filter((gs: any) => gs.subject)
+        .map((gs: any) => ({
+          id: gs.subject.id,
+          name: gs.subject.name,
+          code: gs.subject.code,
+          icon: gs.subject.icon || '📚'
+        }))
+      setGradeSubjectsForQuickStart(subjects)
+    }
+  }
+
+  // Handle quick start button click
+  function handleQuickStart() {
+    if (!quickStartNickname.trim()) return
+    
+    const params = new URLSearchParams()
+    params.set('nickname', quickStartNickname.trim())
+    params.set('sinif', selectedGrade.toString())
+    if (quickStartSubject) {
+      params.set('ders', quickStartSubject)
+    }
+    
+    window.location.href = `/hizli-coz?${params.toString()}`
+  }
 
   async function loadSubjectQuestionCounts() {
     const { data: subjects } = await supabase
@@ -693,8 +739,124 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* HIZLI BAŞLA KARTLARI - YENİ BÖLÜM */}
-      <section className="py-12 px-4">
+      {/* 🚀 HEMEN SORU ÇÖZ - ANA BÖLÜM */}
+      <section className="py-8 px-4 -mt-8 relative z-20">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-gradient-to-br from-indigo-600 via-purple-600 to-violet-700 rounded-3xl shadow-2xl shadow-purple-500/30 p-6 sm:p-8 relative overflow-hidden"
+          >
+            {/* Background decorations */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
+            </div>
+
+            <div className="relative z-10">
+              {/* Header */}
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur rounded-full text-white text-sm font-medium mb-4">
+                  <Sparkles className="w-4 h-4 text-yellow-300" />
+                  Kayıt Olmadan, Ücretsiz, Sınırsız!
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+                  🚀 Hemen Soru Çözmeye Başla!
+                </h2>
+                <p className="text-white/70">
+                  Takma adını yaz, sınıfını seç, anında başla
+                </p>
+              </div>
+
+              {/* Quick Start Form */}
+              <div className="grid sm:grid-cols-3 gap-4 mb-6">
+                {/* Nickname Input */}
+                <div className="relative">
+                  <label className="block text-white/80 text-sm font-medium mb-2">Takma Adın</label>
+                  <input
+                    type="text"
+                    value={quickStartNickname}
+                    onChange={(e) => setQuickStartNickname(e.target.value)}
+                    placeholder="Örn: Kahraman123"
+                    maxLength={20}
+                    className="w-full px-4 py-3 bg-white/20 backdrop-blur border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                  />
+                </div>
+
+                {/* Grade Selection */}
+                <div className="relative">
+                  <label className="block text-white/80 text-sm font-medium mb-2">Sınıfın</label>
+                  <div className="relative">
+                    <select
+                      value={selectedGrade}
+                      onChange={(e) => setSelectedGrade(Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-white/20 backdrop-blur border border-white/30 rounded-xl text-white appearance-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(grade => (
+                        <option key={grade} value={grade} className="bg-purple-800 text-white">{grade}. Sınıf</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Subject Selection */}
+                <div className="relative">
+                  <label className="block text-white/80 text-sm font-medium mb-2">Ders (opsiyonel)</label>
+                  <div className="relative">
+                    <select
+                      value={quickStartSubject}
+                      onChange={(e) => setQuickStartSubject(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/20 backdrop-blur border border-white/30 rounded-xl text-white appearance-none focus:outline-none focus:ring-2 focus:ring-white/50 cursor-pointer"
+                    >
+                      <option value="" className="bg-purple-800 text-white">Karışık</option>
+                      {gradeSubjectsForQuickStart.map(subject => (
+                        <option key={subject.id} value={subject.code} className="bg-purple-800 text-white">
+                          {subject.icon} {subject.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Start Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleQuickStart}
+                disabled={!quickStartNickname.trim()}
+                className="w-full py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold text-lg rounded-xl transition-all shadow-lg shadow-orange-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                <Play className="w-6 h-6" />
+                Soru Çözmeye Başla!
+                <ArrowRight className="w-5 h-5" />
+              </motion.button>
+
+              {/* Quick info */}
+              <div className="flex flex-wrap justify-center gap-4 mt-4 text-white/60 text-sm">
+                <span className="flex items-center gap-1">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  Kayıt gerektirmez
+                </span>
+                <span className="flex items-center gap-1">
+                  <Zap className="w-4 h-4 text-yellow-400" />
+                  XP kazan
+                </span>
+                <span className="flex items-center gap-1">
+                  <Trophy className="w-4 h-4 text-orange-400" />
+                  Sıralamada yüksel
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* HIZLI BAŞLA KARTLARI */}
+      <section className="py-8 px-4">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -705,22 +867,10 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div>
                 <h2 className="text-2xl font-bold text-surface-900 flex items-center gap-2">
-                  <Zap className="w-6 h-6 text-orange-500" />
-                  Hızlı Başla
+                  <BookOpen className="w-6 h-6 text-purple-500" />
+                  Derse Göre Soru Çöz
                 </h2>
-                <p className="text-surface-500 mt-1">Sınıfını seç, hemen pratik yapmaya başla!</p>
-              </div>
-              <div className="relative">
-                <select
-                  value={selectedGrade}
-                  onChange={(e) => setSelectedGrade(Number(e.target.value))}
-                  className="appearance-none px-4 py-2 pr-10 bg-surface-100 border border-surface-200 rounded-xl font-medium text-surface-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(grade => (
-                    <option key={grade} value={grade}>{grade}. Sınıf</option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 pointer-events-none" />
+                <p className="text-surface-500 mt-1">{selectedGrade}. sınıf derslerini keşfet</p>
               </div>
             </div>
 
