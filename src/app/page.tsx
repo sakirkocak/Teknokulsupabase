@@ -48,6 +48,11 @@ import {
   ChevronDown,
   Bot,
   Camera,
+  Flag,
+  Languages,
+  Monitor,
+  Wrench,
+  Dumbbell,
   PieChart,
   Award,
   User
@@ -111,15 +116,25 @@ const features = [
   },
 ]
 
-// Ders kartları
-const subjectCards = [
-  { name: 'Matematik', icon: Calculator, color: 'from-blue-500 to-indigo-600', bgLight: 'bg-blue-50' },
-  { name: 'Türkçe', icon: BookOpen, color: 'from-red-500 to-pink-600', bgLight: 'bg-red-50' },
-  { name: 'Fen Bilimleri', icon: Microscope, color: 'from-green-500 to-emerald-600', bgLight: 'bg-green-50' },
-  { name: 'Sosyal Bilgiler', icon: Globe, color: 'from-amber-500 to-orange-600', bgLight: 'bg-amber-50' },
-  { name: 'İngilizce', icon: Globe, color: 'from-purple-500 to-violet-600', bgLight: 'bg-purple-50' },
-  { name: 'Din Kültürü', icon: BookOpen, color: 'from-teal-500 to-cyan-600', bgLight: 'bg-teal-50' },
-]
+// Ders stilleri - code'a göre ikon ve renk mapping
+const subjectStyles: Record<string, { icon: any, color: string, bgLight: string }> = {
+  'matematik': { icon: Calculator, color: 'from-blue-500 to-indigo-600', bgLight: 'bg-blue-50' },
+  'turkce': { icon: BookOpen, color: 'from-red-500 to-pink-600', bgLight: 'bg-red-50' },
+  'fen_bilimleri': { icon: Microscope, color: 'from-green-500 to-emerald-600', bgLight: 'bg-green-50' },
+  'sosyal_bilgiler': { icon: Globe, color: 'from-amber-500 to-orange-600', bgLight: 'bg-amber-50' },
+  'hayat_bilgisi': { icon: Heart, color: 'from-pink-500 to-rose-600', bgLight: 'bg-pink-50' },
+  'inkilap_tarihi': { icon: Flag, color: 'from-red-600 to-orange-600', bgLight: 'bg-red-50' },
+  'ingilizce': { icon: Languages, color: 'from-purple-500 to-violet-600', bgLight: 'bg-purple-50' },
+  'din_kulturu': { icon: BookOpen, color: 'from-teal-500 to-cyan-600', bgLight: 'bg-teal-50' },
+  'bilisim_teknolojileri': { icon: Monitor, color: 'from-cyan-500 to-blue-600', bgLight: 'bg-cyan-50' },
+  'teknoloji_tasarim': { icon: Wrench, color: 'from-gray-500 to-slate-600', bgLight: 'bg-gray-50' },
+  'gorsel_sanatlar': { icon: Palette, color: 'from-pink-500 to-fuchsia-600', bgLight: 'bg-pink-50' },
+  'muzik': { icon: Music, color: 'from-violet-500 to-purple-600', bgLight: 'bg-violet-50' },
+  'beden_egitimi': { icon: Dumbbell, color: 'from-orange-500 to-red-600', bgLight: 'bg-orange-50' },
+}
+
+// Varsayılan stil (tanımlanmamış dersler için)
+const defaultSubjectStyle = { icon: BookOpen, color: 'from-gray-500 to-slate-600', bgLight: 'bg-gray-50' }
 
 // Rozet listesi
 const badges = [
@@ -332,6 +347,7 @@ export default function HomePage() {
   const [topLeaders, setTopLeaders] = useState<any[]>([])
   const [selectedGrade, setSelectedGrade] = useState(8)
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState<Record<string, number>>({})
+  const [subjectCountsLoading, setSubjectCountsLoading] = useState(false)
   const [leaderboardTab, setLeaderboardTab] = useState<'daily' | 'weekly' | 'monthly' | 'all'>('weekly')
   
   // Quick Start form state
@@ -388,11 +404,10 @@ export default function HomePage() {
   useEffect(() => {
     loadFeaturedCoaches()
     loadTopLeaders()
-    loadSubjectQuestionCounts()
     loadGradeSubjectsForQuickStart()
   }, [selectedGrade])
 
-  // Load grade subjects for quick start dropdown
+  // Load grade subjects for quick start dropdown - ve soru sayılarını da yükle
   async function loadGradeSubjectsForQuickStart() {
     const { data } = await supabase
       .from('grade_subjects')
@@ -414,6 +429,12 @@ export default function HomePage() {
           icon: gs.subject.icon || '📚'
         }))
       setGradeSubjectsForQuickStart(subjects)
+      
+      // Dersler yüklendikten sonra soru sayılarını çek
+      loadSubjectQuestionCounts(subjects)
+    } else {
+      setGradeSubjectsForQuickStart([])
+      setSubjectQuestionCounts({})
     }
   }
 
@@ -432,26 +453,43 @@ export default function HomePage() {
     window.location.href = `/hizli-coz?${params.toString()}`
   }
 
-  async function loadSubjectQuestionCounts() {
-    const { data: subjects } = await supabase
-      .from('subjects')
-      .select('id, name')
-
-    if (!subjects) return
-
-    const counts: Record<string, number> = {}
-    
-    for (const subject of subjects) {
-      const { count } = await supabase
-        .from('questions')
-        .select('*, topic:topics!inner(grade, subject_id)', { count: 'exact', head: true })
-        .eq('topic.subject_id', subject.id)
-        .eq('topic.grade', selectedGrade)
-
-      counts[subject.name] = count || 0
+  // Soru sayılarını yükle - PARALEL sorgular ile hızlı
+  async function loadSubjectQuestionCounts(subjectsToCount: {id: string, name: string}[]) {
+    if (!subjectsToCount || subjectsToCount.length === 0) {
+      setSubjectQuestionCounts({})
+      return
     }
+
+    setSubjectCountsLoading(true)
     
-    setSubjectQuestionCounts(counts)
+    try {
+      // Tüm derslerin soru sayılarını PARALEL olarak çek
+      const countPromises = subjectsToCount.map(async (subject) => {
+        const { count } = await supabase
+          .from('questions')
+          .select('*, topic:topics!inner(grade, subject_id)', { count: 'exact', head: true })
+          .eq('topic.subject_id', subject.id)
+          .eq('topic.grade', selectedGrade)
+          .eq('is_active', true)
+        
+        return { id: subject.id, name: subject.name, count: count || 0 }
+      })
+
+      const results = await Promise.all(countPromises)
+      
+      // ID bazlı ve isim bazlı map oluştur
+      const counts: Record<string, number> = {}
+      results.forEach(r => {
+        counts[r.id] = r.count
+        counts[r.name] = r.count
+      })
+      
+      setSubjectQuestionCounts(counts)
+    } catch (error) {
+      console.error('Soru sayıları yüklenirken hata:', error)
+    } finally {
+      setSubjectCountsLoading(false)
+    }
   }
 
   async function loadTopLeaders() {
@@ -875,35 +913,53 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Ders Kartları */}
+            {/* Ders Kartları - Dinamik */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-              {subjectCards.map((subject, index) => {
-                const questionCount = subjectQuestionCounts[subject.name] || 0
-                return (
-                  <motion.div
-                    key={subject.name}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.05 }}
-                    viewport={{ once: true }}
-                    whileHover={{ scale: 1.05, y: -5 }}
-                    className="relative group cursor-pointer"
-                  >
-                    <Link href={`/hizli-coz?ders=${encodeURIComponent(subject.name)}&sinif=${selectedGrade}`}>
-                      <div className={`${subject.bgLight} rounded-2xl p-4 text-center transition-all duration-300 group-hover:shadow-lg border border-transparent group-hover:border-surface-200`}>
-                        <div className={`w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br ${subject.color} flex items-center justify-center shadow-lg`}>
-                          <subject.icon className="w-6 h-6 text-white" />
+              {gradeSubjectsForQuickStart.length === 0 ? (
+                // Yüklenirken skeleton kartlar
+                Array.from({ length: 6 }).map((_, index) => (
+                  <div key={index} className="bg-gray-100 rounded-2xl p-4 animate-pulse">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gray-200" />
+                    <div className="h-4 bg-gray-200 rounded mx-auto w-16 mb-2" />
+                    <div className="h-3 bg-gray-200 rounded mx-auto w-12" />
+                  </div>
+                ))
+              ) : (
+                gradeSubjectsForQuickStart.map((subject, index) => {
+                  const style = subjectStyles[subject.code] || defaultSubjectStyle
+                  const SubjectIcon = style.icon
+                  const questionCount = subjectQuestionCounts[subject.id] || subjectQuestionCounts[subject.name] || 0
+                  
+                  return (
+                    <motion.div
+                      key={subject.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      whileInView={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.05 }}
+                      viewport={{ once: true }}
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      className="relative group cursor-pointer"
+                    >
+                      <Link href={`/hizli-coz?dersId=${subject.id}&sinif=${selectedGrade}`}>
+                        <div className={`${style.bgLight} rounded-2xl p-4 text-center transition-all duration-300 group-hover:shadow-lg border border-transparent group-hover:border-surface-200`}>
+                          <div className={`w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br ${style.color} flex items-center justify-center shadow-lg`}>
+                            <SubjectIcon className="w-6 h-6 text-white" />
+                          </div>
+                          <h3 className="font-semibold text-surface-900 text-sm mb-1">{subject.name}</h3>
+                          {subjectCountsLoading ? (
+                            <div className="h-3 bg-gray-200 rounded mx-auto w-12 animate-pulse" />
+                          ) : (
+                            <p className="text-xs text-surface-500">{formatNumber(questionCount)} soru</p>
+                          )}
+                          <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-xs font-medium text-primary-600">Çöz →</span>
+                          </div>
                         </div>
-                        <h3 className="font-semibold text-surface-900 text-sm mb-1">{subject.name}</h3>
-                        <p className="text-xs text-surface-500">{formatNumber(questionCount)} soru</p>
-                        <div className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-xs font-medium text-primary-600">Çöz →</span>
-                        </div>
-                      </div>
-                    </Link>
-                  </motion.div>
-                )
-              })}
+                      </Link>
+                    </motion.div>
+                  )
+                })
+              )}
             </div>
 
             {/* Alt Butonlar */}
