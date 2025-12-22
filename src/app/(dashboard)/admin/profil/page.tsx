@@ -6,9 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { 
   User, Mail, Lock, Save, Loader2, 
-  CheckCircle, Shield, Eye, EyeOff
+  CheckCircle, Shield, Eye, EyeOff, Camera
 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import AvatarUpload from '@/components/ui/AvatarUpload'
 
 export default function AdminProfilPage() {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function AdminProfilPage() {
   
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -31,8 +33,15 @@ export default function AdminProfilPage() {
     if (profile) {
       setFullName(profile.full_name || '')
       setEmail(profile.email || '')
+      setAvatarUrl(profile.avatar_url || null)
     }
   }, [profile])
+
+  const handleAvatarUpload = (url: string) => {
+    setAvatarUrl(url)
+    setSuccess('Profil resmi güncellendi!')
+    setTimeout(() => setSuccess(''), 3000)
+  }
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,6 +154,31 @@ export default function AdminProfilPage() {
       )}
 
       <div className="grid gap-6">
+        {/* Profil Resmi */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="card p-6"
+        >
+          <h2 className="text-xl font-semibold text-surface-900 mb-6 flex items-center gap-2">
+            <Camera className="w-5 h-5 text-purple-500" />
+            Profil Resmi
+          </h2>
+          
+          <div className="flex justify-center">
+            {profile && (
+              <AvatarUpload
+                userId={profile.id}
+                currentAvatarUrl={avatarUrl}
+                fullName={profile.full_name}
+                onUploadComplete={handleAvatarUpload}
+                size="lg"
+              />
+            )}
+          </div>
+        </motion.div>
+
         {/* Profil Bilgileri */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
