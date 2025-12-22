@@ -132,22 +132,32 @@ export default function HizliCozPage() {
   const [promptType, setPromptType] = useState<'milestone' | 'streak' | 'session'>('milestone')
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   
-  // URL parametreleri
+  // URL parametreleri - REF olarak tutulacak (state gecikmesi olmasın)
+  const urlGradeRef = useRef<number | null>(null)
+  const urlSubjectIdRef = useRef<string | null>(null)
   const [urlParamsProcessed, setUrlParamsProcessed] = useState(false)
   const [shouldAutoStart, setShouldAutoStart] = useState(false)
   const [subjectsLoaded, setSubjectsLoaded] = useState(false)
   const [autoStartSubjectId, setAutoStartSubjectId] = useState<string | null>(null)
 
-  // 1. İlk yükleme - URL parametrelerini oku
+  // 1. İlk yükleme - URL parametrelerini oku ve REF'lere kaydet
   useEffect(() => {
     const nicknameParam = searchParams.get('nickname')
     const sinifParam = searchParams.get('sinif')
     const dersIdParam = searchParams.get('dersId') // Subject ID
     const autostartParam = searchParams.get('autostart')
     
+    // URL'den okunan değerleri REF'lere kaydet (anlık erişim için)
+    if (sinifParam) {
+      const grade = parseInt(sinifParam) || 8
+      urlGradeRef.current = grade
+      setSelectedGrade(grade)
+    }
+    if (dersIdParam) {
+      urlSubjectIdRef.current = dersIdParam
+      setAutoStartSubjectId(dersIdParam)
+    }
     if (nicknameParam) setNickname(nicknameParam)
-    if (sinifParam) setSelectedGrade(parseInt(sinifParam) || 8)
-    if (dersIdParam) setAutoStartSubjectId(dersIdParam)
     if (autostartParam === 'true' && nicknameParam) {
       setShouldAutoStart(true)
     }
@@ -171,27 +181,35 @@ export default function HizliCozPage() {
   useEffect(() => {
     if (!shouldAutoStart || !subjectsLoaded || !nickname || loading) return
     
-    // Ders ID'si varsa, subject'i bul ve seç
-    if (autoStartSubjectId) {
-      const matchingSubject = subjects.find(s => s.id === autoStartSubjectId)
-      if (matchingSubject && !selectedSubject) {
+    // URL'den gelen sınıf değerini kullan (REF'ten, state'ten değil!)
+    const gradeToUse = urlGradeRef.current ?? selectedGrade
+    const subjectIdToUse = urlSubjectIdRef.current
+    
+    // Ders ID'si varsa, subject'i bul
+    let subjectToUse: Subject | null = null
+    if (subjectIdToUse) {
+      const matchingSubject = subjects.find(s => s.id === subjectIdToUse)
+      if (matchingSubject) {
         console.log('Ders eşleşti:', matchingSubject.name)
+        subjectToUse = matchingSubject
         setSelectedSubject(matchingSubject)
-        return // selectedSubject set edildi, bir sonraki render'da devam edecek
-      }
-      // Eşleşen ders bulunamadıysa, ID'yi temizle ve karışık devam et
-      if (!matchingSubject) {
-        console.log('Ders bulunamadı, karışık devam ediliyor. ID:', autoStartSubjectId)
-        setAutoStartSubjectId(null)
+      } else {
+        console.log('Ders bulunamadı, karışık devam ediliyor. ID:', subjectIdToUse)
       }
     }
     
     // Her şey hazır, başlat!
-    console.log('Autostart tetikleniyor:', { nickname, selectedGrade, selectedSubject: selectedSubject?.name })
+    console.log('Autostart tetikleniyor:', { nickname, gradeToUse, subject: subjectToUse?.name || 'Karışık' })
     setShouldAutoStart(false)
+    
+    // REF değerlerini temizle (bir kez kullanıldı)
+    urlGradeRef.current = null
+    urlSubjectIdRef.current = null
     setAutoStartSubjectId(null)
-    startPractice()
-  }, [shouldAutoStart, subjectsLoaded, nickname, loading, subjects, selectedSubject, autoStartSubjectId])
+    
+    // Direkt parametrelerle başlat (state'e güvenme!)
+    startPracticeWithParams(gradeToUse, subjectToUse)
+  }, [shouldAutoStart, subjectsLoaded, nickname, loading, subjects])
   
   // Load topics when subject/grade changes
   useEffect(() => {
@@ -303,7 +321,31 @@ export default function HizliCozPage() {
     return session
   }
 
-  // Start practice
+  // Start practice with explicit parameters (for autostart from URL)
+  const startPracticeWithParams = async (grade: number, subject: Subject | null) => {
+    if (!nickname.trim()) {
+      alert('Lütfen bir takma ad girin')
+      return
+    }
+    
+    // Grade'i güncelle
+    setSelectedGrade(grade)
+    if (subject) setSelectedSubject(subject)
+    
+    await startGuestSession()
+    
+    setViewMode('practice')
+    setQuestionIndex(0)
+    setSessionStats({ correct: 0, wrong: 0 })
+    setSessionStreak(0)
+    setQuestionStartTime(Date.now())
+    setPracticeLoading(true)
+    // Parametreleri direkt geç (state'e güvenme!)
+    await loadNextQuestion(grade, subject)
+    setPracticeLoading(false)
+  }
+
+  // Start practice from UI (uses current state)
   const startPractice = async () => {
     if (!nickname.trim()) {
       alert('Lütfen bir takma ad girin')
@@ -318,7 +360,7 @@ export default function HizliCozPage() {
     setSessionStreak(0)
     setQuestionStartTime(Date.now())
     setPracticeLoading(true)
-    // Mevcut state değerlerini parametre olarak geç
+    // UI'dan başlatıldığında state değerlerini kullan
     await loadNextQuestion(selectedGrade, selectedSubject)
     setPracticeLoading(false)
   }
