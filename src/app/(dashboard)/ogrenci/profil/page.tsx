@@ -34,7 +34,7 @@ export default function StudentProfilePage() {
   // Location states
   const [cities, setCities] = useState<TurkeyCity[]>([])
   const [districts, setDistricts] = useState<TurkeyDistrict[]>([])
-  const [schools, setSchools] = useState<SchoolType[]>([])
+  const [schools, setSchools] = useState<{id: string, name: string, district_id: string}[]>([])
   const [league, setLeague] = useState<any>(null)
   const [studentPoints, setStudentPoints] = useState<any>(null)
   

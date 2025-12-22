@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -87,7 +87,28 @@ const subjectColorMap: Record<string, { bg: string; text: string }> = {
 
 type ViewMode = 'setup' | 'practice'
 
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-violet-900 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
+        <p className="text-white/60">Yükleniyor...</p>
+      </div>
+    </div>
+  )
+}
+
+// Main page wrapper with Suspense
 export default function HizliCozPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <HizliCozPageContent />
+    </Suspense>
+  )
+}
+
+function HizliCozPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
