@@ -4,7 +4,7 @@ import { useState, Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react'
+import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, ArrowLeft, User, AtSign } from 'lucide-react'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -28,8 +28,13 @@ const GoogleIcon = () => (
   </svg>
 )
 
+// Pseudo-email domain
+const PSEUDO_EMAIL_DOMAIN = '@teknokul.app'
+
 function LoginForm() {
+  const [loginMethod, setLoginMethod] = useState<'email' | 'username'>('username')
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -79,8 +84,13 @@ function LoginForm() {
     setError('')
 
     try {
+      // Kullanıcı adı ile giriş yapılıyorsa, pseudo-email oluştur
+      const loginEmail = loginMethod === 'username' 
+        ? `${username.toLowerCase().trim()}${PSEUDO_EMAIL_DOMAIN}`
+        : email
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: loginEmail,
         password,
       })
 
@@ -111,12 +121,22 @@ function LoginForm() {
         router.refresh()
       }
     } catch (err: any) {
-      setError(err.message === 'Invalid login credentials' 
-        ? 'E-posta veya şifre hatalı' 
-        : err.message)
+      if (err.message === 'Invalid login credentials') {
+        setError(loginMethod === 'username' 
+          ? 'Kullanıcı adı veya şifre hatalı' 
+          : 'E-posta veya şifre hatalı')
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
+  }
+
+  // Kullanıcı adı validasyonu - sadece harf, rakam ve alt çizgi
+  const handleUsernameChange = (value: string) => {
+    const sanitized = value.toLowerCase().replace(/[^a-z0-9_]/g, '')
+    setUsername(sanitized)
   }
 
   return (
@@ -174,25 +194,75 @@ function LoginForm() {
           <div className="w-full border-t border-surface-200"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-white text-surface-500">veya e-posta ile</span>
+          <span className="px-4 bg-white text-surface-500">veya</span>
         </div>
       </div>
 
+      {/* Giriş Yöntemi Seçimi */}
+      <div className="flex gap-2 mb-5 p-1 bg-surface-100 rounded-xl">
+        <button
+          type="button"
+          onClick={() => setLoginMethod('username')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+            loginMethod === 'username'
+              ? 'bg-white text-primary-600 shadow-sm'
+              : 'text-surface-600 hover:text-surface-900'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          Kullanıcı Adı
+        </button>
+        <button
+          type="button"
+          onClick={() => setLoginMethod('email')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+            loginMethod === 'email'
+              ? 'bg-white text-primary-600 shadow-sm'
+              : 'text-surface-600 hover:text-surface-900'
+          }`}
+        >
+          <Mail className="w-4 h-4" />
+          E-posta
+        </button>
+      </div>
+
       <form onSubmit={handleLogin} className="space-y-5">
-        <div>
-          <label className="label">E-posta</label>
-          <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input pl-12"
-              placeholder="ornek@email.com"
-              required
-            />
+        {loginMethod === 'username' ? (
+          <div>
+            <label className="label">Kullanıcı Adı</label>
+            <div className="relative">
+              <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                className="input pl-12"
+                placeholder="kullanici_adi"
+                required
+                autoComplete="username"
+              />
+            </div>
+            <p className="text-xs text-surface-500 mt-1">
+              Sadece küçük harf, rakam ve alt çizgi (_) kullanılabilir
+            </p>
           </div>
-        </div>
+        ) : (
+          <div>
+            <label className="label">E-posta</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input pl-12"
+                placeholder="ornek@email.com"
+                required
+                autoComplete="email"
+              />
+            </div>
+          </div>
+        )}
 
         <div>
           <label className="label">Şifre</label>
@@ -205,6 +275,7 @@ function LoginForm() {
               className="input pl-12 pr-12"
               placeholder="••••••••"
               required
+              autoComplete="current-password"
             />
             <button
               type="button"

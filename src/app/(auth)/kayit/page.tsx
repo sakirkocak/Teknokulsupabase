@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft, School } from 'lucide-react'
+import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft, AtSign, CheckCircle, XCircle } from 'lucide-react'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -27,6 +27,9 @@ const GoogleIcon = () => (
     />
   </svg>
 )
+
+// Pseudo-email domain
+const PSEUDO_EMAIL_DOMAIN = '@teknokul.app'
 
 type RoleOption = {
   id: 'ogrenci' | 'ogretmen' | 'veli'
@@ -75,7 +78,9 @@ const gradeOptions = [
 function RegisterForm() {
   const [step, setStep] = useState(1)
   const [role, setRole] = useState<'ogrenci' | 'ogretmen' | 'veli'>('ogrenci')
+  const [registerMethod, setRegisterMethod] = useState<'username' | 'email'>('username')
   const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [grade, setGrade] = useState<number>(8) // Varsayılan 8. sınıf (LGS)
@@ -83,6 +88,8 @@ function RegisterForm() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
+  const [checkingUsername, setCheckingUsername] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -95,6 +102,41 @@ function RegisterForm() {
       setRole('ogrenci')
     }
   }, [redirectUrl])
+
+  // Kullanıcı adı müsaitlik kontrolü
+  useEffect(() => {
+    if (username.length < 3) {
+      setUsernameAvailable(null)
+      return
+    }
+
+    const checkUsername = async () => {
+      setCheckingUsername(true)
+      try {
+        const pseudoEmail = `${username}${PSEUDO_EMAIL_DOMAIN}`
+        const { data } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', pseudoEmail)
+          .maybeSingle()
+        
+        setUsernameAvailable(!data)
+      } catch {
+        setUsernameAvailable(null)
+      } finally {
+        setCheckingUsername(false)
+      }
+    }
+
+    const timeoutId = setTimeout(checkUsername, 500)
+    return () => clearTimeout(timeoutId)
+  }, [username])
+
+  // Kullanıcı adı validasyonu - sadece harf, rakam ve alt çizgi
+  const handleUsernameChange = (value: string) => {
+    const sanitized = value.toLowerCase().replace(/[^a-z0-9_]/g, '')
+    setUsername(sanitized)
+  }
 
   // Google ile kayıt - rol ve sınıf bilgisini de gönder
   async function handleGoogleRegister() {
@@ -136,14 +178,20 @@ function RegisterForm() {
     setError('')
 
     try {
+      // Kullanıcı adı ile kayıt yapılıyorsa, pseudo-email oluştur
+      const registerEmail = registerMethod === 'username'
+        ? `${username.toLowerCase().trim()}${PSEUDO_EMAIL_DOMAIN}`
+        : email
+
       // 1. Kullanıcı oluştur
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
+        email: registerEmail,
         password,
         options: {
           data: {
             full_name: fullName,
             role: role,
+            username: registerMethod === 'username' ? username : undefined,
           },
         },
       })
@@ -165,7 +213,7 @@ function RegisterForm() {
             .from('profiles')
             .insert({
               id: authData.user.id,
-              email: email,
+              email: registerEmail,
               full_name: fullName,
               role: role,
             })
@@ -247,7 +295,9 @@ function RegisterForm() {
       }
     } catch (err: any) {
       if (err.message.includes('already registered')) {
-        setError('Bu e-posta adresi zaten kayıtlı')
+        setError(registerMethod === 'username' 
+          ? 'Bu kullanıcı adı zaten kullanılıyor' 
+          : 'Bu e-posta adresi zaten kayıtlı')
       } else {
         setError(err.message)
       }
@@ -450,9 +500,43 @@ function RegisterForm() {
               <div className="w-full border-t border-surface-200"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-white text-surface-500">veya e-posta ile</span>
+              <span className="px-4 bg-white text-surface-500">veya</span>
             </div>
           </div>
+
+          {/* Kayıt Yöntemi Seçimi */}
+          <div className="flex gap-2 p-1 bg-surface-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setRegisterMethod('username')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                registerMethod === 'username'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-surface-600 hover:text-surface-900'
+              }`}
+            >
+              <User className="w-4 h-4" />
+              Kullanıcı Adı
+            </button>
+            <button
+              type="button"
+              onClick={() => setRegisterMethod('email')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
+                registerMethod === 'email'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-surface-600 hover:text-surface-900'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              E-posta
+            </button>
+          </div>
+
+          {registerMethod === 'username' && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700">
+              💡 <strong>E-posta adresiniz yok mu?</strong> Sadece kullanıcı adı ve şifre ile kayıt olabilirsiniz!
+            </div>
+          )}
 
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
@@ -470,20 +554,70 @@ function RegisterForm() {
               </div>
             </div>
 
-            <div>
-              <label className="label">E-posta</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-12"
-                  placeholder="ornek@email.com"
-                  required
-                />
+            {registerMethod === 'username' ? (
+              <div>
+                <label className="label">Kullanıcı Adı</label>
+                <div className="relative">
+                  <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    className={`input pl-12 pr-12 ${
+                      username.length >= 3 
+                        ? usernameAvailable 
+                          ? 'border-green-500 focus:border-green-500' 
+                          : usernameAvailable === false 
+                            ? 'border-red-500 focus:border-red-500' 
+                            : ''
+                        : ''
+                    }`}
+                    placeholder="kullanici_adi"
+                    minLength={3}
+                    maxLength={20}
+                    required
+                    autoComplete="username"
+                  />
+                  {username.length >= 3 && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      {checkingUsername ? (
+                        <Loader2 className="w-5 h-5 animate-spin text-surface-400" />
+                      ) : usernameAvailable ? (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      ) : usernameAvailable === false ? (
+                        <XCircle className="w-5 h-5 text-red-500" />
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-between mt-1">
+                  <p className="text-xs text-surface-500">
+                    Sadece küçük harf, rakam ve alt çizgi (_)
+                  </p>
+                  {username.length >= 3 && (
+                    <p className={`text-xs ${usernameAvailable ? 'text-green-600' : usernameAvailable === false ? 'text-red-600' : ''}`}>
+                      {checkingUsername ? 'Kontrol ediliyor...' : usernameAvailable ? 'Kullanılabilir ✓' : usernameAvailable === false ? 'Bu kullanıcı adı alınmış' : ''}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className="label">E-posta</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input pl-12"
+                    placeholder="ornek@email.com"
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="label">Şifre</label>
@@ -497,6 +631,7 @@ function RegisterForm() {
                   placeholder="En az 6 karakter"
                   minLength={6}
                   required
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -518,7 +653,7 @@ function RegisterForm() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (registerMethod === 'username' && (!usernameAvailable || username.length < 3))}
                 className="btn btn-primary btn-lg flex-1"
               >
                 {loading ? (
