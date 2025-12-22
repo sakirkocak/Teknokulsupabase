@@ -419,22 +419,7 @@ export default function LeaderboardPage() {
           setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
         }
       } else if (activeScope === 'school' && selectedSchool) {
-        // Okul liderliği - Önce okula ait öğrencileri bul
-        const { data: schoolStudents } = await supabase
-          .from('student_profiles')
-          .select('user_id')
-          .eq('school_id', selectedSchool)
-        
-        if (!schoolStudents || schoolStudents.length === 0) {
-          setLeaderboard([])
-          setTotalStudents(0)
-          setTotalQuestions(0)
-          setLoading(false)
-          return
-        }
-
-        const studentIds = schoolStudents.map(s => s.user_id)
-
+        // Okul liderliği
         const { data } = await supabase
           .from('student_points')
           .select(`
@@ -454,14 +439,19 @@ export default function LeaderboardPage() {
               school:schools!student_profiles_school_id_fkey(name)
             )
           `)
-          .in('student_id', studentIds)
           .gt('total_questions', 0)
           .order('total_points', { ascending: false })
           .limit(500)
 
         if (data) {
+          // Okula göre filtrele - school_id'yi string olarak karşılaştır
+          let filteredData = data.filter((item: any) => {
+            const studentSchoolId = item.student?.school_id
+            // Her iki değeri de string'e çevirerek karşılaştır
+            return studentSchoolId && String(studentSchoolId) === String(selectedSchool)
+          })
+          
           // Sınıf filtrelemesi uygula
-          let filteredData = data
           if (selectedGrade !== '') {
             const gradeNum = parseInt(selectedGrade)
             if (!isNaN(gradeNum)) {
