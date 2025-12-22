@@ -419,10 +419,7 @@ export default function LeaderboardPage() {
           setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
         }
       } else if (activeScope === 'school' && selectedSchool) {
-        // Okul liderliği - Seçilen okulun adını bul
-        const selectedSchoolData = schools.find(s => s.id === selectedSchool)
-        const selectedSchoolName = selectedSchoolData?.name || ''
-        
+        // Okul liderliği
         const { data } = await supabase
           .from('student_points')
           .select(`
@@ -436,8 +433,6 @@ export default function LeaderboardPage() {
               user_id,
               grade,
               school_id,
-              district_id,
-              school_name,
               profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
               city:turkey_cities!student_profiles_city_id_fkey(name),
               district:turkey_districts!student_profiles_district_id_fkey(name),
@@ -449,31 +444,8 @@ export default function LeaderboardPage() {
           .limit(500)
 
         if (data) {
-          // Okula göre filtrele - 3 yöntemli eşleştirme:
-          // 1. school_id eşleşmesi (en güvenilir)
-          // 2. school.name eşleşmesi + district_id eşleşmesi
-          // 3. school_name (manuel girilen) eşleşmesi + district_id eşleşmesi
-          let filteredData = data.filter((item: any) => {
-            const studentSchoolId = item.student?.school_id
-            const studentSchoolName = item.student?.school?.name || item.student?.school_name
-            const studentDistrictId = item.student?.district_id
-            
-            // Yöntem 1: Direkt school_id eşleşmesi
-            if (studentSchoolId && String(studentSchoolId) === String(selectedSchool)) {
-              return true
-            }
-            
-            // Yöntem 2: Okul adı + İlçe eşleşmesi
-            if (selectedSchoolName && studentSchoolName && selectedDistrict) {
-              const nameMatch = studentSchoolName.toUpperCase().trim() === selectedSchoolName.toUpperCase().trim()
-              const districtMatch = studentDistrictId && String(studentDistrictId) === String(selectedDistrict)
-              if (nameMatch && districtMatch) {
-                return true
-              }
-            }
-            
-            return false
-          })
+          // Okula göre filtrele
+          let filteredData = data.filter((item: any) => item.student?.school_id === selectedSchool)
           
           // Sınıf filtrelemesi uygula
           if (selectedGrade !== '') {
@@ -588,21 +560,33 @@ export default function LeaderboardPage() {
             student:student_profiles!student_points_student_id_fkey(
               user_id,
               grade,
+              school_id,
+              city_id,
+              district_id,
               profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
             )
           `)
           .gt(cols.correct, 0)
           .order(cols.points, { ascending: false })
-          .limit(100)
+          .limit(500)
 
         if (data) {
           let filteredData = data
+          
+          // Kapsam bazlı filtreleme (il, ilçe, okul)
+          if (activeScope === 'city' && selectedCity) {
+            filteredData = filteredData.filter((item: any) => item.student?.city_id === selectedCity)
+          } else if (activeScope === 'district' && selectedDistrict) {
+            filteredData = filteredData.filter((item: any) => item.student?.district_id === selectedDistrict)
+          } else if (activeScope === 'school' && selectedSchool) {
+            filteredData = filteredData.filter((item: any) => item.student?.school_id === selectedSchool)
+          }
           
           // Sınıf filtrelemesi
           if (selectedGrade !== '') {
             const gradeNum = parseInt(selectedGrade)
             if (!isNaN(gradeNum)) {
-              filteredData = data.filter((item: any) => item.student?.grade === gradeNum)
+              filteredData = filteredData.filter((item: any) => item.student?.grade === gradeNum)
             }
           }
 
@@ -657,25 +641,13 @@ export default function LeaderboardPage() {
       {/* Header */}
       <header className="border-b border-white/10 bg-black/20 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <img 
-              src="/images/logo.png" 
-              alt="Teknokul - Eğitimin Dijital Üssü" 
-              className="h-16 object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none'
-                const fallback = document.getElementById('liderlik-logo-fallback')
-                if (fallback) fallback.style.display = 'flex'
-              }}
-            />
-            <div id="liderlik-logo-fallback" className="hidden items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white">
-                Tekn<span className="text-primary-400">okul</span>
-              </span>
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+              <GraduationCap className="w-6 h-6 text-white" />
             </div>
+            <span className="text-xl font-bold text-white">
+              Tekn<span className="text-primary-400">okul</span>
+            </span>
           </Link>
           <div className="flex items-center gap-3">
             {user && userProfile ? (

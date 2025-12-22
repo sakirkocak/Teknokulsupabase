@@ -506,26 +506,14 @@ export default function HomePage() {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 lg:h-24">
-            <Link href="/" className="flex items-center">
-              <img 
-                src="/images/logo.png" 
-                alt="Teknokul - Eğitimin Dijital Üssü" 
-                className="h-14 sm:h-16 lg:h-20 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                  const fallback = document.getElementById('navbar-logo-fallback')
-                  if (fallback) fallback.style.display = 'flex'
-                }}
-              />
-              <div id="navbar-logo-fallback" className="hidden items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold">
-                  Tekn<span className="text-primary-500">okul</span>
-                </span>
+          <div className="flex items-center justify-between h-16">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
+              <span className="text-xl font-bold">
+                Tekn<span className="text-primary-500">okul</span>
+              </span>
             </Link>
             
             {/* Desktop Navigation */}
@@ -1698,31 +1686,16 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto">
           <div className="grid sm:grid-cols-2 lg:grid-cols-6 gap-8 mb-8">
             <div className="lg:col-span-2">
-              <Link href="/" className="flex items-center gap-3 mb-4">
-                <img 
-                  src="/images/logo.png" 
-                  alt="Teknokul" 
-                  className="h-12 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                    const fallback = document.getElementById('footer-logo-fallback')
-                    if (fallback) fallback.style.display = 'flex'
-                  }}
-                />
-                <div id="footer-logo-fallback" className="hidden items-center gap-2">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                    <GraduationCap className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xl font-bold">
-                      Tekn<span className="text-primary-500">okul</span>
-                    </span>
-                    <span className="text-xs text-surface-500 font-medium">Eğitimin Dijital Üssü</span>
-                  </div>
+              <Link href="/" className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                  <GraduationCap className="w-6 h-6 text-white" />
                 </div>
+                <span className="text-xl font-bold">
+                  Tekn<span className="text-primary-500">okul</span>
+                </span>
               </Link>
               <p className="text-surface-500 text-sm">
-                <span className="font-semibold text-surface-700">Eğitimin Dijital Üssü</span> - AI destekli soru bankası, liderlik yarışı ve eğitim koçluğu platformu
+                AI destekli soru bankası, liderlik yarışı ve eğitim koçluğu platformu
               </p>
             </div>
             

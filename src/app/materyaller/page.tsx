@@ -81,25 +81,13 @@ export default function MaterialsPage() {
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center">
-              <img 
-                src="/images/logo.png" 
-                alt="Teknokul - Eğitimin Dijital Üssü" 
-                className="h-16 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                  const fallback = document.getElementById('materyaller-logo-fallback')
-                  if (fallback) fallback.style.display = 'flex'
-                }}
-              />
-              <div id="materyaller-logo-fallback" className="hidden items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold">
-                  Tekn<span className="text-primary-500">okul</span>
-                </span>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
+              <span className="text-xl font-bold">
+                Tekn<span className="text-primary-500">okul</span>
+              </span>
             </Link>
             
             {profile ? (

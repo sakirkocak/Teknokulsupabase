@@ -25,8 +25,7 @@ import {
   EyeOff,
   Plus,
   X,
-  ExternalLink,
-  Lock
+  ExternalLink
 } from 'lucide-react'
 
 export default function CoachProfilePage() {
@@ -34,15 +33,7 @@ export default function CoachProfilePage() {
   const { teacherProfile, loading: teacherLoading, refetch: refetchTeacher } = useTeacherProfile(profile?.id || '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [activeTab, setActiveTab] = useState<'basic' | 'listing' | 'security'>('basic')
-  
-  // Şifre değiştirme state'leri
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPasswords, setShowPasswords] = useState(false)
-  const [changingPassword, setChangingPassword] = useState(false)
-  const [passwordError, setPasswordError] = useState('')
-  const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [activeTab, setActiveTab] = useState<'basic' | 'listing'>('basic')
   
   // Temel bilgiler
   const [formData, setFormData] = useState({
@@ -173,43 +164,6 @@ export default function CoachProfilePage() {
     setSaving(false)
   }
 
-  // Şifre değiştirme fonksiyonu
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault()
-    setChangingPassword(true)
-    setPasswordError('')
-    setPasswordSuccess('')
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Şifreler eşleşmiyor')
-      setChangingPassword(false)
-      return
-    }
-
-    if (newPassword.length < 6) {
-      setPasswordError('Şifre en az 6 karakter olmalıdır')
-      setChangingPassword(false)
-      return
-    }
-
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
-      })
-
-      if (error) throw error
-
-      setPasswordSuccess('Şifre başarıyla değiştirildi!')
-      setNewPassword('')
-      setConfirmPassword('')
-      setTimeout(() => setPasswordSuccess(''), 3000)
-    } catch (err: any) {
-      setPasswordError(err.message || 'Şifre değiştirilirken hata oluştu')
-    } finally {
-      setChangingPassword(false)
-    }
-  }
-
   const pageLoading = profileLoading || teacherLoading
 
   if (pageLoading) {
@@ -273,17 +227,6 @@ export default function CoachProfilePage() {
           >
             <Eye className="w-4 h-4 inline mr-2" />
             İlan Ayarları
-          </button>
-          <button
-            onClick={() => setActiveTab('security')}
-            className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-colors ${
-              activeTab === 'security'
-                ? 'bg-white text-surface-900 shadow-sm'
-                : 'text-surface-600 hover:text-surface-900'
-            }`}
-          >
-            <Lock className="w-4 h-4 inline mr-2" />
-            Güvenlik
           </button>
         </div>
 
@@ -601,104 +544,24 @@ export default function CoachProfilePage() {
               </>
             )}
 
-            {/* Submit - sadece basic ve listing tablarında göster */}
-            {(activeTab === 'basic' || activeTab === 'listing') && (
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn btn-primary btn-lg w-full"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Kaydediliyor...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-5 h-5" />
-                    Kaydet
-                  </>
-                )}
-              </button>
-            )}
-
-            {/* Security Tab Content */}
-            {activeTab === 'security' && (
-              <div className="space-y-6">
-                <h3 className="text-lg font-semibold text-surface-900 flex items-center gap-2">
-                  <Lock className="w-5 h-5 text-primary-500" />
-                  Şifre Değiştir
-                </h3>
-
-                {passwordError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-                    {passwordError}
-                  </div>
-                )}
-
-                {passwordSuccess && (
-                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4" />
-                    {passwordSuccess}
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="label">Yeni Şifre</label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                      <input
-                        type={showPasswords ? 'text' : 'password'}
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="input pl-12 pr-12"
-                        placeholder="En az 6 karakter"
-                        minLength={6}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords(!showPasswords)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
-                      >
-                        {showPasswords ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="label">Yeni Şifre Tekrar</label>
-                    <div className="relative">
-                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                      <input
-                        type={showPasswords ? 'text' : 'password'}
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="input pl-12"
-                        placeholder="Şifreyi tekrar girin"
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleChangePassword}
-                    disabled={changingPassword || !newPassword || !confirmPassword}
-                    className="btn btn-primary"
-                  >
-                    {changingPassword ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <>
-                        <Lock className="w-4 h-4" />
-                        Şifreyi Değiştir
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn btn-primary btn-lg w-full"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Kaydediliyor...
+                </>
+              ) : (
+                <>
+                  <Save className="w-5 h-5" />
+                  Kaydet
+                </>
+              )}
+            </button>
           </form>
         </div>
       </div>

@@ -33,8 +33,7 @@ import {
   UserCircle,
   Wand2,
   Volume2,
-  Flag,
-  Shapes
+  Flag
 } from 'lucide-react'
 
 type NavItem = {
@@ -88,7 +87,6 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
-    { label: 'Görsel Soru Üretici', href: '/admin/gorsel-soru-uretici', icon: Shapes },
     { label: 'Soru Bildirimleri', href: '/admin/soru-bildirimleri', icon: Flag },
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
@@ -181,25 +179,13 @@ export default function DashboardLayout({
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-4 border-b border-surface-100">
-            <Link href="/" className="flex items-center">
-              <img 
-                src="/images/logo.png" 
-                alt="Teknokul - Eğitimin Dijital Üssü" 
-                className="h-14 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                  const fallback = document.getElementById('sidebar-logo-fallback')
-                  if (fallback) fallback.style.display = 'flex'
-                }}
-              />
-              <div id="sidebar-logo-fallback" className="hidden items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold">
-                  Tekn<span className="text-primary-500">okul</span>
-                </span>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
+              <span className="text-xl font-bold">
+                Tekn<span className="text-primary-500">okul</span>
+              </span>
             </Link>
           </div>
 

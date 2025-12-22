@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react'
-import { trackLogin } from '@/lib/gtag'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -80,24 +79,12 @@ function LoginForm() {
     setError('')
 
     try {
-      // 🔒 API üzerinden güvenli giriş (rate limiting)
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Giriş yapılamadı')
-      }
-
-      // 📊 Google Ads giriş dönüşümü izleme
-      trackLogin('email')
-      
-      // Supabase client tarafında da oturum aç
-      await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
 
       // Redirect URL varsa oraya git
       if (redirectUrl) {
@@ -106,11 +93,27 @@ function LoginForm() {
         return
       }
 
-      // API'den gelen yönlendirmeyi kullan
-      router.push(data.redirectTo || '/')
-      router.refresh()
+      // Yoksa kullanıcı rolüne göre yönlendir
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile) {
+        const routes: Record<string, string> = {
+          ogretmen: '/koc',
+          ogrenci: '/ogrenci',
+          veli: '/veli',
+          admin: '/admin',
+        }
+        router.push(routes[profile.role] || '/')
+        router.refresh()
+      }
     } catch (err: any) {
-      setError(err.message || 'Giriş yapılamadı')
+      setError(err.message === 'Invalid login credentials' 
+        ? 'E-posta veya şifre hatalı' 
+        : err.message)
     } finally {
       setLoading(false)
     }
@@ -118,25 +121,13 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-md">
-      <Link href="/" className="flex flex-col items-start mb-8">
-        <img 
-          src="/images/logo.png" 
-          alt="Teknokul - Eğitimin Dijital Üssü" 
-          className="h-20 object-contain"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none'
-            const fallback = document.getElementById('login-logo-fallback')
-            if (fallback) fallback.style.display = 'flex'
-          }}
-        />
-        <div id="login-logo-fallback" className="hidden items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
-          <span className="text-xl font-bold">
-            Tekn<span className="text-primary-500">okul</span>
-          </span>
+      <Link href="/" className="flex items-center gap-2 mb-8">
+        <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+          <GraduationCap className="w-6 h-6 text-white" />
         </div>
+        <span className="text-xl font-bold">
+          Tekn<span className="text-primary-500">okul</span>
+        </span>
       </Link>
 
       <h1 className="text-2xl font-bold text-surface-900 mb-2">
@@ -276,37 +267,15 @@ export default function LoginPage() {
       </div>
 
       {/* Sağ Panel - Görsel */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary-500 to-primary-700 items-center justify-center p-12 relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-10 w-64 h-64 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-80 h-80 bg-white rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="text-white text-center max-w-md relative z-10">
-          <img 
-            src="/images/logo-white.png" 
-            alt="Teknokul" 
-            className="h-24 object-contain mx-auto mb-6"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none'
-              const fallback = document.getElementById('login-panel-fallback')
-              if (fallback) fallback.style.display = 'flex'
-            }}
-          />
-          <div id="login-panel-fallback" className="hidden flex-col items-center mb-6">
-            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
-              <GraduationCap className="w-10 h-10" />
-            </div>
-            <span className="text-3xl font-bold">Tekn<span className="text-primary-200">okul</span></span>
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary-500 to-primary-700 items-center justify-center p-12">
+        <div className="text-white text-center max-w-md">
+          <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <GraduationCap className="w-10 h-10" />
           </div>
-          <h2 className="text-3xl font-bold mb-2">
-            Eğitimin Dijital Üssü
+          <h2 className="text-3xl font-bold mb-4">
+            Eğitimde Yeni Nesil
           </h2>
-          <p className="text-lg text-primary-100 mb-4">
-            Öğren. Yarış. Kazan.
-          </p>
-          <p className="text-primary-200">
+          <p className="text-primary-100">
             Kişisel koçunla birlikte hedeflerine ulaş. 
             AI destekli öneriler ve gelişim takibi ile fark yarat.
           </p>

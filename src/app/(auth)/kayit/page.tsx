@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft, School } from 'lucide-react'
-import { trackSignup, trackGoogleSignup } from '@/lib/gtag'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -87,10 +86,6 @@ function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  
-  // 🔒 Güvenlik state'leri
-  const [honeypot, setHoneypot] = useState('') // Bot tuzağı
-  const [formLoadTime] = useState(Date.now()) // Form yüklenme zamanı
 
   const redirectUrl = searchParams.get('redirect')
 
@@ -141,34 +136,99 @@ function RegisterForm() {
     setError('')
 
     try {
-      // 🔒 API üzerinden güvenli kayıt
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          password,
-          fullName,
-          role,
-          grade: role === 'ogrenci' ? grade : undefined,
-          honeypot, // Bot tuzağı (boş olmalı)
-          formLoadTime, // Form yüklenme zamanı
-        }),
+      // 1. Kullanıcı oluştur
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: role,
+          },
+        },
       })
 
-      const data = await response.json()
+      if (authError) throw authError
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Kayıt sırasında bir hata oluştu')
-      }
+      if (authData.user) {
+        // 2. Trigger çalışmayabilir, manuel olarak profil oluştur
+        // Önce profil var mı kontrol et
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', authData.user.id)
+          .single()
 
-      if (data.success) {
-        // 📊 Google Ads dönüşüm izleme
-        trackSignup(role)
-        
-        // Supabase oturumunu senkronize et
-        await supabase.auth.signInWithPassword({ email, password })
-        
+        if (!existingProfile) {
+          // Profile oluştur
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: authData.user.id,
+              email: email,
+              full_name: fullName,
+              role: role,
+            })
+
+          if (profileError && !profileError.message.includes('duplicate')) {
+            console.error('Profil oluşturma hatası:', profileError)
+          }
+        }
+
+        // 3. Role göre ek profil oluştur
+        if (role === 'ogrenci') {
+          const { data: existingStudentProfile } = await supabase
+            .from('student_profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+
+          if (!existingStudentProfile) {
+            const { error: studentError } = await supabase
+              .from('student_profiles')
+              .insert({ 
+                user_id: authData.user.id,
+                grade: grade // Sınıf bilgisi
+              })
+
+            if (studentError && !studentError.message.includes('duplicate')) {
+              console.error('Öğrenci profili oluşturma hatası:', studentError)
+            }
+          }
+        } else if (role === 'ogretmen') {
+          const { data: existingTeacherProfile } = await supabase
+            .from('teacher_profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+
+          if (!existingTeacherProfile) {
+            const { error: teacherError } = await supabase
+              .from('teacher_profiles')
+              .insert({ user_id: authData.user.id, is_coach: true })
+
+            if (teacherError && !teacherError.message.includes('duplicate')) {
+              console.error('Öğretmen profili oluşturma hatası:', teacherError)
+            }
+          }
+        } else if (role === 'veli') {
+          const { data: existingParentProfile } = await supabase
+            .from('parent_profiles')
+            .select('id')
+            .eq('user_id', authData.user.id)
+            .single()
+
+          if (!existingParentProfile) {
+            const { error: parentError } = await supabase
+              .from('parent_profiles')
+              .insert({ user_id: authData.user.id })
+
+            if (parentError && !parentError.message.includes('duplicate')) {
+              console.error('Veli profili oluşturma hatası:', parentError)
+            }
+          }
+        }
+
         // Redirect URL varsa oraya git
         if (redirectUrl) {
           router.push(redirectUrl)
@@ -176,12 +236,21 @@ function RegisterForm() {
           return
         }
 
-        // Yoksa API'den gelen yönlendirmeyi kullan
-        router.push(data.redirectTo || '/')
+        // Yoksa role göre yönlendir
+        const routes: Record<string, string> = {
+          ogretmen: '/koc',
+          ogrenci: '/ogrenci',
+          veli: '/veli',
+        }
+        router.push(routes[role] || '/')
         router.refresh()
       }
     } catch (err: any) {
-      setError(err.message || 'Kayıt sırasında bir hata oluştu')
+      if (err.message.includes('already registered')) {
+        setError('Bu e-posta adresi zaten kayıtlı')
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -189,25 +258,13 @@ function RegisterForm() {
 
   return (
     <div className="w-full max-w-md">
-      <Link href="/" className="flex flex-col items-start mb-8">
-        <img 
-          src="/images/logo.png" 
-          alt="Teknokul - Eğitimin Dijital Üssü" 
-          className="h-20 object-contain"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none'
-            const fallback = document.getElementById('register-logo-fallback')
-            if (fallback) fallback.style.display = 'flex'
-          }}
-        />
-        <div id="register-logo-fallback" className="hidden items-center gap-2">
-          <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
-          <span className="text-xl font-bold">
-            Tekn<span className="text-primary-500">okul</span>
-          </span>
+      <Link href="/" className="flex items-center gap-2 mb-8">
+        <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+          <GraduationCap className="w-6 h-6 text-white" />
         </div>
+        <span className="text-xl font-bold">
+          Tekn<span className="text-primary-500">okul</span>
+        </span>
       </Link>
 
       <h1 className="text-2xl font-bold text-surface-900 mb-2">
@@ -398,32 +455,6 @@ function RegisterForm() {
           </div>
 
           <form onSubmit={handleRegister} className="space-y-4">
-            {/* 🔒 Honeypot - Bot tuzağı (kullanıcıya görünmez) */}
-            <div 
-              aria-hidden="true" 
-              style={{ 
-                position: 'absolute', 
-                left: '-9999px', 
-                top: '-9999px',
-                opacity: 0, 
-                height: 0, 
-                width: 0,
-                overflow: 'hidden',
-                pointerEvents: 'none'
-              }}
-            >
-              <label htmlFor="website">Website</label>
-              <input
-                type="text"
-                id="website"
-                name="website"
-                value={honeypot}
-                onChange={(e) => setHoneypot(e.target.value)}
-                tabIndex={-1}
-                autoComplete="off"
-              />
-            </div>
-
             <div>
               <label className="label">Ad Soyad</label>
               <div className="relative">
@@ -539,37 +570,15 @@ export default function RegisterPage() {
       </div>
 
       {/* Sağ Panel - Görsel */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-secondary-500 to-secondary-700 items-center justify-center p-12 relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-10 w-64 h-64 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-10 w-80 h-80 bg-white rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="text-white text-center max-w-md relative z-10">
-          <img 
-            src="/images/logo-white.png" 
-            alt="Teknokul" 
-            className="h-24 object-contain mx-auto mb-6"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none'
-              const fallback = document.getElementById('register-panel-fallback')
-              if (fallback) fallback.style.display = 'flex'
-            }}
-          />
-          <div id="register-panel-fallback" className="hidden flex-col items-center mb-6">
-            <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
-              <Users className="w-10 h-10" />
-            </div>
-            <span className="text-3xl font-bold">Tekn<span className="text-secondary-200">okul</span></span>
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-secondary-500 to-secondary-700 items-center justify-center p-12">
+        <div className="text-white text-center max-w-md">
+          <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Users className="w-10 h-10" />
           </div>
-          <h2 className="text-3xl font-bold mb-2">
-            Eğitimin Dijital Üssü
-          </h2>
-          <p className="text-lg text-secondary-100 mb-4">
+          <h2 className="text-3xl font-bold mb-4">
             Topluluğumuza Katıl
-          </p>
-          <p className="text-secondary-200">
+          </h2>
+          <p className="text-secondary-100">
             Binlerce öğrenci ve koç ile birlikte eğitimde yeni bir sayfa aç.
           </p>
         </div>

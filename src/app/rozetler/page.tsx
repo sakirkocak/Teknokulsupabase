@@ -113,25 +113,13 @@ export default function BadgesPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center">
-              <img 
-                src="/images/logo.png" 
-                alt="Teknokul - Eğitimin Dijital Üssü" 
-                className="h-16 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                  const fallback = document.getElementById('rozetler-logo-fallback')
-                  if (fallback) fallback.style.display = 'flex'
-                }}
-              />
-              <div id="rozetler-logo-fallback" className="hidden items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                  <GraduationCap className="w-6 h-6 text-white" />
-                </div>
-                <span className="text-xl font-bold">
-                  Tekn<span className="text-primary-500">okul</span>
-                </span>
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
+              <span className="text-xl font-bold">
+                Tekn<span className="text-primary-500">okul</span>
+              </span>
             </Link>
             
             <div className="flex items-center gap-4">
@@ -445,13 +433,8 @@ export default function BadgesPage() {
 
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-surface-100 bg-white">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-surface-600 flex items-center justify-center gap-2 mb-2">
-            <span className="text-red-500">❤️</span>
-            <span>Sevgiyle öğrenciler için tasarlandı</span>
-            <span className="text-red-500">❤️</span>
-          </p>
-          <p className="text-surface-500 text-sm">© 2026 Tekn<span className="text-primary-500">okul</span> - Eğitimin Dijital Üssü. Tüm hakları saklıdır.</p>
+        <div className="max-w-6xl mx-auto text-center text-surface-500 text-sm">
+          <p>© 2026 Tekn<span className="text-primary-500">okul</span>. Tüm hakları saklıdır.</p>
         </div>
       </footer>
     </div>
