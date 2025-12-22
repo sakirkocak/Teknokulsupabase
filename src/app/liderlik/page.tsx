@@ -419,7 +419,10 @@ export default function LeaderboardPage() {
           setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
         }
       } else if (activeScope === 'school' && selectedSchool) {
-        // Okul liderliği
+        // Okul liderliği - Seçilen okulun adını bul
+        const selectedSchoolData = schools.find(s => s.id === selectedSchool)
+        const selectedSchoolName = selectedSchoolData?.name || ''
+        
         const { data } = await supabase
           .from('student_points')
           .select(`
@@ -433,6 +436,8 @@ export default function LeaderboardPage() {
               user_id,
               grade,
               school_id,
+              district_id,
+              school_name,
               profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
               city:turkey_cities!student_profiles_city_id_fkey(name),
               district:turkey_districts!student_profiles_district_id_fkey(name),
@@ -444,11 +449,30 @@ export default function LeaderboardPage() {
           .limit(500)
 
         if (data) {
-          // Okula göre filtrele - school_id'yi string olarak karşılaştır
+          // Okula göre filtrele - 3 yöntemli eşleştirme:
+          // 1. school_id eşleşmesi (en güvenilir)
+          // 2. school.name eşleşmesi + district_id eşleşmesi
+          // 3. school_name (manuel girilen) eşleşmesi + district_id eşleşmesi
           let filteredData = data.filter((item: any) => {
             const studentSchoolId = item.student?.school_id
-            // Her iki değeri de string'e çevirerek karşılaştır
-            return studentSchoolId && String(studentSchoolId) === String(selectedSchool)
+            const studentSchoolName = item.student?.school?.name || item.student?.school_name
+            const studentDistrictId = item.student?.district_id
+            
+            // Yöntem 1: Direkt school_id eşleşmesi
+            if (studentSchoolId && String(studentSchoolId) === String(selectedSchool)) {
+              return true
+            }
+            
+            // Yöntem 2: Okul adı + İlçe eşleşmesi
+            if (selectedSchoolName && studentSchoolName && selectedDistrict) {
+              const nameMatch = studentSchoolName.toUpperCase().trim() === selectedSchoolName.toUpperCase().trim()
+              const districtMatch = studentDistrictId && String(studentDistrictId) === String(selectedDistrict)
+              if (nameMatch && districtMatch) {
+                return true
+              }
+            }
+            
+            return false
           })
           
           // Sınıf filtrelemesi uygula
