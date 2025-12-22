@@ -95,10 +95,9 @@ export default function HizliCozPage() {
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('setup')
   
-  // Setup state - URL parametrelerinden başlangıç değerlerini al
+  // Setup state
   const [nickname, setNickname] = useState('')
   const [selectedGrade, setSelectedGrade] = useState<number>(8)
-  const [initialSubjectCode, setInitialSubjectCode] = useState<string | null>(null)
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null)
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [topics, setTopics] = useState<Topic[]>([])
@@ -133,10 +132,13 @@ export default function HizliCozPage() {
   const [promptType, setPromptType] = useState<'milestone' | 'streak' | 'session'>('milestone')
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   
-  // URL parametrelerini oku ve autostart kontrolü
+  // URL parametreleri
+  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false)
   const [shouldAutoStart, setShouldAutoStart] = useState(false)
-  const [paramsLoaded, setParamsLoaded] = useState(false)
-  
+  const [subjectsLoaded, setSubjectsLoaded] = useState(false)
+  const [autoStartSubjectCode, setAutoStartSubjectCode] = useState<string | null>(null)
+
+  // 1. İlk yükleme - URL parametrelerini oku
   useEffect(() => {
     const nicknameParam = searchParams.get('nickname')
     const sinifParam = searchParams.get('sinif')
@@ -145,35 +147,47 @@ export default function HizliCozPage() {
     
     if (nicknameParam) setNickname(nicknameParam)
     if (sinifParam) setSelectedGrade(parseInt(sinifParam) || 8)
-    if (dersParam) setInitialSubjectCode(dersParam)
+    if (dersParam) setAutoStartSubjectCode(dersParam)
     if (autostartParam === 'true' && nicknameParam) {
       setShouldAutoStart(true)
     }
-    setParamsLoaded(true)
-  }, [searchParams])
+    
+    setUrlParamsProcessed(true)
+  }, []) // Sadece ilk mount'ta çalış
 
-  // Load subjects when grade changes
+  // 2. Sınıf değiştiğinde dersleri yükle
   useEffect(() => {
-    loadGradeSubjects()
-    checkExistingSession()
-  }, [selectedGrade])
-
-  // Autostart - parametreler ve dersler yüklendikten sonra otomatik başlat
-  useEffect(() => {
-    // subjects yüklendi ve autostart aktif ise başlat
-    if (shouldAutoStart && paramsLoaded && nickname && !loading && subjects.length > 0) {
-      // initialSubjectCode varsa ve henüz selectedSubject set edilmediyse bekle
-      if (initialSubjectCode && !selectedSubject) {
-        return // selectedSubject set edilene kadar bekle
-      }
-      
-      const timer = setTimeout(() => {
-        startPractice()
-        setShouldAutoStart(false)
-      }, 100)
-      return () => clearTimeout(timer)
+    if (urlParamsProcessed) {
+      loadGradeSubjects()
     }
-  }, [shouldAutoStart, paramsLoaded, nickname, loading, subjects, selectedSubject, initialSubjectCode])
+  }, [selectedGrade, urlParamsProcessed])
+
+  // 3. İlk yüklemede session kontrolü
+  useEffect(() => {
+    checkExistingSession()
+  }, [])
+
+  // 4. Autostart - her şey hazır olduğunda başlat
+  useEffect(() => {
+    if (!shouldAutoStart || !subjectsLoaded || !nickname || loading) return
+    
+    // Ders seçiliyse, subject'in yüklenmesini bekle
+    if (autoStartSubjectCode) {
+      const matchingSubject = subjects.find(
+        s => s.code === autoStartSubjectCode || s.name === autoStartSubjectCode
+      )
+      if (matchingSubject && !selectedSubject) {
+        setSelectedSubject(matchingSubject)
+        return // selectedSubject set edildi, bir sonraki render'da devam edecek
+      }
+    }
+    
+    // Her şey hazır, başlat!
+    console.log('Autostart tetikleniyor:', { nickname, selectedGrade, selectedSubject })
+    setShouldAutoStart(false)
+    setAutoStartSubjectCode(null)
+    startPractice()
+  }, [shouldAutoStart, subjectsLoaded, nickname, loading, subjects, selectedSubject, autoStartSubjectCode])
   
   // Load topics when subject/grade changes
   useEffect(() => {
@@ -203,8 +217,10 @@ export default function HizliCozPage() {
   }
 
   const loadGradeSubjects = async () => {
-    // Sınıf değiştiğinde ders seçimini sıfırla (initialSubjectCode yoksa)
-    if (!initialSubjectCode) {
+    setSubjectsLoaded(false)
+    
+    // Autostart değilse ve sınıf değiştiyse ders seçimini sıfırla
+    if (!shouldAutoStart) {
       setSelectedSubject(null)
     }
     setTopics([])
@@ -233,18 +249,11 @@ export default function HizliCozPage() {
           isExamSubject: gs.is_exam_subject
         }))
       setSubjects(formattedSubjects)
-      
-      // URL'den gelen ders koduna göre seç
-      if (initialSubjectCode) {
-        const matchingSubject = formattedSubjects.find(
-          (s: Subject) => s.code === initialSubjectCode || s.name === initialSubjectCode
-        )
-        if (matchingSubject) {
-          setSelectedSubject(matchingSubject)
-        }
-        setInitialSubjectCode(null) // Sadece ilk yüklemede kullan
-      }
+    } else {
+      setSubjects([])
     }
+    
+    setSubjectsLoaded(true)
   }
 
   const loadTopics = async () => {
