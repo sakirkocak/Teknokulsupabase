@@ -31,6 +31,7 @@ interface Subject {
   name: string
   code: string
   icon: string | null
+  isExamSubject?: boolean
 }
 
 interface Topic {
@@ -130,11 +131,11 @@ export default function HizliCozPage() {
   const [promptType, setPromptType] = useState<'milestone' | 'streak' | 'session'>('milestone')
   const [showSessionSummary, setShowSessionSummary] = useState(false)
   
-  // Load subjects on mount
+  // Load subjects when grade changes
   useEffect(() => {
-    loadSubjects()
+    loadGradeSubjects()
     checkExistingSession()
-  }, [])
+  }, [selectedGrade])
   
   // Load topics when subject/grade changes
   useEffect(() => {
@@ -163,13 +164,36 @@ export default function HizliCozPage() {
     setLoading(false)
   }
 
-  const loadSubjects = async () => {
-    const { data } = await supabase
-      .from('subjects')
-      .select('id, name, code, icon')
-      .order('name')
+  const loadGradeSubjects = async () => {
+    // Sınıf değiştiğinde ders seçimini sıfırla
+    setSelectedSubject(null)
+    setTopics([])
     
-    if (data) setSubjects(data)
+    // Sınıfa göre müfredattaki dersleri getir
+    const { data } = await supabase
+      .from('grade_subjects')
+      .select(`
+        id,
+        grade_id,
+        is_exam_subject,
+        subject:subjects(id, name, code, icon)
+      `)
+      .eq('grade_id', selectedGrade)
+      .order('is_exam_subject', { ascending: false })
+    
+    if (data) {
+      // Subject verilerini düzleştir
+      const formattedSubjects = data
+        .filter((gs: any) => gs.subject) // null olanları filtrele
+        .map((gs: any) => ({
+          id: gs.subject.id,
+          name: gs.subject.name,
+          code: gs.subject.code,
+          icon: gs.subject.icon,
+          isExamSubject: gs.is_exam_subject
+        }))
+      setSubjects(formattedSubjects)
+    }
   }
 
   const loadTopics = async () => {
@@ -1063,21 +1087,31 @@ export default function HizliCozPage() {
                 <Sparkles className="h-5 w-5 mx-auto mb-1" />
                 <span className="text-xs">Karışık</span>
               </button>
-              {subjects.slice(0, 7).map(subject => (
+              {subjects.map(subject => (
                 <button
                   key={subject.id}
                   onClick={() => setSelectedSubject(subject)}
-                  className={`p-3 rounded-xl text-center transition-all border ${
+                  className={`p-3 rounded-xl text-center transition-all border relative ${
                     selectedSubject?.id === subject.id
                       ? 'bg-purple-500 border-purple-400 text-white'
                       : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                   }`}
                 >
+                  {subject.isExamSubject && (
+                    <span className="absolute -top-1 -right-1 text-[10px] bg-yellow-500 text-white px-1 rounded">
+                      ⭐
+                    </span>
+                  )}
                   <span className="text-lg block mb-1">{subject.icon || '📚'}</span>
                   <span className="text-xs truncate block">{subject.name}</span>
                 </button>
               ))}
             </div>
+            {subjects.length === 0 && (
+              <p className="text-white/40 text-sm mt-2 text-center">
+                Bu sınıf için ders bulunamadı
+              </p>
+            )}
           </div>
 
           {/* Start Button */}
