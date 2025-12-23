@@ -35,8 +35,10 @@ interface QuestionReport {
     }
   }
   student?: {
-    full_name: string
     grade: number
+    profile?: {
+      full_name: string
+    }
   }
 }
 
@@ -80,7 +82,10 @@ export default function SoruBildirimleriPage() {
             subject:subjects(name, icon)
           )
         ),
-        student:student_profiles(full_name, grade)
+        student:student_profiles(
+          grade,
+          profile:profiles!student_profiles_user_id_fkey(full_name)
+        )
       `)
       .order('created_at', { ascending: false })
 
@@ -277,7 +282,7 @@ export default function SoruBildirimleriPage() {
                         <div className="mt-2 flex items-center gap-2 text-sm">
                           <span className="text-gray-500">Bildiren:</span>
                           <span className="text-gray-700 dark:text-gray-300">
-                            {report.student?.full_name} ({report.student?.grade}. sınıf)
+                            {report.student?.profile?.full_name || 'Anonim'} ({report.student?.grade}. sınıf)
                           </span>
                         </div>
                       </div>
