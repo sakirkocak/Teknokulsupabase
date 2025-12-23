@@ -441,25 +441,37 @@ export default function LeaderboardPage() {
             student:student_profiles!student_points_student_id_fkey(
               user_id,
               grade,
+              city_id,
+              district_id,
+              school_id,
               profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
             )
           `)
           .gt(cols.correct, 0)
           .order(cols.points, { ascending: false })
-          .limit(100)
+          .limit(500)
 
         if (data) {
           let filteredData = data
+
+          // Scope filtreleri - DERS BAZLI LİDERLİK İÇİN DE UYGULA
+          if (activeScope === 'city' && selectedCity) {
+            filteredData = filteredData.filter((item: any) => item.student?.city_id === selectedCity)
+          } else if (activeScope === 'district' && selectedDistrict) {
+            filteredData = filteredData.filter((item: any) => item.student?.district_id === selectedDistrict)
+          } else if (activeScope === 'school' && selectedSchool) {
+            filteredData = filteredData.filter((item: any) => item.student?.school_id === selectedSchool)
+          }
           
           // Sınıf filtrelemesi
           if (selectedGrade !== '') {
             const gradeNum = parseInt(selectedGrade)
             if (!isNaN(gradeNum)) {
-              filteredData = data.filter((item: any) => item.student?.grade === gradeNum)
+              filteredData = filteredData.filter((item: any) => item.student?.grade === gradeNum)
             }
           }
 
-          const formatted = filteredData.map((item: any, index: number) => {
+          const formatted = filteredData.slice(0, 100).map((item: any, index: number) => {
             const correct = item[cols.correct] || 0
             const wrong = item[cols.wrong] || 0
             const total = correct + wrong

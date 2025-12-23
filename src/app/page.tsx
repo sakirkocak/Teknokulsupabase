@@ -55,7 +55,8 @@ import {
   Dumbbell,
   PieChart,
   Award,
-  User
+  User,
+  Calendar
 } from 'lucide-react'
 
 // Yeni Features Array
@@ -502,64 +503,86 @@ export default function HomePage() {
     setLeaderboardLoading(true)
     
     try {
-      // Tarih filtrelerini hesapla
-      const now = new Date()
-      let startDate: Date | null = null
-      
+      let data: any[] | null = null
+      let error: any = null
+
+      // Dönem bazlı liderlik fonksiyonlarını kullan
       switch (leaderboardTab) {
         case 'daily':
-          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+          const dailyResult = await supabase.rpc('get_daily_leaderboard', { p_limit: 10 })
+          data = dailyResult.data
+          error = dailyResult.error
           break
         case 'weekly':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          const weeklyResult = await supabase.rpc('get_weekly_leaderboard', { p_limit: 10 })
+          data = weeklyResult.data
+          error = weeklyResult.error
           break
         case 'monthly':
-          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          const monthlyResult = await supabase.rpc('get_monthly_leaderboard', { p_limit: 10 })
+          data = monthlyResult.data
+          error = monthlyResult.error
           break
         case 'all':
         default:
-          startDate = null
+          const allResult = await supabase.rpc('get_alltime_leaderboard', { p_limit: 10 })
+          data = allResult.data
+          error = allResult.error
       }
 
-      // student_points tablosunu kullan - last_activity_at ile filtrele
-      let query = supabase
-        .from('student_points')
-        .select(`
-          student_id,
-          total_points,
-          total_questions,
-          total_correct,
-          max_streak,
-          last_activity_at,
-          student:student_profiles!student_points_student_id_fkey(
-            user_id,
-            grade,
-            profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
-          )
-        `)
-        .gt('total_questions', 0)
-        .order('total_points', { ascending: false })
-        .limit(10)
-
-      // Tarih bazlı filtreleme ekle
-      if (startDate) {
-        query = query.gte('last_activity_at', startDate.toISOString())
+      // Hata durumunda veya fonksiyon yoksa eski yönteme fallback
+      if (error) {
+        console.log('RPC fonksiyonu bulunamadı, fallback kullanılıyor:', error.message)
+        
+        // Eski yöntem - student_points tablosundan çek
+        const { data: fallbackData } = await supabase
+          .from('student_points')
+          .select(`
+            student_id,
+            total_points,
+            total_questions,
+            total_correct,
+            max_streak,
+            student:student_profiles!student_points_student_id_fkey(
+              user_id,
+              grade,
+              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
+            )
+          `)
+          .gt('total_questions', 0)
+          .order('total_points', { ascending: false })
+          .limit(10)
+        
+        if (fallbackData && fallbackData.length > 0) {
+          setTopLeaders(fallbackData.map((item: any, index: number) => ({
+            rank: index + 1,
+            name: item.student?.profile?.full_name || 'Anonim',
+            avatar: item.student?.profile?.avatar_url,
+            points: item.total_points,
+            questions: item.total_questions,
+            correct: item.total_correct,
+            streak: item.max_streak,
+            grade: item.student?.grade
+          })))
+        } else {
+          setTopLeaders([])
+        }
+        return
       }
-
-      const { data } = await query
 
       if (data && data.length > 0) {
-        setTopLeaders(data.map((item: any, index: number) => ({
-          rank: index + 1,
-          name: item.student?.profile?.full_name || 'Anonim',
-          avatar: item.student?.profile?.avatar_url,
-          points: item.total_points,
-          questions: item.total_questions,
-          correct: item.total_correct,
-          streak: item.max_streak,
-          grade: item.student?.grade
+        setTopLeaders(data.map((item: any) => ({
+          rank: Number(item.rank),
+          name: item.full_name || 'Anonim',
+          avatar: item.avatar_url,
+          points: Number(item.total_points),
+          questions: Number(item.total_questions),
+          correct: Number(item.total_questions), // Dönem bazlı correct sayısı yok, questions kullan
+          streak: 0,
+          grade: null
         })))
       } else {
+        // Dönem bazlı veri yoksa bilgilendirme için boş bırak
         setTopLeaders([])
       }
     } catch (error) {
@@ -647,24 +670,63 @@ export default function HomePage() {
             </Link>
             
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-5">
               <Link href="/hizli-coz" className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
                 <Target className="w-4 h-4" />
                 Soru Çöz
+              </Link>
+              <Link href="/koclar" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                Koçlar
               </Link>
               <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
                 <Trophy className="w-4 h-4" />
                 Liderlik
               </Link>
-              <Link href="/koclar" className="text-surface-600 hover:text-primary-500 font-medium transition-colors">
-                Koçlar
+              <Link href="/rehberler" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                <BookOpen className="w-4 h-4" />
+                Rehberlik
               </Link>
-              <Link href="/materyaller" className="text-surface-600 hover:text-primary-500 font-medium transition-colors">
-                Materyaller
+              <Link href="/sinav-takvimi" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                <Calendar className="w-4 h-4" />
+                Sınav Takvimi
               </Link>
+              {/* Puan Hesapla Dropdown */}
+              <div className="relative group">
+                <button className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                  <Calculator className="w-4 h-4" />
+                  Puan Hesapla
+                  <ChevronDown className="w-3 h-3 group-hover:rotate-180 transition-transform" />
+                </button>
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <Link 
+                    href="/lgs-puan-hesaplama" 
+                    className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 hover:text-primary-500 rounded-t-xl transition-colors"
+                  >
+                    <Target className="w-4 h-4" />
+                    LGS Puan Hesaplama
+                  </Link>
+                  <Link 
+                    href="/yks-puan-hesaplama" 
+                    className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 hover:text-primary-500 rounded-b-xl transition-colors"
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                    YKS Puan Hesaplama
+                  </Link>
+                </div>
+              </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-3">
+              {/* Koç Ol Butonu */}
+              <Link 
+                href="/koc-ol" 
+                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm"
+              >
+                <UserPlus className="w-4 h-4" />
+                Koç Ol
+              </Link>
+              
               {authLoading ? (
                 <div className="w-8 h-8 rounded-full bg-surface-100 animate-pulse" />
               ) : user && userProfile ? (
@@ -712,7 +774,7 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             className="md:hidden bg-white border-b border-surface-100 px-4 py-4"
           >
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Link 
                 href="/hizli-coz" 
                 onClick={() => setMobileMenuOpen(false)}
@@ -720,6 +782,14 @@ export default function HomePage() {
               >
                 <Target className="w-5 h-5" />
                 Soru Çöz
+              </Link>
+              <Link 
+                href="/koclar" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
+              >
+                <Users className="w-4 h-4" />
+                Koçlar
               </Link>
               <Link 
                 href="/liderlik" 
@@ -730,18 +800,56 @@ export default function HomePage() {
                 Liderlik
               </Link>
               <Link 
-                href="/koclar" 
+                href="/rehberler" 
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
+                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
               >
-                Koçlar
+                <BookOpen className="w-4 h-4" />
+                Rehberlik
               </Link>
               <Link 
-                href="/materyaller" 
+                href="/sinav-takvimi" 
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
+                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
               >
-                Materyaller
+                <Calendar className="w-4 h-4" />
+                Sınav Takvimi
+              </Link>
+              
+              {/* Puan Hesaplama Linkleri */}
+              <div className="px-4 py-2">
+                <p className="text-xs text-surface-400 font-medium mb-2 flex items-center gap-1">
+                  <Calculator className="w-3 h-3" />
+                  PUAN HESAPLAMA
+                </p>
+                <div className="space-y-1 pl-2">
+                  <Link 
+                    href="/lgs-puan-hesaplama" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
+                  >
+                    <Target className="w-4 h-4" />
+                    LGS Puan Hesaplama
+                  </Link>
+                  <Link 
+                    href="/yks-puan-hesaplama" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
+                  >
+                    <GraduationCap className="w-4 h-4" />
+                    YKS Puan Hesaplama
+                  </Link>
+                </div>
+              </div>
+              
+              {/* Koç Ol Butonu - Mobile */}
+              <Link 
+                href="/koc-ol" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium"
+              >
+                <UserPlus className="w-5 h-5" />
+                Koç Ol
               </Link>
               <div className="pt-3 border-t border-surface-100 space-y-2">
                 {user && userProfile ? (
@@ -787,13 +895,14 @@ export default function HomePage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-600 rounded-full text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4" />
-              AI Destekli Soru Bankası & Liderlik Yarışı
+              AI Destekli Soru Bankası & Liderlik Yarışı & Koçluk Sistemi
             </div>
             
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-surface-900 mb-6 leading-tight">
-              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 bg-clip-text text-transparent">Öğren.</span>{' '}
-              <span className="bg-gradient-to-r from-purple-500 via-violet-500 to-purple-600 bg-clip-text text-transparent">Yarış.</span>{' '}
-              <span className="bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 bg-clip-text text-transparent">Kazan.</span>
+              <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 bg-clip-text text-transparent">ÖĞREN.</span>{' '}
+              <span className="bg-gradient-to-r from-purple-500 via-violet-500 to-purple-600 bg-clip-text text-transparent">YARIŞ.</span>{' '}
+              <span className="bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 bg-clip-text text-transparent">KAZAN.</span>{' '}
+              <span className="bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-600 bg-clip-text text-transparent">KOÇ OL.</span>
             </h1>
             
             <p className="text-lg sm:text-xl text-surface-600 max-w-3xl mx-auto mb-8">
@@ -2107,14 +2216,20 @@ export default function HomePage() {
           </div>
           
           <div className="relative">
-            <div className="flex animate-marquee gap-8">
+            <div className="flex animate-marquee gap-6">
               {[...universities, ...universities].map((uni, index) => (
-                <div
+                <a
                   key={index}
-                  className="flex-shrink-0 w-24 h-16 bg-white rounded-xl shadow-sm border border-surface-100 flex items-center justify-center"
+                  href={uni.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 group"
+                  title={uni.name}
                 >
-                  <span className="font-bold text-surface-400 text-lg">{uni.abbr}</span>
-                </div>
+                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${uni.color} flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-110 transition-all duration-300 cursor-pointer`}>
+                    <span className="text-white font-bold text-lg drop-shadow-sm">{uni.abbr}</span>
+                  </div>
+                </a>
               ))}
             </div>
           </div>
@@ -2154,6 +2269,7 @@ export default function HomePage() {
               <ul className="space-y-2 text-surface-600">
                 <li><Link href="/lgs-puan-hesaplama" className="hover:text-primary-500">LGS Hesaplama</Link></li>
                 <li><Link href="/yks-puan-hesaplama" className="hover:text-primary-500">YKS Hesaplama</Link></li>
+                <li><Link href="/sinav-takvimi" className="hover:text-primary-500">Sınav Takvimi</Link></li>
                 <li><Link href="/koclar" className="hover:text-primary-500">Koçlar</Link></li>
               </ul>
             </div>
@@ -2163,7 +2279,7 @@ export default function HomePage() {
               <ul className="space-y-2 text-surface-600">
                 <li><Link href="/giris" className="hover:text-primary-500">Giriş Yap</Link></li>
                 <li><Link href="/kayit" className="hover:text-primary-500">Kayıt Ol</Link></li>
-                <li><Link href="/kayit?role=ogretmen" className="hover:text-primary-500">Koç Ol</Link></li>
+                <li><Link href="/koc-ol" className="hover:text-primary-500">Koç Ol</Link></li>
               </ul>
             </div>
 

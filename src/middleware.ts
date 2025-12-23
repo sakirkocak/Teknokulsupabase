@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Public rotalar (korumasız)
-  const publicPaths = ['/koclar', '/materyaller']
+  const publicPaths = ['/koclar', '/materyaller', '/koc-ol', '/sinav-takvimi']
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
 
   // Auth sayfaları

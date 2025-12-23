@@ -888,6 +888,18 @@ export default function SoruBankasiPage() {
         } else {
           setStudentPoints({ ...existingPoints, ...updateData })
           
+          // Puan geçmişine ekle (günlük/haftalık/aylık liderlik için)
+          await supabase.from('point_history').insert({
+            student_id: studentProfile.id,
+            points: totalXPGain,
+            source: 'question',
+            subject_code: subjectCode,
+            is_correct: correct,
+            question_id: currentQuestion.id
+          }).then(({ error }) => {
+            if (error) console.log('point_history insert hatası (tablo henüz yok olabilir):', error.message)
+          })
+          
           // XP geçmişine ekle
           await supabase.from('xp_history').insert({
             user_id: userId,
@@ -959,6 +971,18 @@ export default function SoruBankasiPage() {
           console.error('Puan ekleme hatası:', insertError)
         } else {
           setStudentPoints(insertData)
+          
+          // Puan geçmişine ekle (günlük/haftalık/aylık liderlik için)
+          await supabase.from('point_history').insert({
+            student_id: studentProfile.id,
+            points: baseXP,
+            source: 'question',
+            subject_code: subjectCode,
+            is_correct: correct,
+            question_id: currentQuestion.id
+          }).then(({ error }) => {
+            if (error) console.log('point_history insert hatası (tablo henüz yok olabilir):', error.message)
+          })
           
           // XP geçmişine ekle
           await supabase.from('xp_history').insert({

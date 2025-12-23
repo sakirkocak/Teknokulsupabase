@@ -88,16 +88,18 @@ export const activityMessages = [
 ]
 
 export const universities = [
-  { name: 'İTÜ', abbr: 'İTÜ' },
-  { name: 'Boğaziçi', abbr: 'BÜ' },
-  { name: 'ODTÜ', abbr: 'ODTÜ' },
-  { name: 'Hacettepe', abbr: 'HÜ' },
-  { name: 'Koç', abbr: 'KOÇ' },
-  { name: 'Sabancı', abbr: 'SÜ' },
-  { name: 'Bilkent', abbr: 'BİL' },
-  { name: 'Yıldız Teknik', abbr: 'YTÜ' },
-  { name: 'Ankara', abbr: 'AÜ' },
-  { name: 'Ege', abbr: 'EÜ' },
+  { name: 'İstanbul Teknik Üniversitesi', abbr: 'İTÜ', url: 'https://www.itu.edu.tr', color: 'from-red-500 to-red-600' },
+  { name: 'Boğaziçi Üniversitesi', abbr: 'BÜ', url: 'https://www.boun.edu.tr', color: 'from-blue-600 to-blue-700' },
+  { name: 'Orta Doğu Teknik Üniversitesi', abbr: 'ODTÜ', url: 'https://www.metu.edu.tr', color: 'from-red-600 to-orange-600' },
+  { name: 'Hacettepe Üniversitesi', abbr: 'HÜ', url: 'https://www.hacettepe.edu.tr', color: 'from-orange-500 to-amber-500' },
+  { name: 'Koç Üniversitesi', abbr: 'KOÇ', url: 'https://www.ku.edu.tr', color: 'from-blue-500 to-indigo-600' },
+  { name: 'Sabancı Üniversitesi', abbr: 'SÜ', url: 'https://www.sabanciuniv.edu', color: 'from-purple-500 to-violet-600' },
+  { name: 'Bilkent Üniversitesi', abbr: 'BİL', url: 'https://www.bilkent.edu.tr', color: 'from-sky-500 to-blue-600' },
+  { name: 'Yıldız Teknik Üniversitesi', abbr: 'YTÜ', url: 'https://www.yildiz.edu.tr', color: 'from-yellow-500 to-orange-500' },
+  { name: 'Ankara Üniversitesi', abbr: 'AÜ', url: 'https://www.ankara.edu.tr', color: 'from-emerald-500 to-teal-600' },
+  { name: 'Ege Üniversitesi', abbr: 'EÜ', url: 'https://www.ege.edu.tr', color: 'from-cyan-500 to-blue-500' },
+  { name: 'Galatasaray Üniversitesi', abbr: 'GSÜ', url: 'https://www.gsu.edu.tr', color: 'from-red-500 to-yellow-500' },
+  { name: 'Marmara Üniversitesi', abbr: 'MÜ', url: 'https://www.marmara.edu.tr', color: 'from-indigo-500 to-purple-600' },
 ]
 
 export const demoCoaches = [

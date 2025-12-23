@@ -88,6 +88,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
     { label: 'Soru Bildirimleri', href: '/admin/soru-bildirimleri', icon: Flag },
+    { label: 'Sınav Takvimi', href: '/admin/sinav-takvimi', icon: Calendar },
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
     { label: 'Ayarlar', href: '/admin/ayarlar', icon: Settings },
