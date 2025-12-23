@@ -125,11 +125,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <head>
+      <body className="font-sans">
         {/* JSON-LD Structured Data */}
         <JsonLdSchema />
-      </head>
-      <body className="font-sans">
+        
         {/* Google Analytics + Ads Tag (gtag.js) */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-C6HMDXCKK8"
