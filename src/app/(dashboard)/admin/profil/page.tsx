@@ -103,8 +103,9 @@ export default function AdminProfilePage() {
           <h2 className="font-semibold text-surface-900 mb-4">Profil Fotoğrafı</h2>
           <div className="flex flex-col items-center">
             <AvatarUpload
-              currentAvatar={profile?.avatar_url}
-              userName={profile?.full_name || ''}
+              userId={profile?.id || ''}
+              currentAvatarUrl={profile?.avatar_url ?? null}
+              fullName={profile?.full_name}
               onUploadComplete={async (url) => {
                 await supabase
                   .from('profiles')
