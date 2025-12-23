@@ -186,11 +186,12 @@ const TYT_KATSAYILAR = {
   fen: 1.36,        // 20 soru
 }
 
+// TYT Soru Sayıları (Toplam 120 soru, 165 dakika)
 const TYT_SORU_SAYILARI = {
-  turkce: 40,
-  sosyal: 20,
-  matematik: 40,
-  fen: 20,
+  turkce: 40,     // Dil Bilgisi ve Paragraf
+  sosyal: 20,     // Tarih (5), Coğrafya (5), Felsefe (5), Din Kültürü (5)
+  matematik: 40,  // Matematik ve Geometri
+  fen: 20,        // Fizik (7), Kimya (7), Biyoloji (6)
   // Toplam: 120 soru
 }
 
@@ -220,14 +221,19 @@ const AYT_KATSAYILAR = {
   },
 }
 
+// AYT Soru Sayıları (Toplam 160 soru, aday kendi alanına göre ~80 soru çözer)
 const AYT_SORU_SAYILARI = {
+  // Matematik Testi (40 soru)
   matematik: 40,
+  // Fen Bilimleri Testi (40 soru)
   fizik: 14,
   kimya: 13,
   biyoloji: 13,
+  // Türk Dili ve Edebiyatı - Sosyal Bilimler-1 Testi (40 soru)
   edebiyat: 24,
   tarih1: 10,
   cografya1: 6,
+  // Sosyal Bilimler-2 Testi (40 soru)
   tarih2: 11,
   cografya2: 11,
   felsefe: 12,

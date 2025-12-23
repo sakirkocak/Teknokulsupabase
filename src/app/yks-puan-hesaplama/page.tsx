@@ -32,39 +32,47 @@ import {
 } from '@/lib/exam-calculations'
 import { CalculatorSchema, FAQSchema } from '@/components/JsonLdSchema'
 
-// TYT Dersleri
+// TYT Dersleri (Toplam 120 soru, 165 dakika)
 const TYT_DERSLER = [
-  { key: 'turkce', ad: 'Türkçe', maxSoru: 40, icon: '📖' },
-  { key: 'sosyal', ad: 'Sosyal Bilimler', maxSoru: 20, icon: '🌍' },
-  { key: 'matematik', ad: 'Temel Matematik', maxSoru: 40, icon: '🔢' },
-  { key: 'fen', ad: 'Fen Bilimleri', maxSoru: 20, icon: '🔬' },
+  { key: 'turkce', ad: 'Türkçe', maxSoru: 40, icon: '📖', alt: 'Dil Bilgisi ve Paragraf' },
+  { key: 'sosyal', ad: 'Sosyal Bilimler', maxSoru: 20, icon: '🌍', alt: 'Tarih 5, Coğrafya 5, Felsefe 5, Din 5' },
+  { key: 'matematik', ad: 'Temel Matematik', maxSoru: 40, icon: '🔢', alt: 'Matematik ve Geometri' },
+  { key: 'fen', ad: 'Fen Bilimleri', maxSoru: 20, icon: '🔬', alt: 'Fizik 7, Kimya 7, Biyoloji 6' },
 ]
 
-// AYT Dersleri (Puan türüne göre)
+// AYT Dersleri (Puan türüne göre - Toplam 160 soru, 180 dakika)
+// Her aday kendi alanına göre ~80 soru çözer
 const AYT_DERSLER = {
   SAY: [
-    { key: 'matematik', ad: 'Matematik', maxSoru: 40, icon: '🔢' },
-    { key: 'fizik', ad: 'Fizik', maxSoru: 14, icon: '⚡' },
-    { key: 'kimya', ad: 'Kimya', maxSoru: 13, icon: '🧪' },
-    { key: 'biyoloji', ad: 'Biyoloji', maxSoru: 13, icon: '🧬' },
+    // Matematik Testi (40 soru)
+    { key: 'matematik', ad: 'Matematik', maxSoru: 40, icon: '🔢', test: 'Matematik' },
+    // Fen Bilimleri Testi (40 soru)
+    { key: 'fizik', ad: 'Fizik', maxSoru: 14, icon: '⚡', test: 'Fen Bilimleri' },
+    { key: 'kimya', ad: 'Kimya', maxSoru: 13, icon: '🧪', test: 'Fen Bilimleri' },
+    { key: 'biyoloji', ad: 'Biyoloji', maxSoru: 13, icon: '🧬', test: 'Fen Bilimleri' },
   ],
   SOZ: [
-    { key: 'edebiyat', ad: 'Türk Dili ve Edebiyatı', maxSoru: 24, icon: '📚' },
-    { key: 'tarih1', ad: 'Tarih-1', maxSoru: 10, icon: '🏛️' },
-    { key: 'cografya1', ad: 'Coğrafya-1', maxSoru: 6, icon: '🗺️' },
-    { key: 'tarih2', ad: 'Tarih-2', maxSoru: 11, icon: '📜' },
-    { key: 'cografya2', ad: 'Coğrafya-2', maxSoru: 11, icon: '🌐' },
-    { key: 'felsefe', ad: 'Felsefe Grubu', maxSoru: 12, icon: '🤔' },
-    { key: 'din', ad: 'Din Kültürü', maxSoru: 6, icon: '📿' },
+    // Türk Dili ve Edebiyatı - Sosyal Bilimler-1 Testi (40 soru)
+    { key: 'edebiyat', ad: 'Türk Dili ve Edebiyatı', maxSoru: 24, icon: '📚', test: 'TDE-Sosyal 1' },
+    { key: 'tarih1', ad: 'Tarih-1', maxSoru: 10, icon: '🏛️', test: 'TDE-Sosyal 1' },
+    { key: 'cografya1', ad: 'Coğrafya-1', maxSoru: 6, icon: '🗺️', test: 'TDE-Sosyal 1' },
+    // Sosyal Bilimler-2 Testi (40 soru)
+    { key: 'tarih2', ad: 'Tarih-2', maxSoru: 11, icon: '📜', test: 'Sosyal 2' },
+    { key: 'cografya2', ad: 'Coğrafya-2', maxSoru: 11, icon: '🌐', test: 'Sosyal 2' },
+    { key: 'felsefe', ad: 'Felsefe Grubu', maxSoru: 12, icon: '🤔', test: 'Sosyal 2' },
+    { key: 'din', ad: 'Din Kültürü', maxSoru: 6, icon: '📿', test: 'Sosyal 2' },
   ],
   EA: [
-    { key: 'matematik', ad: 'Matematik', maxSoru: 40, icon: '🔢' },
-    { key: 'edebiyat', ad: 'Türk Dili ve Edebiyatı', maxSoru: 24, icon: '📚' },
-    { key: 'tarih1', ad: 'Tarih-1', maxSoru: 10, icon: '🏛️' },
-    { key: 'cografya1', ad: 'Coğrafya-1', maxSoru: 6, icon: '🗺️' },
+    // Matematik Testi (40 soru)
+    { key: 'matematik', ad: 'Matematik', maxSoru: 40, icon: '🔢', test: 'Matematik' },
+    // Türk Dili ve Edebiyatı - Sosyal Bilimler-1 Testi (40 soru)
+    { key: 'edebiyat', ad: 'Türk Dili ve Edebiyatı', maxSoru: 24, icon: '📚', test: 'TDE-Sosyal 1' },
+    { key: 'tarih1', ad: 'Tarih-1', maxSoru: 10, icon: '🏛️', test: 'TDE-Sosyal 1' },
+    { key: 'cografya1', ad: 'Coğrafya-1', maxSoru: 6, icon: '🗺️', test: 'TDE-Sosyal 1' },
   ],
   DIL: [
-    { key: 'ydt', ad: 'Yabancı Dil Testi', maxSoru: 80, icon: '🌐' },
+    // Yabancı Dil Testi (80 soru, 120 dakika - ayrı oturum)
+    { key: 'ydt', ad: 'Yabancı Dil Testi', maxSoru: 80, icon: '🌐', test: 'YDT' },
   ],
 }
 
