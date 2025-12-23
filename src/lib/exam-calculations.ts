@@ -13,7 +13,7 @@ export interface LGSNetler {
   turkce: number      // Max 20
   matematik: number   // Max 20
   fen: number         // Max 20
-  sosyal: number      // Max 20
+  inkilap: number     // Max 10 (T.C. İnkılap Tarihi ve Atatürkçülük)
   din: number         // Max 10
   ingilizce: number   // Max 10
 }
@@ -28,29 +28,32 @@ export interface LGSSonuc {
     turkce: number
     matematik: number
     fen: number
-    sosyal: number
+    inkilap: number
     din: number
     ingilizce: number
   }
 }
 
-// 2024 LGS Katsayıları (Yaklaşık)
+// 2025 LGS Soru Sayıları ve Katsayılar
+// LGS toplam 90 soru - Sözel 50 + Sayısal 40
+// Her doğru net yaklaşık 5.55 puan (500/90)
 const LGS_KATSAYILAR = {
-  turkce: 4,
-  matematik: 4,
-  fen: 4,
-  sosyal: 4,
-  din: 2,
-  ingilizce: 2,
+  turkce: 4,        // Sözel bölüm
+  matematik: 4,     // Sayısal bölüm
+  fen: 4,           // Sayısal bölüm
+  inkilap: 4,       // Sözel bölüm (T.C. İnkılap Tarihi)
+  din: 4,           // Sözel bölüm
+  ingilizce: 4,     // Sözel bölüm
 }
 
 const LGS_SORU_SAYILARI = {
-  turkce: 20,
-  matematik: 20,
-  fen: 20,
-  sosyal: 20,
-  din: 10,
-  ingilizce: 10,
+  turkce: 20,       // 20 soru
+  matematik: 20,    // 20 soru
+  fen: 20,          // 20 soru
+  inkilap: 10,      // 10 soru (T.C. İnkılap Tarihi ve Atatürkçülük)
+  din: 10,          // 10 soru
+  ingilizce: 10,    // 10 soru
+  // Toplam: 90 soru
 }
 
 export function hesaplaLGS(netler: LGSNetler): LGSSonuc {
@@ -59,7 +62,7 @@ export function hesaplaLGS(netler: LGSNetler): LGSSonuc {
     turkce: Math.min(Math.max(0, netler.turkce), LGS_SORU_SAYILARI.turkce),
     matematik: Math.min(Math.max(0, netler.matematik), LGS_SORU_SAYILARI.matematik),
     fen: Math.min(Math.max(0, netler.fen), LGS_SORU_SAYILARI.fen),
-    sosyal: Math.min(Math.max(0, netler.sosyal), LGS_SORU_SAYILARI.sosyal),
+    inkilap: Math.min(Math.max(0, netler.inkilap), LGS_SORU_SAYILARI.inkilap),
     din: Math.min(Math.max(0, netler.din), LGS_SORU_SAYILARI.din),
     ingilizce: Math.min(Math.max(0, netler.ingilizce), LGS_SORU_SAYILARI.ingilizce),
   }
@@ -74,12 +77,12 @@ export function hesaplaLGS(netler: LGSNetler): LGSSonuc {
     turkce: validNetler.turkce * LGS_KATSAYILAR.turkce,
     matematik: validNetler.matematik * LGS_KATSAYILAR.matematik,
     fen: validNetler.fen * LGS_KATSAYILAR.fen,
-    sosyal: validNetler.sosyal * LGS_KATSAYILAR.sosyal,
+    inkilap: validNetler.inkilap * LGS_KATSAYILAR.inkilap,
     din: validNetler.din * LGS_KATSAYILAR.din,
     ingilizce: validNetler.ingilizce * LGS_KATSAYILAR.ingilizce,
   }
 
-  // Toplam ham puan (0-500 arası)
+  // Toplam ham puan
   const toplamHamPuan = Object.values(dersBazliPuanlar).reduce((a, b) => a + b, 0)
   
   // LGS Puanı hesaplama (100-500 arası)
@@ -88,9 +91,9 @@ export function hesaplaLGS(netler: LGSNetler): LGSSonuc {
     LGS_SORU_SAYILARI.turkce * LGS_KATSAYILAR.turkce +
     LGS_SORU_SAYILARI.matematik * LGS_KATSAYILAR.matematik +
     LGS_SORU_SAYILARI.fen * LGS_KATSAYILAR.fen +
-    LGS_SORU_SAYILARI.sosyal * LGS_KATSAYILAR.sosyal +
+    LGS_SORU_SAYILARI.inkilap * LGS_KATSAYILAR.inkilap +
     LGS_SORU_SAYILARI.din * LGS_KATSAYILAR.din +
-    LGS_SORU_SAYILARI.ingilizce * LGS_KATSAYILAR.ingilizce // 340
+    LGS_SORU_SAYILARI.ingilizce * LGS_KATSAYILAR.ingilizce // 360 (90 soru x 4 katsayı)
 
   const tahminiPuan = 100 + (toplamHamPuan / maxHamPuan) * 400
 
@@ -323,11 +326,11 @@ export function formatSiralama(siralama: number): string {
   return siralama.toLocaleString('tr-TR')
 }
 
-// Geçmiş yıl verileri (örnek)
+// Geçmiş yıl verileri (yaklaşık)
 export const LGS_GECMIS_YILLAR = [
-  { yil: 2024, ortPuan: 320, yuzde1Esik: 485, yuzde5Esik: 450 },
-  { yil: 2023, ortPuan: 315, yuzde1Esik: 480, yuzde5Esik: 445 },
-  { yil: 2022, ortPuan: 310, yuzde1Esik: 478, yuzde5Esik: 440 },
+  { yil: 2024, ortPuan: 280, yuzde1Esik: 475, yuzde5Esik: 440 },
+  { yil: 2023, ortPuan: 275, yuzde1Esik: 470, yuzde5Esik: 435 },
+  { yil: 2022, ortPuan: 270, yuzde1Esik: 465, yuzde5Esik: 430 },
 ]
 
 export const YKS_GECMIS_YILLAR = {

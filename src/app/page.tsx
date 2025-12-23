@@ -1921,6 +1921,182 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* SINAV ARAÇLARI - YENİ SEO BÖLÜMÜ */}
+      <section className="py-20 px-4 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 bg-purple-500/20 text-purple-300 px-4 py-2 rounded-full text-sm mb-4"
+            >
+              <Calculator className="w-4 h-4" />
+              Ücretsiz Sınav Araçları
+            </motion.div>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Puanını Hesapla, Hedefini Belirle
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              LGS ve YKS puan hesaplama araçları ile sınav performansını analiz et
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* LGS Hesaplama */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <Link href="/lgs-puan-hesaplama" className="block group">
+                <div className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 backdrop-blur-sm rounded-2xl border border-purple-500/30 p-6 h-full hover:border-purple-400/50 hover:shadow-lg hover:shadow-purple-500/10 transition-all">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center">
+                      <GraduationCap className="w-7 h-7 text-white" />
+                    </div>
+                    <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full">8. Sınıf</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2 group-hover:text-purple-300 transition">
+                    LGS Puan Hesaplama
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    Netlerini gir, tahmini puanını ve yüzdelik dilimini anında öğren.
+                  </p>
+                  <div className="flex items-center text-purple-400 text-sm font-medium group-hover:gap-2 transition-all">
+                    Hesapla <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+
+            {/* YKS Hesaplama */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <Link href="/yks-puan-hesaplama" className="block group">
+                <div className="bg-gradient-to-br from-indigo-600/20 to-blue-600/20 backdrop-blur-sm rounded-2xl border border-indigo-500/30 p-6 h-full hover:border-indigo-400/50 hover:shadow-lg hover:shadow-indigo-500/10 transition-all">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-blue-500 rounded-2xl flex items-center justify-center">
+                      <Award className="w-7 h-7 text-white" />
+                    </div>
+                    <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-xs rounded-full">12. Sınıf</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition">
+                    YKS Puan Hesaplama
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    TYT-AYT netlerini gir, puan türüne göre sıralamanı öğren.
+                  </p>
+                  <div className="flex items-center text-indigo-400 text-sm font-medium group-hover:gap-2 transition-all">
+                    Hesapla <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* REHBERLER - YENİ SEO BÖLÜMÜ */}
+      <section className="py-20 px-4 bg-gradient-to-br from-emerald-50 to-teal-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-sm mb-4"
+            >
+              <BookOpen className="w-4 h-4" />
+              Ücretsiz Eğitim Rehberleri
+            </motion.div>
+            <h2 className="text-3xl md:text-4xl font-bold text-surface-900 mb-4">
+              Verimli Çalışma Teknikleri
+            </h2>
+            <p className="text-surface-600 max-w-2xl mx-auto">
+              Sınavlara hazırlık, motivasyon ve verimli çalışma rehberleri
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                slug: 'pomodoro-teknigi-ile-verimli-ders-calisma',
+                title: 'Pomodoro Tekniği',
+                desc: '25 dakika odaklanma ile verimliliğini %40 artır',
+                icon: Clock,
+                color: 'from-red-500 to-orange-500',
+                tag: 'Popüler'
+              },
+              {
+                slug: 'lgs-hazirlik-rehberi-8-sinif',
+                title: 'LGS Hazırlık Rehberi',
+                desc: 'Adım adım LGS hazırlık stratejileri',
+                icon: Target,
+                color: 'from-purple-500 to-indigo-500',
+                tag: 'LGS'
+              },
+              {
+                slug: 'yks-calisma-programi-nasil-yapilir',
+                title: 'YKS Çalışma Programı',
+                desc: 'Kişisel YKS programı oluşturma rehberi',
+                icon: PieChart,
+                color: 'from-blue-500 to-cyan-500',
+                tag: 'YKS'
+              },
+              {
+                slug: 'sinav-kaygisi-nasil-yenilir',
+                title: 'Sınav Kaygısı Yönetimi',
+                desc: 'Stres ve kaygıyı yenmek için 7 teknik',
+                icon: Heart,
+                color: 'from-pink-500 to-rose-500',
+                tag: 'Motivasyon'
+              },
+            ].map((rehber, index) => (
+              <motion.div
+                key={rehber.slug}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                viewport={{ once: true }}
+              >
+                <Link href={`/rehberler/${rehber.slug}`} className="block group h-full">
+                  <div className="bg-white rounded-2xl border border-surface-100 p-5 h-full shadow-sm hover:shadow-md hover:border-emerald-200 transition-all">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className={`w-11 h-11 bg-gradient-to-br ${rehber.color} rounded-xl flex items-center justify-center`}>
+                        <rehber.icon className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-xs rounded-full">
+                        {rehber.tag}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-surface-900 mb-1 group-hover:text-emerald-600 transition">
+                      {rehber.title}
+                    </h3>
+                    <p className="text-surface-500 text-sm">
+                      {rehber.desc}
+                    </p>
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="text-center mt-8">
+            <Link
+              href="/rehberler"
+              className="inline-flex items-center gap-2 text-emerald-600 font-medium hover:text-emerald-700 hover:gap-3 transition-all"
+            >
+              Tüm Rehberleri Gör
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* University Logos */}
       <section className="py-12 px-4 bg-surface-50 overflow-hidden">
         <div className="max-w-7xl mx-auto">
@@ -1969,14 +2145,16 @@ export default function HomePage() {
                 <li><Link href="/hizli-coz" className="hover:text-primary-500">Soru Çöz</Link></li>
                 <li><Link href="/liderlik" className="hover:text-primary-500">Liderlik</Link></li>
                 <li><Link href="/materyaller" className="hover:text-primary-500">Materyaller</Link></li>
+                <li><Link href="/rehberler" className="hover:text-primary-500">Rehberler</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-semibold text-surface-900 mb-4">Koçluk</h4>
+              <h4 className="font-semibold text-surface-900 mb-4">Araçlar</h4>
               <ul className="space-y-2 text-surface-600">
+                <li><Link href="/lgs-puan-hesaplama" className="hover:text-primary-500">LGS Hesaplama</Link></li>
+                <li><Link href="/yks-puan-hesaplama" className="hover:text-primary-500">YKS Hesaplama</Link></li>
                 <li><Link href="/koclar" className="hover:text-primary-500">Koçlar</Link></li>
-                <li><Link href="/kayit?role=ogretmen" className="hover:text-primary-500">Koç Ol</Link></li>
               </ul>
             </div>
             
@@ -1985,6 +2163,7 @@ export default function HomePage() {
               <ul className="space-y-2 text-surface-600">
                 <li><Link href="/giris" className="hover:text-primary-500">Giriş Yap</Link></li>
                 <li><Link href="/kayit" className="hover:text-primary-500">Kayıt Ol</Link></li>
+                <li><Link href="/kayit?role=ogretmen" className="hover:text-primary-500">Koç Ol</Link></li>
               </ul>
             </div>
 

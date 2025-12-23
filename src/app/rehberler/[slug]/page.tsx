@@ -29,7 +29,7 @@ const MAKALELER: Record<string, {
     ozet: '25 dakika odaklanma, 5 dakika mola. Bu basit teknik ile ders çalışma verimliliğinizi %40 artırın.',
     kategori: 'Verimli Çalışma',
     sure: '8 dk',
-    tarih: '2025-01-15',
+    tarih: '2025-12-23',
     etiketler: ['pomodoro', 'verimlilik', 'odaklanma'],
     icerik: `
 ## Pomodoro Tekniği Nedir?
@@ -113,7 +113,7 @@ Hemen bugün deneyin: Bir zamanlayıcı kurun ve ilk pomodoro'nuzu başlatın!
     ozet: 'LGS\'de başarılı olmak için adım adım hazırlık rehberi. Hangi konulara ne kadar zaman ayırmalısınız?',
     kategori: 'Sınav Hazırlık',
     sure: '12 dk',
-    tarih: '2025-01-14',
+    tarih: '2025-12-23',
     etiketler: ['LGS', '8. sınıf', 'sınav'],
     icerik: `
 ## LGS Nedir?
@@ -229,7 +229,7 @@ Unutmayın: LGS bir maraton, sprint değil. Kendinize zaman tanıyın ve motivas
     ozet: 'Kendi öğrenme hızınıza uygun, gerçekçi ve sürdürülebilir bir YKS çalışma programı oluşturma rehberi.',
     kategori: 'Planlama',
     sure: '10 dk',
-    tarih: '2025-01-13',
+    tarih: '2025-12-23',
     etiketler: ['YKS', 'planlama', 'program'],
     icerik: `
 ## Neden Çalışma Programı Önemli?
@@ -340,7 +340,7 @@ Unutmayın: En iyi program, uygulayabileceğiniz programdır. Gerçekçi olun ve
     ozet: 'Sınav öncesi stres ve kaygıyı azaltmak için bilimsel olarak kanıtlanmış 7 etkili yöntem.',
     kategori: 'Motivasyon',
     sure: '7 dk',
-    tarih: '2025-01-12',
+    tarih: '2025-12-23',
     etiketler: ['kaygı', 'stres', 'motivasyon'],
     icerik: `
 ## Sınav Kaygısı Nedir?
@@ -453,6 +453,500 @@ Unutmayın: Bir sınav, hayatınızın tamamını belirlemez. Elinizden gelenin 
       {
         question: 'Sınav sırasında panik atak geçiriyorum, ne yapmalıyım?',
         answer: 'Derin nefes alın, ayaklarınızı yere basın ve çevrenizdeki 5 şeyi sayın (grounding tekniği). Eğer sık yaşıyorsanız, mutlaka bir uzmana başvurun.',
+      },
+    ],
+  },
+  'feynman-teknigi-ile-ogrenme': {
+    baslik: 'Feynman Tekniği ile Kalıcı Öğrenme',
+    ozet: 'Nobel ödüllü fizikçi Richard Feynman\'ın öğrenme tekniği ile konuları gerçekten anlayın ve unutmayın.',
+    kategori: 'Verimli Çalışma',
+    sure: '6 dk',
+    tarih: '2025-12-23',
+    etiketler: ['feynman', 'öğrenme', 'teknik'],
+    icerik: `
+## Feynman Tekniği Nedir?
+
+Richard Feynman, 20. yüzyılın en parlak fizikçilerinden biriydi. Nobel ödüllü bu bilim insanı, karmaşık konuları basit bir şekilde açıklama yeteneğiyle ünlüydü. Feynman Tekniği, onun öğrenme felsefesine dayanır: **"Bir şeyi gerçekten anladıysanız, onu basitçe açıklayabilirsiniz."**
+
+## Feynman Tekniği'nin 4 Adımı
+
+### Adım 1: Konuyu Seçin
+Öğrenmek istediğiniz konuyu belirleyin ve boş bir kağıdın üstüne yazın.
+
+Örnek: "Fotosentez"
+
+### Adım 2: Basit Bir Dille Açıklayın
+Konuyu sanki 10 yaşındaki birine anlatıyormuş gibi açıklayın. Teknik terimler kullanmayın, basit kelimeler tercih edin.
+
+**Kötü örnek:** "Fotosentez, kloroplastlarda gerçekleşen ve ışık enerjisinin kimyasal enerjiye dönüştürüldüğü anabolik bir süreçtir."
+
+**İyi örnek:** "Fotosentez, bitkilerin güneş ışığını kullanarak yemek yapmasıdır. Bitkiler havadan karbondioksit alır, topraktan su çeker ve güneş ışığıyla bunları şekere dönüştürür. Bu şeker bitkinin yemeğidir."
+
+### Adım 3: Boşlukları Tespit Edin
+Açıklama yaparken takıldığınız, basitleştiremediğiniz yerler var mı? Bu noktalar, gerçekten anlamadığınız yerlerdir.
+
+- Bu boşlukları not edin
+- Kaynaklara geri dönün
+- Anlamadığınız kısımları tekrar çalışın
+
+### Adım 4: Sadeleştirin ve Analoji Kullanın
+Açıklamanızı daha da basitleştirin. Benzetmeler ve örnekler kullanın.
+
+**Fotosentez için analoji:** "Fotosentez, bitkilerin mutfağıdır. Güneş ocak, su ve karbondioksit malzemeler, şeker ise pişen yemektir."
+
+## Neden Etkili?
+
+### 1. Aktif Öğrenme
+Pasif okuma yerine, bilgiyi aktif olarak işlersiniz.
+
+### 2. Anlama Testi
+Basit açıklama yapabilmek, gerçek anlamanın göstergesidir.
+
+### 3. Boşluk Tespiti
+Bilmediğiniz şeyleri hızlıca fark edersiniz.
+
+### 4. Uzun Süreli Hafıza
+Kendi kelimelerinizle açıklamak, bilgiyi uzun süreli hafızaya yerleştirir.
+
+## Öğrenciler İçin Uygulama
+
+### Matematik
+- Formülü ezberlemek yerine, neden işe yaradığını açıklayın
+- "Pisagor teoremi neden doğru?" sorusunu cevaplayın
+
+### Fen Bilimleri
+- Deneylerin mantığını açıklayın
+- Süreçleri adım adım basit kelimelerle anlatın
+
+### Sosyal Bilimler
+- Tarihi olayları neden-sonuç ilişkisiyle açıklayın
+- Kavramları günlük hayat örnekleriyle bağlayın
+
+## Feynman'dan Öğrenme İpuçları
+
+1. **"Bilmiyorum" demekten korkmayın** - Bilmediğinizi kabul etmek, öğrenmenin ilk adımıdır.
+
+2. **Merak edin** - Her şeyi sorgulayın. "Neden?" sorusu en güçlü öğrenme aracıdır.
+
+3. **Analojiler kurun** - Yeni bilgiyi bildiklerinize bağlayın.
+
+4. **Başkalarına anlatın** - En iyi öğrenme yöntemi öğretmektir.
+
+## Sonuç
+
+Feynman Tekniği, ezber yerine anlama odaklı bir öğrenme yöntemidir. Bu tekniği düzenli kullanarak:
+
+- Konuları gerçekten anlarsınız
+- Sınavlarda farklı soru tiplerine uyum sağlarsınız
+- Bilgileriniz kalıcı olur
+
+Bugün bir konu seçin ve Feynman Tekniği'ni deneyin!
+    `,
+    faqs: [
+      {
+        question: 'Feynman Tekniği her ders için uygun mu?',
+        answer: 'Evet, özellikle kavram ağırlıklı dersler (Fen, Matematik, Sosyal) için çok etkilidir. Dil öğreniminde de kelime ve gramer kurallarını açıklamak için kullanılabilir.',
+      },
+      {
+        question: 'Ne kadar sürede sonuç alırım?',
+        answer: 'İlk uygulamadan itibaren fark edeceksiniz. Düzenli kullanımda 2-3 hafta içinde öğrenme hızınızda belirgin artış olur.',
+      },
+    ],
+  },
+  'aktif-tekrar-ve-spaced-repetition': {
+    baslik: 'Aktif Tekrar ve Aralıklı Tekrar Yöntemi',
+    ozet: 'Bilimsel araştırmalara göre en etkili ezber ve hatırlama tekniği: Spaced Repetition (Aralıklı Tekrar).',
+    kategori: 'Verimli Çalışma',
+    sure: '9 dk',
+    tarih: '2025-12-23',
+    etiketler: ['ezber', 'tekrar', 'hafıza'],
+    icerik: `
+## Unutma Eğrisi
+
+1885'te Alman psikolog Hermann Ebbinghaus, "Unutma Eğrisi"ni keşfetti. Bu araştırmaya göre:
+
+- 1 saat sonra: Öğrenilenlerin %50'si unutulur
+- 1 gün sonra: %70'i unutulur
+- 1 hafta sonra: %90'ı unutulur
+
+Bu karamsar tablo, düzenli tekrar yapmadan öğrenmenin neredeyse imkansız olduğunu gösteriyor.
+
+## Aralıklı Tekrar (Spaced Repetition) Nedir?
+
+Aralıklı tekrar, bilgiyi tam unutmadan önce tekrar etme stratejisidir. Her başarılı tekrarda, bir sonraki tekrar aralığı uzar.
+
+**Örnek tekrar programı:**
+- 1. tekrar: Öğrendikten 1 gün sonra
+- 2. tekrar: 3 gün sonra
+- 3. tekrar: 1 hafta sonra
+- 4. tekrar: 2 hafta sonra
+- 5. tekrar: 1 ay sonra
+
+## Aktif Tekrar vs Pasif Tekrar
+
+### Pasif Tekrar (Etkisiz)
+- Notları tekrar tekrar okumak
+- Kitabı baştan sona geçmek
+- Altını çizmek
+
+### Aktif Tekrar (Etkili)
+- Kendine soru sormak
+- Flash kartlar kullanmak
+- Test çözmek
+- Özet çıkarmak
+
+**Araştırma sonucu:** Aktif tekrar, pasif tekrara göre %50 daha etkilidir.
+
+## Flash Kart Tekniği
+
+Flash kartlar, aralıklı tekrarın en pratik uygulamasıdır.
+
+### Nasıl Hazırlanır?
+- Ön yüz: Soru veya kavram
+- Arka yüz: Cevap veya açıklama
+
+### Leitner Sistemi
+Flash kartları 5 kutuya ayırın:
+
+1. **Kutu 1:** Her gün çalışılacak kartlar
+2. **Kutu 2:** 2 günde bir
+3. **Kutu 3:** Haftada bir
+4. **Kutu 4:** 2 haftada bir
+5. **Kutu 5:** Ayda bir
+
+**Kural:** Doğru bildiğiniz kart bir sonraki kutuya geçer. Yanlış bildiğiniz kart 1. kutuya geri döner.
+
+## Dijital Araçlar
+
+### Anki
+- Ücretsiz flash kart uygulaması
+- Otomatik aralıklı tekrar algoritması
+- Bilgisayar ve telefon senkronizasyonu
+
+### Quizlet
+- Hazır kart setleri
+- Oyunlaştırma özellikleri
+- Arkadaşlarla yarışma
+
+## Ders Bazlı Uygulama
+
+### Matematik
+- Formül kartları
+- Problem çözüm adımları
+- Teorem isimleri ve açıklamaları
+
+### İngilizce
+- Kelime-anlam kartları
+- Gramer kuralları
+- İrregular verbs
+
+### Tarih
+- Tarih-olay kartları
+- Neden-sonuç ilişkileri
+- Önemli isimler ve katkıları
+
+### Fen Bilimleri
+- Tanım kartları
+- Formül kartları
+- Deney sonuçları
+
+## Haftalık Tekrar Planı
+
+| Gün | Aktivite |
+|-----|----------|
+| Pazartesi | Yeni konuları öğren |
+| Salı | Dünkü konuları tekrar et |
+| Çarşamba | Yeni konuları öğren |
+| Perşembe | Salı + Çarşamba tekrarı |
+| Cuma | Yeni konuları öğren |
+| Cumartesi | Haftalık genel tekrar |
+| Pazar | Zayıf konulara odaklan |
+
+## Sık Yapılan Hatalar
+
+1. **Çok fazla kart yapmak** - Günde 20-30 yeni kart yeterli
+2. **Kartları atlamak** - Zor kartları atlamayın, tekrarlayın
+3. **Düzensizlik** - Her gün kısa süreli çalışma, haftada bir uzun çalışmadan iyidir
+4. **Pasif okuma** - Kartı okumadan önce cevabı tahmin etmeye çalışın
+
+## Sonuç
+
+Aralıklı tekrar ve aktif tekrar, bilimsel olarak kanıtlanmış en etkili öğrenme yöntemleridir. Bu teknikleri kullanarak:
+
+- Daha az zamanda daha çok öğrenirsiniz
+- Öğrendiklerinizi uzun süre hatırlarsınız
+- Sınav stresi azalır
+
+Bugün ilk flash kart setinizi oluşturun ve farkı görün!
+    `,
+    faqs: [
+      {
+        question: 'Günde kaç yeni kart öğrenmeliyim?',
+        answer: 'Başlangıçta günde 10-15 yeni kart yeterlidir. Alıştıkça 20-30 karta çıkabilirsiniz. Önemli olan tutarlılıktır.',
+      },
+      {
+        question: 'Hangi uygulama daha iyi: Anki mi Quizlet mı?',
+        answer: 'Anki algoritma olarak daha güçlüdür ve uzun vadeli öğrenme için idealdir. Quizlet daha kullanıcı dostudur ve hazır setler sunar. Başlangıç için Quizlet, ileri seviye için Anki önerilir.',
+      },
+    ],
+  },
+  'gunluk-ders-calisma-programi': {
+    baslik: 'Günlük Ders Çalışma Programı Örneği',
+    ozet: 'Sabahtan akşama kadar verimli bir gün geçirmek için örnek ders çalışma programı ve ipuçları.',
+    kategori: 'Planlama',
+    sure: '5 dk',
+    tarih: '2025-12-23',
+    etiketler: ['günlük', 'program', 'rutin'],
+    icerik: `
+## Neden Günlük Program Önemli?
+
+Düzenli bir program:
+- Zamanı verimli kullanmanızı sağlar
+- Prokrastinasyonu (ertelemeyi) azaltır
+- Motivasyonunuzu korur
+- Stresi azaltır
+
+## Örnek Günlük Program (Hafta İçi)
+
+### Sabah Rutini (07:00 - 08:00)
+- 07:00 - Uyanış, yüz yıkama
+- 07:15 - Hafif egzersiz veya germe
+- 07:30 - Kahvaltı
+- 07:45 - Okula hazırlık
+
+### Okul Sonrası (15:00 - 15:30)
+- Dinlenme ve atıştırmalık
+- Günün yorgunluğunu atma
+
+### Çalışma Bloğu 1 (15:30 - 17:00)
+- **15:30 - 16:00:** Zor ders (Matematik/Fen)
+- **16:00 - 16:05:** Kısa mola
+- **16:05 - 16:35:** Zor ders devam
+- **16:35 - 16:45:** Mola
+- **16:45 - 17:00:** Ödev kontrolü
+
+### Mola (17:00 - 17:30)
+- Dışarı çıkma, hava alma
+- Atıştırmalık
+
+### Çalışma Bloğu 2 (17:30 - 19:00)
+- **17:30 - 18:00:** Orta zorluk ders (Türkçe/Sosyal)
+- **18:00 - 18:05:** Kısa mola
+- **18:05 - 18:35:** Orta zorluk ders devam
+- **18:35 - 18:45:** Mola
+- **18:45 - 19:00:** Test çözümü
+
+### Akşam Yemeği (19:00 - 19:45)
+- Aile ile yemek
+- Sohbet ve dinlenme
+
+### Çalışma Bloğu 3 (20:00 - 21:00)
+- **20:00 - 20:30:** Kolay ders (İngilizce/Din)
+- **20:30 - 21:00:** Günün tekrarı
+
+### Gece Rutini (21:00 - 22:30)
+- 21:00 - Serbest zaman (TV, oyun, kitap)
+- 22:00 - Yatmaya hazırlık
+- 22:30 - Uyku
+
+## Hafta Sonu Programı
+
+### Cumartesi
+- **09:00 - 12:00:** Yoğun çalışma (eksik konular)
+- **12:00 - 14:00:** Öğle yemeği ve dinlenme
+- **14:00 - 16:00:** Test/deneme çözümü
+- **16:00 - :** Serbest zaman
+
+### Pazar
+- **10:00 - 12:00:** Haftalık tekrar
+- **12:00 - :** Serbest zaman ve dinlenme
+
+## Verimli Çalışma İpuçları
+
+### Çalışma Ortamı
+- Sessiz ve düzenli bir masa
+- İyi aydınlatma
+- Telefon uzakta veya sessize
+- Su ve sağlıklı atıştırmalık yakında
+
+### Pomodoro Entegrasyonu
+Her çalışma seansını Pomodoro tekniği ile yapın:
+- 25 dakika odaklanma
+- 5 dakika mola
+- 4 pomodoro sonrası 15-30 dakika uzun mola
+
+### Ders Sıralaması
+1. **En zor ders:** Enerjinin en yüksek olduğu zaman
+2. **Orta zorluk:** Ortada
+3. **Kolay ders:** Yorgun olduğunuzda
+
+## Esnek Olun
+
+Program bir rehberdir, kelepçe değil:
+- Yorgun hissediyorsanız molayı uzatın
+- Çok verimli hissediyorsanız devam edin
+- Beklenmedik durumlar için tampon zaman bırakın
+
+## Takip ve Değerlendirme
+
+Her gün sonunda kendinize sorun:
+- Planladığım her şeyi yaptım mı?
+- En verimli zaman dilimim hangisiydi?
+- Yarın neyi farklı yapabilirim?
+
+## Sonuç
+
+İyi bir günlük program, başarının temelidir. Bu örnek programı kendi ihtiyaçlarınıza göre uyarlayın ve tutarlı olmaya çalışın.
+
+Unutmayın: Mükemmel program yoktur, size uygun program vardır!
+    `,
+    faqs: [
+      {
+        question: 'Günde kaç saat çalışmalıyım?',
+        answer: 'Ortaokul için günde 2-3 saat, lise için 3-5 saat yeterlidir. Önemli olan süre değil, verimliliktir.',
+      },
+      {
+        question: 'Çalışırken müzik dinleyebilir miyim?',
+        answer: 'Sözsüz, sakin müzikler odaklanmayı artırabilir. Ancak sözlü şarkılar dikkat dağıtır. Herkes farklıdır, kendiniz deneyin.',
+      },
+    ],
+  },
+  'matematik-korkusu-nasil-asilir': {
+    baslik: 'Matematik Korkusu Nasıl Aşılır?',
+    ozet: 'Matematikten korkmayı bırakıp sevmeye başlamak için pratik öneriler ve zihinsel teknikler.',
+    kategori: 'Motivasyon',
+    sure: '8 dk',
+    tarih: '2025-12-23',
+    etiketler: ['matematik', 'korku', 'özgüven'],
+    icerik: `
+## Matematik Korkusu (Math Anxiety) Nedir?
+
+Matematik korkusu, matematik ile karşılaşıldığında yaşanan gerginlik, endişe ve korku halidir. Araştırmalara göre öğrencilerin yaklaşık %50'si bir düzeyde matematik korkusu yaşar.
+
+### Belirtiler
+- Matematik dersinden önce gerginlik
+- Sınav sırasında zihin boşalması
+- "Ben matematiği yapamam" inancı
+- Matematik ödevlerini erteleme
+- Fiziksel belirtiler (terleme, kalp çarpıntısı)
+
+## Matematik Korkusunun Nedenleri
+
+### 1. Olumsuz Deneyimler
+- Geçmişte yaşanan başarısızlıklar
+- Öğretmen veya ebeveynden olumsuz geri bildirim
+- Sınıfta utandırılma
+
+### 2. Yanlış İnançlar
+- "Matematik yeteneği doğuştandır"
+- "Ya anlarsın ya anlamazsın"
+- "Kızlar matematikten anlamaz" (tamamen yanlış!)
+
+### 3. Eksik Temel
+- Önceki konuları tam anlamamak
+- Üst konularda zorlanmak
+- Kötü döngüye girmek
+
+## Matematik Korkusunu Yenme Stratejileri
+
+### 1. Zihniyetinizi Değiştirin
+
+**Sabit Zihniyet → Gelişim Zihniyeti**
+
+- "Matematiği yapamıyorum" → "Henüz yapamıyorum, öğreneceğim"
+- "Zeki değilim" → "Çalışarak gelişebilirim"
+- "Hata yapmak kötü" → "Hatalar öğrenme fırsatı"
+
+### 2. Temelden Başlayın
+
+Eksik konularınızı tespit edin ve oradan başlayın:
+- Çarpım tablosu
+- Kesirler
+- Denklemler
+- Temel geometri
+
+### 3. Küçük Adımlarla İlerleyin
+
+Büyük hedefler yerine küçük hedefler koyun:
+- ❌ "Tüm matematiği öğreneceğim"
+- ✅ "Bugün 5 kesir sorusu çözeceğim"
+
+### 4. Hataları Kucaklayın
+
+Her hata bir öğrenme fırsatıdır:
+- Yanlış çözümü inceleyin
+- Nerede hata yaptığınızı bulun
+- Doğru çözümü anlayın
+- Benzer soru çözün
+
+### 5. Matematiği Günlük Hayata Bağlayın
+
+- Market alışverişinde hesap yapın
+- Yemek tariflerinde ölçüleri hesaplayın
+- Sporla ilgiliyseniz istatistikleri inceleyin
+- Oyunlardaki matematiksel kalıpları keşfedin
+
+### 6. Olumlu Öz Konuşma
+
+Olumsuz düşünceleri değiştirin:
+- "Bu çok zor" → "Bu zorlayıcı ama başarabilirim"
+- "Anlayamayacağım" → "Adım adım anlayacağım"
+- "Herkes benden iyi" → "Herkesin hızı farklı"
+
+### 7. Yardım İsteyin
+
+- Öğretmeninize soru sorun
+- Arkadaşlarınızla çalışın
+- Online kaynaklardan faydalanın
+- Gerekirse özel ders alın
+
+## Pratik Egzersizler
+
+### Günlük Matematik Rutini
+1. **5 dakika:** Zihinsel matematik (çarpma, toplama)
+2. **10 dakika:** Kolay sorular (özgüven için)
+3. **15 dakika:** Orta zorluk sorular
+4. **5 dakika:** Zor soru (meydan okuma)
+
+### Nefes Egzersizi (Sınav Öncesi)
+1. 4 saniye nefes alın
+2. 4 saniye tutun
+3. 4 saniye verin
+4. 3-5 kez tekrarlayın
+
+### Görselleştirme
+Sınavda başarılı olduğunuzu hayal edin:
+- Soruları rahatlıkla çözüyorsunuz
+- Doğru cevapları işaretliyorsunuz
+- Sınavdan mutlu çıkıyorsunuz
+
+## Başarı Hikayeleri
+
+Birçok ünlü matematikçi ve bilim insanı başlangıçta matematikle zorlanmıştır:
+
+- **Albert Einstein:** Okul yıllarında matematikle mücadele etti
+- **Maryam Mirzakhani:** Başlangıçta matematikten hoşlanmıyordu, sonra Fields Madalyası kazandı
+
+## Sonuç
+
+Matematik korkusu gerçektir ama yenilebilir. Doğru strateji, sabır ve düzenli çalışma ile matematiği sevmeye başlayabilirsiniz.
+
+**Unutmayın:** Matematik bir yetenek değil, bir beceridir. Beceriler çalışarak gelişir!
+
+Bugün küçük bir adım atın: Sadece bir soru çözün ve kendinizi tebrik edin!
+    `,
+    faqs: [
+      {
+        question: 'Matematik korkusu kalıtsal mı?',
+        answer: 'Hayır, matematik korkusu öğrenilmiş bir tepkidir. Olumsuz deneyimler ve yanlış inançlardan kaynaklanır. Doğru yaklaşımla tamamen aşılabilir.',
+      },
+      {
+        question: 'Ne kadar sürede matematiği sevebilirim?',
+        answer: 'Bu kişiye göre değişir. Düzenli ve olumlu deneyimlerle birkaç hafta içinde tutumunuz değişmeye başlar. 2-3 ay içinde belirgin fark hissedersiniz.',
+      },
+      {
+        question: 'Özel ders almam gerekir mi?',
+        answer: 'Şart değil. Online kaynaklar, YouTube videoları ve kendi kendine çalışma ile de başarılı olabilirsiniz. Ancak çok gerideyseniz veya motivasyon sorunu yaşıyorsanız özel ders faydalı olabilir.',
       },
     ],
   },

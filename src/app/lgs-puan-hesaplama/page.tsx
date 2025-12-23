@@ -22,25 +22,25 @@ import {
 import { hesaplaLGS, LGSNetler, LGSSonuc, formatPuan, LGS_GECMIS_YILLAR } from '@/lib/exam-calculations'
 import { CalculatorSchema, FAQSchema } from '@/components/JsonLdSchema'
 
-// Ders bilgileri
+// Ders bilgileri - LGS 2025 (Toplam 90 soru)
 const DERSLER = [
   { key: 'turkce', ad: 'Türkçe', maxSoru: 20, renk: 'from-blue-500 to-blue-600', icon: '📖' },
   { key: 'matematik', ad: 'Matematik', maxSoru: 20, renk: 'from-purple-500 to-purple-600', icon: '🔢' },
   { key: 'fen', ad: 'Fen Bilimleri', maxSoru: 20, renk: 'from-green-500 to-green-600', icon: '🔬' },
-  { key: 'sosyal', ad: 'Sosyal Bilgiler', maxSoru: 20, renk: 'from-orange-500 to-orange-600', icon: '🌍' },
+  { key: 'inkilap', ad: 'T.C. İnkılap Tarihi', maxSoru: 10, renk: 'from-orange-500 to-orange-600', icon: '🏛️' },
   { key: 'din', ad: 'Din Kültürü', maxSoru: 10, renk: 'from-teal-500 to-teal-600', icon: '📿' },
-  { key: 'ingilizce', ad: 'İngilizce', maxSoru: 10, renk: 'from-red-500 to-red-600', icon: '🌐' },
+  { key: 'ingilizce', ad: 'Yabancı Dil', maxSoru: 10, renk: 'from-red-500 to-red-600', icon: '🌐' },
 ]
 
 // SSS için FAQ Schema
 const LGS_FAQS = [
   {
     question: 'LGS puanı nasıl hesaplanır?',
-    answer: 'LGS puanı, her dersin netinin ilgili katsayı ile çarpılması ve toplanmasıyla hesaplanır. Türkçe, Matematik, Fen ve Sosyal derslerinin katsayısı 4, Din Kültürü ve İngilizce derslerinin katsayısı 2\'dir. Toplam 100 soru üzerinden 500 puan hesaplanır.',
+    answer: 'LGS puanı, her dersin netinin ilgili katsayı ile çarpılması ve toplanmasıyla hesaplanır. Tüm derslerin katsayısı eşittir. Toplam 90 soru üzerinden 500 puan hesaplanır. Her doğru net yaklaşık 5.55 puan değerindedir.',
   },
   {
     question: 'LGS\'de kaç soru var?',
-    answer: 'LGS\'de toplam 90 soru bulunmaktadır: Türkçe 20, Matematik 20, Fen Bilimleri 20, Sosyal Bilgiler 20, Din Kültürü 10 ve İngilizce 10 soru.',
+    answer: 'LGS\'de toplam 90 soru bulunmaktadır: Türkçe 20, Matematik 20, Fen Bilimleri 20, T.C. İnkılap Tarihi ve Atatürkçülük 10, Din Kültürü ve Ahlak Bilgisi 10, Yabancı Dil 10 soru.',
   },
   {
     question: 'LGS yüzdelik dilim nasıl hesaplanır?',
@@ -48,7 +48,7 @@ const LGS_FAQS = [
   },
   {
     question: 'LGS için kaç net yapmak gerekir?',
-    answer: 'İyi bir liseye yerleşmek için genellikle %80 ve üzeri başarı (80+ net) hedeflenmelidir. Fen liseleri için %90 üzeri, Anadolu liseleri için %70-80 arası net yapmak önerilir.',
+    answer: 'İyi bir liseye yerleşmek için genellikle 70+ net hedeflenmelidir. Fen liseleri için 80-85+ net, Anadolu liseleri için 65-75 arası net yapmak önerilir.',
   },
 ]
 
@@ -58,7 +58,7 @@ export default function LGSPuanHesaplamaPage() {
     turkce: 0,
     matematik: 0,
     fen: 0,
-    sosyal: 0,
+    inkilap: 0,
     din: 0,
     ingilizce: 0,
   })
@@ -85,7 +85,7 @@ export default function LGSPuanHesaplamaPage() {
       turkce: 0,
       matematik: 0,
       fen: 0,
-      sosyal: 0,
+      inkilap: 0,
       din: 0,
       ingilizce: 0,
     })
