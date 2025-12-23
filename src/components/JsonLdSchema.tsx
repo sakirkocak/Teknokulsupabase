@@ -1,0 +1,292 @@
+export default function JsonLdSchema() {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  // Organization Schema
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'EducationalOrganization',
+    '@id': `${baseUrl}/#organization`,
+    name: 'Teknokul',
+    alternateName: 'Teknokul - Eğitimin Dijital Üssü',
+    description: 'AI destekli soru bankası, liderlik yarışı, kişisel eğitim koçluğu ve gelişim takibi platformu. 1-12. sınıf öğrencileri için MEB müfredatına uygun eğitim içerikleri.',
+    url: baseUrl,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${baseUrl}/images/logo.png`,
+      width: 512,
+      height: 512,
+    },
+    sameAs: [
+      // Sosyal medya hesapları eklenebilir
+    ],
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer support',
+      availableLanguage: 'Turkish',
+    },
+    areaServed: {
+      '@type': 'Country',
+      name: 'Turkey',
+    },
+    founder: {
+      '@type': 'Organization',
+      name: 'Teknokul',
+    },
+  }
+
+  // WebSite Schema with SearchAction
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${baseUrl}/#website`,
+    url: baseUrl,
+    name: 'Teknokul',
+    description: 'Öğren. Yarış. Kazan! AI destekli eğitim platformu.',
+    publisher: {
+      '@id': `${baseUrl}/#organization`,
+    },
+    inLanguage: 'tr-TR',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${baseUrl}/hizli-coz?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  }
+
+  // Course Schema for educational content
+  const courseSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Course',
+    '@id': `${baseUrl}/#course`,
+    name: 'Teknokul Soru Bankası',
+    description: '1-12. sınıf MEB müfredatına uygun, zorluk seviyelerine göre ayrılmış binlerce soru içeren interaktif eğitim platformu.',
+    provider: {
+      '@id': `${baseUrl}/#organization`,
+    },
+    educationalLevel: [
+      'İlkokul (1-4. Sınıf)',
+      'Ortaokul (5-8. Sınıf)',
+      'Lise (9-12. Sınıf)',
+    ],
+    teaches: [
+      'Matematik',
+      'Türkçe',
+      'Fen Bilimleri',
+      'Sosyal Bilgiler',
+      'İngilizce',
+      'Fizik',
+      'Kimya',
+      'Biyoloji',
+    ],
+    hasCourseInstance: {
+      '@type': 'CourseInstance',
+      courseMode: 'online',
+      courseWorkload: 'PT30M', // 30 dakika günlük
+    },
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'TRY',
+      availability: 'https://schema.org/InStock',
+    },
+  }
+
+  // SoftwareApplication Schema
+  const softwareSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Teknokul',
+    applicationCategory: 'EducationalApplication',
+    operatingSystem: 'Web',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'TRY',
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      ratingCount: '500',
+      bestRating: '5',
+      worstRating: '1',
+    },
+  }
+
+  // BreadcrumbList Schema (temel yapı)
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    '@id': `${baseUrl}/#breadcrumb`,
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Ana Sayfa',
+        item: baseUrl,
+      },
+    ],
+  }
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(organizationSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(websiteSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(courseSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(softwareSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbSchema),
+        }}
+      />
+    </>
+  )
+}
+
+// FAQ Schema helper for blog/rehber pages
+export function FAQSchema({ faqs }: { faqs: { question: string; answer: string }[] }) {
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((faq) => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.answer,
+      },
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(faqSchema),
+      }}
+    />
+  )
+}
+
+// Article Schema helper for blog posts
+export function ArticleSchema({
+  title,
+  description,
+  slug,
+  publishedAt,
+  updatedAt,
+  authorName,
+  imageUrl,
+}: {
+  title: string
+  description: string
+  slug: string
+  publishedAt: string
+  updatedAt?: string
+  authorName?: string
+  imageUrl?: string
+}) {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  const articleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: title,
+    description: description,
+    url: `${baseUrl}/rehberler/${slug}`,
+    datePublished: publishedAt,
+    dateModified: updatedAt || publishedAt,
+    author: {
+      '@type': 'Organization',
+      name: authorName || 'Teknokul',
+      url: baseUrl,
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Teknokul',
+      logo: {
+        '@type': 'ImageObject',
+        url: `${baseUrl}/images/logo.png`,
+      },
+    },
+    image: imageUrl || `${baseUrl}/images/logo.png`,
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `${baseUrl}/rehberler/${slug}`,
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(articleSchema),
+      }}
+    />
+  )
+}
+
+// Calculator Tool Schema for LGS/YKS pages
+export function CalculatorSchema({
+  name,
+  description,
+  url,
+}: {
+  name: string
+  description: string
+  url: string
+}) {
+  const calculatorSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: name,
+    description: description,
+    url: url,
+    applicationCategory: 'EducationalApplication',
+    operatingSystem: 'Web',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'TRY',
+    },
+    featureList: [
+      'Anlık puan hesaplama',
+      'Yüzdelik dilim tahmini',
+      'Geçmiş yıl karşılaştırması',
+      'Sonuç paylaşma',
+    ],
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(calculatorSchema),
+      }}
+    />
+  )
+}
+

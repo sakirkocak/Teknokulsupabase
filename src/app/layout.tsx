@@ -1,36 +1,121 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import { Suspense } from 'react'
 import GoogleAdsTracker from '@/components/GoogleAdsTracker'
+import JsonLdSchema from '@/components/JsonLdSchema'
 import './globals.css'
 
+const baseUrl = 'https://www.teknokul.com.tr'
+
 export const metadata: Metadata = {
-  title: 'Teknokul - Eğitimin Dijital Üssü',
-  description: 'Öğren. Yarış. Kazan! AI destekli soru bankası, liderlik yarışı, kişisel eğitim koçluğu ve gelişim takibi platformu.',
-  keywords: ['eğitim', 'soru bankası', 'LGS', 'YKS', 'koçluk', 'öğrenme', 'yapay zeka', 'liderlik', 'yarış'],
-  authors: [{ name: 'Teknokul' }],
+  metadataBase: new URL(baseUrl),
+  title: {
+    default: 'Teknokul - Eğitimin Dijital Üssü | AI Destekli Soru Bankası',
+    template: '%s | Teknokul',
+  },
+  description: 'Öğren. Yarış. Kazan! AI destekli soru bankası, liderlik yarışı, kişisel eğitim koçluğu ve gelişim takibi platformu. 1-12. sınıf MEB müfredatına uygun 10.000+ soru.',
+  keywords: [
+    'eğitim',
+    'soru bankası',
+    'online soru çöz',
+    'LGS',
+    'LGS hazırlık',
+    'LGS soruları',
+    'LGS puan hesaplama',
+    'YKS',
+    'YKS hazırlık',
+    'YKS puan hesaplama',
+    'TYT',
+    'AYT',
+    'koçluk',
+    'eğitim koçu',
+    'öğrenme',
+    'yapay zeka eğitim',
+    'AI soru çözümü',
+    'liderlik yarışı',
+    'matematik soruları',
+    'türkçe soruları',
+    'fen bilimleri soruları',
+    'verimli ders çalışma',
+    'pomodoro tekniği',
+    '8. sınıf',
+    '12. sınıf',
+    'MEB müfredat',
+  ],
+  authors: [{ name: 'Teknokul', url: baseUrl }],
+  creator: 'Teknokul',
+  publisher: 'Teknokul',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
   verification: {
     google: 'WzuPyvuTXOhcUAQKmvXXqJMOa3WIWXF5MIMmDruO7zs',
   },
   other: {
     'google-adsense-account': 'ca-pub-2370010010396512',
   },
+  alternates: {
+    canonical: baseUrl,
+    languages: {
+      'tr-TR': baseUrl,
+    },
+  },
   openGraph: {
     title: 'Teknokul - Eğitimin Dijital Üssü',
-    description: 'Öğren. Yarış. Kazan! AI destekli soru bankası ve liderlik yarışı platformu.',
+    description: 'Öğren. Yarış. Kazan! AI destekli soru bankası, liderlik yarışı ve eğitim koçluğu platformu. 10.000+ soru ile sınavlara hazırlan!',
     siteName: 'Teknokul',
     locale: 'tr_TR',
     type: 'website',
+    url: baseUrl,
+    images: [
+      {
+        url: '/images/logo.png',
+        width: 512,
+        height: 512,
+        alt: 'Teknokul Logo',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Teknokul - Eğitimin Dijital Üssü',
     description: 'Öğren. Yarış. Kazan! AI destekli soru bankası ve liderlik yarışı platformu.',
+    images: ['/images/logo.png'],
+    creator: '@teknokul',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
   icons: {
-    icon: '/images/favicon.ico',
-    apple: '/images/logo-icon.png',
+    icon: [
+      { url: '/images/favicon.ico' },
+      { url: '/images/logo.png', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/images/logo.png' },
+    ],
   },
+  category: 'education',
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 }
 
 export default function RootLayout({
@@ -40,6 +125,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
+      <head>
+        {/* JSON-LD Structured Data */}
+        <JsonLdSchema />
+      </head>
       <body className="font-sans">
         {/* Google Analytics + Ads Tag (gtag.js) */}
         <Script
@@ -74,4 +163,3 @@ export default function RootLayout({
     </html>
   )
 }
-
