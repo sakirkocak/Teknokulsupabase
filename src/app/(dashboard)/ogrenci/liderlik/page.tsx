@@ -234,25 +234,83 @@ export default function StudentLeaderboardPage() {
       })
     }
 
-    // Ders seçimine göre farklı tablo kullan
-    let pointsData: any[] = []
+    // Sınıf filtresi - null veya number
+    const gradeFilter = selectedGradeFilter && selectedGradeFilter > 0 ? selectedGradeFilter : null
 
+    // Genel liderlik için veritabanı fonksiyonlarını kullan
     if (selectedSubject === 'genel') {
-      // Genel: student_points tablosundan
-      const { data, error } = await supabase
-        .from('student_points')
-        .select('*')
-        .gt('total_questions', 0)
-        .order('total_points', { ascending: false })
-        .limit(200)
+      let data: any[] | null = null
+      let error: any = null
+
+      // Scope'a göre uygun fonksiyonu çağır
+      if (activeScope === 'turkey') {
+        const result = await supabase.rpc('get_leaderboard_turkey', {
+          p_grade_filter: gradeFilter,
+          p_limit: 100
+        })
+        data = result.data
+        error = result.error
+      } else if (activeScope === 'city' && studentProfile.city_id) {
+        const result = await supabase.rpc('get_leaderboard_by_city', {
+          p_city_id: studentProfile.city_id,
+          p_grade_filter: gradeFilter,
+          p_limit: 100
+        })
+        data = result.data
+        error = result.error
+      } else if (activeScope === 'district' && studentProfile.district_id) {
+        const result = await supabase.rpc('get_leaderboard_by_district', {
+          p_district_id: studentProfile.district_id,
+          p_grade_filter: gradeFilter,
+          p_limit: 100
+        })
+        data = result.data
+        error = result.error
+      } else if (activeScope === 'school' && studentProfile.school_id) {
+        const result = await supabase.rpc('get_leaderboard_by_school', {
+          p_school_id: studentProfile.school_id,
+          p_grade_filter: gradeFilter,
+          p_limit: 100
+        })
+        data = result.data
+        error = result.error
+      } else if (activeScope === 'class' && studentProfile.school_id && studentProfile.grade) {
+        const result = await supabase.rpc('get_leaderboard_by_classroom', {
+          p_school_id: studentProfile.school_id,
+          p_grade: studentProfile.grade,
+          p_limit: 100
+        })
+        data = result.data
+        error = result.error
+      }
 
       if (error) {
-        console.error('Puanlar yüklenirken hata:', error)
-        setLeaderboard([])
-        setLoading(false)
+        console.error('Liderlik tablosu yüklenirken hata:', error)
+        // Hata durumunda fallback yöntemini kullan
+        await loadDataFallback()
         return
       }
-      pointsData = data || []
+
+      if (data && data.length > 0) {
+        const formatted: LeaderboardEntry[] = data.map((item: any) => ({
+          student_id: item.student_id,
+          full_name: item.full_name || 'Anonim',
+          avatar_url: item.avatar_url,
+          grade: item.grade,
+          city_name: item.city_name || null,
+          district_name: item.district_name || null,
+          school_name: item.school_name || null,
+          total_points: item.total_points,
+          total_questions: item.total_questions,
+          total_correct: item.total_correct,
+          max_streak: item.max_streak,
+          success_rate: Number(item.success_rate) || 0,
+          rank: Number(item.rank),
+        }))
+        setLeaderboard(formatted)
+      } else {
+        setLeaderboard([])
+      }
     } else {
       // Ders bazlı: student_subject_points tablosundan
       const { data, error } = await supabase
@@ -265,132 +323,168 @@ export default function StudentLeaderboardPage() {
 
       if (error) {
         console.error('Ders puanları yüklenirken hata:', error)
-        // Tablo yoksa genel liderliğe dön
         setSelectedSubject('genel')
         setLoading(false)
         return
       }
-      pointsData = data || []
-    }
 
-    if (pointsData.length === 0) {
-      setLeaderboard([])
-      setLoading(false)
-      return
-    }
-
-    // Tüm student_id'leri al
-    const studentIds = pointsData.map(p => p.student_id)
-
-    // Student profillerini çek
-    const { data: studentsData } = await supabase
-      .from('student_profiles')
-      .select(`
-        id,
-        grade,
-        city_id,
-        district_id,
-        school_id,
-        user_id
-      `)
-      .in('id', studentIds)
-
-    // Profile bilgilerini çek
-    const userIds = studentsData?.map(s => s.user_id).filter(Boolean) || []
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('id, full_name, avatar_url')
-      .in('id', userIds)
-
-    // Okul/İl/İlçe bilgilerini çek
-    const schoolIds = studentsData?.map(s => s.school_id).filter(Boolean) || []
-    const cityIds = studentsData?.map(s => s.city_id).filter(Boolean) || []
-    const districtIds = studentsData?.map(s => s.district_id).filter(Boolean) || []
-
-    const { data: schoolsData } = await supabase.from('schools').select('id, name').in('id', schoolIds)
-    const { data: citiesData } = await supabase.from('turkey_cities').select('id, name').in('id', cityIds)
-    const { data: districtsData } = await supabase.from('turkey_districts').select('id, name').in('id', districtIds)
-
-    // Map'ler oluştur
-    const studentMap = new Map(studentsData?.map(s => [s.id, s]) || [])
-    const profileMap = new Map(profilesData?.map(p => [p.id, p]) || [])
-    const schoolMap = new Map(schoolsData?.map(s => [s.id, s.name]) || [])
-    const cityMap = new Map(citiesData?.map(c => [c.id, c.name]) || [])
-    const districtMap = new Map(districtsData?.map(d => [d.id, d.name]) || [])
-
-    // Verileri birleştir ve filtrele
-    let combined = pointsData.map(points => {
-      const student = studentMap.get(points.student_id)
-      const profile = student ? profileMap.get(student.user_id) : null
-      return {
-        ...points,
-        grade: student?.grade,
-        city_id: student?.city_id,
-        district_id: student?.district_id,
-        school_id: student?.school_id,
-        full_name: profile?.full_name || 'Anonim',
-        avatar_url: profile?.avatar_url,
-        school_name: student?.school_id ? schoolMap.get(student.school_id) : null,
-        city_name: student?.city_id ? cityMap.get(student.city_id) : null,
-        district_name: student?.district_id ? districtMap.get(student.district_id) : null,
+      if (!data || data.length === 0) {
+        setLeaderboard([])
+        setLoading(false)
+        return
       }
-    })
 
-    // Scope filtreleri
-    if (activeScope === 'city' && studentProfile.city_id) {
-      combined = combined.filter(item => item.city_id === studentProfile.city_id)
-    } else if (activeScope === 'district' && studentProfile.district_id) {
-      combined = combined.filter(item => item.district_id === studentProfile.district_id)
-    } else if (activeScope === 'school' && studentProfile.school_id) {
-      combined = combined.filter(item => item.school_id === studentProfile.school_id)
-    } else if (activeScope === 'class' && studentProfile.school_id && studentProfile.grade) {
-      combined = combined.filter(item => 
-        item.school_id === studentProfile.school_id && item.grade === studentProfile.grade
-      )
+      // Tüm student_id'leri al
+      const studentIds = data.map(p => p.student_id)
+
+      // Student profillerini çek
+      const { data: studentsData } = await supabase
+        .from('student_profiles')
+        .select('id, grade, city_id, district_id, school_id, user_id')
+        .in('id', studentIds)
+
+      // Profile bilgilerini çek
+      const userIds = studentsData?.map(s => s.user_id).filter(Boolean) || []
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds)
+
+      // Map'ler oluştur
+      const studentMap = new Map(studentsData?.map(s => [s.id, s]) || [])
+      const profileMap = new Map(profilesData?.map(p => [p.id, p]) || [])
+
+      // Verileri birleştir ve filtrele
+      let combined = data.map(points => {
+        const student = studentMap.get(points.student_id)
+        const profile = student ? profileMap.get(student.user_id) : null
+        return {
+          ...points,
+          grade: student?.grade,
+          city_id: student?.city_id,
+          district_id: student?.district_id,
+          school_id: student?.school_id,
+          full_name: profile?.full_name || 'Anonim',
+          avatar_url: profile?.avatar_url,
+        }
+      })
+
+      // Scope filtreleri
+      if (activeScope === 'city' && studentProfile.city_id) {
+        combined = combined.filter(item => item.city_id === studentProfile.city_id)
+      } else if (activeScope === 'district' && studentProfile.district_id) {
+        combined = combined.filter(item => item.district_id === studentProfile.district_id)
+      } else if (activeScope === 'school' && studentProfile.school_id) {
+        combined = combined.filter(item => item.school_id === studentProfile.school_id)
+      } else if (activeScope === 'class' && studentProfile.school_id && studentProfile.grade) {
+        combined = combined.filter(item => 
+          item.school_id === studentProfile.school_id && item.grade === studentProfile.grade
+        )
+      }
+
+      // Sınıf filtresi
+      if (gradeFilter) {
+        combined = combined.filter(item => item.grade === gradeFilter)
+      }
+
+      // Sırala ve formatla
+      combined.sort((a, b) => (b.points || 0) - (a.points || 0))
+
+      const formatted: LeaderboardEntry[] = combined.slice(0, 100).map((item, index) => {
+        const totalQuestions = (item.correct_count || 0) + (item.wrong_count || 0)
+        const totalCorrect = item.correct_count || 0
+        
+        return {
+          student_id: item.student_id,
+          full_name: item.full_name,
+          avatar_url: item.avatar_url,
+          grade: item.grade,
+          city_name: null,
+          district_name: null,
+          school_name: null,
+          total_points: item.points || 0,
+          total_questions: totalQuestions,
+          total_correct: totalCorrect,
+          max_streak: 0,
+          success_rate: totalQuestions > 0 
+            ? Math.round((totalCorrect / totalQuestions) * 100) 
+            : 0,
+          rank: index + 1,
+        }
+      })
+
+      setLeaderboard(formatted)
     }
 
-    // Sınıf filtresi
-    if (selectedGradeFilter && selectedGradeFilter > 0) {
-      combined = combined.filter(item => item.grade === selectedGradeFilter)
-    }
+    setLoading(false)
+  }
 
-    // Sırala (puana göre)
-    const pointsKey = selectedSubject === 'genel' ? 'total_points' : 'points'
-    combined.sort((a, b) => {
-      const aPoints = (a as any)[pointsKey] || 0
-      const bPoints = (b as any)[pointsKey] || 0
-      return bPoints - aPoints
-    })
+  // Fallback fonksiyonu - veritabanı fonksiyonları çalışmazsa
+  const loadDataFallback = async () => {
+    const gradeFilter = selectedGradeFilter && selectedGradeFilter > 0 ? selectedGradeFilter : null
 
-    // Top 100 al ve formatla
-    const formatted: LeaderboardEntry[] = combined.slice(0, 100).map((item, index) => {
-      // Ders bazlı için farklı alanlar kullan
-      const isSubject = selectedSubject !== 'genel'
-      const totalQuestions = isSubject 
-        ? ((item as any).correct_count || 0) + ((item as any).wrong_count || 0)
-        : (item.total_questions || 0)
-      const totalCorrect = isSubject ? ((item as any).correct_count || 0) : (item.total_correct || 0)
-      
-      return {
+    const { data } = await supabase
+      .from('student_points')
+      .select(`
+        student_id,
+        total_points,
+        total_questions,
+        total_correct,
+        total_wrong,
+        max_streak,
+        student:student_profiles!student_points_student_id_fkey(
+          user_id,
+          grade,
+          city_id,
+          district_id,
+          school_id,
+          profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
+        )
+      `)
+      .gt('total_questions', 0)
+      .order('total_points', { ascending: false })
+      .limit(500)
+
+    if (data) {
+      let filteredData = data
+
+      // Scope filtreleri
+      if (activeScope === 'city' && studentProfile?.city_id) {
+        filteredData = filteredData.filter((item: any) => item.student?.city_id === studentProfile.city_id)
+      } else if (activeScope === 'district' && studentProfile?.district_id) {
+        filteredData = filteredData.filter((item: any) => item.student?.district_id === studentProfile.district_id)
+      } else if (activeScope === 'school' && studentProfile?.school_id) {
+        filteredData = filteredData.filter((item: any) => item.student?.school_id === studentProfile.school_id)
+      } else if (activeScope === 'class' && studentProfile?.school_id && studentProfile?.grade) {
+        filteredData = filteredData.filter((item: any) => 
+          item.student?.school_id === studentProfile.school_id && item.student?.grade === studentProfile.grade
+        )
+      }
+
+      // Sınıf filtresi
+      if (gradeFilter) {
+        filteredData = filteredData.filter((item: any) => item.student?.grade === gradeFilter)
+      }
+
+      const formatted: LeaderboardEntry[] = filteredData.slice(0, 100).map((item: any, index: number) => ({
         student_id: item.student_id,
-        full_name: item.full_name,
-        avatar_url: item.avatar_url,
-        grade: item.grade,
-        city_name: item.city_name,
-        district_name: item.district_name,
-        school_name: item.school_name,
-        total_points: isSubject ? ((item as any).points || 0) : (item.total_points || 0),
-        total_questions: totalQuestions,
-        total_correct: totalCorrect,
-        max_streak: (item as any).max_streak || 0,
-        success_rate: totalQuestions > 0 
-          ? Math.round((totalCorrect / totalQuestions) * 100) 
+        full_name: item.student?.profile?.full_name || 'Anonim',
+        avatar_url: item.student?.profile?.avatar_url,
+        grade: item.student?.grade,
+        city_name: null,
+        district_name: null,
+        school_name: null,
+        total_points: item.total_points,
+        total_questions: item.total_questions,
+        total_correct: item.total_correct,
+        max_streak: item.max_streak,
+        success_rate: item.total_questions > 0 
+          ? Math.round((item.total_correct / item.total_questions) * 100) 
           : 0,
         rank: index + 1,
-      }
-    })
-
-    setLeaderboard(formatted)
+      }))
+      setLeaderboard(formatted)
+    }
     setLoading(false)
   }
 

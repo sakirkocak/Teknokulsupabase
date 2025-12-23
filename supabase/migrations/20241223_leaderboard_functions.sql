@@ -1,0 +1,4 @@
+-- Bu migration zaten uygulandı (Liderlik tablosu fonksiyonları)
+-- Fonksiyonlar: get_leaderboard_by_school, get_leaderboard_by_district, 
+-- get_leaderboard_by_city, get_leaderboard_turkey, get_leaderboard_by_classroom
+-- Trigger: sync_student_location_from_school
