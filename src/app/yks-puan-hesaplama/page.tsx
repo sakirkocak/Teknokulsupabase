@@ -79,19 +79,19 @@ const PUAN_TURLERI: { value: YKSPuanTuru; label: string; icon: React.ElementType
 const YKS_FAQS = [
   {
     question: 'YKS puanı nasıl hesaplanır?',
-    answer: 'YKS puanı, TYT ve AYT puanlarının birleşimiyle hesaplanır. Yerleşme puanı = TYT × 0.4 + AYT × 0.6 + Diploma Notu Katkısı formülüyle bulunur. Her puan türü için farklı katsayılar kullanılır.',
+    answer: 'YKS puanı şu formülle hesaplanır: Yerleştirme Puanı = (TYT Puanı × 0.4) + (AYT Puanı × 0.6) + OBP Katkısı. TYT %40, AYT %60 katkı sağlar. OBP (Diploma Notu × 5) × 0.12 olarak eklenir.',
   },
   {
-    question: 'TYT baraj puanı kaç?',
-    answer: 'TYT\'de lisans programlarına başvurabilmek için en az 150 puan almak gerekir. Önlisans programları için ise 100 puan yeterlidir.',
+    question: '4 yanlış 1 doğruyu götürür mü?',
+    answer: 'Evet, YKS\'de 4 yanlış 1 doğruyu götürür. Net hesabı: Net = Doğru - (Yanlış / 4). Bu LGS\'den farklıdır (LGS\'de 3 yanlış 1 doğruyu götürür).',
   },
   {
-    question: 'Diploma notu YKS\'yi nasıl etkiler?',
-    answer: 'Diploma notu (50-100 arası), yerleşme puanına ek olarak eklenir. Formül: (Diploma Notu - 50) × 0.1. Yani 100 diploma notu 5 puan katkı sağlar.',
+    question: 'OBP (Diploma notu) nasıl hesaplanır?',
+    answer: 'Diploma notunuz (50-100) 5 ile çarpılır → OBP (250-500 arası). Sonra OBP × 0.12 yerleştirme puanınıza eklenir. Örnek: 80 diploma notu → 400 OBP → 48 puan katkı. Önceki yıl yerleşenler için katsayı 0.06\'ya düşer.',
   },
   {
-    question: 'AYT\'ye girmeden sadece TYT ile nereye yerleşebilirim?',
-    answer: 'Sadece TYT puanı ile 2 yıllık önlisans programlarına ve açık öğretim programlarına yerleşebilirsiniz. 4 yıllık lisans programları için AYT\'ye de girmeniz gerekir.',
+    question: 'TYT ve AYT katkısı nasıl hesaplanır?',
+    answer: 'TYT\'de net başına yaklaşık 1.33 puan (Türkçe-Matematik) veya 1.36 puan (Sosyal-Fen) alırsınız. AYT\'de puan türüne göre net başına 2.8-3.3 puan arası değişir. TYT toplam puanın %40\'ını, AYT %60\'ını oluşturur.',
   },
 ]
 
@@ -99,6 +99,7 @@ export default function YKSPuanHesaplamaPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [puanTuru, setPuanTuru] = useState<YKSPuanTuru>('SAY')
   const [diplomaNotu, setDiplomaNotu] = useState(80)
+  const [kirikOBP, setKirikOBP] = useState(false) // Önceki yıl yerleşti mi?
   
   const [tytNetler, setTytNetler] = useState<TYTNetler>({
     turkce: 0,
@@ -118,12 +119,12 @@ export default function YKSPuanHesaplamaPage() {
 
   // Her değişiklikte hesapla
   useEffect(() => {
-    const result = hesaplaYKS(tytNetler, aytNetler, puanTuru, diplomaNotu)
+    const result = hesaplaYKS(tytNetler, aytNetler, puanTuru, diplomaNotu, kirikOBP)
     setSonuc(result)
     setAnimateResult(true)
     const timer = setTimeout(() => setAnimateResult(false), 300)
     return () => clearTimeout(timer)
-  }, [tytNetler, aytNetler, puanTuru, diplomaNotu])
+  }, [tytNetler, aytNetler, puanTuru, diplomaNotu, kirikOBP])
 
   const handleTytChange = (ders: string, value: number) => {
     const maxValue = TYT_DERSLER.find(d => d.key === ders)?.maxSoru || 40
@@ -148,9 +149,11 @@ export default function YKSPuanHesaplamaPage() {
     if (!sonuc) return
     
     const text = `🎓 YKS Puan Hesaplamam (${puanTuru}):
-📊 TYT: ${formatPuan(sonuc.tytPuan)}
-📈 AYT: ${formatPuan(sonuc.aytPuan)}
-⭐ Yerleşme Puanı: ${formatPuan(sonuc.yerlesmeYKS)}
+📊 TYT Ham: ${formatPuan(sonuc.tytPuan)} (×0.4 = ${formatPuan(sonuc.tytKatki)})
+📈 AYT Ham: ${formatPuan(sonuc.aytPuan)} (×0.6 = ${formatPuan(sonuc.aytKatki)})
+📋 Ham Puan: ${formatPuan(sonuc.hamPuan)}
+🎓 OBP Katkısı: +${formatPuan(sonuc.obpKatki)}
+⭐ Yerleştirme Puanı: ${formatPuan(sonuc.yerlesmeYKS)}
 🏆 Tahmini Sıralama: ${formatSiralama(sonuc.tahminiSiralama)}
 
 Hesapla: teknokul.com.tr/yks-puan-hesaplama`
@@ -419,7 +422,7 @@ Hesapla: teknokul.com.tr/yks-puan-hesaplama`
                 </div>
               </motion.div>
 
-              {/* Diploma Notu */}
+              {/* Diploma Notu ve OBP */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -428,10 +431,10 @@ Hesapla: teknokul.com.tr/yks-puan-hesaplama`
               >
                 <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                   <GraduationCap className="w-5 h-5 text-yellow-400" />
-                  Diploma Notu
+                  Diploma Notu (OBP)
                 </h2>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 mb-4">
                   <input
                     type="range"
                     min="50"
@@ -447,9 +450,29 @@ Hesapla: teknokul.com.tr/yks-puan-hesaplama`
                     <span className="text-2xl font-bold text-yellow-400">{diplomaNotu}</span>
                   </div>
                 </div>
-                <p className="text-gray-500 text-sm mt-2">
-                  Katkı: +{((diplomaNotu - 50) * 0.1).toFixed(1)} puan
-                </p>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+                  <div className="text-gray-400">
+                    OBP: <span className="text-white font-medium">{diplomaNotu * 5}</span> | 
+                    Katkı: <span className="text-yellow-400 font-medium">+{(diplomaNotu * 5 * (kirikOBP ? 0.06 : 0.12)).toFixed(1)}</span> puan
+                  </div>
+                  
+                  <label className="flex items-center gap-2 text-gray-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={kirikOBP}
+                      onChange={(e) => setKirikOBP(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-600 bg-white/10 text-yellow-500 focus:ring-yellow-500/50"
+                    />
+                    <span className="text-sm">Geçen yıl yerleştim (Kırık OBP)</span>
+                  </label>
+                </div>
+                
+                {kirikOBP && (
+                  <p className="text-orange-400 text-xs mt-2">
+                    ⚠️ Kırık OBP: Önceki yıl bir programa yerleştiğiniz için OBP katsayınız 0.12 yerine 0.06
+                  </p>
+                )}
               </motion.div>
             </div>
 
@@ -480,7 +503,7 @@ Hesapla: teknokul.com.tr/yks-puan-hesaplama`
                   <div className="space-y-6">
                     {/* Yerleşme Puanı */}
                     <div className="text-center py-4">
-                      <p className="text-white/70 text-sm mb-1">Yerleşme Puanı</p>
+                      <p className="text-white/70 text-sm mb-1">Yerleştirme Puanı</p>
                       <motion.p
                         key={sonuc.yerlesmeYKS}
                         initial={animateResult ? { scale: 1.1 } : {}}
@@ -492,23 +515,33 @@ Hesapla: teknokul.com.tr/yks-puan-hesaplama`
                     </div>
 
                     {/* Detaylı Puanlar */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white/10 rounded-xl p-4 text-center">
-                        <p className="text-white/60 text-xs mb-1">TYT Puanı</p>
-                        <p className="text-2xl font-bold text-white">{formatPuan(sonuc.tytPuan)}</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white/10 rounded-xl p-3 text-center">
+                        <p className="text-white/60 text-xs mb-1">TYT Ham Puanı</p>
+                        <p className="text-xl font-bold text-white">{formatPuan(sonuc.tytPuan)}</p>
+                        <p className="text-xs text-indigo-300">×0.4 = {formatPuan(sonuc.tytKatki)}</p>
                       </div>
-                      <div className="bg-white/10 rounded-xl p-4 text-center">
-                        <p className="text-white/60 text-xs mb-1">AYT Katkısı</p>
-                        <p className="text-2xl font-bold text-white">{formatPuan(sonuc.aytPuan)}</p>
+                      <div className="bg-white/10 rounded-xl p-3 text-center">
+                        <p className="text-white/60 text-xs mb-1">AYT Ham Puanı</p>
+                        <p className="text-xl font-bold text-white">{formatPuan(sonuc.aytPuan)}</p>
+                        <p className="text-xs text-purple-300">×0.6 = {formatPuan(sonuc.aytKatki)}</p>
                       </div>
-                      <div className="bg-white/10 rounded-xl p-4 text-center">
-                        <p className="text-white/60 text-xs mb-1">Diploma Katkısı</p>
-                        <p className="text-2xl font-bold text-yellow-400">+{sonuc.diplomanotKatkisi}</p>
+                      <div className="bg-white/10 rounded-xl p-3 text-center">
+                        <p className="text-white/60 text-xs mb-1">Ham Puan</p>
+                        <p className="text-xl font-bold text-white">{formatPuan(sonuc.hamPuan)}</p>
+                        <p className="text-xs text-gray-400">TYT + AYT katkısı</p>
                       </div>
-                      <div className="bg-white/10 rounded-xl p-4 text-center">
-                        <p className="text-white/60 text-xs mb-1">Tahmini Sıralama</p>
-                        <p className="text-xl font-bold text-green-400">{formatSiralama(sonuc.tahminiSiralama)}</p>
+                      <div className="bg-white/10 rounded-xl p-3 text-center">
+                        <p className="text-white/60 text-xs mb-1">OBP Katkısı</p>
+                        <p className="text-xl font-bold text-yellow-400">+{formatPuan(sonuc.obpKatki)}</p>
+                        <p className="text-xs text-yellow-200/60">{sonuc.obpPuan} × {kirikOBP ? '0.06' : '0.12'}</p>
                       </div>
+                    </div>
+
+                    {/* Tahmini Sıralama */}
+                    <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-xl p-4 text-center border border-green-500/30">
+                      <p className="text-white/60 text-xs mb-1">Tahmini Sıralama</p>
+                      <p className="text-2xl font-bold text-green-400">{formatSiralama(sonuc.tahminiSiralama)}</p>
                     </div>
                   </div>
                 )}

@@ -137,6 +137,9 @@ function hesaplaYuzdelikDilim(basariYuzdesi: number): number {
 // YKS HESAPLAMA
 // ============================================
 
+// YKS'de 4 yanlış 1 doğruyu götürür
+// Net = Doğru - (Yanlış / 4)
+
 export interface TYTNetler {
   turkce: number      // Max 40
   sosyal: number      // Max 20
@@ -150,8 +153,8 @@ export interface AYTNetler {
   kimya?: number          // Max 13 (SAY)
   biyoloji?: number       // Max 13 (SAY)
   edebiyat?: number       // Max 24 (SOZ, EA)
-  tarih1?: number         // Max 10 (SOZ)
-  cografya1?: number      // Max 6 (SOZ)
+  tarih1?: number         // Max 10 (SOZ, EA)
+  cografya1?: number      // Max 6 (SOZ, EA)
   tarih2?: number         // Max 11 (SOZ)
   cografya2?: number      // Max 11 (SOZ)
   felsefe?: number        // Max 12 (SOZ)
@@ -161,21 +164,26 @@ export interface AYTNetler {
 export type YKSPuanTuru = 'SAY' | 'SOZ' | 'EA' | 'DIL'
 
 export interface YKSSonuc {
-  tytPuan: number
-  aytPuan: number
-  yerlesmeYKS: number
-  diplomanotKatkisi: number
-  toplamPuan: number
+  tytPuan: number         // TYT ham puan
+  tytKatki: number        // TYT'nin yerleşme puanına katkısı (%40)
+  aytPuan: number         // AYT ham puan
+  aytKatki: number        // AYT'nin yerleşme puanına katkısı (%60)
+  hamPuan: number         // Toplam ham puan (TYT + AYT katkıları)
+  obpPuan: number         // OBP (Diploma notu x 5)
+  obpKatki: number        // OBP'nin puanına katkısı (OBP x 0.12)
+  yerlesmeYKS: number     // Yerleştirme puanı (Ham puan + OBP katkısı)
   tahminiSiralama: number
   puanTuru: YKSPuanTuru
 }
 
-// TYT Katsayıları
+// TYT Katsayıları (2025 tahmini)
+// TYT toplam puana %40 katkı sağlar
+// Ortalama net başına ~1.33 puan
 const TYT_KATSAYILAR = {
-  turkce: 3.3,
-  sosyal: 3.4,
-  matematik: 3.3,
-  fen: 3.4,
+  turkce: 1.33,     // 40 soru
+  sosyal: 1.36,     // 20 soru
+  matematik: 1.33,  // 40 soru
+  fen: 1.36,        // 20 soru
 }
 
 const TYT_SORU_SAYILARI = {
@@ -183,34 +191,50 @@ const TYT_SORU_SAYILARI = {
   sosyal: 20,
   matematik: 40,
   fen: 20,
+  // Toplam: 120 soru
 }
 
 // AYT Katsayıları (puan türüne göre değişir)
+// AYT toplam puana %60 katkı sağlar
 const AYT_KATSAYILAR = {
   SAY: {
-    matematik: 3,
-    fizik: 2.85,
-    kimya: 3.07,
-    biyoloji: 3.07,
+    matematik: 3.0,      // 40 soru
+    fizik: 2.85,         // 14 soru
+    kimya: 3.07,         // 13 soru
+    biyoloji: 3.07,      // 13 soru
   },
   SOZ: {
-    edebiyat: 3,
-    tarih1: 2.8,
-    cografya1: 3.33,
-    tarih2: 2.91,
-    cografya2: 2.91,
-    felsefe: 3,
-    din: 3.33,
+    edebiyat: 3.0,       // 24 soru
+    tarih1: 2.80,        // 10 soru
+    cografya1: 3.33,     // 6 soru
+    tarih2: 2.91,        // 11 soru
+    cografya2: 2.91,     // 11 soru
+    felsefe: 3.0,        // 12 soru
+    din: 3.33,           // 6 soru
   },
   EA: {
-    matematik: 3,
-    edebiyat: 3,
-    tarih1: 2.8,
-    cografya1: 3.33,
+    matematik: 3.0,      // 40 soru
+    edebiyat: 3.0,       // 24 soru
+    tarih1: 2.80,        // 10 soru
+    cografya1: 3.30,     // 6 soru
   },
 }
 
-export function hesaplaTYT(netler: TYTNetler): number {
+const AYT_SORU_SAYILARI = {
+  matematik: 40,
+  fizik: 14,
+  kimya: 13,
+  biyoloji: 13,
+  edebiyat: 24,
+  tarih1: 10,
+  cografya1: 6,
+  tarih2: 11,
+  cografya2: 11,
+  felsefe: 12,
+  din: 6,
+}
+
+export function hesaplaTYT(netler: TYTNetler): { hamPuan: number, toplamNet: number } {
   const validNetler = {
     turkce: Math.min(Math.max(0, netler.turkce), TYT_SORU_SAYILARI.turkce),
     sosyal: Math.min(Math.max(0, netler.sosyal), TYT_SORU_SAYILARI.sosyal),
@@ -218,74 +242,112 @@ export function hesaplaTYT(netler: TYTNetler): number {
     fen: Math.min(Math.max(0, netler.fen), TYT_SORU_SAYILARI.fen),
   }
 
-  // TYT Puan = 100 + (Netler * Katsayılar)
-  const hamPuan = 
+  const toplamNet = validNetler.turkce + validNetler.sosyal + validNetler.matematik + validNetler.fen
+
+  // TYT Ham Puan = Taban (100) + (Netler * Katsayılar)
+  const hamPuan = 100 +
     validNetler.turkce * TYT_KATSAYILAR.turkce +
     validNetler.sosyal * TYT_KATSAYILAR.sosyal +
     validNetler.matematik * TYT_KATSAYILAR.matematik +
     validNetler.fen * TYT_KATSAYILAR.fen
 
-  return 100 + hamPuan
+  return { hamPuan, toplamNet }
 }
 
-export function hesaplaAYT(netler: AYTNetler, puanTuru: YKSPuanTuru): number {
+export function hesaplaAYT(netler: AYTNetler, puanTuru: YKSPuanTuru): { hamPuan: number, toplamNet: number } {
   let hamPuan = 0
+  let toplamNet = 0
 
   if (puanTuru === 'SAY') {
+    const matematik = Math.min(Math.max(0, netler.matematik || 0), AYT_SORU_SAYILARI.matematik)
+    const fizik = Math.min(Math.max(0, netler.fizik || 0), AYT_SORU_SAYILARI.fizik)
+    const kimya = Math.min(Math.max(0, netler.kimya || 0), AYT_SORU_SAYILARI.kimya)
+    const biyoloji = Math.min(Math.max(0, netler.biyoloji || 0), AYT_SORU_SAYILARI.biyoloji)
+    
+    toplamNet = matematik + fizik + kimya + biyoloji
     hamPuan = 
-      (netler.matematik || 0) * AYT_KATSAYILAR.SAY.matematik +
-      (netler.fizik || 0) * AYT_KATSAYILAR.SAY.fizik +
-      (netler.kimya || 0) * AYT_KATSAYILAR.SAY.kimya +
-      (netler.biyoloji || 0) * AYT_KATSAYILAR.SAY.biyoloji
+      matematik * AYT_KATSAYILAR.SAY.matematik +
+      fizik * AYT_KATSAYILAR.SAY.fizik +
+      kimya * AYT_KATSAYILAR.SAY.kimya +
+      biyoloji * AYT_KATSAYILAR.SAY.biyoloji
   } else if (puanTuru === 'SOZ') {
+    const edebiyat = Math.min(Math.max(0, netler.edebiyat || 0), AYT_SORU_SAYILARI.edebiyat)
+    const tarih1 = Math.min(Math.max(0, netler.tarih1 || 0), AYT_SORU_SAYILARI.tarih1)
+    const cografya1 = Math.min(Math.max(0, netler.cografya1 || 0), AYT_SORU_SAYILARI.cografya1)
+    const tarih2 = Math.min(Math.max(0, netler.tarih2 || 0), AYT_SORU_SAYILARI.tarih2)
+    const cografya2 = Math.min(Math.max(0, netler.cografya2 || 0), AYT_SORU_SAYILARI.cografya2)
+    const felsefe = Math.min(Math.max(0, netler.felsefe || 0), AYT_SORU_SAYILARI.felsefe)
+    const din = Math.min(Math.max(0, netler.din || 0), AYT_SORU_SAYILARI.din)
+
+    toplamNet = edebiyat + tarih1 + cografya1 + tarih2 + cografya2 + felsefe + din
     hamPuan = 
-      (netler.edebiyat || 0) * AYT_KATSAYILAR.SOZ.edebiyat +
-      (netler.tarih1 || 0) * AYT_KATSAYILAR.SOZ.tarih1 +
-      (netler.cografya1 || 0) * AYT_KATSAYILAR.SOZ.cografya1 +
-      (netler.tarih2 || 0) * AYT_KATSAYILAR.SOZ.tarih2 +
-      (netler.cografya2 || 0) * AYT_KATSAYILAR.SOZ.cografya2 +
-      (netler.felsefe || 0) * AYT_KATSAYILAR.SOZ.felsefe +
-      (netler.din || 0) * AYT_KATSAYILAR.SOZ.din
+      edebiyat * AYT_KATSAYILAR.SOZ.edebiyat +
+      tarih1 * AYT_KATSAYILAR.SOZ.tarih1 +
+      cografya1 * AYT_KATSAYILAR.SOZ.cografya1 +
+      tarih2 * AYT_KATSAYILAR.SOZ.tarih2 +
+      cografya2 * AYT_KATSAYILAR.SOZ.cografya2 +
+      felsefe * AYT_KATSAYILAR.SOZ.felsefe +
+      din * AYT_KATSAYILAR.SOZ.din
   } else if (puanTuru === 'EA') {
+    const matematik = Math.min(Math.max(0, netler.matematik || 0), AYT_SORU_SAYILARI.matematik)
+    const edebiyat = Math.min(Math.max(0, netler.edebiyat || 0), AYT_SORU_SAYILARI.edebiyat)
+    const tarih1 = Math.min(Math.max(0, netler.tarih1 || 0), AYT_SORU_SAYILARI.tarih1)
+    const cografya1 = Math.min(Math.max(0, netler.cografya1 || 0), AYT_SORU_SAYILARI.cografya1)
+
+    toplamNet = matematik + edebiyat + tarih1 + cografya1
     hamPuan = 
-      (netler.matematik || 0) * AYT_KATSAYILAR.EA.matematik +
-      (netler.edebiyat || 0) * AYT_KATSAYILAR.EA.edebiyat +
-      (netler.tarih1 || 0) * AYT_KATSAYILAR.EA.tarih1 +
-      (netler.cografya1 || 0) * AYT_KATSAYILAR.EA.cografya1
+      matematik * AYT_KATSAYILAR.EA.matematik +
+      edebiyat * AYT_KATSAYILAR.EA.edebiyat +
+      tarih1 * AYT_KATSAYILAR.EA.tarih1 +
+      cografya1 * AYT_KATSAYILAR.EA.cografya1
   }
 
-  return hamPuan
+  return { hamPuan, toplamNet }
 }
 
 export function hesaplaYKS(
   tytNetler: TYTNetler, 
   aytNetler: AYTNetler, 
   puanTuru: YKSPuanTuru,
-  diplomaNotu: number = 80
+  diplomaNotu: number = 80, // 50-100 arası
+  kirikOBP: boolean = false // Önceki yıl yerleşti mi?
 ): YKSSonuc {
-  const tytPuan = hesaplaTYT(tytNetler)
-  const aytPuan = hesaplaAYT(aytNetler, puanTuru)
+  const tytSonuc = hesaplaTYT(tytNetler)
+  const aytSonuc = hesaplaAYT(aytNetler, puanTuru)
   
-  // Diploma notu katkısı (max 5 puan)
-  // Formül: (Diploma Notu - 50) * 0.1
+  // OBP (Ortaöğretim Başarı Puanı) Hesaplama
+  // Diploma notu (50-100) x 5 = OBP (250-500 arası)
   const validDiplomaNotu = Math.min(Math.max(50, diplomaNotu), 100)
-  const diplomanotKatkisi = (validDiplomaNotu - 50) * 0.1
+  const obpPuan = validDiplomaNotu * 5
+  
+  // OBP Katkısı: OBP x 0.12 (veya 0.06 kırık OBP için)
+  const obpKatsayi = kirikOBP ? 0.06 : 0.12
+  const obpKatki = obpPuan * obpKatsayi
 
-  // Yerleşme puanı = TYT * 0.4 + AYT * 0.6 + Diploma Katkısı
-  const yerlesmeYKS = tytPuan * 0.4 + aytPuan * 0.6 + diplomanotKatkisi
+  // TYT katkısı (%40): TYT ham puanının %40'ı
+  const tytKatki = tytSonuc.hamPuan * 0.4
+  
+  // AYT katkısı (%60): AYT ham puanının %60'ı
+  const aytKatki = aytSonuc.hamPuan * 0.6
+  
+  // Ham Puan = TYT katkısı + AYT katkısı
+  const hamPuan = tytKatki + aytKatki
 
-  // Toplam puan
-  const toplamPuan = tytPuan + aytPuan + diplomanotKatkisi
+  // Yerleştirme Puanı = Ham Puan + OBP Katkısı
+  const yerlesmeYKS = hamPuan + obpKatki
 
   // Tahmini sıralama (basit model)
-  const tahminiSiralama = hesaplaYKSSiralama(toplamPuan, puanTuru)
+  const tahminiSiralama = hesaplaYKSSiralama(yerlesmeYKS, puanTuru)
 
   return {
-    tytPuan: Math.round(tytPuan * 100) / 100,
-    aytPuan: Math.round(aytPuan * 100) / 100,
+    tytPuan: Math.round(tytSonuc.hamPuan * 100) / 100,
+    tytKatki: Math.round(tytKatki * 100) / 100,
+    aytPuan: Math.round(aytSonuc.hamPuan * 100) / 100,
+    aytKatki: Math.round(aytKatki * 100) / 100,
+    hamPuan: Math.round(hamPuan * 100) / 100,
+    obpPuan: Math.round(obpPuan * 100) / 100,
+    obpKatki: Math.round(obpKatki * 100) / 100,
     yerlesmeYKS: Math.round(yerlesmeYKS * 100) / 100,
-    diplomanotKatkisi: Math.round(diplomanotKatkisi * 100) / 100,
-    toplamPuan: Math.round(toplamPuan * 100) / 100,
     tahminiSiralama,
     puanTuru,
   }
