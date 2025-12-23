@@ -35,15 +35,15 @@ export interface LGSSonuc {
 }
 
 // 2025 LGS Soru Sayıları ve Katsayılar
-// LGS toplam 90 soru - Sözel 50 + Sayısal 40
-// Her doğru net yaklaşık 5.55 puan (500/90)
+// Matematik, Türkçe, Fen = 4 katsayı (toplam puanın ~%80'i)
+// İnkılap, Din, Yabancı Dil = 1 katsayı
 const LGS_KATSAYILAR = {
-  turkce: 4,        // Sözel bölüm
-  matematik: 4,     // Sayısal bölüm
-  fen: 4,           // Sayısal bölüm
-  inkilap: 4,       // Sözel bölüm (T.C. İnkılap Tarihi)
-  din: 4,           // Sözel bölüm
-  ingilizce: 4,     // Sözel bölüm
+  turkce: 4,        // Yüksek ağırlık
+  matematik: 4,     // Yüksek ağırlık
+  fen: 4,           // Yüksek ağırlık
+  inkilap: 1,       // Düşük ağırlık
+  din: 1,           // Düşük ağırlık
+  ingilizce: 1,     // Düşük ağırlık
 }
 
 const LGS_SORU_SAYILARI = {
@@ -51,8 +51,8 @@ const LGS_SORU_SAYILARI = {
   matematik: 20,    // 20 soru
   fen: 20,          // 20 soru
   inkilap: 10,      // 10 soru (T.C. İnkılap Tarihi ve Atatürkçülük)
-  din: 10,          // 10 soru
-  ingilizce: 10,    // 10 soru
+  din: 10,          // 10 soru (Din Kültürü ve Ahlak Bilgisi)
+  ingilizce: 10,    // 10 soru (Yabancı Dil)
   // Toplam: 90 soru
 }
 
@@ -86,14 +86,15 @@ export function hesaplaLGS(netler: LGSNetler): LGSSonuc {
   const toplamHamPuan = Object.values(dersBazliPuanlar).reduce((a, b) => a + b, 0)
   
   // LGS Puanı hesaplama (100-500 arası)
-  // Formül: 100 + (Ham Puan / Max Ham Puan) * 400
+  // Formül: Taban Puan (100) + (Ağırlıklı Ham Puan / Max Ağırlıklı Ham Puan) * 400
+  // Max = (20*4 + 20*4 + 20*4 + 10*1 + 10*1 + 10*1) = 270
   const maxHamPuan = 
     LGS_SORU_SAYILARI.turkce * LGS_KATSAYILAR.turkce +
     LGS_SORU_SAYILARI.matematik * LGS_KATSAYILAR.matematik +
     LGS_SORU_SAYILARI.fen * LGS_KATSAYILAR.fen +
     LGS_SORU_SAYILARI.inkilap * LGS_KATSAYILAR.inkilap +
     LGS_SORU_SAYILARI.din * LGS_KATSAYILAR.din +
-    LGS_SORU_SAYILARI.ingilizce * LGS_KATSAYILAR.ingilizce // 360 (90 soru x 4 katsayı)
+    LGS_SORU_SAYILARI.ingilizce * LGS_KATSAYILAR.ingilizce // 270
 
   const tahminiPuan = 100 + (toplamHamPuan / maxHamPuan) * 400
 

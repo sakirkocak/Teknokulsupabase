@@ -23,32 +23,34 @@ import { hesaplaLGS, LGSNetler, LGSSonuc, formatPuan, LGS_GECMIS_YILLAR } from '
 import { CalculatorSchema, FAQSchema } from '@/components/JsonLdSchema'
 
 // Ders bilgileri - LGS 2025 (Toplam 90 soru)
+// Katsayı 4: Ana dersler (toplam puanın %80'i)
+// Katsayı 1: Yardımcı dersler (toplam puanın %20'si)
 const DERSLER = [
-  { key: 'turkce', ad: 'Türkçe', maxSoru: 20, renk: 'from-blue-500 to-blue-600', icon: '📖' },
-  { key: 'matematik', ad: 'Matematik', maxSoru: 20, renk: 'from-purple-500 to-purple-600', icon: '🔢' },
-  { key: 'fen', ad: 'Fen Bilimleri', maxSoru: 20, renk: 'from-green-500 to-green-600', icon: '🔬' },
-  { key: 'inkilap', ad: 'T.C. İnkılap Tarihi', maxSoru: 10, renk: 'from-orange-500 to-orange-600', icon: '🏛️' },
-  { key: 'din', ad: 'Din Kültürü', maxSoru: 10, renk: 'from-teal-500 to-teal-600', icon: '📿' },
-  { key: 'ingilizce', ad: 'Yabancı Dil', maxSoru: 10, renk: 'from-red-500 to-red-600', icon: '🌐' },
+  { key: 'turkce', ad: 'Türkçe', maxSoru: 20, katsayi: 4, renk: 'from-blue-500 to-blue-600', icon: '📖' },
+  { key: 'matematik', ad: 'Matematik', maxSoru: 20, katsayi: 4, renk: 'from-purple-500 to-purple-600', icon: '🔢' },
+  { key: 'fen', ad: 'Fen Bilimleri', maxSoru: 20, katsayi: 4, renk: 'from-green-500 to-green-600', icon: '🔬' },
+  { key: 'inkilap', ad: 'T.C. İnkılap Tarihi', maxSoru: 10, katsayi: 1, renk: 'from-orange-500 to-orange-600', icon: '🏛️' },
+  { key: 'din', ad: 'Din Kültürü', maxSoru: 10, katsayi: 1, renk: 'from-teal-500 to-teal-600', icon: '📿' },
+  { key: 'ingilizce', ad: 'Yabancı Dil', maxSoru: 10, katsayi: 1, renk: 'from-red-500 to-red-600', icon: '🌐' },
 ]
 
 // SSS için FAQ Schema
 const LGS_FAQS = [
   {
     question: 'LGS puanı nasıl hesaplanır?',
-    answer: 'LGS puanı, her dersin netinin ilgili katsayı ile çarpılması ve toplanmasıyla hesaplanır. Tüm derslerin katsayısı eşittir. Toplam 90 soru üzerinden 500 puan hesaplanır. Her doğru net yaklaşık 5.55 puan değerindedir.',
+    answer: 'LGS puanı, her dersin netinin katsayısı ile çarpılıp toplanmasıyla hesaplanır. Türkçe, Matematik ve Fen Bilimleri 4 katsayı ile çarpılırken; İnkılap, Din ve Yabancı Dil 1 katsayı ile çarpılır. Yani Matematik neti, Din netinden 4 kat daha değerlidir. Net = Doğru - (Yanlış/3) formülüyle hesaplanır.',
+  },
+  {
+    question: 'LGS\'de hangi dersler daha önemli?',
+    answer: 'Matematik, Türkçe ve Fen Bilimleri toplam puanın yaklaşık %80\'ini oluşturur (4 katsayı). İnkılap, Din ve Yabancı Dil ise %20\'sini oluşturur (1 katsayı). Bu yüzden ana derslere öncelik vermelisiniz.',
   },
   {
     question: 'LGS\'de kaç soru var?',
-    answer: 'LGS\'de toplam 90 soru bulunmaktadır: Türkçe 20, Matematik 20, Fen Bilimleri 20, T.C. İnkılap Tarihi ve Atatürkçülük 10, Din Kültürü ve Ahlak Bilgisi 10, Yabancı Dil 10 soru.',
+    answer: 'LGS\'de toplam 90 soru bulunmaktadır: Türkçe 20, Matematik 20, Fen Bilimleri 20, T.C. İnkılap Tarihi 10, Din Kültürü 10, Yabancı Dil 10 soru.',
   },
   {
-    question: 'LGS yüzdelik dilim nasıl hesaplanır?',
-    answer: 'Yüzdelik dilim, öğrencinin tüm sınava giren öğrenciler arasındaki konumunu gösterir. Örneğin %5\'lik dilim, en başarılı %5\'lik kesimde olduğunuz anlamına gelir.',
-  },
-  {
-    question: 'LGS için kaç net yapmak gerekir?',
-    answer: 'İyi bir liseye yerleşmek için genellikle 70+ net hedeflenmelidir. Fen liseleri için 80-85+ net, Anadolu liseleri için 65-75 arası net yapmak önerilir.',
+    question: '3 yanlış 1 doğruyu götürür mü?',
+    answer: 'Evet, LGS\'de 3 yanlış 1 doğruyu götürür. Net hesabı şöyle yapılır: Net = Doğru Sayısı - (Yanlış Sayısı / 3). Boş bırakılan sorular neti etkilemez.',
   },
 ]
 
@@ -255,6 +257,9 @@ Hesapla: teknokul.com.tr/lgs-puan-hesaplama`
                       <label className="text-gray-300 flex items-center gap-2">
                         <span>{ders.icon}</span>
                         {ders.ad}
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${ders.katsayi === 4 ? 'bg-purple-500/30 text-purple-300' : 'bg-gray-500/30 text-gray-400'}`}>
+                          x{ders.katsayi}
+                        </span>
                       </label>
                       <span className="text-sm text-gray-500">
                         {netler[ders.key as keyof LGSNetler]} / {ders.maxSoru}
