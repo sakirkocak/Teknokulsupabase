@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useTeacherProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
@@ -30,8 +31,10 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import Link from 'next/link'
+import { trackSignup } from '@/lib/gtag'
 
 export default function CoachProfilePage() {
+  const searchParams = useSearchParams()
   const { profile, loading: profileLoading, refetch } = useProfile()
   const { teacherProfile, loading: teacherLoading, refetch: refetchTeacher } = useTeacherProfile(profile?.id || '')
   const [saving, setSaving] = useState(false)
@@ -64,6 +67,16 @@ export default function CoachProfilePage() {
   const [newCertificate, setNewCertificate] = useState({ name: '', issuer: '', url: '' })
 
   const supabase = createClient()
+
+  // Yeni kayıt dönüşüm takibi (Google Ads)
+  useEffect(() => {
+    const isWelcome = searchParams.get('welcome') === 'true'
+    if (isWelcome) {
+      // Google Ads dönüşümünü tetikle
+      trackSignup('ogretmen')
+      console.log('📊 Koç kayıt dönüşümü izlendi')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (profile && teacherProfile) {

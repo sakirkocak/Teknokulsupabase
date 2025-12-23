@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { GraduationCap, Mail, Lock, Eye, EyeOff, User, Loader2, Users, UserCheck, Users2, ArrowLeft, AtSign, CheckCircle, XCircle } from 'lucide-react'
+import { trackSignup } from '@/lib/gtag'
 
 // Google SVG Icon
 const GoogleIcon = () => (
@@ -276,6 +277,10 @@ function RegisterForm() {
             }
           }
         }
+
+        // Google Ads dönüşüm takibi
+        trackSignup(role)
+        console.log('📊 Kayıt dönüşümü izlendi:', role)
 
         // Redirect URL varsa oraya git
         if (redirectUrl) {

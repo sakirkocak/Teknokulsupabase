@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useStudentProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
@@ -27,8 +28,10 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { TurkeyCity, TurkeyDistrict, School as SchoolType, League } from '@/types/database'
+import { trackSignup } from '@/lib/gtag'
 
 export default function StudentProfilePage() {
+  const searchParams = useSearchParams()
   const { profile, loading: profileLoading, refetch } = useProfile()
   const { studentProfile, loading: studentLoading, refetch: refetchStudent } = useStudentProfile(profile?.id || '')
   const [saving, setSaving] = useState(false)
@@ -54,6 +57,16 @@ export default function StudentProfilePage() {
   })
   
   const supabase = createClient()
+
+  // Yeni kayıt dönüşüm takibi (Google Ads)
+  useEffect(() => {
+    const isWelcome = searchParams.get('welcome') === 'true'
+    if (isWelcome) {
+      // Google Ads dönüşümünü tetikle
+      trackSignup('ogrenci')
+      console.log('📊 Öğrenci kayıt dönüşümü izlendi')
+    }
+  }, [searchParams])
 
   // İlleri yükle
   useEffect(() => {
