@@ -21,8 +21,11 @@ import {
   Building2,
   Trophy,
   Medal,
-  Sparkles
+  Sparkles,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
+import Link from 'next/link'
 import { TurkeyCity, TurkeyDistrict, School as SchoolType, League } from '@/types/database'
 
 export default function StudentProfilePage() {
@@ -595,6 +598,26 @@ export default function StudentProfilePage() {
                 <li>🌆 <strong>İl Liderliği:</strong> Aynı ildeki tüm öğrenciler</li>
                 <li>🇹🇷 <strong>Türkiye Liderliği:</strong> Tüm Türkiye öğrencileri</li>
               </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Danger Zone - Hesap Silme */}
+        <div className="card p-6 border-2 border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-800 dark:text-red-400 mb-1">Tehlikeli Bölge</h3>
+              <p className="text-sm text-red-600 dark:text-red-300 mb-4">
+                Hesabınızı sildiğinizde tüm verileriniz kalıcı olarak silinir. Bu işlem geri alınamaz.
+              </p>
+              <Link
+                href="/yasal/hesap-silme"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Hesabımı Sil
+              </Link>
             </div>
           </div>
         </div>
