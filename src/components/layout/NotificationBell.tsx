@@ -18,9 +18,11 @@ import {
 interface Notification {
   id: string
   title: string
-  body: string
+  message?: string
+  body?: string // eski alan için geriye uyumluluk
   type: string
   is_read: boolean
+  link?: string
   data?: { link?: string }
   created_at: string
 }
@@ -209,9 +211,9 @@ export default function NotificationBell({ userId }: { userId: string }) {
                               </button>
                             )}
                           </div>
-                          {notification.body && (
+                          {(notification.message || notification.body) && (
                             <p className="text-sm text-surface-500 mt-0.5 line-clamp-2">
-                              {notification.body}
+                              {notification.message || notification.body}
                             </p>
                           )}
                           <div className="text-xs text-surface-400 mt-1">
@@ -222,9 +224,9 @@ export default function NotificationBell({ userId }: { userId: string }) {
                               minute: '2-digit'
                             })}
                           </div>
-                          {notification.data?.link && (
+                          {(notification.link || notification.data?.link) && (
                             <Link
-                              href={notification.data.link}
+                              href={notification.link || notification.data?.link || '#'}
                               onClick={() => {
                                 markAsRead(notification.id)
                                 setIsOpen(false)

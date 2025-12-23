@@ -1101,19 +1101,41 @@ export default function SoruBankasiPage() {
 
       if (error) throw error
 
+      // Admin'lere bildirim gönder
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+      
+      if (admins && admins.length > 0) {
+        const notifications = admins.map(admin => ({
+          user_id: admin.id,
+          title: '🚨 Yeni Soru Bildirimi',
+          message: `Bir öğrenci "${currentQuestion.topic?.subject?.name || 'Ders'}" dersinden bir soru bildirdi: "${reportReason.trim().substring(0, 100)}${reportReason.length > 100 ? '...' : ''}"`,
+          type: 'warning',
+          link: '/admin/soru-bildirimleri'
+        }))
+        
+        await supabase.from('notifications').insert(notifications)
+      }
+
       setReportSuccess(true)
+      
+      // 1.5 saniye sonra modal'ı kapat ve sonraki soruya geç
       setTimeout(() => {
         setShowReportModal(false)
         setReportReason('')
         setReportSuccess(false)
-      }, 2000)
+        
+        // Sonraki soruya geç
+        loadNextQuestion()
+      }, 1500)
     } catch (error) {
       console.error('Soru bildirme hatası:', error)
       alert('Bildirim gönderilemedi. Lütfen tekrar deneyin.')
     } finally {
       setReportSubmitting(false)
     }
-    setCurrentQuestion(null)
   }
 
   if (loading) {
