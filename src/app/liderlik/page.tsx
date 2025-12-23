@@ -238,6 +238,36 @@ export default function LeaderboardPage() {
   const loadLeaderboard = async () => {
     setLoading(true)
 
+    // 🔒 GUARD: İl bazlı modda il seçilmeden veri gösterme
+    if (activeScope === 'city' && !selectedCity) {
+      setLeaderboard([])
+      setSubjectLeaders([])
+      setTotalStudents(0)
+      setTotalQuestions(0)
+      setLoading(false)
+      return
+    }
+
+    // 🔒 GUARD: İlçe bazlı modda il veya ilçe seçilmeden veri gösterme
+    if (activeScope === 'district' && (!selectedCity || !selectedDistrict)) {
+      setLeaderboard([])
+      setSubjectLeaders([])
+      setTotalStudents(0)
+      setTotalQuestions(0)
+      setLoading(false)
+      return
+    }
+
+    // 🔒 GUARD: Okul bazlı modda il, ilçe veya okul seçilmeden veri gösterme
+    if (activeScope === 'school' && (!selectedCity || !selectedDistrict || !selectedSchool)) {
+      setLeaderboard([])
+      setSubjectLeaders([])
+      setTotalStudents(0)
+      setTotalQuestions(0)
+      setLoading(false)
+      return
+    }
+
     if (activeTab === 'genel') {
       if (activeScope === 'turkey') {
         // Türkiye liderliği - doğrudan student_points'tan çek
