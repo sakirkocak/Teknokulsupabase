@@ -232,16 +232,77 @@ function RegisterForm() {
             .eq('user_id', authData.user.id)
             .single()
 
+          let studentProfileId = existingStudentProfile?.id
+
           if (!existingStudentProfile) {
-            const { error: studentError } = await supabase
+            const { data: newStudentProfile, error: studentError } = await supabase
               .from('student_profiles')
               .insert({ 
                 user_id: authData.user.id,
                 grade: grade // Sınıf bilgisi
               })
+              .select('id')
+              .single()
 
             if (studentError && !studentError.message.includes('duplicate')) {
               console.error('Öğrenci profili oluşturma hatası:', studentError)
+            } else if (newStudentProfile) {
+              studentProfileId = newStudentProfile.id
+            }
+          }
+
+          // 🎯 Misafir puanlarını transfer et
+          if (studentProfileId) {
+            try {
+              const guestSessionToken = localStorage.getItem('guest_session_token')
+              
+              if (guestSessionToken) {
+                // Misafir session verilerini al
+                const { data: guestData } = await supabase
+                  .from('guest_sessions')
+                  .select('*')
+                  .eq('session_token', guestSessionToken)
+                  .single()
+
+                if (guestData && guestData.total_points > 0) {
+                  console.log('🎁 Misafir puanları transfer ediliyor:', guestData)
+
+                  // Student points tablosuna ekle/güncelle
+                  const { error: pointsError } = await supabase
+                    .from('student_points')
+                    .upsert({
+                      student_id: studentProfileId,
+                      total_points: guestData.total_points,
+                      total_xp: guestData.total_points,
+                      daily_xp: guestData.total_points,
+                      total_questions: guestData.total_questions,
+                      total_correct: guestData.total_correct,
+                      total_wrong: guestData.total_wrong,
+                      current_streak: guestData.current_streak,
+                      max_streak: guestData.max_streak,
+                    }, {
+                      onConflict: 'student_id'
+                    })
+
+                  if (pointsError) {
+                    console.error('Puan transfer hatası:', pointsError)
+                  } else {
+                    console.log('✅ Misafir puanları başarıyla transfer edildi!')
+                    
+                    // Misafir session'ı temizle
+                    localStorage.removeItem('guest_session_token')
+                    
+                    // Opsiyonel: guest_sessions'dan kaydı sil veya işaretle
+                    await supabase
+                      .from('guest_sessions')
+                      .update({ transferred_to_user: authData.user.id })
+                      .eq('session_token', guestSessionToken)
+                  }
+                }
+              }
+            } catch (transferError) {
+              console.error('Puan transfer işlemi hatası:', transferError)
+              // Transfer başarısız olsa bile kayıt devam etsin
             }
           }
         } else if (role === 'ogretmen') {
