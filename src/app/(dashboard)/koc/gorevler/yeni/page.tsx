@@ -165,8 +165,8 @@ function NewTaskContent() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     
-    if (!form.student_id || !form.title) {
-      alert('Lütfen öğrenci seçin ve görev başlığı girin.')
+    if (!form.student_id || !form.title || !form.description) {
+      alert('Lütfen öğrenci seçin, görev başlığı ve açıklama girin.')
       return
     }
 
@@ -283,12 +283,13 @@ function NewTaskContent() {
 
           {/* Description */}
           <div>
-            <label className="label">Açıklama (Opsiyonel)</label>
+            <label className="label">Açıklama <span className="text-red-500">*</span></label>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="input min-h-[120px]"
               placeholder="Görev detaylarını yazın..."
+              required
             />
           </div>
 

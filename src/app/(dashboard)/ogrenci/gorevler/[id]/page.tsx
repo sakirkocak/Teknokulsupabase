@@ -245,10 +245,7 @@ export default function StudentTaskDetailPage() {
   // Görevi teslim et
   async function submitTask() {
     if (!task) return
-    if (screenshots.length === 0) {
-      alert('Lütfen en az bir ekran görüntüsü yükleyin.')
-      return
-    }
+    // Resim artık opsiyonel - kontrol kaldırıldı
 
     setActionLoading(true)
 
@@ -462,7 +459,7 @@ export default function StudentTaskDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-medium text-surface-900">
-                    Ekran Görüntüleri {screenshots.length > 0 && `(${screenshots.length})`}
+                    Ekran Görüntüleri {screenshots.length > 0 ? `(${screenshots.length})` : '(Opsiyonel)'}
                   </h3>
                   {task.status === 'in_progress' && (
                     <button
@@ -487,26 +484,23 @@ export default function StudentTaskDetailPage() {
                     {screenshots.map((url, index) => (
                       <div 
                         key={index} 
-                        className="relative group aspect-video rounded-xl overflow-hidden border border-surface-200 cursor-pointer"
-                        onClick={() => setSelectedImage(url)}
+                        className="relative group aspect-video rounded-xl overflow-hidden border border-surface-200"
                       >
                         <img 
                           src={url} 
                           alt={`Ekran görüntüsü ${index + 1}`} 
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => setSelectedImage(url)}
                         />
                         {task.status === 'in_progress' && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeScreenshot(url)
-                            }}
-                            className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            type="button"
+                            onClick={() => removeScreenshot(url)}
+                            className="absolute top-2 right-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-lg transition-colors z-10"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-4 h-4" />
                           </button>
                         )}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                       </div>
                     ))}
                     
@@ -540,7 +534,7 @@ export default function StudentTaskDetailPage() {
                       <Upload className="w-12 h-12 mx-auto mb-3 text-surface-400" />
                     )}
                     <p className="text-surface-600 font-medium mb-1">
-                      {uploading ? 'Yükleniyor...' : 'Ekran görüntüsü yükle'}
+                      {uploading ? 'Yükleniyor...' : 'Ekran görüntüsü yükle (Opsiyonel)'}
                     </p>
                     <p className="text-sm text-surface-500">PNG, JPG (max 5MB) - Birden fazla seçebilirsiniz</p>
                   </div>
@@ -599,7 +593,7 @@ export default function StudentTaskDetailPage() {
             {task.status === 'in_progress' && (
               <button
                 onClick={submitTask}
-                disabled={actionLoading || screenshots.length === 0}
+                disabled={actionLoading}
                 className="btn btn-primary btn-lg w-full"
               >
                 {actionLoading ? (

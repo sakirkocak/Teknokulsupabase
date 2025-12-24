@@ -35,7 +35,8 @@ import { useGamification } from '@/hooks/useGamification'
 export default function StudentDashboard() {
   const { profile, loading: profileLoading } = useProfile()
   const { studentProfile, loading: studentLoading } = useStudentProfile(profile?.id || '')
-  const [coach, setCoach] = useState<any>(null)
+  const [coaches, setCoaches] = useState<any[]>([])
+  const [pendingCoach, setPendingCoach] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [recommendations, setRecommendations] = useState<any[]>([])
   const [examStats, setExamStats] = useState<{ weakTopics: string[], strongTopics: string[], avgNet: number, lastExam: any }>({ weakTopics: [], strongTopics: [], avgNet: 0, lastExam: null })
@@ -57,8 +58,8 @@ export default function StudentDashboard() {
   async function loadDashboardData() {
     if (!studentProfile?.id) return
 
-    // Koç bilgisini yükle
-    const { data: relationship } = await supabase
+    // Koç bilgilerini yükle (birden fazla koç destekli)
+    const { data: relationships } = await supabase
       .from('coaching_relationships')
       .select(`
         *,
@@ -72,13 +73,22 @@ export default function StudentDashboard() {
       .eq('student_id', studentProfile.id)
       .in('status', ['active', 'pending'])
       .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
 
-    if (relationship) {
-      setCoachingStatus(relationship.status as any)
-      if (relationship.status === 'active' && relationship.coach) {
-        setCoach(relationship.coach)
+    if (relationships && relationships.length > 0) {
+      // Aktif koçları ayır
+      const activeCoaches = relationships
+        .filter(r => r.status === 'active' && r.coach)
+        .map(r => r.coach)
+      
+      // Bekleyen başvuru var mı?
+      const pendingRelation = relationships.find(r => r.status === 'pending')
+      
+      if (activeCoaches.length > 0) {
+        setCoaches(activeCoaches)
+        setCoachingStatus('active')
+      } else if (pendingRelation) {
+        setPendingCoach(pendingRelation.coach)
+        setCoachingStatus('pending')
       }
     }
 
@@ -323,7 +333,9 @@ export default function StudentDashboard() {
                   : coachingStatus === 'pending'
                   ? 'Koçluk başvurun değerlendiriliyor'
                   : coachingStatus === 'active'
-                  ? 'Koçunla birlikte ilerliyorsun!'
+                  ? coaches.length > 1 
+                    ? `${coaches.length} koçunla birlikte ilerliyorsun!`
+                    : 'Koçunla birlikte ilerliyorsun!'
                   : 'Bir koç bul ve yolculuğuna başla!'
                 }
               </p>
@@ -397,29 +409,40 @@ export default function StudentDashboard() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* My Coach */}
+            {/* My Coaches */}
             <div className="card">
-              <div className="p-6 border-b border-surface-100">
-                <h2 className="text-lg font-semibold text-surface-900">Koçum</h2>
+              <div className="p-6 border-b border-surface-100 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-surface-900">
+                  {coaches.length > 1 ? 'Koçlarım' : 'Koçum'}
+                </h2>
+                {coaches.length > 0 && (
+                  <Link href="/koclar" className="text-sm text-primary-500 hover:text-primary-600 font-medium">
+                    + Koç Ekle
+                  </Link>
+                )}
               </div>
-              {coachingStatus === 'active' && coach ? (
-                <div className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white text-xl font-medium overflow-hidden">
-                      {coach.profile?.avatar_url ? (
-                        <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        getInitials(coach.profile?.full_name)
-                      )}
+              {coachingStatus === 'active' && coaches.length > 0 ? (
+                <div className="divide-y divide-surface-100">
+                  {coaches.map((coach, index) => (
+                    <div key={coach.id || index} className="p-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-primary-400 to-primary-600 rounded-xl flex items-center justify-center text-white text-xl font-medium overflow-hidden">
+                          {coach.profile?.avatar_url ? (
+                            <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            getInitials(coach.profile?.full_name)
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg text-surface-900">{coach.profile?.full_name}</div>
+                          <div className="text-sm text-surface-500">{coach.headline}</div>
+                        </div>
+                        <Link href="/ogrenci/mesajlar" className="btn btn-primary btn-sm">
+                          Mesaj Gönder
+                        </Link>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <div className="font-semibold text-lg text-surface-900">{coach.profile?.full_name}</div>
-                      <div className="text-sm text-surface-500">{coach.headline}</div>
-                    </div>
-                    <Link href="/ogrenci/mesajlar" className="btn btn-primary btn-sm">
-                      Mesaj Gönder
-                    </Link>
-                  </div>
+                  ))}
                 </div>
               ) : coachingStatus === 'pending' ? (
                 <div className="p-6">

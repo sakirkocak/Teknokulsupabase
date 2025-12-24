@@ -267,9 +267,16 @@ function FloatingSymbols() {
   )
 }
 
+// Skeleton component for loading state
+function StatSkeleton() {
+  return (
+    <span className="inline-block w-10 h-5 bg-surface-200 rounded animate-pulse" />
+  )
+}
+
 // Live Stats Banner Component
 function LiveStatsBanner() {
-  const [mounted, setMounted] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     todayQuestions: 0,
     activeStudents: 0,
@@ -278,19 +285,19 @@ function LiveStatsBanner() {
   const supabase = createClient()
 
   useEffect(() => {
-    setMounted(true)
     loadStats()
   }, [])
 
   async function loadStats() {
-    // Bugün çözülen sorular (son 24 saat)
+    // Bugün çözülen sorular - point_history tablosundan gerçek sayı
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     
-    const { count: todayCount } = await supabase
-      .from('student_points')
+    const { count: todayQuestions } = await supabase
+      .from('point_history')
       .select('*', { count: 'exact', head: true })
-      .gte('last_activity_at', today.toISOString())
+      .gte('created_at', today.toISOString())
+      .eq('source', 'question')
 
     // Toplam soru sayısı
     const { count: totalQuestions } = await supabase
@@ -304,14 +311,12 @@ function LiveStatsBanner() {
       .gt('total_questions', 0)
 
     setStats({
-      todayQuestions: (todayCount || 0) * 15, // Estimated daily questions
+      todayQuestions: todayQuestions || 0,
       activeStudents: activeStudents || 0,
       totalQuestions: totalQuestions || 0
     })
+    setLoading(false)
   }
-
-  // Hydration uyumluluğu için başlangıç değerleri
-  const displayStats = mounted ? stats : { todayQuestions: 0, activeStudents: 0, totalQuestions: 0 }
 
   return (
     <motion.div
@@ -323,13 +328,21 @@ function LiveStatsBanner() {
       <div className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm border border-surface-100">
         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
         <span className="text-surface-600 text-sm">
-          <span className="font-bold text-surface-900">{displayStats.todayQuestions > 0 ? formatNumber(displayStats.todayQuestions) : '45'}+</span> soru bugün çözüldü
+          {loading ? (
+            <StatSkeleton />
+          ) : (
+            <span className="font-bold text-surface-900">{formatNumber(stats.todayQuestions)}+</span>
+          )} soru bugün çözüldü
         </span>
       </div>
       <div className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm border border-surface-100">
         <Trophy className="w-4 h-4 text-yellow-500" />
         <span className="text-surface-600 text-sm">
-          <span className="font-bold text-surface-900">{displayStats.activeStudents > 0 ? formatNumber(displayStats.activeStudents) : '5'}+</span> öğrenci yarışıyor
+          {loading ? (
+            <StatSkeleton />
+          ) : (
+            <span className="font-bold text-surface-900">{formatNumber(stats.activeStudents)}+</span>
+          )} öğrenci yarışıyor
         </span>
       </div>
       <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg">
