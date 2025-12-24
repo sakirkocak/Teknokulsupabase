@@ -104,6 +104,13 @@ export function useDailyChallenge(userId: string | null): UseDailyChallengeRetur
     }
 
     try {
+      // Önce görevleri senkronize et (bugün çözülen sorularla)
+      try {
+        await fetch('/api/challenges/sync', { method: 'POST' })
+      } catch (syncErr) {
+        console.warn('Görev senkronizasyonu başarısız:', syncErr)
+      }
+
       // Kullanıcının ilerleme verilerini al (tablo varsa)
       const today = new Date().toISOString().split('T')[0]
       
