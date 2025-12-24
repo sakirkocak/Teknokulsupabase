@@ -33,7 +33,8 @@ import {
   UserCircle,
   Wand2,
   Volume2,
-  Flag
+  Flag,
+  Bot
 } from 'lucide-react'
 
 type NavItem = {
@@ -61,6 +62,7 @@ const navItems: Record<string, NavItem[]> = {
   ogrenci: [
     { label: 'Dashboard', href: '/ogrenci', icon: LayoutDashboard },
     { label: 'Soru Bankası', href: '/ogrenci/soru-bankasi', icon: GraduationCap },
+    { label: 'AI Koç', href: '/ogrenci/ai-koc', icon: Bot },
     { label: 'Başarımlarım', href: '/ogrenci/basarimlar', icon: Award },
     { label: 'Liderlik', href: '/ogrenci/liderlik', icon: Trophy },
     { label: 'Harf Öğrenme', href: '/ogrenci/harf-ogrenme', icon: Volume2 },

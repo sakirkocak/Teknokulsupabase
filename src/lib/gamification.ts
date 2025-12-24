@@ -3,7 +3,7 @@
 // =====================================================
 
 // Rozet Kategorileri
-export type BadgeCategory = 'soru' | 'streak' | 'basari' | 'hiz' | 'liderlik' | 'ders'
+export type BadgeCategory = 'soru' | 'streak' | 'basari' | 'hiz' | 'liderlik' | 'ders' | 'ai_koc'
 
 // Rozet Tipi
 export interface Badge {
@@ -212,6 +212,14 @@ export const ALL_BADGES: Badge[] = [
   { id: 'science_500', name: 'Fen Ustası', description: 'Fen Bilimlerinden 500 puan topla', icon: '🔬', category: 'ders', requirement_type: 'subject_fen', requirement_value: 500, xp_reward: 150, color: 'from-green-500 to-emerald-600' },
   { id: 'social_100', name: 'Sosyal Aşığı', description: 'Sosyal Bilgilerden 100 puan topla', icon: '🌍', category: 'ders', requirement_type: 'subject_sosyal', requirement_value: 100, xp_reward: 50, color: 'from-amber-400 to-orange-500' },
   { id: 'social_500', name: 'Sosyal Ustası', description: 'Sosyal Bilgilerden 500 puan topla', icon: '🌍', category: 'ders', requirement_type: 'subject_sosyal', requirement_value: 500, xp_reward: 150, color: 'from-amber-500 to-orange-600' },
+  
+  // AI Koç Rozetleri
+  { id: 'ai_student', name: 'AI Öğrencisi', description: 'AI Koç ile ilk sohbeti yap', icon: '🤖', category: 'ai_koc', requirement_type: 'ai_first_chat', requirement_value: 1, xp_reward: 25, color: 'from-violet-400 to-purple-500' },
+  { id: 'ai_curious', name: 'Meraklı Öğrenci', description: 'AI Koç ile 10 sohbet yap', icon: '💬', category: 'ai_koc', requirement_type: 'ai_chat_count', requirement_value: 10, xp_reward: 50, color: 'from-purple-400 to-violet-500' },
+  { id: 'ai_improver', name: 'Gelişim Odaklı', description: '5 AI Koç görevi tamamla', icon: '📈', category: 'ai_koc', requirement_type: 'ai_tasks_completed', requirement_value: 5, xp_reward: 100, color: 'from-cyan-400 to-blue-500' },
+  { id: 'ai_focused', name: 'Odaklanmış', description: '7 gün üst üste AI görevi tamamla', icon: '🎯', category: 'ai_koc', requirement_type: 'ai_task_streak', requirement_value: 7, xp_reward: 200, color: 'from-emerald-400 to-green-500' },
+  { id: 'ai_favorite', name: 'AI Koç Hayranı', description: '30 gün AI Koç ile etkileşim kur', icon: '⭐', category: 'ai_koc', requirement_type: 'ai_interaction_days', requirement_value: 30, xp_reward: 500, color: 'from-yellow-400 to-amber-500' },
+  { id: 'ai_master', name: 'AI Koç Ustası', description: '20 AI Koç görevi tamamla', icon: '👑', category: 'ai_koc', requirement_type: 'ai_tasks_completed', requirement_value: 20, xp_reward: 300, color: 'from-amber-400 to-yellow-500' },
 ]
 
 /**
@@ -498,6 +506,7 @@ export function getCategoryName(category: BadgeCategory): string {
     hiz: 'Hız Rozetleri',
     liderlik: 'Liderlik Rozetleri',
     ders: 'Ders Rozetleri',
+    ai_koc: 'AI Koç Rozetleri',
   }
   return names[category]
 }
@@ -513,6 +522,7 @@ export function getCategoryIcon(category: BadgeCategory): string {
     hiz: '⚡',
     liderlik: '🏆',
     ders: '📐',
+    ai_koc: '🤖',
   }
   return icons[category]
 }
