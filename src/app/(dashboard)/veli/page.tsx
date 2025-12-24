@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import { trackSignup } from '@/lib/gtag'
 
-export default function ParentDashboard() {
+function ParentDashboardContent() {
   const searchParams = useSearchParams()
   const { profile, loading: profileLoading } = useProfile()
   const { parentProfile, loading: parentLoading } = useParentProfile(profile?.id || '')
@@ -458,5 +458,19 @@ export default function ParentDashboard() {
         )}
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function ParentDashboard() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout role="veli">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
+        </div>
+      </DashboardLayout>
+    }>
+      <ParentDashboardContent />
+    </Suspense>
   )
 }

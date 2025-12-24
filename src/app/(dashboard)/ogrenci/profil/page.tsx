@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useStudentProfile } from '@/hooks/useProfile'
@@ -30,7 +30,7 @@ import Link from 'next/link'
 import { TurkeyCity, TurkeyDistrict, School as SchoolType, League } from '@/types/database'
 import { trackSignup } from '@/lib/gtag'
 
-export default function StudentProfilePage() {
+function StudentProfileContent() {
   const searchParams = useSearchParams()
   const { profile, loading: profileLoading, refetch } = useProfile()
   const { studentProfile, loading: studentLoading, refetch: refetchStudent } = useStudentProfile(profile?.id || '')
@@ -636,5 +636,19 @@ export default function StudentProfilePage() {
         </div>
       </div>
     </DashboardLayout>
+  )
+}
+
+export default function StudentProfilePage() {
+  return (
+    <Suspense fallback={
+      <DashboardLayout role="ogrenci">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full" />
+        </div>
+      </DashboardLayout>
+    }>
+      <StudentProfileContent />
+    </Suspense>
   )
 }
