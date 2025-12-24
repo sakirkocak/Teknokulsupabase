@@ -23,6 +23,12 @@ export interface StudentContext {
   weakSubjects: string[]
   strongSubjects: string[]
   daysUntilExam?: number
+  // Deneme sonuçları (opsiyonel)
+  examStats?: {
+    totalExams: number
+    avgNet: number
+    netTrend: 'up' | 'down' | 'stable'
+  }
 }
 
 export function buildSystemPrompt(context: StudentContext): string {
@@ -31,11 +37,20 @@ export function buildSystemPrompt(context: StudentContext): string {
     : ''
   
   const weakSubjectsText = context.weakSubjects.length > 0
-    ? `Zayıf olduğu dersler: ${context.weakSubjects.join(', ')}`
+    ? `Zayıf olduğu dersler/konular: ${context.weakSubjects.join(', ')}`
     : 'Tüm derslerde dengeli performans gösteriyor.'
   
   const strongSubjectsText = context.strongSubjects.length > 0
-    ? `Güçlü olduğu dersler: ${context.strongSubjects.join(', ')}`
+    ? `Güçlü olduğu dersler/konular: ${context.strongSubjects.join(', ')}`
+    : ''
+
+  // Deneme istatistikleri
+  const examStatsText = context.examStats && context.examStats.totalExams > 0
+    ? `
+📝 DENEME SONUÇLARI:
+- Yüklenen deneme sayısı: ${context.examStats.totalExams}
+- Ortalama net: ${context.examStats.avgNet.toFixed(1)}
+- Son trend: ${context.examStats.netTrend === 'up' ? '📈 Yükselişte' : context.examStats.netTrend === 'down' ? '📉 Düşüşte' : '➡️ Stabil'}`
     : ''
 
   return `Sen Teknokul platformunun AI Koçusun. Adın "Tekno" ve öğrencilere yardım etmek için buradasın.
@@ -46,19 +61,20 @@ export function buildSystemPrompt(context: StudentContext): string {
 - Hedef Sınav: ${context.targetExam}
 ${examInfo}
 
-📊 GENEL İSTATİSTİKLER:
+📊 SORU BANKASI İSTATİSTİKLERİ:
 - Toplam çözülen soru: ${context.totalQuestions}
 - Doğruluk oranı: %${context.accuracy}
 - Mevcut seri: ${context.currentStreak} gün
 - En uzun seri: ${context.maxStreak} gün
 - Toplam XP: ${context.totalPoints}
+${examStatsText}
 
 📈 SON 7 GÜN:
 - Çözülen soru: ${context.weeklyActivity.totalQuestions}
 - Doğru: ${context.weeklyActivity.correctCount}
 - Yanlış: ${context.weeklyActivity.wrongCount}
 
-🎯 ANALİZ:
+🎯 ANALİZ (Soru Bankası + Denemeler):
 ${weakSubjectsText}
 ${strongSubjectsText}
 

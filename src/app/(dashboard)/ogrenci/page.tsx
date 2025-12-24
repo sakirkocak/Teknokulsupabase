@@ -38,12 +38,36 @@ export default function StudentDashboard() {
   const [coaches, setCoaches] = useState<any[]>([])
   const [pendingCoach, setPendingCoach] = useState<any>(null)
   const [tasks, setTasks] = useState<any[]>([])
-  const [recommendations, setRecommendations] = useState<any[]>([])
-  const [examStats, setExamStats] = useState<{ weakTopics: string[], strongTopics: string[], avgNet: number, lastExam: any }>({ weakTopics: [], strongTopics: [], avgNet: 0, lastExam: null })
   const [coachingStatus, setCoachingStatus] = useState<'none' | 'pending' | 'active'>('none')
   const [parentRequests, setParentRequests] = useState<any[]>([])
   const [approvedParents, setApprovedParents] = useState<any[]>([])
   const [processingRequest, setProcessingRequest] = useState<string | null>(null)
+  
+  // AI Koç entegrasyonu - birleşik analiz verileri
+  const [aiCoachData, setAiCoachData] = useState<{
+    loading: boolean
+    weakSubjects: string[]
+    strongSubjects: string[]
+    avgNet: number
+    totalExams: number
+    netTrend: 'up' | 'down' | 'stable'
+    currentStreak: number
+    accuracy: number
+    motivationalMessages: string[]
+    summary: string
+  }>({
+    loading: true,
+    weakSubjects: [],
+    strongSubjects: [],
+    avgNet: 0,
+    totalExams: 0,
+    netTrend: 'stable',
+    currentStreak: 0,
+    accuracy: 0,
+    motivationalMessages: [],
+    summary: ''
+  })
+  
   const supabase = createClient()
   
   // Gamification hooks
@@ -103,17 +127,29 @@ export default function StudentDashboard() {
       setTasks(taskData)
     }
 
-    // AI önerilerini yükle
-    const { data: recData } = await supabase
-      .from('ai_recommendations')
-      .select('*')
-      .eq('student_id', studentProfile.id)
-      .eq('is_dismissed', false)
-      .order('created_at', { ascending: false })
-      .limit(3)
-
-    if (recData) {
-      setRecommendations(recData)
+    // AI Koç'tan birleşik analiz verilerini al (soru bankası + deneme sonuçları)
+    try {
+      const aiResponse = await fetch('/api/ai-coach/analyze')
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json()
+        setAiCoachData({
+          loading: false,
+          weakSubjects: aiData.analysis?.weakSubjects || [],
+          strongSubjects: aiData.analysis?.strongSubjects || [],
+          avgNet: aiData.examStats?.avgNet || 0,
+          totalExams: aiData.examStats?.totalExams || 0,
+          netTrend: aiData.examStats?.netTrend || 'stable',
+          currentStreak: aiData.stats?.currentStreak || 0,
+          accuracy: aiData.stats?.accuracy || 0,
+          motivationalMessages: aiData.analysis?.motivationalMessages || [],
+          summary: aiData.analysis?.summary || ''
+        })
+      } else {
+        setAiCoachData(prev => ({ ...prev, loading: false }))
+      }
+    } catch (error) {
+      console.error('AI Koç verisi alınamadı:', error)
+      setAiCoachData(prev => ({ ...prev, loading: false }))
     }
 
     // Bekleyen veli isteklerini yükle
@@ -155,101 +191,6 @@ export default function StudentDashboard() {
 
     if (approvedData) {
       setApprovedParents(approvedData)
-    }
-
-    // Deneme sonuçlarını yükle ve AI önerileri için analiz et
-    const { data: examData } = await supabase
-      .from('exam_results')
-      .select('*')
-      .eq('student_id', studentProfile.id)
-      .order('exam_date', { ascending: false })
-
-    if (examData && examData.length > 0) {
-      // Tüm zayıf ve güçlü konuları topla
-      const allWeakTopics = new Set<string>()
-      const allStrongTopics = new Set<string>()
-      
-      examData.forEach(exam => {
-        if (exam.weak_topics) {
-          exam.weak_topics.forEach((t: string) => allWeakTopics.add(t))
-        }
-        if (exam.strong_topics) {
-          exam.strong_topics.forEach((t: string) => allStrongTopics.add(t))
-        }
-      })
-
-      // Ortalama net hesapla
-      const avgNet = examData.reduce((acc, e) => acc + (e.net_score || 0), 0) / examData.length
-
-      setExamStats({
-        weakTopics: Array.from(allWeakTopics).slice(0, 5),
-        strongTopics: Array.from(allStrongTopics).slice(0, 5),
-        avgNet,
-        lastExam: examData[0]
-      })
-
-      // Deneme verilerine göre dinamik öneriler oluştur
-      const dynamicRecs: any[] = []
-      
-      // Zayıf konular varsa öneri ekle
-      if (allWeakTopics.size > 0) {
-        const weakArray = Array.from(allWeakTopics)
-        dynamicRecs.push({
-          id: 'weak-1',
-          subject: 'Zayıf Konular',
-          priority: 'high',
-          message: `${weakArray.slice(0, 3).join(', ')} konularına daha fazla odaklan.`
-        })
-      }
-
-      // Son deneme analizi
-      const lastExam = examData[0]
-      if (lastExam.ai_analysis?.analysis?.recommendations) {
-        const aiRecs = lastExam.ai_analysis.analysis.recommendations
-        if (Array.isArray(aiRecs) && aiRecs.length > 0) {
-          dynamicRecs.push({
-            id: 'ai-rec-1',
-            subject: 'AI Analizi',
-            priority: 'medium',
-            message: aiRecs[0]
-          })
-        }
-      }
-
-      // Gelişim önerisi
-      if (examData.length >= 2) {
-        const lastNet = examData[0].net_score || 0
-        const prevNet = examData[1].net_score || 0
-        const diff = lastNet - prevNet
-
-        if (diff > 0) {
-          dynamicRecs.push({
-            id: 'progress-1',
-            subject: 'Gelişim',
-            priority: 'low',
-            message: `Harika! Son denemede ${diff.toFixed(1)} net artış var. Aynı tempoda devam et!`
-          })
-        } else if (diff < 0) {
-          dynamicRecs.push({
-            id: 'progress-2',
-            subject: 'Dikkat',
-            priority: 'high',
-            message: `Son denemede ${Math.abs(diff).toFixed(1)} net düşüş var. Eksik konuları gözden geçir.`
-          })
-        }
-      }
-
-      // Motivasyon önerisi
-      if (avgNet > 0 && avgNet < 100) {
-        dynamicRecs.push({
-          id: 'motivation-1',
-          subject: 'Motivasyon',
-          priority: 'medium',
-          message: `Ortalama netin ${avgNet.toFixed(1)}. Düzenli çalışarak daha da yükseltebilirsin!`
-        })
-      }
-
-      setRecommendations(dynamicRecs)
     }
   }
 
@@ -646,95 +587,115 @@ export default function StudentDashboard() {
               <ArrowRight className="w-5 h-5" />
             </Link>
 
-            {/* AI Recommendations */}
-            <div className="card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-surface-900">AI Önerileri</h3>
-                <Sparkles className="w-5 h-5 text-primary-500" />
+            {/* AI Koç Önerileri - Birleşik Widget (Soru Bankası + Deneme) */}
+            <div className="card overflow-hidden">
+              <div className="bg-gradient-to-r from-purple-500 to-indigo-600 p-4 text-white">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-5 h-5" />
+                    <h3 className="font-semibold">AI Koç Önerileri</h3>
+                  </div>
+                  <Sparkles className="w-4 h-4 opacity-80" />
+                </div>
+                <p className="text-xs text-purple-100 mt-1">Soru bankası + Deneme sonuçları analizi</p>
               </div>
-              {recommendations.length > 0 ? (
-                <div className="space-y-3">
-                  {recommendations.map((rec) => (
-                    <div 
-                      key={rec.id}
-                      className={`p-3 rounded-xl text-sm ${
-                        rec.priority === 'high' ? 'bg-red-50 border border-red-200' :
-                        rec.priority === 'medium' ? 'bg-yellow-50 border border-yellow-200' :
-                        'bg-green-50 border border-green-200'
-                      }`}
-                    >
-                      <div className="font-medium mb-1">{rec.subject || 'Genel'}</div>
-                      <div className="text-surface-600">{rec.message}</div>
-                    </div>
-                  ))}
+              
+              {aiCoachData.loading ? (
+                <div className="p-6 flex justify-center">
+                  <div className="animate-spin w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full" />
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <Brain className="w-10 h-10 mx-auto mb-2 text-surface-300" />
-                  <p className="text-sm text-surface-500 mb-3">
-                    Deneme sonucu yükleyerek AI önerileri al
-                  </p>
-                  <Link href="/ogrenci/denemeler" className="btn btn-primary btn-sm">
-                    Deneme Yükle
+                <div className="p-4 space-y-4">
+                  {/* Deneme İstatistikleri - Varsa göster */}
+                  {aiCoachData.totalExams > 0 && (
+                    <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-primary-50 to-accent-50 rounded-xl">
+                      <div className="text-center flex-1">
+                        <div className="text-2xl font-bold text-primary-600">{aiCoachData.avgNet.toFixed(1)}</div>
+                        <div className="text-xs text-surface-500">Ort. Net</div>
+                      </div>
+                      <div className="w-px h-10 bg-surface-200" />
+                      <div className="text-center flex-1">
+                        <div className="text-2xl font-bold text-accent-600">%{aiCoachData.accuracy}</div>
+                        <div className="text-xs text-surface-500">Başarı</div>
+                      </div>
+                      <div className="w-px h-10 bg-surface-200" />
+                      <div className="text-center flex-1">
+                        <div className="flex items-center justify-center gap-1">
+                          {aiCoachData.netTrend === 'up' ? (
+                            <TrendingUp className="w-5 h-5 text-green-500" />
+                          ) : aiCoachData.netTrend === 'down' ? (
+                            <TrendingUp className="w-5 h-5 text-red-500 rotate-180" />
+                          ) : (
+                            <ArrowRight className="w-5 h-5 text-yellow-500" />
+                          )}
+                        </div>
+                        <div className="text-xs text-surface-500">Trend</div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Zayıf Konular */}
+                  {aiCoachData.weakSubjects.length > 0 && (
+                    <div className="p-3 bg-red-50 border border-red-100 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="w-4 h-4 text-red-500" />
+                        <span className="text-xs font-medium text-red-700">Odaklanman Gereken Konular</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {aiCoachData.weakSubjects.slice(0, 4).map((topic, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Güçlü Konular */}
+                  {aiCoachData.strongSubjects.length > 0 && (
+                    <div className="p-3 bg-green-50 border border-green-100 rounded-xl">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                        <span className="text-xs font-medium text-green-700">Güçlü Olduğun Konular</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {aiCoachData.strongSubjects.slice(0, 4).map((topic, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Motivasyon Mesajı */}
+                  {aiCoachData.motivationalMessages.length > 0 && (
+                    <div className="p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                      <p className="text-sm text-purple-700">{aiCoachData.motivationalMessages[0]}</p>
+                    </div>
+                  )}
+
+                  {/* Veri yoksa */}
+                  {aiCoachData.weakSubjects.length === 0 && aiCoachData.strongSubjects.length === 0 && aiCoachData.totalExams === 0 && (
+                    <div className="text-center py-2">
+                      <p className="text-sm text-surface-500 mb-3">
+                        Soru çöz veya deneme yükle, AI Koç sana özel öneriler versin!
+                      </p>
+                    </div>
+                  )}
+
+                  {/* AI Koç'a Git Butonu */}
+                  <Link 
+                    href="/ogrenci/ai-koc" 
+                    className="flex items-center justify-center gap-2 w-full p-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl font-medium hover:from-purple-600 hover:to-indigo-700 transition-all"
+                  >
+                    <Brain className="w-4 h-4" />
+                    AI Koç'a Git
+                    <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
               )}
             </div>
-
-            {/* Deneme Özeti */}
-            {examStats.lastExam && (
-              <div className="card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-surface-900">Deneme Özeti</h3>
-                  <TrendingUp className="w-5 h-5 text-accent-500" />
-                </div>
-                <div className="space-y-4">
-                  <div className="text-center p-4 bg-gradient-to-br from-primary-50 to-accent-50 rounded-xl">
-                    <div className="text-3xl font-bold text-primary-600">{examStats.avgNet.toFixed(1)}</div>
-                    <div className="text-sm text-surface-500">Ortalama Net</div>
-                  </div>
-                  
-                  {examStats.weakTopics.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium text-surface-500 mb-2 flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 text-red-500" />
-                        Zayıf Konular
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {examStats.weakTopics.map((topic, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-red-50 text-red-600 text-xs rounded-full">
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {examStats.strongTopics.length > 0 && (
-                    <div>
-                      <div className="text-xs font-medium text-surface-500 mb-2 flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3 text-green-500" />
-                        Güçlü Konular
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {examStats.strongTopics.map((topic, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-green-50 text-green-600 text-xs rounded-full">
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Link 
-                    href="/ogrenci/denemeler" 
-                    className="flex items-center justify-center gap-2 w-full p-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                  >
-                    Tüm Denemeleri Gör <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
-              </div>
-            )}
 
             {/* Quick Stats */}
             <div className="card p-6">

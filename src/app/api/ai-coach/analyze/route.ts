@@ -117,6 +117,66 @@ export async function GET(request: NextRequest) {
       .eq('student_id', studentProfile.id)
       .single()
 
+    // Deneme sonuçlarını çek (exam_results)
+    const { data: examResults } = await supabase
+      .from('exam_results')
+      .select('*')
+      .eq('student_id', studentProfile.id)
+      .order('exam_date', { ascending: false })
+      .limit(10)
+
+    // Deneme istatistiklerini hesapla
+    let examStats = {
+      totalExams: 0,
+      avgNet: 0,
+      lastExamDate: null as string | null,
+      weakTopicsFromExams: [] as string[],
+      strongTopicsFromExams: [] as string[],
+      netTrend: 'stable' as 'up' | 'down' | 'stable',
+      lastExamAnalysis: null as string | null
+    }
+
+    if (examResults && examResults.length > 0) {
+      examStats.totalExams = examResults.length
+      examStats.avgNet = examResults.reduce((acc, e) => acc + (e.net_score || 0), 0) / examResults.length
+      examStats.lastExamDate = examResults[0].exam_date
+
+      // Tüm zayıf ve güçlü konuları topla
+      const allWeakTopics = new Set<string>()
+      const allStrongTopics = new Set<string>()
+      
+      examResults.forEach(exam => {
+        if (exam.weak_topics) {
+          exam.weak_topics.forEach((t: string) => allWeakTopics.add(t))
+        }
+        if (exam.strong_topics) {
+          exam.strong_topics.forEach((t: string) => allStrongTopics.add(t))
+        }
+      })
+
+      examStats.weakTopicsFromExams = Array.from(allWeakTopics).slice(0, 5)
+      examStats.strongTopicsFromExams = Array.from(allStrongTopics).slice(0, 5)
+
+      // Net trendi hesapla (son 2 deneme karşılaştırması)
+      if (examResults.length >= 2) {
+        const lastNet = examResults[0].net_score || 0
+        const prevNet = examResults[1].net_score || 0
+        const diff = lastNet - prevNet
+        
+        if (diff > 2) examStats.netTrend = 'up'
+        else if (diff < -2) examStats.netTrend = 'down'
+        else examStats.netTrend = 'stable'
+      }
+
+      // Son denemenin AI analizi varsa al
+      if (examResults[0].ai_analysis?.analysis?.recommendations) {
+        const aiRecs = examResults[0].ai_analysis.analysis.recommendations
+        if (Array.isArray(aiRecs) && aiRecs.length > 0) {
+          examStats.lastExamAnalysis = aiRecs[0]
+        }
+      }
+    }
+
     // Context oluştur
     const subjects = studentStats.subjects || {}
     const subjectStats: Record<string, { correct: number; wrong: number; accuracy: number; name: string }> = {}
@@ -135,6 +195,10 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Deneme ve soru bankasından gelen zayıf konuları birleştir
+    const combinedWeakSubjects = [...new Set([...weakSubjects, ...examStats.weakTopicsFromExams])]
+    const combinedStrongSubjects = [...new Set([...strongSubjects, ...examStats.strongTopicsFromExams])]
+
     const context: StudentContext = {
       name: profile?.full_name || 'Öğrenci',
       grade: studentProfile.grade || 8,
@@ -151,8 +215,14 @@ export async function GET(request: NextRequest) {
         wrongCount: weeklyActivity.wrong_count
       },
       subjects: subjectStats,
-      weakSubjects,
-      strongSubjects
+      weakSubjects: combinedWeakSubjects,
+      strongSubjects: combinedStrongSubjects,
+      // Deneme verileri eklendi
+      examStats: {
+        totalExams: examStats.totalExams,
+        avgNet: examStats.avgNet,
+        netTrend: examStats.netTrend
+      }
     }
 
     // AI analiz özeti oluştur
@@ -201,10 +271,20 @@ export async function GET(request: NextRequest) {
       },
       subjects: subjectStats,
       analysis: {
-        weakSubjects,
-        strongSubjects,
+        weakSubjects: combinedWeakSubjects, // Birleşik zayıf konular (soru bankası + deneme)
+        strongSubjects: combinedStrongSubjects, // Birleşik güçlü konular
+        weakSubjectsFromQuestions: weakSubjects, // Sadece soru bankasından
+        weakSubjectsFromExams: examStats.weakTopicsFromExams, // Sadece denemelerden
         summary: analysisSummary,
         motivationalMessages
+      },
+      // Deneme istatistikleri (yeni eklendi)
+      examStats: {
+        totalExams: examStats.totalExams,
+        avgNet: Math.round(examStats.avgNet * 10) / 10,
+        lastExamDate: examStats.lastExamDate,
+        netTrend: examStats.netTrend,
+        lastExamAnalysis: examStats.lastExamAnalysis
       },
       aiCoach: {
         totalChats: aiStats?.total_chats || 0,
