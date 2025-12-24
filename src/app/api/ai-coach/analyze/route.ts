@@ -110,12 +110,18 @@ export async function GET(request: NextRequest) {
       correct: data.correct
     }))
 
-    // AI Coach stats
+    // AI Coach stats (cache bilgileri dahil)
     const { data: aiStats } = await supabase
       .from('ai_coach_stats')
-      .select('*')
+      .select('*, analysis_summary, analysis_updated_at, motivational_messages, cached_weak_subjects, cached_strong_subjects')
       .eq('student_id', studentProfile.id)
       .single()
+
+    // Cache kontrolü - 12 saat (43200000 ms)
+    const CACHE_DURATION_MS = 12 * 60 * 60 * 1000 // 12 saat
+    const now = new Date()
+    const lastCacheUpdate = aiStats?.analysis_updated_at ? new Date(aiStats.analysis_updated_at) : null
+    const cacheValid = lastCacheUpdate && (now.getTime() - lastCacheUpdate.getTime()) < CACHE_DURATION_MS
 
     // Deneme sonuçlarını çek (exam_results)
     const { data: examResults } = await supabase
@@ -225,14 +231,43 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // AI analiz özeti oluştur
-    const analysisSummary = await generateAnalysisSummary({
-      ...context,
-      weeklyByDay: weeklyActivity?.by_day || []
-    })
+    // AI analiz özeti - 12 saatlik cache kontrolü
+    let analysisSummary: string
+    let motivationalMessages: string[]
+    let shouldUpdateCache = false
 
-    // Motivasyon mesajları
-    const motivationalMessages = getMotivationalMessages(context)
+    if (cacheValid && aiStats?.analysis_summary) {
+      // Cache geçerli - Gemini çağrılmıyor! ✅
+      console.log('📦 Cache kullanılıyor (Gemini çağrılmadı)')
+      analysisSummary = aiStats.analysis_summary
+      motivationalMessages = aiStats.motivational_messages || getMotivationalMessages(context)
+    } else {
+      // Cache geçersiz veya yok - Gemini çağrılıyor
+      console.log('🤖 Gemini API çağrılıyor (cache yenileniyor)')
+      analysisSummary = await generateAnalysisSummary({
+        ...context,
+        weeklyByDay: weeklyActivity?.by_day || []
+      })
+      motivationalMessages = getMotivationalMessages(context)
+      shouldUpdateCache = true
+    }
+
+    // Cache'i güncelle (gerekiyorsa)
+    if (shouldUpdateCache) {
+      await supabase
+        .from('ai_coach_stats')
+        .upsert({
+          student_id: studentProfile.id,
+          analysis_summary: analysisSummary,
+          analysis_updated_at: now.toISOString(),
+          motivational_messages: motivationalMessages,
+          cached_weak_subjects: combinedWeakSubjects,
+          cached_strong_subjects: combinedStrongSubjects,
+          last_interaction: now.toISOString()
+        }, {
+          onConflict: 'student_id'
+        })
+    }
 
     // Güncel bildirim
     const notification = getCurrentNotification(context)
