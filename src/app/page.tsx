@@ -345,6 +345,16 @@ function LiveStatsBanner() {
           )} öğrenci yarışıyor
         </span>
       </div>
+      <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm border border-surface-100">
+        <BookOpen className="w-4 h-4 text-primary-500" />
+        <span className="text-surface-600 text-sm">
+          {loading ? (
+            <StatSkeleton />
+          ) : (
+            <span className="font-bold text-surface-900">{formatNumber(stats.totalQuestions)}+</span>
+          )} soru bankası
+        </span>
+      </div>
       <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg">
         <Zap className="w-4 h-4" />
         <span className="text-sm font-medium">Sen de katıl!</span>
