@@ -515,8 +515,7 @@ export default function KocOlPage() {
                 {[
                   'Kredi kartı gerekmez',
                   'Anında erişim',
-                  'Tüm özellikler dahil',
-                  '14 gün ücretsiz deneme'
+                  'Tüm özellikler dahil'
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2 text-emerald-700">
                     <Check className="w-5 h-5" />
