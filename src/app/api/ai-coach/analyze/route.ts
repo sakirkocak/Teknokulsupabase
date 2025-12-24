@@ -32,15 +32,83 @@ export async function GET(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Öğrenci istatistikleri
-    const { data: studentStats } = await supabase.rpc('get_student_analysis', {
-      p_student_id: studentProfile.id
+    // Öğrenci istatistiklerini point_history'den çek (daha güncel)
+    const { data: pointHistoryStats } = await supabase
+      .from('point_history')
+      .select('points, is_correct, subject_code, created_at')
+      .eq('student_id', studentProfile.id)
+      .eq('source', 'question')
+
+    // Student points tablosundan streak ve XP bilgisi
+    const { data: studentPointsData } = await supabase
+      .from('student_points')
+      .select('current_streak, max_streak, total_points')
+      .eq('student_id', studentProfile.id)
+      .single()
+
+    // İstatistikleri hesapla
+    const allQuestions = pointHistoryStats || []
+    const totalQuestions = allQuestions.length
+    const totalCorrect = allQuestions.filter(q => q.is_correct === true).length
+    const totalWrong = totalQuestions - totalCorrect
+    const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0
+    const totalPoints = allQuestions.reduce((sum, q) => sum + (q.points || 0), 0)
+
+    // Ders bazlı istatistikler
+    const subjectStatsRaw: Record<string, { correct: number; wrong: number }> = {}
+    allQuestions.forEach(q => {
+      const subj = q.subject_code || 'diger'
+      if (!subjectStatsRaw[subj]) {
+        subjectStatsRaw[subj] = { correct: 0, wrong: 0 }
+      }
+      if (q.is_correct) {
+        subjectStatsRaw[subj].correct++
+      } else {
+        subjectStatsRaw[subj].wrong++
+      }
     })
 
-    // Haftalık aktivite
-    const { data: weeklyActivity } = await supabase.rpc('get_weekly_activity', {
-      p_student_id: studentProfile.id
+    const studentStats = {
+      total_questions: totalQuestions,
+      total_correct: totalCorrect,
+      total_wrong: totalWrong,
+      accuracy: accuracy,
+      current_streak: studentPointsData?.current_streak || 0,
+      max_streak: studentPointsData?.max_streak || 0,
+      total_points: totalPoints || studentPointsData?.total_points || 0,
+      subjects: subjectStatsRaw
+    }
+
+    // Haftalık aktivite (son 7 gün)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    
+    const weeklyQuestions = allQuestions.filter(q => 
+      new Date(q.created_at) >= sevenDaysAgo
+    )
+    
+    const weeklyActivity = {
+      total_questions: weeklyQuestions.length,
+      correct_count: weeklyQuestions.filter(q => q.is_correct === true).length,
+      wrong_count: weeklyQuestions.filter(q => q.is_correct !== true).length,
+      by_day: [] as any[]
+    }
+
+    // Günlük dağılım
+    const dayMap: Record<string, { questions: number; correct: number }> = {}
+    weeklyQuestions.forEach(q => {
+      const day = new Date(q.created_at).toISOString().split('T')[0]
+      if (!dayMap[day]) {
+        dayMap[day] = { questions: 0, correct: 0 }
+      }
+      dayMap[day].questions++
+      if (q.is_correct) dayMap[day].correct++
     })
+    weeklyActivity.by_day = Object.entries(dayMap).map(([day, data]) => ({
+      day,
+      questions: data.questions,
+      correct: data.correct
+    }))
 
     // AI Coach stats
     const { data: aiStats } = await supabase
@@ -50,7 +118,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     // Context oluştur
-    const subjects = studentStats?.subjects || {}
+    const subjects = studentStats.subjects || {}
     const subjectStats: Record<string, { correct: number; wrong: number; accuracy: number; name: string }> = {}
     const weakSubjects: string[] = []
     const strongSubjects: string[] = []
@@ -58,12 +126,12 @@ export async function GET(request: NextRequest) {
     Object.keys(subjects).forEach(key => {
       const s = subjects[key]
       const total = s.correct + s.wrong
-      const accuracy = total > 0 ? Math.round((s.correct / total) * 100) : 0
-      subjectStats[key] = { ...s, accuracy, name: getSubjectName(key) }
+      const subjectAccuracy = total > 0 ? Math.round((s.correct / total) * 100) : 0
+      subjectStats[key] = { ...s, accuracy: subjectAccuracy, name: getSubjectName(key) }
       
-      if (total >= 10) {
-        if (accuracy < 50) weakSubjects.push(getSubjectName(key))
-        else if (accuracy >= 70) strongSubjects.push(getSubjectName(key))
+      if (total >= 5) {
+        if (subjectAccuracy < 50) weakSubjects.push(getSubjectName(key))
+        else if (subjectAccuracy >= 70) strongSubjects.push(getSubjectName(key))
       }
     })
 
@@ -71,16 +139,16 @@ export async function GET(request: NextRequest) {
       name: profile?.full_name || 'Öğrenci',
       grade: studentProfile.grade || 8,
       targetExam: studentProfile.target_exam || 'LGS',
-      totalQuestions: studentStats?.total_questions || 0,
-      totalCorrect: studentStats?.total_correct || 0,
-      accuracy: studentStats?.accuracy || 0,
-      currentStreak: studentStats?.current_streak || 0,
-      maxStreak: studentStats?.max_streak || 0,
-      totalPoints: studentStats?.total_points || 0,
+      totalQuestions: studentStats.total_questions,
+      totalCorrect: studentStats.total_correct,
+      accuracy: studentStats.accuracy,
+      currentStreak: studentStats.current_streak,
+      maxStreak: studentStats.max_streak,
+      totalPoints: studentStats.total_points,
       weeklyActivity: {
-        totalQuestions: weeklyActivity?.total_questions || 0,
-        correctCount: weeklyActivity?.correct_count || 0,
-        wrongCount: weeklyActivity?.wrong_count || 0
+        totalQuestions: weeklyActivity.total_questions,
+        correctCount: weeklyActivity.correct_count,
+        wrongCount: weeklyActivity.wrong_count
       },
       subjects: subjectStats,
       weakSubjects,
