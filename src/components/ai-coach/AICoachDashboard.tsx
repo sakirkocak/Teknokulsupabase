@@ -106,7 +106,10 @@ export default function AICoachDashboard() {
     try {
       setLoading(true)
       
-      // Paralel olarak tüm verileri yükle
+      // Önce görevleri senkronize et (bugün çözülen sorularla)
+      await fetch('/api/ai-coach/sync', { method: 'POST' })
+      
+      // Sonra tüm verileri yükle
       const [analysisRes, tasksRes, chatRes] = await Promise.all([
         fetch('/api/ai-coach/analyze'),
         fetch('/api/ai-coach/tasks'),
