@@ -65,7 +65,6 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'AI Koç', href: '/ogrenci/ai-koc', icon: Bot },
     { label: 'Başarımlarım', href: '/ogrenci/basarimlar', icon: Award },
     { label: 'Liderlik', href: '/ogrenci/liderlik', icon: Trophy },
-    { label: 'Harf Öğrenme', href: '/ogrenci/harf-ogrenme', icon: Volume2 },
     { label: 'Koçum', href: '/ogrenci/kocum', icon: Target },
     { label: 'Sınıflarım', href: '/ogrenci/siniflarim', icon: BookOpen },
     { label: 'Düello', href: '/ogrenci/duello', icon: Swords },

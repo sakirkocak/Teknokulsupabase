@@ -628,7 +628,7 @@ export default function AIQuestionGeneratorPage() {
 
   if (profileLoading) {
     return (
-      <DashboardLayout>
+      <DashboardLayout role="admin">
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
         </div>
@@ -638,7 +638,7 @@ export default function AIQuestionGeneratorPage() {
 
   if (profile?.role !== 'admin') {
     return (
-      <DashboardLayout>
+      <DashboardLayout role="admin">
         <div className="text-center py-12">
           <AlertTriangle className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-800">Erişim Engellendi</h2>
@@ -649,7 +649,7 @@ export default function AIQuestionGeneratorPage() {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout role="admin">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <motion.div 
