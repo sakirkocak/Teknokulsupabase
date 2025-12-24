@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     ).length
     
     // Farklı dersler
-    const uniqueSubjects = [...new Set(questions.map(q => q.subject_code).filter(Boolean))]
+    const uniqueSubjects = Array.from(new Set(questions.map(q => q.subject_code).filter(Boolean)))
     const subjectCount = uniqueSubjects.length
 
     // Doğruluk oranı

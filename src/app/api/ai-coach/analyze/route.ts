@@ -202,8 +202,8 @@ export async function GET(request: NextRequest) {
     })
 
     // Deneme ve soru bankasından gelen zayıf konuları birleştir
-    const combinedWeakSubjects = [...new Set([...weakSubjects, ...examStats.weakTopicsFromExams])]
-    const combinedStrongSubjects = [...new Set([...strongSubjects, ...examStats.strongTopicsFromExams])]
+    const combinedWeakSubjects = Array.from(new Set([...weakSubjects, ...examStats.weakTopicsFromExams]))
+    const combinedStrongSubjects = Array.from(new Set([...strongSubjects, ...examStats.strongTopicsFromExams]))
 
     const context: StudentContext = {
       name: profile?.full_name || 'Öğrenci',
