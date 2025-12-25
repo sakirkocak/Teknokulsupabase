@@ -628,7 +628,14 @@ export default function HomePage() {
     const { data: coachData } = await supabase
       .from('teacher_profiles')
       .select(`
-        *,
+        id,
+        user_id,
+        headline,
+        bio,
+        subjects,
+        experience_years,
+        hourly_rate,
+        is_verified,
         profile:profiles!teacher_profiles_user_id_fkey(id, full_name, avatar_url)
       `)
       .eq('is_coach', true)
@@ -636,20 +643,31 @@ export default function HomePage() {
       .limit(6)
 
     if (coachData && coachData.length > 0) {
-      const coachesWithReviews = await Promise.all(coachData.map(async (coach) => {
-        const { data: reviews } = await supabase
-          .from('reviews')
-          .select('overall_rating')
-          .eq('teacher_id', coach.id)
-          .eq('is_approved', true)
+      // N+1 Query Optimizasyonu: Tüm koçların review'larını tek sorguda çek
+      const coachIds = coachData.map(c => c.id)
+      const { data: allReviews } = await supabase
+        .from('reviews')
+        .select('teacher_id, overall_rating')
+        .in('teacher_id', coachIds)
+        .eq('is_approved', true)
 
-        const reviewCount = reviews?.length || 0
+      // Review'ları koçlara göre grupla
+      const reviewsByCoach = new Map<string, number[]>()
+      allReviews?.forEach(review => {
+        const ratings = reviewsByCoach.get(review.teacher_id) || []
+        ratings.push(review.overall_rating)
+        reviewsByCoach.set(review.teacher_id, ratings)
+      })
+
+      // Her koça review verilerini ekle
+      const coachesWithReviews = coachData.map(coach => {
+        const ratings = reviewsByCoach.get(coach.id) || []
+        const reviewCount = ratings.length
         const avgRating = reviewCount > 0
-          ? reviews!.reduce((acc, r) => acc + r.overall_rating, 0) / reviewCount
+          ? ratings.reduce((acc, r) => acc + r, 0) / reviewCount
           : 0
-
         return { ...coach, reviewCount, avgRating }
-      }))
+      })
 
       setCoaches(coachesWithReviews)
     } else {

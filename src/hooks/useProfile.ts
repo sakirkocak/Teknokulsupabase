@@ -4,23 +4,78 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Profile, TeacherProfile, StudentProfile, ParentProfile } from '@/types/database'
 
+// Cache key'leri ve süreleri
+const PROFILE_CACHE_KEY = 'teknokul_profile_cache'
+const CACHE_DURATION = 5 * 60 * 1000 // 5 dakika
+
+// Cache yardımcı fonksiyonları
+function getProfileFromCache(): Profile | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const cached = sessionStorage.getItem(PROFILE_CACHE_KEY)
+    if (!cached) return null
+    const { data, timestamp } = JSON.parse(cached)
+    // Cache süresi dolmuş mu kontrol et
+    if (Date.now() - timestamp > CACHE_DURATION) {
+      sessionStorage.removeItem(PROFILE_CACHE_KEY)
+      return null
+    }
+    return data as Profile
+  } catch {
+    return null
+  }
+}
+
+function setProfileToCache(profile: Profile): void {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({
+      data: profile,
+      timestamp: Date.now()
+    }))
+  } catch {
+    // Storage hatası, sessizce devam et
+  }
+}
+
+// Profil güncellendiğinde veya çıkış yapıldığında cache'i temizle
+export function clearProfileCache(): void {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.removeItem(PROFILE_CACHE_KEY)
+  } catch {
+    // Storage hatası, sessizce devam et
+  }
+}
+
 export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  const loadProfile = useCallback(async () => {
+  const loadProfile = useCallback(async (forceRefresh = false) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) {
+        clearProfileCache()
         setLoading(false)
         return
       }
 
+      // Cache'den oku (force refresh değilse)
+      if (!forceRefresh) {
+        const cachedProfile = getProfileFromCache()
+        if (cachedProfile && cachedProfile.id === user.id) {
+          setProfile(cachedProfile)
+          setLoading(false)
+          return
+        }
+      }
+
       let { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, full_name, avatar_url, phone, role, is_active, created_at, updated_at')
         .eq('id', user.id)
         .single()
 
@@ -67,6 +122,12 @@ export function useProfile() {
       }
 
       if (error && error.code !== 'PGRST116') throw error
+      
+      // Profili cache'e kaydet
+      if (data) {
+        setProfileToCache(data)
+      }
+      
       setProfile(data)
     } catch (error) {
       console.error('Error loading profile:', error)
@@ -79,7 +140,10 @@ export function useProfile() {
     loadProfile()
   }, [loadProfile])
 
-  return { profile, loading, setProfile, refetch: loadProfile }
+  // refetch her zaman fresh data çeker
+  const refetch = useCallback(() => loadProfile(true), [loadProfile])
+
+  return { profile, loading, setProfile, refetch, clearCache: clearProfileCache }
 }
 
 export function useTeacherProfile(userId: string) {
@@ -92,7 +156,7 @@ export function useTeacherProfile(userId: string) {
     try {
       const { data, error } = await supabase
         .from('teacher_profiles')
-        .select('*')
+        .select('id, user_id, headline, bio, subjects, experience_years, education, languages, hourly_rate, available_days, lesson_types, average_rating, review_count, is_verified, is_coach, is_listed, video_url, certificates, specializations, teaching_style, target_students, achievements, created_at')
         .eq('user_id', userId)
         .single()
 
@@ -127,7 +191,7 @@ export function useStudentProfile(userId: string) {
     try {
       let { data, error } = await supabase
         .from('student_profiles')
-        .select('*')
+        .select('id, user_id, grade_level, grade, target_exam, school_name, city_id, district_id, school_id, created_at')
         .eq('user_id', userId)
         .single()
 
@@ -177,7 +241,7 @@ export function useParentProfile(userId: string) {
     try {
       const { data, error } = await supabase
         .from('parent_profiles')
-        .select('*')
+        .select('id, user_id, phone, created_at')
         .eq('user_id', userId)
         .single()
 

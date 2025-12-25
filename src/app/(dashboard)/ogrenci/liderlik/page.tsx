@@ -216,7 +216,7 @@ export default function StudentLeaderboardPage() {
     // Kendi istatistiklerimi al
     const { data: myPointsData } = await supabase
       .from('student_points')
-      .select('*')
+      .select('total_points, total_questions, total_correct, total_wrong, current_streak, max_streak, matematik_points, turkce_points, fen_points')
       .eq('student_id', studentProfile.id)
       .single()
 
@@ -315,7 +315,7 @@ export default function StudentLeaderboardPage() {
       // Ders bazlı: student_subject_points tablosundan
       const { data, error } = await supabase
         .from('student_subject_points')
-        .select('*')
+        .select('student_id, points, correct_count, wrong_count')
         .eq('subject_id', selectedSubject)
         .gt('points', 0)
         .order('points', { ascending: false })
@@ -443,7 +443,7 @@ export default function StudentLeaderboardPage() {
       `)
       .gt('total_questions', 0)
       .order('total_points', { ascending: false })
-      .limit(500)
+      .limit(100)
 
     if (data) {
       let filteredData = data

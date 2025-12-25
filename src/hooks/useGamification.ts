@@ -115,7 +115,7 @@ export function useGamification(userId: string | null): UseGamificationReturn {
       // Student points'i al
       const { data: pointsData, error: pointsError } = await supabase
         .from('student_points')
-        .select('*')
+        .select('total_xp, total_points, total_questions, total_correct, current_streak, max_streak, last_activity_at, level')
         .eq('student_id', studentProfile.id)
         .single()
 

@@ -127,7 +127,7 @@ export default function LeaderboardPage() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, full_name, avatar_url, role')
           .eq('id', user.id)
           .single()
         setUserProfile(profile)
@@ -141,7 +141,7 @@ export default function LeaderboardPage() {
       if (session?.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, full_name, avatar_url, role')
           .eq('id', session.user.id)
           .single()
         setUserProfile(profile)
@@ -158,7 +158,7 @@ export default function LeaderboardPage() {
     async function loadCities() {
       const { data } = await supabase
         .from('turkey_cities')
-        .select('*')
+        .select('id, name, plate_code')
         .order('name')
       if (data) setCities(data)
     }
@@ -223,7 +223,7 @@ export default function LeaderboardPage() {
         .select('id, name, district_id')
         .eq('district_id', selectedDistrict)
         .order('name')
-        .limit(500)
+        .limit(200)
       
       if (schoolsData) setSchools(schoolsData)
     }
@@ -263,7 +263,7 @@ export default function LeaderboardPage() {
       `)
       .gt('total_questions', 0)
       .order('total_points', { ascending: false })
-      .limit(500)
+      .limit(100)
 
     if (data) {
       let filteredData = data
@@ -449,7 +449,7 @@ export default function LeaderboardPage() {
           `)
           .gt(cols.correct, 0)
           .order(cols.points, { ascending: false })
-          .limit(500)
+          .limit(100)
 
         if (data) {
           let filteredData = data
