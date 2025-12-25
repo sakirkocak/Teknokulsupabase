@@ -83,17 +83,32 @@ export async function generateStaticParams() {
 }
 
 async function getQuestionData(questionId: string) {
-  const supabase = await createClient()
-  
-  // Paralel sorgular
-  const [questionResult, relatedResult] = await Promise.all([
-    supabase.rpc('get_question_detail', { p_question_id: questionId }),
-    supabase.rpc('get_related_questions', { p_question_id: questionId, p_limit: 5 }),
-  ])
-  
-  return {
-    question: questionResult.data?.[0] || null,
-    relatedQuestions: relatedResult.data || [],
+  try {
+    const supabase = await createClient()
+    
+    // Paralel sorgular
+    const [questionResult, relatedResult] = await Promise.all([
+      supabase.rpc('get_question_detail', { p_question_id: questionId }),
+      supabase.rpc('get_related_questions', { p_question_id: questionId, p_limit: 5 }),
+    ])
+    
+    if (questionResult.error) {
+      console.error('get_question_detail error:', questionResult.error)
+    }
+    if (relatedResult.error) {
+      console.error('get_related_questions error:', relatedResult.error)
+    }
+    
+    return {
+      question: questionResult.data?.[0] || null,
+      relatedQuestions: relatedResult.data || [],
+    }
+  } catch (error) {
+    console.error('getQuestionData exception:', error)
+    return {
+      question: null,
+      relatedQuestions: [],
+    }
   }
 }
 
