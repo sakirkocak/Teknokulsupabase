@@ -163,6 +163,110 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.log('Blog tablosu bulunamadı, statik sayfalar ile devam ediliyor')
   }
 
-  return [...staticPages, ...coachPages, ...materialPages, ...blogPages]
+  // ========== SORU BANKAS SEO SAYFALARI ==========
+  
+  // Ana soru bankası sayfası
+  const questionBankPages: MetadataRoute.Sitemap = [
+    {
+      url: `${baseUrl}/sorular`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.95,
+    },
+    // Programatik SEO sayfaları
+    {
+      url: `${baseUrl}/sorular/lgs-en-zor-100`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/sorular/sinav-oncesi-hizli-tekrar`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/sorular/yeni-eklenen-sorular`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/sorular/en-cok-cozulen`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+    {
+      url: `${baseUrl}/sorular/gorselli-sorular`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.85,
+    },
+  ]
+
+  // Ders bazlı sayfalar (Pillar Pages)
+  let subjectPages: MetadataRoute.Sitemap = []
+  const subjectCodes = [
+    'matematik', 'turkce', 'fen_bilimleri', 'sosyal_bilgiler', 
+    'ingilizce', 'fizik', 'kimya', 'biyoloji', 'inkilap_tarihi', 'din_kulturu'
+  ]
+  
+  try {
+    const { data: subjects } = await supabase
+      .from('subjects')
+      .select('code')
+      .in('code', subjectCodes)
+    
+    if (subjects) {
+      // Her ders için pillar page
+      subjectPages = subjects.map((subject) => ({
+        url: `${baseUrl}/sorular/${subject.code}`,
+        lastModified: new Date(),
+        changeFrequency: 'daily' as const,
+        priority: 0.8,
+      }))
+    }
+  } catch (error) {
+    console.error('Ders sayfaları sitemap hatası:', error)
+  }
+
+  // Sınıf bazlı sayfalar (Cluster Pages) - Ders + Sınıf kombinasyonları
+  let gradePages: MetadataRoute.Sitemap = []
+  const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  
+  try {
+    const { data: subjects } = await supabase
+      .from('subjects')
+      .select('code')
+      .in('code', subjectCodes)
+    
+    if (subjects) {
+      // Her ders + sınıf kombinasyonu için cluster page
+      subjects.forEach((subject) => {
+        grades.forEach((grade) => {
+          gradePages.push({
+            url: `${baseUrl}/sorular/${subject.code}/${grade}-sinif`,
+            lastModified: new Date(),
+            changeFrequency: 'daily' as const,
+            priority: grade === 8 || grade === 12 ? 0.75 : 0.7, // LGS ve YKS sınıflarına öncelik
+          })
+        })
+      })
+    }
+  } catch (error) {
+    console.error('Sınıf sayfaları sitemap hatası:', error)
+  }
+
+  return [
+    ...staticPages, 
+    ...coachPages, 
+    ...materialPages, 
+    ...blogPages,
+    ...questionBankPages,
+    ...subjectPages,
+    ...gradePages,
+  ]
 }
 

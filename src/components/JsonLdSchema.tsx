@@ -290,3 +290,154 @@ export function CalculatorSchema({
   )
 }
 
+// Quiz Schema for question pages - Google Rich Snippets
+export interface QuizQuestion {
+  text: string
+  options: string[]
+  correctAnswer: string
+}
+
+export function QuizSchema({
+  name,
+  description,
+  subject,
+  grade,
+  questionCount,
+  questions,
+  url,
+}: {
+  name: string
+  description: string
+  subject: string
+  grade?: number
+  questionCount: number
+  questions: QuizQuestion[]
+  url: string
+}) {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  const quizSchema = {
+    '@context': 'https://schema.org/',
+    '@type': 'Quiz',
+    name: name,
+    description: description,
+    url: url,
+    provider: {
+      '@type': 'Organization',
+      name: 'Teknokul',
+      url: baseUrl,
+    },
+    about: {
+      '@type': 'Thing',
+      name: subject,
+    },
+    educationalLevel: grade ? `${grade}. Sınıf` : 'Tüm Seviyeler',
+    numberOfQuestions: questionCount,
+    educationalAlignment: {
+      '@type': 'AlignmentObject',
+      alignmentType: 'educationalSubject',
+      targetName: subject,
+    },
+    hasPart: questions.slice(0, 10).map((q, index) => ({
+      '@type': 'Question',
+      '@id': `${url}#question-${index + 1}`,
+      position: index + 1,
+      name: q.text.length > 200 ? q.text.substring(0, 200) + '...' : q.text,
+      text: q.text,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: q.correctAnswer,
+      },
+      suggestedAnswer: q.options
+        .filter(opt => opt !== q.correctAnswer)
+        .map(opt => ({
+          '@type': 'Answer',
+          text: opt,
+        })),
+    })),
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'TRY',
+      availability: 'https://schema.org/InStock',
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(quizSchema),
+      }}
+    />
+  )
+}
+
+// Breadcrumb Schema helper for navigation
+export function BreadcrumbSchema({
+  items,
+}: {
+  items: { name: string; url: string }[]
+}) {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: item.url.startsWith('http') ? item.url : `${baseUrl}${item.url}`,
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(breadcrumbSchema),
+      }}
+    />
+  )
+}
+
+// ItemList Schema for question list pages
+export function QuestionListSchema({
+  name,
+  description,
+  url,
+  items,
+}: {
+  name: string
+  description: string
+  url: string
+  items: { name: string; url: string; position: number }[]
+}) {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  const listSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: name,
+    description: description,
+    url: url,
+    numberOfItems: items.length,
+    itemListElement: items.map((item) => ({
+      '@type': 'ListItem',
+      position: item.position,
+      name: item.name,
+      url: item.url.startsWith('http') ? item.url : `${baseUrl}${item.url}`,
+    })),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(listSchema),
+      }}
+    />
+  )
+}
+

@@ -1,0 +1,508 @@
+import { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
+import { 
+  BookOpen, Calculator, Beaker, Globe, Languages, 
+  Atom, FlaskConical, Leaf, History, BookText,
+  ChevronRight, CheckCircle, Star, Zap, Crown,
+  ArrowLeft, Play, Target, Sparkles
+} from 'lucide-react'
+
+const subjectMeta: Record<string, { name: string }> = {
+  'matematik': { name: 'Matematik' },
+  'turkce': { name: 'Türkçe' },
+  'fen_bilimleri': { name: 'Fen Bilimleri' },
+  'sosyal_bilgiler': { name: 'Sosyal Bilgiler' },
+  'ingilizce': { name: 'İngilizce' },
+  'fizik': { name: 'Fizik' },
+  'kimya': { name: 'Kimya' },
+  'biyoloji': { name: 'Biyoloji' },
+  'inkilap_tarihi': { name: 'İnkılap Tarihi' },
+  'din_kulturu': { name: 'Din Kültürü' },
+}
+
+const subjectIcons: Record<string, React.ReactNode> = {
+  'matematik': <Calculator className="w-6 h-6" />,
+  'turkce': <BookText className="w-6 h-6" />,
+  'fen_bilimleri': <Beaker className="w-6 h-6" />,
+  'sosyal_bilgiler': <Globe className="w-6 h-6" />,
+  'ingilizce': <Languages className="w-6 h-6" />,
+  'fizik': <Atom className="w-6 h-6" />,
+  'kimya': <FlaskConical className="w-6 h-6" />,
+  'biyoloji': <Leaf className="w-6 h-6" />,
+  'inkilap_tarihi': <History className="w-6 h-6" />,
+  'din_kulturu': <BookOpen className="w-6 h-6" />,
+}
+
+const subjectColors: Record<string, { gradient: string; light: string; text: string }> = {
+  'matematik': { gradient: 'from-red-500 to-rose-600', light: 'bg-red-50', text: 'text-red-600' },
+  'turkce': { gradient: 'from-blue-500 to-indigo-600', light: 'bg-blue-50', text: 'text-blue-600' },
+  'fen_bilimleri': { gradient: 'from-green-500 to-emerald-600', light: 'bg-green-50', text: 'text-green-600' },
+  'sosyal_bilgiler': { gradient: 'from-orange-500 to-amber-600', light: 'bg-orange-50', text: 'text-orange-600' },
+  'ingilizce': { gradient: 'from-purple-500 to-violet-600', light: 'bg-purple-50', text: 'text-purple-600' },
+  'fizik': { gradient: 'from-indigo-500 to-blue-600', light: 'bg-indigo-50', text: 'text-indigo-600' },
+  'kimya': { gradient: 'from-pink-500 to-rose-600', light: 'bg-pink-50', text: 'text-pink-600' },
+  'biyoloji': { gradient: 'from-emerald-500 to-teal-600', light: 'bg-emerald-50', text: 'text-emerald-600' },
+  'inkilap_tarihi': { gradient: 'from-amber-500 to-orange-600', light: 'bg-amber-50', text: 'text-amber-600' },
+  'din_kulturu': { gradient: 'from-teal-500 to-cyan-600', light: 'bg-teal-50', text: 'text-teal-600' },
+}
+
+const difficultyConfig = {
+  easy: { label: 'Kolay', color: 'bg-green-100 text-green-700', icon: CheckCircle },
+  medium: { label: 'Orta', color: 'bg-yellow-100 text-yellow-700', icon: Star },
+  hard: { label: 'Zor', color: 'bg-orange-100 text-orange-700', icon: Zap },
+  legendary: { label: 'Efsane', color: 'bg-purple-100 text-purple-700', icon: Crown },
+}
+
+interface Props {
+  params: Promise<{ subject: string; grade: string }>
+}
+
+function parseGrade(gradeParam: string): number | null {
+  // "8-sinif" formatından sadece sayıyı al
+  const match = gradeParam.match(/^(\d+)-sinif$/)
+  if (match) {
+    const grade = parseInt(match[1], 10)
+    if (grade >= 1 && grade <= 12) {
+      return grade
+    }
+  }
+  return null
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { subject, grade: gradeParam } = await params
+  const meta = subjectMeta[subject]
+  const grade = parseGrade(gradeParam)
+  
+  if (!meta || !grade) {
+    return { title: 'Sayfa Bulunamadı' }
+  }
+  
+  const isLGS = grade === 8
+  const isYKS = grade === 12
+  const examLabel = isLGS ? ' (LGS)' : isYKS ? ' (YKS)' : ''
+  
+  const title = `${grade}. Sınıf ${meta.name} Soruları${examLabel} | Teknokul`
+  const description = `${grade}. sınıf ${meta.name} soruları - MEB müfredatına uygun, zorluk seviyelerine göre ayrılmış kapsamlı soru bankası.${isLGS ? ' LGS hazırlık soruları.' : ''}${isYKS ? ' YKS hazırlık soruları.' : ''}`
+  
+  return {
+    title,
+    description,
+    keywords: [
+      `${grade}. sınıf ${meta.name.toLowerCase()} soruları`,
+      `${meta.name.toLowerCase()} test`,
+      isLGS ? 'LGS soruları' : '',
+      isYKS ? 'YKS soruları' : '',
+    ].filter(Boolean),
+    openGraph: {
+      title,
+      description,
+      url: `https://www.teknokul.com.tr/sorular/${subject}/${grade}-sinif`,
+      type: 'website',
+    },
+    alternates: {
+      canonical: `https://www.teknokul.com.tr/sorular/${subject}/${grade}-sinif`,
+    },
+  }
+}
+
+export async function generateStaticParams() {
+  const subjects = Object.keys(subjectMeta)
+  const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  
+  const params: { subject: string; grade: string }[] = []
+  
+  subjects.forEach((subject) => {
+    grades.forEach((grade) => {
+      params.push({ subject, grade: `${grade}-sinif` })
+    })
+  })
+  
+  return params
+}
+
+async function getQuestionsData(subjectCode: string, grade: number) {
+  const supabase = await createClient()
+  
+  // Subject ID'yi bul
+  const { data: subject } = await supabase
+    .from('subjects')
+    .select('id, name')
+    .eq('code', subjectCode)
+    .single()
+  
+  if (!subject) return null
+  
+  // Bu sınıftaki topic'leri bul
+  const { data: topics } = await supabase
+    .from('topics')
+    .select('id, main_topic, sub_topic')
+    .eq('subject_id', subject.id)
+    .eq('grade', grade)
+  
+  if (!topics || topics.length === 0) return null
+  
+  const topicIds = topics.map(t => t.id)
+  
+  // Soruları getir (ilk 20 tanesi Schema için)
+  const { data: questions, count: totalCount } = await supabase
+    .from('questions')
+    .select('id, question_text, options, correct_answer, difficulty, topic_id', { count: 'exact' })
+    .in('topic_id', topicIds)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  
+  // Zorluk dağılımını hesapla
+  const difficultyStats = {
+    easy: 0,
+    medium: 0,
+    hard: 0,
+    legendary: 0,
+  }
+  
+  if (questions) {
+    // Tüm sorular için zorluk dağılımı
+    const { data: allQuestions } = await supabase
+      .from('questions')
+      .select('difficulty')
+      .in('topic_id', topicIds)
+    
+    allQuestions?.forEach((q) => {
+      if (q.difficulty in difficultyStats) {
+        difficultyStats[q.difficulty as keyof typeof difficultyStats]++
+      }
+    })
+  }
+  
+  // Topic'leri grupla
+  const topicGroups = new Map<string, { subTopics: string[]; questionCount: number }>()
+  
+  for (const topic of topics) {
+    const existing = topicGroups.get(topic.main_topic)
+    if (existing) {
+      if (topic.sub_topic && !existing.subTopics.includes(topic.sub_topic)) {
+        existing.subTopics.push(topic.sub_topic)
+      }
+    } else {
+      topicGroups.set(topic.main_topic, {
+        subTopics: topic.sub_topic ? [topic.sub_topic] : [],
+        questionCount: 0,
+      })
+    }
+  }
+  
+  // Her topic için soru sayısı
+  for (const topic of topics) {
+    const { count } = await supabase
+      .from('questions')
+      .select('id', { count: 'exact', head: true })
+      .eq('topic_id', topic.id)
+    
+    const group = topicGroups.get(topic.main_topic)
+    if (group) {
+      group.questionCount += count || 0
+    }
+  }
+  
+  return {
+    subject,
+    topics: Array.from(topicGroups.entries()).map(([name, data]) => ({
+      name,
+      ...data,
+    })),
+    questions: questions || [],
+    totalCount: totalCount || 0,
+    difficultyStats,
+  }
+}
+
+export default async function GradePage({ params }: Props) {
+  const { subject, grade: gradeParam } = await params
+  const meta = subjectMeta[subject]
+  const grade = parseGrade(gradeParam)
+  
+  if (!meta || !grade) {
+    notFound()
+  }
+  
+  const data = await getQuestionsData(subject, grade)
+  
+  if (!data) {
+    notFound()
+  }
+  
+  const colors = subjectColors[subject] || { gradient: 'from-gray-500 to-gray-600', light: 'bg-gray-50', text: 'text-gray-600' }
+  const icon = subjectIcons[subject] || <BookOpen className="w-6 h-6" />
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  const isLGS = grade === 8
+  const isYKS = grade === 12
+  const examLabel = isLGS ? ' (LGS)' : isYKS ? ' (YKS)' : ''
+  
+  // Quiz Schema için soruları hazırla
+  const quizQuestions: QuizQuestion[] = data.questions.map((q) => {
+    const options = q.options as { A: string; B: string; C: string; D: string; E?: string }
+    const correctAnswer = options[q.correct_answer as keyof typeof options] || ''
+    
+    return {
+      text: q.question_text,
+      options: Object.values(options).filter(Boolean) as string[],
+      correctAnswer,
+    }
+  })
+
+  return (
+    <>
+      <BreadcrumbSchema
+        items={[
+          { name: 'Ana Sayfa', url: '/' },
+          { name: 'Soru Bankası', url: '/sorular' },
+          { name: meta.name, url: `/sorular/${subject}` },
+          { name: `${grade}. Sınıf`, url: `/sorular/${subject}/${grade}-sinif` },
+        ]}
+      />
+      <QuizSchema
+        name={`${grade}. Sınıf ${meta.name} Soruları${examLabel}`}
+        description={`${grade}. sınıf ${meta.name} soruları - MEB müfredatına uygun ${data.totalCount} soru`}
+        subject={meta.name}
+        grade={grade}
+        questionCount={data.totalCount}
+        questions={quizQuestions}
+        url={`${baseUrl}/sorular/${subject}/${grade}-sinif`}
+      />
+      
+      {/* Header */}
+      <header className={`bg-gradient-to-r ${colors.gradient} text-white`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-2 text-white/70 text-sm mb-6 flex-wrap">
+            <Link href="/" className="hover:text-white transition-colors">Ana Sayfa</Link>
+            <ChevronRight className="w-4 h-4" />
+            <Link href="/sorular" className="hover:text-white transition-colors">Soru Bankası</Link>
+            <ChevronRight className="w-4 h-4" />
+            <Link href={`/sorular/${subject}`} className="hover:text-white transition-colors">{meta.name}</Link>
+            <ChevronRight className="w-4 h-4" />
+            <span className="text-white font-medium">{grade}. Sınıf</span>
+          </nav>
+          
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                {icon}
+              </div>
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold">
+                    {grade}. Sınıf {meta.name}
+                  </h1>
+                  {(isLGS || isYKS) && (
+                    <span className={`px-3 py-1 ${isLGS ? 'bg-orange-500' : 'bg-purple-500'} text-white text-sm font-semibold rounded-full`}>
+                      {isLGS ? 'LGS' : 'YKS'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-lg text-white/90">
+                  MEB müfredatına uygun {data.totalCount.toLocaleString('tr-TR')} soru
+                </p>
+              </div>
+            </div>
+            
+            {/* CTA */}
+            <Link
+              href={`/hizli-coz?subject=${subject}&grade=${grade}`}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-colors shadow-lg"
+            >
+              <Play className="w-5 h-5" />
+              Hemen Çöz
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Back Link */}
+        <Link 
+          href={`/sorular/${subject}`}
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {meta.name} - Tüm Sınıflara Dön
+        </Link>
+
+        {/* Zorluk Dağılımı */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Zorluk Dağılımı</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(difficultyConfig).map(([key, config]) => {
+              const count = data.difficultyStats[key as keyof typeof data.difficultyStats]
+              const Icon = config.icon
+              
+              return (
+                <div key={key} className={`p-4 rounded-xl ${config.color}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{config.label}</span>
+                  </div>
+                  <div className="text-2xl font-bold">{count.toLocaleString('tr-TR')}</div>
+                  <div className="text-sm opacity-75">soru</div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+
+        {/* Konular */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Target className="w-5 h-5 text-indigo-600" />
+            Konular ({data.topics.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {data.topics.map((topic, index) => (
+              <div
+                key={index}
+                className={`p-5 rounded-xl ${colors.light} border border-gray-100 hover:shadow-md transition-all`}
+              >
+                <h3 className={`font-semibold ${colors.text} mb-2`}>{topic.name}</h3>
+                {topic.subTopics.length > 0 && (
+                  <div className="text-sm text-gray-600 mb-3">
+                    {topic.subTopics.slice(0, 3).join(', ')}
+                    {topic.subTopics.length > 3 && ` +${topic.subTopics.length - 3} daha`}
+                  </div>
+                )}
+                <div className="text-sm font-medium text-gray-500">
+                  {topic.questionCount.toLocaleString('tr-TR')} soru
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Örnek Sorular */}
+        <section className="mb-12">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-amber-500" />
+            Örnek Sorular
+          </h2>
+          <div className="space-y-4">
+            {data.questions.slice(0, 5).map((question, index) => {
+              const difficulty = difficultyConfig[question.difficulty as keyof typeof difficultyConfig]
+              const DiffIcon = difficulty?.icon || Star
+              const options = question.options as { A: string; B: string; C: string; D: string; E?: string }
+              
+              return (
+                <div
+                  key={question.id}
+                  className="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-500">Soru {index + 1}</span>
+                      {difficulty && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${difficulty.color}`}>
+                          <DiffIcon className="w-3 h-3" />
+                          {difficulty.label}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <p className="text-gray-800 mb-4 line-clamp-3">
+                    {question.question_text}
+                  </p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {Object.entries(options).filter(([_, v]) => v).map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
+                      >
+                        <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
+                          {key}
+                        </span>
+                        <span className="text-gray-700 line-clamp-1">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          
+          {data.totalCount > 5 && (
+            <div className="text-center mt-6">
+              <Link
+                href={`/hizli-coz?subject=${subject}&grade=${grade}`}
+                className={`inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r ${colors.gradient} text-white font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-lg`}
+              >
+                <Play className="w-5 h-5" />
+                Tüm {data.totalCount.toLocaleString('tr-TR')} Soruyu Çöz
+              </Link>
+            </div>
+          )}
+        </section>
+
+        {/* İlgili Sayfalar */}
+        <section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">İlgili Sayfalar</h2>
+          <div className="flex flex-wrap gap-3">
+            {grade > 1 && (
+              <Link
+                href={`/sorular/${subject}/${grade - 1}-sinif`}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+              >
+                ← {grade - 1}. Sınıf {meta.name}
+              </Link>
+            )}
+            {grade < 12 && (
+              <Link
+                href={`/sorular/${subject}/${grade + 1}-sinif`}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+              >
+                {grade + 1}. Sınıf {meta.name} →
+              </Link>
+            )}
+            <Link
+              href="/sorular/lgs-en-zor-100"
+              className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm"
+            >
+              LGS En Zor 100 Soru
+            </Link>
+            <Link
+              href="/sorular/sinav-oncesi-hizli-tekrar"
+              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm"
+            >
+              Hızlı Tekrar
+            </Link>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-gray-50 border-t border-gray-200 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <p className="text-gray-600 text-sm">
+              © 2025 Teknokul. Tüm hakları saklıdır.
+            </p>
+            <div className="flex items-center gap-6">
+              <Link href="/" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">
+                Ana Sayfa
+              </Link>
+              <Link href="/sorular" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">
+                Soru Bankası
+              </Link>
+              <Link href="/hizli-coz" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">
+                Hızlı Çöz
+              </Link>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </>
+  )
+}
+
