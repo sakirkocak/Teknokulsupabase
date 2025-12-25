@@ -724,6 +724,10 @@ export default function HomePage() {
                 <Trophy className="w-4 h-4" />
                 Liderlik
               </Link>
+              <Link href="/sorular" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+                <FileText className="w-4 h-4" />
+                Soru Bankası
+              </Link>
               <Link href="/rehberler" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
                 <BookOpen className="w-4 h-4" />
                 Rehberlik
@@ -841,6 +845,14 @@ export default function HomePage() {
                 Liderlik
               </Link>
               <Link 
+                href="/sorular" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
+              >
+                <FileText className="w-4 h-4" />
+                Soru Bankası
+              </Link>
+              <Link 
                 href="/rehberler" 
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
@@ -951,11 +963,15 @@ export default function HomePage() {
               <span className="font-semibold text-surface-800"> AI destekli öğrenme</span> ile fark yarat.
             </p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
               <Link href="/hizli-coz" className="group relative btn btn-lg px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/30 transition-all hover:shadow-xl hover:shadow-orange-500/40 hover:scale-105">
                 <Target className="w-5 h-5" />
                 Hemen Soru Çöz
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link href="/sorular" className="btn btn-outline btn-lg border-indigo-300 text-indigo-600 hover:bg-indigo-50">
+                <FileText className="w-5 h-5" />
+                Soru Bankası
               </Link>
               <Link href="/liderlik" className="btn btn-outline btn-lg border-purple-300 text-purple-600 hover:bg-purple-50">
                 <Trophy className="w-5 h-5" />
