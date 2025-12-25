@@ -158,7 +158,7 @@ export default function LeaderboardPage() {
     async function loadCities() {
       const { data } = await supabase
         .from('turkey_cities')
-        .select('id, name, plate_code')
+        .select('id, name, plate_code, created_at')
         .order('name')
       if (data) setCities(data)
     }
