@@ -144,29 +144,17 @@ export default function AdminUsersPage() {
     setDeleting(true)
 
     try {
-      // 1. İlişkili profilleri sil
-      await supabase.from('student_profiles').delete().eq('user_id', userId)
-      await supabase.from('teacher_profiles').delete().eq('user_id', userId)
-      await supabase.from('parent_profiles').delete().eq('user_id', userId)
-      
-      // 2. İlişkili verileri sil (opsiyonel - cascade ile de yapılabilir)
-      // Bildirimleri sil
-      await supabase.from('notifications').delete().eq('user_id', userId)
-      // Mesajları sil
-      await supabase.from('messages').delete().eq('sender_id', userId)
-      await supabase.from('messages').delete().eq('receiver_id', userId)
+      // API route üzerinden sil (Admin API ile RLS bypass)
+      const response = await fetch(`/api/admin/delete-user?userId=${userId}`, {
+        method: 'DELETE',
+      })
 
-      // 3. Ana profili sil
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId)
+      const result = await response.json()
 
-      if (error) {
-        console.error('Kullanıcı silme hatası:', error)
-        alert('Kullanıcı silinirken bir hata oluştu: ' + error.message)
+      if (!response.ok) {
+        alert('Hata: ' + (result.error || 'Kullanıcı silinemedi'))
       } else {
-        alert('Kullanıcı başarıyla silindi!')
+        alert(result.message || 'Kullanıcı başarıyla silindi!')
         loadUsers()
       }
     } catch (err: any) {
