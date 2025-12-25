@@ -19,7 +19,9 @@ import {
   Users2,
   Ban,
   CheckCircle,
-  Mail
+  Mail,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react'
 
 export default function AdminUsersPage() {
@@ -29,6 +31,8 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
   const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [deleteConfirm, setDeleteConfirm] = useState<any>(null)
+  const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -132,6 +136,46 @@ export default function AdminUsersPage() {
 
     if (!error) {
       loadUsers()
+    }
+  }
+
+  async function deleteUser(userId: string) {
+    if (deleting) return
+    setDeleting(true)
+
+    try {
+      // 1. İlişkili profilleri sil
+      await supabase.from('student_profiles').delete().eq('user_id', userId)
+      await supabase.from('teacher_profiles').delete().eq('user_id', userId)
+      await supabase.from('parent_profiles').delete().eq('user_id', userId)
+      
+      // 2. İlişkili verileri sil (opsiyonel - cascade ile de yapılabilir)
+      // Bildirimleri sil
+      await supabase.from('notifications').delete().eq('user_id', userId)
+      // Mesajları sil
+      await supabase.from('messages').delete().eq('sender_id', userId)
+      await supabase.from('messages').delete().eq('receiver_id', userId)
+
+      // 3. Ana profili sil
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
+
+      if (error) {
+        console.error('Kullanıcı silme hatası:', error)
+        alert('Kullanıcı silinirken bir hata oluştu: ' + error.message)
+      } else {
+        alert('Kullanıcı başarıyla silindi!')
+        loadUsers()
+      }
+    } catch (err: any) {
+      console.error('Hata:', err)
+      alert('Bir hata oluştu: ' + err.message)
+    } finally {
+      setDeleting(false)
+      setDeleteConfirm(null)
+      setSelectedUser(null)
     }
   }
 
@@ -301,6 +345,19 @@ export default function AdminUsersPage() {
                                   {user.role === r && <CheckCircle className="w-3 h-3 ml-auto" />}
                                 </button>
                               ))}
+                              {/* Sil Butonu */}
+                              {user.role !== 'admin' && (
+                                <>
+                                  <div className="border-t border-surface-100 my-1" />
+                                  <button
+                                    onClick={() => setDeleteConfirm(user)}
+                                    className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    Kullanıcıyı Sil
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
@@ -320,6 +377,71 @@ export default function AdminUsersPage() {
           )}
         </div>
       </div>
+
+      {/* Silme Onay Modalı */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-surface-900">Kullanıcıyı Sil</h3>
+                <p className="text-sm text-surface-500">Bu işlem geri alınamaz!</p>
+              </div>
+            </div>
+            
+            <div className="bg-surface-50 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-medium">
+                  {getInitials(deleteConfirm.full_name)}
+                </div>
+                <div>
+                  <div className="font-medium text-surface-900">{deleteConfirm.full_name}</div>
+                  <div className="text-sm text-surface-500">{deleteConfirm.email}</div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-sm text-surface-600 mb-6">
+              <strong>{deleteConfirm.full_name}</strong> kullanıcısını ve tüm ilişkili verilerini 
+              (profil, puanlar, mesajlar, bildirimler vb.) kalıcı olarak silmek istediğinize emin misiniz?
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 border border-surface-200 text-surface-700 rounded-xl hover:bg-surface-50 transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => deleteUser(deleteConfirm.id)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Siliniyor...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Evet, Sil
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </>
   )
 }
