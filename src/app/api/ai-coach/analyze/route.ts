@@ -4,6 +4,8 @@ import { generateAnalysisSummary } from '@/lib/ai-coach/gemini'
 import { StudentContext, getMotivationalMessages, getSubjectName } from '@/lib/ai-coach/prompts'
 import { getCurrentNotification } from '@/lib/ai-coach/notifications'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
