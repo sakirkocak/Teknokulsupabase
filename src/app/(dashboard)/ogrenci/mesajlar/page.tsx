@@ -69,27 +69,49 @@ export default function StudentMessagesPage() {
   }, [messages])
 
   async function loadCoach() {
-    const { data } = await supabase
-      .from('coaching_relationships')
-      .select(`
-        coach:teacher_profiles!coaching_relationships_coach_id_fkey(
-          id,
-          user_id,
-          profile:profiles!teacher_profiles_user_id_fkey(id, full_name, avatar_url)
-        )
-      `)
-      .eq('student_id', studentProfile?.id)
-      .eq('status', 'active')
-      .single()
+    try {
+      // 1. Coaching relationship'i çek
+      const { data: relData, error: relError } = await supabase
+        .from('coaching_relationships')
+        .select('coach_id')
+        .eq('student_id', studentProfile?.id)
+        .eq('status', 'active')
+        .single()
 
-    if (data?.coach) {
-      const coachData = data.coach as any
-      const coachProfile = Array.isArray(coachData.profile) ? coachData.profile[0] : coachData.profile
-      setCoach({
-        ...coachData,
-        profile: coachProfile,
-        profile_id: coachProfile?.id,
-      })
+      if (relError || !relData) {
+        console.log('Aktif koçluk ilişkisi yok')
+        return
+      }
+
+      // 2. Teacher profile çek
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teacher_profiles')
+        .select('id, user_id')
+        .eq('id', relData.coach_id)
+        .single()
+
+      if (teacherError || !teacherData) {
+        console.error('Koç profili bulunamadı:', teacherError)
+        return
+      }
+
+      // 3. Profile bilgisini çek
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('id', teacherData.user_id)
+        .single()
+
+      if (profileData) {
+        setCoach({
+          id: teacherData.id,
+          user_id: teacherData.user_id,
+          profile: profileData,
+          profile_id: profileData.id,
+        })
+      }
+    } catch (err) {
+      console.error('Koç yükleme hatası:', err)
     }
   }
 

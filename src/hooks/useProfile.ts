@@ -156,7 +156,7 @@ export function useTeacherProfile(userId: string) {
     try {
       const { data, error } = await supabase
         .from('teacher_profiles')
-        .select('id, user_id, headline, bio, subjects, experience_years, education, languages, hourly_rate, available_days, lesson_types, average_rating, review_count, is_verified, is_coach, is_listed, video_url, certificates, specializations, teaching_style, target_students, achievements, created_at')
+        .select('id, user_id, headline, bio, experience_years, education, languages, hourly_rate, available_days, lesson_types, average_rating, review_count, is_coach, is_listed, video_url, certificates, specializations, teaching_style, target_students, achievements, created_at')
         .eq('user_id', userId)
         .single()
 

@@ -36,27 +36,52 @@ export default function MyCoachPage() {
 
   async function loadCoach() {
     setLoading(true)
+    try {
+      // 1. Coaching relationship'i çek
+      const { data: relData, error: relError } = await supabase
+        .from('coaching_relationships')
+        .select('id, coach_id, student_id, status, started_at, created_at')
+        .eq('student_id', studentProfile?.id)
+        .in('status', ['active', 'pending'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
 
-    const { data } = await supabase
-      .from('coaching_relationships')
-      .select(`
-        *,
-        coach:teacher_profiles!coaching_relationships_coach_id_fkey(
-          *,
-          profile:profiles!teacher_profiles_user_id_fkey(full_name, avatar_url, email)
-        )
-      `)
-      .eq('student_id', studentProfile?.id)
-      .in('status', ['active', 'pending'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+      if (relError || !relData) {
+        console.log('Koçluk ilişkisi bulunamadı:', relError)
+        setLoading(false)
+        return
+      }
 
-    if (data) {
-      setRelationship(data)
-      setCoach(data.coach)
+      setRelationship(relData)
+
+      // 2. Teacher profile çek
+      const { data: teacherData, error: teacherError } = await supabase
+        .from('teacher_profiles')
+        .select('id, user_id, headline, bio, subjects, experience_years, education, languages, hourly_rate, available_days, lesson_types, average_rating, review_count, is_verified')
+        .eq('id', relData.coach_id)
+        .single()
+
+      if (teacherError || !teacherData) {
+        console.error('Koç profili bulunamadı:', teacherError)
+        setLoading(false)
+        return
+      }
+
+      // 3. Profile bilgisini çek
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url, email')
+        .eq('id', teacherData.user_id)
+        .single()
+
+      setCoach({
+        ...teacherData,
+        profile: profileData
+      })
+    } catch (err) {
+      console.error('Koç yükleme hatası:', err)
     }
-
     setLoading(false)
   }
 

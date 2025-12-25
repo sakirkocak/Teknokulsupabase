@@ -41,17 +41,28 @@ export default function StudentDetailPage() {
     setLoading(true)
 
     // Öğrenci bilgisi
-    const { data: studentData } = await supabase
+    const { data: studentData, error: spError } = await supabase
       .from('student_profiles')
-      .select(`
-        *,
-        profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url, email)
-      `)
+      .select('id, user_id, grade_level, school_name, target_exam')
       .eq('id', params.id)
       .single()
 
+    if (spError) {
+      console.error('student_profiles hatası:', spError)
+    }
+
     if (studentData) {
-      setStudent(studentData)
+      // Profile bilgisini ayrı çek
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url, email')
+        .eq('id', studentData.user_id)
+        .single()
+
+      setStudent({
+        ...studentData,
+        profile: profileData
+      })
     }
 
     // Görevler

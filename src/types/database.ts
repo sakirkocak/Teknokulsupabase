@@ -17,7 +17,7 @@ export interface TeacherProfile {
   user_id: string
   headline: string | null
   bio: string | null
-  subjects: string[]
+  subjects?: string[] // Opsiyonel - tabloda olmayabilir
   experience_years: number
   education: string | null
   languages: string[]
@@ -26,7 +26,7 @@ export interface TeacherProfile {
   lesson_types: string[]
   average_rating: number
   review_count: number
-  is_verified: boolean
+  is_verified?: boolean // Opsiyonel - tabloda olmayabilir
   is_coach: boolean
   is_listed: boolean
   video_url: string | null

@@ -45,51 +45,103 @@ export default function CoachDashboard() {
   async function loadDashboardData() {
     if (!teacherProfile?.id) return
 
-    // Aktif öğrencileri yükle
-    const { data: activeRelationships } = await supabase
-      .from('coaching_relationships')
-      .select(`
-        *,
-        student:student_profiles!coaching_relationships_student_id_fkey(
-          id,
-          user_id,
-          grade_level,
-          profiles:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
-        )
-      `)
-      .eq('coach_id', teacherProfile.id)
-      .eq('status', 'active')
+    try {
+      // 1. Aktif ilişkileri çek
+      const { data: activeRelationships, error: activeError } = await supabase
+        .from('coaching_relationships')
+        .select('id, student_id, started_at')
+        .eq('coach_id', teacherProfile.id)
+        .eq('status', 'active')
 
-    if (activeRelationships) {
-      const studentData = activeRelationships.map(r => ({
-        ...r.student,
-        relationship_id: r.id,
-        started_at: r.started_at,
-      }))
-      setStudents(studentData)
-      setStats(prev => ({ ...prev, totalStudents: activeRelationships.length }))
-    }
+      if (activeError) {
+        console.error('Aktif ilişkiler hatası:', activeError)
+      }
 
-    // Bekleyen başvuruları yükle
-    const { data: pending } = await supabase
-      .from('coaching_relationships')
-      .select(`
-        *,
-        student:student_profiles!coaching_relationships_student_id_fkey(
-          id,
-          user_id,
-          grade_level,
-          school_name,
-          profiles:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
-        )
-      `)
-      .eq('coach_id', teacherProfile.id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
+      // 2. Bekleyen ilişkileri çek
+      const { data: pendingRelationships, error: pendingError } = await supabase
+        .from('coaching_relationships')
+        .select('id, student_id, created_at')
+        .eq('coach_id', teacherProfile.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
 
-    if (pending) {
-      setPendingRequests(pending)
-      setStats(prev => ({ ...prev, pendingRequests: pending.length }))
+      if (pendingError) {
+        console.error('Bekleyen ilişkiler hatası:', pendingError)
+      }
+
+      // 3. Tüm student ID'leri topla
+      const allStudentIds = [
+        ...(activeRelationships || []).map(r => r.student_id),
+        ...(pendingRelationships || []).map(r => r.student_id)
+      ].filter(Boolean)
+
+      if (allStudentIds.length === 0) {
+        setStudents([])
+        setPendingRequests([])
+        setStats(prev => ({ ...prev, totalStudents: 0, pendingRequests: 0 }))
+        return
+      }
+
+      // 4. Student profiles çek
+      const { data: studentProfiles, error: spError } = await supabase
+        .from('student_profiles')
+        .select('id, user_id, grade_level, school_name')
+        .in('id', allStudentIds)
+
+      if (spError) {
+        console.error('Student profiles hatası:', spError)
+      }
+
+      // 5. Profiles çek
+      const userIds = (studentProfiles || []).map(sp => sp.user_id).filter(Boolean)
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds)
+
+      if (pError) {
+        console.error('Profiles hatası:', pError)
+      }
+
+      // 6. Verileri birleştir - Aktif öğrenciler
+      if (activeRelationships) {
+        const studentData = activeRelationships.map(rel => {
+          const studentProfile = studentProfiles?.find(sp => sp.id === rel.student_id)
+          const profile = profiles?.find(p => p.id === studentProfile?.user_id)
+          return {
+            id: studentProfile?.id,
+            user_id: studentProfile?.user_id,
+            grade_level: studentProfile?.grade_level,
+            profiles: profile ? { full_name: profile.full_name, avatar_url: profile.avatar_url } : null,
+            relationship_id: rel.id,
+            started_at: rel.started_at,
+          }
+        }).filter(s => s.id)
+        setStudents(studentData)
+        setStats(prev => ({ ...prev, totalStudents: studentData.length }))
+      }
+
+      // 7. Verileri birleştir - Bekleyen başvurular
+      if (pendingRelationships) {
+        const pendingData = pendingRelationships.map(rel => {
+          const studentProfile = studentProfiles?.find(sp => sp.id === rel.student_id)
+          const profile = profiles?.find(p => p.id === studentProfile?.user_id)
+          return {
+            id: rel.id,
+            student: {
+              id: studentProfile?.id,
+              user_id: studentProfile?.user_id,
+              grade_level: studentProfile?.grade_level,
+              school_name: studentProfile?.school_name,
+              profiles: profile ? { full_name: profile.full_name, avatar_url: profile.avatar_url } : null,
+            }
+          }
+        }).filter(r => r.student.id)
+        setPendingRequests(pendingData)
+        setStats(prev => ({ ...prev, pendingRequests: pendingData.length }))
+      }
+    } catch (err) {
+      console.error('Dashboard veri yükleme hatası:', err)
     }
 
     // Görev istatistikleri

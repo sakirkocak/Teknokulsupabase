@@ -32,29 +32,82 @@ export default function CoachStudentsPage() {
   }, [teacherProfile?.id])
 
   async function loadStudents() {
-    const { data } = await supabase
-      .from('coaching_relationships')
-      .select(`
-        *,
-        student:student_profiles!coaching_relationships_student_id_fkey(
-          id,
-          user_id,
-          grade_level,
-          school_name,
-          target_exam,
-          profiles:profiles!student_profiles_user_id_fkey(full_name, avatar_url, email)
-        )
-      `)
-      .eq('coach_id', teacherProfile?.id)
-      .eq('status', 'active')
-      .order('started_at', { ascending: false })
+    try {
+      console.log('=== DEBUG: loadStudents ===')
+      console.log('teacherProfile:', teacherProfile)
+      console.log('teacherProfile?.id:', teacherProfile?.id)
+      
+      // 1. Önce coaching_relationships'i çek
+      const { data: relationships, error: relError } = await supabase
+        .from('coaching_relationships')
+        .select('id, student_id, started_at, coach_id, status')
+        .eq('coach_id', teacherProfile?.id)
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+      
+      console.log('relationships query result:', relationships)
+      console.log('relationships error:', relError)
 
-    if (data) {
-      setStudents(data.map(r => ({
-        ...r.student,
-        relationship_id: r.id,
-        started_at: r.started_at,
-      })))
+      if (relError) {
+        console.error('coaching_relationships hatası:', relError)
+        return
+      }
+
+      if (!relationships || relationships.length === 0) {
+        setStudents([])
+        return
+      }
+
+      // 2. Student ID'lerini al
+      const studentIds = relationships.map(r => r.student_id)
+
+      // 3. Student profiles'ı çek
+      const { data: studentProfiles, error: spError } = await supabase
+        .from('student_profiles')
+        .select('id, user_id, grade_level, school_name, target_exam')
+        .in('id', studentIds)
+
+      if (spError) {
+        console.error('student_profiles hatası:', spError)
+        return
+      }
+
+      // 4. User ID'lerini al ve profiles'ı çek
+      const userIds = (studentProfiles || []).map(sp => sp.user_id).filter(Boolean)
+      
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url, email')
+        .in('id', userIds)
+
+      if (pError) {
+        console.error('profiles hatası:', pError)
+      }
+
+      // 5. Verileri birleştir
+      const studentsData = relationships.map(rel => {
+        const studentProfile = studentProfiles?.find(sp => sp.id === rel.student_id)
+        const profile = profiles?.find(p => p.id === studentProfile?.user_id)
+        
+        return {
+          id: studentProfile?.id,
+          user_id: studentProfile?.user_id,
+          grade_level: studentProfile?.grade_level,
+          school_name: studentProfile?.school_name,
+          target_exam: studentProfile?.target_exam,
+          profiles: profile ? {
+            full_name: profile.full_name,
+            avatar_url: profile.avatar_url,
+            email: profile.email
+          } : null,
+          relationship_id: rel.id,
+          started_at: rel.started_at,
+        }
+      }).filter(s => s.id) // Geçersiz öğrencileri filtrele
+
+      setStudents(studentsData)
+    } catch (err) {
+      console.error('Öğrenci yükleme hatası:', err)
     }
   }
 

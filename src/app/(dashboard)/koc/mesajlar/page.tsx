@@ -70,26 +70,51 @@ export default function CoachMessagesPage() {
   }, [messages])
 
   async function loadConversations() {
-    // Aktif öğrencileri yükle
-    const { data } = await supabase
-      .from('coaching_relationships')
-      .select(`
-        student:student_profiles!coaching_relationships_student_id_fkey(
-          id,
-          user_id,
-          profile:profiles!student_profiles_user_id_fkey(id, full_name, avatar_url)
-        )
-      `)
-      .eq('coach_id', teacherProfile?.id)
-      .eq('status', 'active')
+    try {
+      // 1. Aktif coaching relationships çek
+      const { data: relationships, error: relError } = await supabase
+        .from('coaching_relationships')
+        .select('student_id')
+        .eq('coach_id', teacherProfile?.id)
+        .eq('status', 'active')
 
-    if (data) {
-      const students = data.map((d: any) => {
-        const studentProfile = Array.isArray(d.student?.profile) ? d.student.profile[0] : d.student?.profile
+      if (relError || !relationships || relationships.length === 0) {
+        console.log('Aktif öğrenci yok')
+        setConversations([])
+        return
+      }
+
+      // 2. Student profiles çek
+      const studentIds = relationships.map(r => r.student_id)
+      const { data: studentProfiles, error: spError } = await supabase
+        .from('student_profiles')
+        .select('id, user_id')
+        .in('id', studentIds)
+
+      if (spError || !studentProfiles) {
+        console.error('Öğrenci profilleri bulunamadı:', spError)
+        return
+      }
+
+      // 3. Profiles çek
+      const userIds = studentProfiles.map(sp => sp.user_id).filter(Boolean)
+      const { data: profiles, error: pError } = await supabase
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .in('id', userIds)
+
+      if (pError) {
+        console.error('Profiller bulunamadı:', pError)
+      }
+
+      // 4. Verileri birleştir
+      const students = studentProfiles.map(sp => {
+        const profile = profiles?.find(p => p.id === sp.user_id)
         return {
-          ...d.student,
-          profile: studentProfile,
-          profile_id: studentProfile?.id,
+          id: sp.id,
+          user_id: sp.user_id,
+          profile: profile,
+          profile_id: profile?.id,
         }
       }).filter(s => s.profile_id)
       
@@ -97,6 +122,8 @@ export default function CoachMessagesPage() {
       if (students.length > 0 && !selectedStudent) {
         setSelectedStudent(students[0])
       }
+    } catch (err) {
+      console.error('Konuşmalar yüklenemedi:', err)
     }
   }
 
