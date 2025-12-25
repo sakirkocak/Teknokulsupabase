@@ -5,15 +5,19 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
 interface MathRendererProps {
-  text: string
+  text?: string
+  content?: string // Alias for text
   className?: string
 }
 
-export default function MathRenderer({ text, className = '' }: MathRendererProps) {
+export default function MathRenderer({ text, content, className = '' }: MathRendererProps) {
+  // content veya text kullan
+  const inputText = content || text || ''
+  
   const renderedHtml = useMemo(() => {
-    if (!text) return ''
+    if (!inputText) return ''
     
-    let result = text
+    let result = inputText
     
     // Çift ters eğik çizgiyi tek yap (JSON'dan gelen)
     // \\frac -> \frac, \\sqrt -> \sqrt vb.
@@ -82,9 +86,9 @@ export default function MathRenderer({ text, className = '' }: MathRendererProps
     })
     
     return result
-  }, [text])
+  }, [inputText])
 
-  if (!text) return null
+  if (!inputText) return null
 
   return (
     <span 

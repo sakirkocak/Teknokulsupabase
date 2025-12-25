@@ -11,7 +11,7 @@ import {
   BarChart3, ArrowRight, Clock, Brain, GraduationCap,
   ChevronDown, ChevronUp, Layers, Sparkles, ArrowLeft,
   TrendingUp, Award, Flame, Home, Flag, Medal, Settings,
-  Gift, Timer, Keyboard
+  Gift, Timer, Keyboard, ImageIcon
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
@@ -76,7 +76,8 @@ interface Question {
   topic_id: string
   difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
   question_text: string
-  question_image_url: string | null
+  image_url: string | null // Görüntülü soru desteği
+  question_image_url?: string | null // Eski alan (geriye uyumluluk)
   options: { A: string; B: string; C: string; D: string; E?: string }
   correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
   explanation: string | null
@@ -157,6 +158,7 @@ export default function SoruBankasiPage() {
   const [selectedSubject, setSelectedSubject] = useState<GradeSubject | null>(null)
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('')
+  const [showImageOnly, setShowImageOnly] = useState(false) // Görüntülü soru filtresi
   const [expandedMainTopics, setExpandedMainTopics] = useState<string[]>([])
 
   // Soru çözme state
@@ -277,7 +279,7 @@ export default function SoruBankasiPage() {
       
       // Enter ile sonraki soru
       if (e.key === 'Enter' && showResult) {
-        loadNextQuestion()
+        showImageOnly ? loadNextImageQuestion() : loadNextQuestion()
       }
       
       // ESC ile oturumu bitir
@@ -612,6 +614,106 @@ export default function SoruBankasiPage() {
     setPracticeLoading(false)
   }
 
+  // 🖼️ Görüntülü soru çözme modu - Direkt başlat
+  const startImageQuestionMode = async () => {
+    setShowImageOnly(true)
+    setSelectedTopic(null)
+    setSelectedDifficulty('')
+    setViewMode('practice')
+    setQuestionIndex(0)
+    setSessionStats({ correct: 0, wrong: 0 })
+    setSessionStreak(0)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
+    setPracticeLoading(true)
+    
+    // Görüntülü soruları getir (tüm derslerden veya seçili dersten)
+    let query = supabase
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
+      .eq('is_active', true)
+      .not('question_image_url', 'is', null)
+
+    // Eğer bir ders seçiliyse, o dersten getir
+    if (selectedSubject) {
+      const topicIds = topics.map(t => t.id)
+      if (topicIds.length > 0) {
+        query = query.in('topic_id', topicIds)
+      }
+    } else {
+      // Tüm sınıftan görüntülü sorular
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('id')
+        .eq('grade', selectedGrade)
+        .eq('is_active', true)
+      
+      if (allTopics && allTopics.length > 0) {
+        const topicIds = allTopics.map(t => t.id)
+        query = query.in('topic_id', topicIds)
+      }
+    }
+
+    const { data } = await query
+
+    if (data && data.length > 0) {
+      const randomIndex = Math.floor(Math.random() * data.length)
+      setCurrentQuestion(data[randomIndex] as any)
+      setQuestionIndex(1)
+    } else {
+      setCurrentQuestion(null)
+    }
+    
+    setPracticeLoading(false)
+  }
+
+  // Sonraki görüntülü soruyu yükle
+  const loadNextImageQuestion = async () => {
+    setSelectedAnswer(null)
+    setShowResult(false)
+    setEarnedPoints(null)
+    setTimerKey(prev => prev + 1)
+    setQuestionStartTime(Date.now())
+
+    let query = supabase
+      .from('questions')
+      .select('*, topic:topics(*, subject:subjects(*))')
+      .eq('is_active', true)
+      .not('question_image_url', 'is', null)
+
+    if (selectedSubject) {
+      const topicIds = topics.map(t => t.id)
+      if (topicIds.length > 0) {
+        query = query.in('topic_id', topicIds)
+      }
+    } else {
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('id')
+        .eq('grade', selectedGrade)
+        .eq('is_active', true)
+      
+      if (allTopics && allTopics.length > 0) {
+        const topicIds = allTopics.map(t => t.id)
+        query = query.in('topic_id', topicIds)
+      }
+    }
+
+    if (selectedDifficulty) {
+      query = query.eq('difficulty', selectedDifficulty)
+    }
+
+    const { data } = await query
+
+    if (data && data.length > 0) {
+      const randomIndex = Math.floor(Math.random() * data.length)
+      setCurrentQuestion(data[randomIndex] as any)
+      setQuestionIndex(prev => prev + 1)
+    } else {
+      setCurrentQuestion(null)
+    }
+  }
+
   // Tüm sınıftan rastgele soru yükle
   const loadRandomQuestion = async () => {
     setSelectedAnswer(null)
@@ -711,6 +813,11 @@ export default function SoruBankasiPage() {
 
     if (selectedDifficulty) {
       query = query.eq('difficulty', selectedDifficulty)
+    }
+
+    // Görüntülü soru filtresi
+    if (showImageOnly) {
+      query = query.not('question_image_url', 'is', null)
     }
 
     const { data } = await query
@@ -1128,7 +1235,7 @@ export default function SoruBankasiPage() {
         setReportSuccess(false)
         
         // Sonraki soruya geç
-        loadNextQuestion()
+        showImageOnly ? loadNextImageQuestion() : loadNextQuestion()
       }, 1500)
     } catch (error) {
       console.error('Soru bildirme hatası:', error)
@@ -1216,16 +1323,29 @@ export default function SoruBankasiPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-center"
           >
-            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="h-10 w-10 text-white/60" />
+            <div className={`w-20 h-20 ${showImageOnly ? 'bg-purple-500/20' : 'bg-white/10'} rounded-full flex items-center justify-center mx-auto mb-6`}>
+              {showImageOnly ? (
+                <ImageIcon className="h-10 w-10 text-purple-400" />
+              ) : (
+                <BookOpen className="h-10 w-10 text-white/60" />
+              )}
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Bu Konuda Soru Yok</h2>
-            <p className="text-white/60 mb-6">Bu konu için henüz soru eklenmemiş. Farklı bir konu seçebilirsin.</p>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {showImageOnly ? 'Görüntülü Soru Bulunamadı' : 'Bu Konuda Soru Yok'}
+            </h2>
+            <p className="text-white/60 mb-6">
+              {showImageOnly 
+                ? 'Bu ders/konuda henüz görüntülü soru eklenmemiş. Admin panelinden görüntülü soru üretebilirsiniz.'
+                : 'Bu konu için henüz soru eklenmemiş. Farklı bir konu seçebilirsin.'}
+            </p>
             <button
-              onClick={goBack}
+              onClick={() => {
+                if (showImageOnly) setShowImageOnly(false)
+                goBack()
+              }}
               className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white rounded-xl transition-all font-medium"
             >
-              Başka Konu Seç
+              {showImageOnly ? 'Tüm Sorulara Dön' : 'Başka Konu Seç'}
             </button>
           </motion.div>
         </div>
@@ -1264,6 +1384,14 @@ export default function SoruBankasiPage() {
                   <Target className="h-4 w-4 text-indigo-400" />
                   <span className="text-white font-medium">Soru {questionIndex}</span>
                 </div>
+
+                {/* Görüntülü Soru Modu Badge */}
+                {showImageOnly && (
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-3 py-2 rounded-xl border border-purple-500/50">
+                    <ImageIcon className="h-4 w-4 text-purple-400" />
+                    <span className="text-purple-300 text-sm font-medium hidden sm:inline">Görüntülü</span>
+                  </div>
+                )}
 
                 {/* Zorluk */}
                 <div className={`${difficultyConfig[currentQuestion.difficulty].color} px-3 py-2 rounded-xl text-white text-sm flex items-center gap-2 shadow-lg`}>
@@ -1372,13 +1500,13 @@ export default function SoruBankasiPage() {
               <MathRenderer text={currentQuestion.question_text} />
             </div>
 
-            {/* Görsel */}
-            {currentQuestion.question_image_url && (
-              <div className="mb-8 rounded-xl overflow-hidden border border-white/10">
+            {/* Görsel - Hem image_url hem question_image_url desteklenir */}
+            {(currentQuestion.image_url || currentQuestion.question_image_url) && (
+              <div className="mb-8 rounded-xl overflow-hidden border border-white/10 bg-white/5 p-2">
                 <img 
-                  src={currentQuestion.question_image_url} 
+                  src={currentQuestion.image_url || currentQuestion.question_image_url || ''} 
                   alt="Soru görseli"
-                  className="max-w-full"
+                  className="max-w-full max-h-[400px] mx-auto object-contain rounded-lg"
                 />
               </div>
             )}
@@ -1520,7 +1648,7 @@ export default function SoruBankasiPage() {
                       <span className="hidden sm:inline font-medium">Bildir</span>
                     </button>
                     <button
-                      onClick={() => loadNextQuestion()}
+                      onClick={() => showImageOnly ? loadNextImageQuestion() : loadNextQuestion()}
                       className="flex-1 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50"
                     >
                       Sonraki Soru
@@ -1880,6 +2008,30 @@ export default function SoruBankasiPage() {
               </button>
             </div>
           </div>
+
+          {/* 🖼️ Görüntülü Sorular - Özel Buton */}
+          <motion.button
+            onClick={startImageQuestionMode}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="w-full mb-6 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white rounded-xl p-4 shadow-lg shadow-purple-200 dark:shadow-purple-900/30 hover:shadow-xl transition-all"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                  <ImageIcon className="w-6 h-6" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-bold text-lg">Görüntülü Sorular</h3>
+                  <p className="text-white/80 text-sm">Grafik, tablo ve diyagram içeren sorular</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg">
+                <Play className="w-5 h-5" />
+                <span className="font-semibold">Başla</span>
+              </div>
+            </div>
+          </motion.button>
 
           {/* Zorluk Filtresi */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-6">

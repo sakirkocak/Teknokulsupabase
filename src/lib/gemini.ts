@@ -7,6 +7,14 @@ export const geminiModel = genAI.getGenerativeModel({
   model: 'gemini-3-flash-preview'
 })
 
+// =====================================================
+// NANO BANANA PRO - GÖRÜNTÜ ÜRETİMİ
+// Gemini 3 Pro Image Preview - Yüksek kaliteli görüntü üretimi
+// =====================================================
+export const geminiImageModel = genAI.getGenerativeModel({ 
+  model: 'gemini-3-pro-image-preview'
+})
+
 // Soru tipleri
 export type QuestionType = 'multiple_choice' | 'true_false' | 'open_ended' | 'fill_blank'
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'legendary'
@@ -832,6 +840,494 @@ ${subjectGuidelines}
   } catch (error: any) {
     console.error('Müfredat sorusu üretme hatası:', error)
     throw error
+  }
+}
+
+// =====================================================
+// GÖRÜNTÜLÜ SORU ÜRETİCİ
+// Nano Banana ile eğitim görselleri oluşturma
+// =====================================================
+
+export interface ImageQuestionType {
+  imageType: 'graph' | 'diagram' | 'chart' | 'map' | 'scientific' | 'geometry'
+  subject: string
+  description: string
+}
+
+export interface GeneratedImageQuestion {
+  question_text: string
+  image_prompt: string
+  image_base64?: string
+  options: {
+    A: string
+    B: string
+    C: string
+    D: string
+    E?: string
+  }
+  correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
+  explanation: string
+  difficulty: Difficulty
+  bloom_level: string
+}
+
+// Görüntü tipi açıklamaları
+const imageTypeDescriptions: Record<string, string> = {
+  graph: 'Çizgi grafik, sütun grafik veya pasta grafik',
+  diagram: 'Bilimsel diyagram (DNA, hücre, atom yapısı vb.)',
+  chart: 'Veri tablosu veya karşılaştırma çizelgesi',
+  map: 'Harita veya coğrafi şema',
+  scientific: 'Deney düzeneği veya fizik/kimya şeması',
+  geometry: 'Geometrik şekil veya matematiksel çizim'
+}
+
+// Görüntü prompt'u oluştur
+function createImagePrompt(
+  imageType: string,
+  subject: string,
+  topic: string,
+  description: string,
+  grade: number
+): string {
+  const baseStyle = `Clean, educational diagram style. Simple lines, clear labels in Turkish. 
+White or light gray background. No decorative elements. 
+Suitable for ${grade}. grade students in Turkey.`
+
+  const typePrompts: Record<string, string> = {
+    graph: `Create a clear ${description}. 
+X and Y axes clearly labeled in Turkish. 
+Grid lines visible. Data points connected with smooth lines.
+Legend if multiple data series. ${baseStyle}`,
+    
+    diagram: `Create a scientific diagram of ${description}. 
+Parts clearly labeled in Turkish with arrows.
+Accurate scientific representation.
+Colors: blue, green, orange for different parts. ${baseStyle}`,
+    
+    chart: `Create a data table or chart showing ${description}.
+Rows and columns clearly defined.
+Headers in bold. Numbers clearly readable.
+Use colors to highlight important data. ${baseStyle}`,
+    
+    map: `Create an educational map showing ${description}.
+Geographic features clearly marked.
+Cities/regions labeled in Turkish.
+Compass rose and scale if relevant. ${baseStyle}`,
+    
+    scientific: `Create a scientific illustration of ${description}.
+Equipment/setup clearly labeled in Turkish.
+Arrows showing direction of flow/force if applicable.
+Accurate proportions and relationships. ${baseStyle}`,
+    
+    geometry: `Create a geometric diagram showing ${description}.
+Clean lines, accurate angles.
+Measurements and labels in Turkish.
+Use standard geometric notation. ${baseStyle}`
+  }
+
+  return typePrompts[imageType] || `Create an educational image of ${description}. ${baseStyle}`
+}
+
+// Görüntü üret (Nano Banana)
+export async function generateEducationalImage(
+  prompt: string
+): Promise<{ base64: string; mimeType: string } | null> {
+  try {
+    console.log('Görüntü üretimi başlatılıyor:', prompt.substring(0, 100))
+    
+    const result = await geminiImageModel.generateContent({
+      contents: [{ 
+        role: 'user', 
+        parts: [{ 
+          text: `Generate an educational image: ${prompt}
+          
+          IMPORTANT: Create a clean, simple, educational diagram or illustration.
+          Style: Minimalist, clear labels, suitable for students.
+          DO NOT include any text that is not part of the image labels.` 
+        }] 
+      }],
+      generationConfig: {
+        // @ts-ignore - responseModalities yeni özellik
+        responseModalities: ['image', 'text'],
+      }
+    })
+    
+    const response = await result.response
+    const candidate = response.candidates?.[0]
+    
+    if (candidate?.content?.parts) {
+      for (const part of candidate.content.parts) {
+        // @ts-ignore - inlineData yeni format
+        if (part.inlineData) {
+          // @ts-ignore
+          return {
+            base64: part.inlineData.data,
+            mimeType: part.inlineData.mimeType || 'image/png'
+          }
+        }
+      }
+    }
+    
+    console.log('Görüntü üretilemedi - yanıtta görsel yok')
+    return null
+    
+  } catch (error: any) {
+    console.error('Görüntü üretme hatası:', error)
+    throw error
+  }
+}
+
+// Konuya göre otomatik görsel açıklaması üret
+async function generateImageDescription(
+  grade: number,
+  subject: string,
+  topic: string,
+  imageType: string
+): Promise<string> {
+  const imageTypeDesc = imageTypeDescriptions[imageType] || imageType
+  
+  const prompt = `Sen bir eğitim içerik uzmanısın. ${grade}. sınıf ${subject} dersi "${topic}" konusu için ${imageTypeDesc} türünde bir görsel açıklaması oluştur.
+
+Bu görsel, öğrencilerin konuyu anlamasına yardımcı olacak ve soru sorulabilecek bir görsel olmalı.
+
+SADECE görsel açıklamasını yaz, başka bir şey yazma. Türkçe yaz.
+
+Örnek formatlar:
+- Grafik için: "K, L, M şehirlerinin yıl boyunca gündüz süresi değişimini gösteren çizgi grafik"
+- Diyagram için: "DNA çift sarmal yapısı ve adenin-timin, guanin-sitozin eşleşmelerini gösteren diyagram"
+- Tablo için: "Elementlerin atom numarası, kütle numarası ve elektron sayısını gösteren tablo"
+- Harita için: "Dünya'nın 21 Haziran tarihindeki Güneş etrafındaki konumunu gösteren şema"
+- Deney için: "Asit-baz tepkimesini gösteren deney düzeneği"
+- Geometri için: "ABC üçgeninde açıortay ve kenarortay çizimini gösteren şekil"
+
+ŞİMDİ "${topic}" KONUSU İÇİN UYGUN BİR GÖRSEL AÇIKLAMASI YAZ:`
+
+  try {
+    const result = await geminiModel.generateContent(prompt)
+    const response = await result.response
+    let text = response.text().trim()
+    
+    // Temizle - sadece açıklamayı al
+    text = text.replace(/^["']|["']$/g, '').trim()
+    
+    return text || `${topic} konusunu gösteren ${imageTypeDesc}`
+    
+  } catch (error) {
+    console.error('Görsel açıklaması üretme hatası:', error)
+    return `${topic} konusunu gösteren ${imageTypeDesc}`
+  }
+}
+
+// Görüntülü soru üret (imageDescription artık optional)
+export async function generateImageQuestion(
+  grade: number,
+  subject: string,
+  topic: string,
+  imageType: string,
+  imageDescription?: string, // Artık optional!
+  difficulty: Difficulty = 'medium'
+): Promise<GeneratedImageQuestion> {
+  const isHighSchool = grade >= 9
+  
+  // Eğer görsel açıklaması verilmemişse AI üretsin
+  const finalImageDescription = imageDescription || await generateImageDescription(grade, subject, topic, imageType)
+  
+  console.log('Görsel açıklaması:', finalImageDescription)
+  
+  // Görüntü için prompt oluştur
+  const imagePrompt = createImagePrompt(imageType, subject, topic, finalImageDescription, grade)
+  
+  // Soru metni ve şıkları için AI'dan yardım al
+  const questionPrompt = `Sen bir soru bankası yazarısın. ${grade}. sınıf ${subject} dersi için "${topic}" konusunda GÖRÜNTÜLÜ bir soru hazırla.
+
+GÖRÜNTÜ AÇIKLAMASI: ${finalImageDescription}
+GÖRÜNTÜ TİPİ: ${imageTypeDescriptions[imageType] || imageType}
+ZORLUK: ${difficulty}
+
+Bu görüntüye bakarak cevaplanabilecek bir soru hazırla. Soru, öğrencinin görüntüyü analiz etmesini gerektirsin.
+
+SADECE JSON formatında yanıt ver:
+{
+  "question_text": "Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre... [soru metni]",
+  "image_description": "${finalImageDescription}",
+  "options": {
+    "A": "Şık A metni",
+    "B": "Şık B metni",
+    "C": "Şık C metni",
+    "D": "Şık D metni"${isHighSchool ? ',\n    "E": "Şık E metni"' : ''}
+  },
+  "correct_answer": "B",
+  "explanation": "Doğru cevap B çünkü... [açıklama]",
+  "bloom_level": "analiz"
+}
+
+KURALLAR:
+- Soru görüntüyü analiz etmeyi gerektirsin
+- Doğru cevap rastgele bir şık olsun (her zaman A veya B değil)
+- Açıklama görüntüdeki detayları referans alsın
+- bloom_level: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme`
+
+  try {
+    console.log('Soru üretme prompt gönderiliyor...')
+    
+    // Soru metnini üret
+    const result = await geminiModel.generateContent(questionPrompt)
+    const response = await result.response
+    let text = response.text()
+    
+    console.log('AI yanıtı (ilk 500 karakter):', text.substring(0, 500))
+    
+    // JSON'u temizle ve parse et
+    text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    
+    if (!jsonMatch) {
+      console.error('JSON bulunamadı! AI yanıtı:', text)
+      throw new Error('JSON format bulunamadı')
+    }
+    
+    let jsonStr = jsonMatch[0]
+      .replace(/,(\s*[}\]])/g, '$1')
+      .replace(/[\x00-\x1F\x7F]/g, ' ')
+    
+    console.log('Parse edilecek JSON (ilk 300 karakter):', jsonStr.substring(0, 300))
+    
+    const questionData = JSON.parse(jsonStr)
+    
+    console.log('Parse edilen soru:', {
+      question_text: questionData.question_text?.substring(0, 50),
+      options: questionData.options,
+      correct_answer: questionData.correct_answer
+    })
+    
+    return {
+      question_text: questionData.question_text || 'Yukarıdaki görüntüye göre hangi ifade doğrudur?',
+      image_prompt: imagePrompt,
+      options: {
+        A: questionData.options?.A || 'Şık A',
+        B: questionData.options?.B || 'Şık B',
+        C: questionData.options?.C || 'Şık C',
+        D: questionData.options?.D || 'Şık D',
+        ...(isHighSchool && { E: questionData.options?.E || 'Şık E' })
+      },
+      correct_answer: (questionData.correct_answer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E',
+      explanation: questionData.explanation || '',
+      difficulty,
+      bloom_level: questionData.bloom_level || 'analiz'
+    }
+    
+  } catch (error: any) {
+    console.error('Görüntülü soru üretme hatası:', error)
+    
+    // Hata durumunda fallback soru döndür
+    return {
+      question_text: `Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre aşağıdaki ifadelerden hangisi doğrudur?`,
+      image_prompt: imagePrompt,
+      options: {
+        A: 'I ve II',
+        B: 'I ve III', 
+        C: 'II ve III',
+        D: 'I, II ve III',
+        ...(isHighSchool && { E: 'Hiçbiri' })
+      },
+      correct_answer: 'C' as const,
+      explanation: 'Görüntü analiz edilerek doğru cevap belirlenmelidir.',
+      difficulty,
+      bloom_level: 'analiz'
+    }
+  }
+}
+
+// 🆕 YENİ YAKLAŞIM: Önce soru üret, sonra soruya ÖZEL görsel üret
+// Öğretmen geri dönütü: "Soru ile görsel uyumsuzluğu var. Görsel genel konuyu değil, sadece sorunun kapsamını göstermeli."
+
+// Soruya özel görsel açıklaması üret
+async function generateImageDescriptionForQuestion(
+  questionText: string,
+  options: { A: string; B: string; C: string; D: string; E?: string },
+  correctAnswer: string,
+  subject: string,
+  topic: string,
+  imageType: string
+): Promise<string> {
+  const prompt = `Sen bir eğitim görseli tasarımcısısın. Aşağıdaki soru için TAM UYUMLU bir görsel açıklaması oluştur.
+
+SORU: ${questionText}
+
+ŞIKLAR:
+A) ${options.A}
+B) ${options.B}
+C) ${options.C}
+D) ${options.D}
+${options.E ? `E) ${options.E}` : ''}
+
+DOĞRU CEVAP: ${correctAnswer}
+DERS: ${subject}
+KONU: ${topic}
+GÖRSEL TİPİ: ${imageTypeDescriptions[imageType] || imageType}
+
+ÖNEMLİ KURALLAR:
+1. Görsel SADECE bu soruyu cevaplamak için gerekli bilgileri içermeli
+2. Görsel tüm konuyu DEĞİL, sadece sorulan kısmı göstermeli
+3. Doğru cevabı bulmak için gereken TÜM veriler görselde olmalı
+4. Yanlış şıkları eleyebilmek için yeterli detay olmalı
+5. Örneğin mitoz/mayoz sorusuysa, tüm aşamaları değil sadece sorulan aşama(ları) göster
+
+SADECE görsel açıklamasını yaz, başka bir şey yazma. Türkçe yaz. Çok spesifik ol.`
+
+  try {
+    const result = await geminiModel.generateContent(prompt)
+    const response = await result.response
+    let text = response.text().trim()
+    text = text.replace(/^["']|["']$/g, '').trim()
+    
+    console.log('Soruya özel görsel açıklaması:', text)
+    return text
+    
+  } catch (error) {
+    console.error('Soruya özel görsel açıklaması üretilemedi:', error)
+    return `${topic} konusunda ${questionText.substring(0, 50)} sorusu için ${imageTypeDescriptions[imageType] || imageType}`
+  }
+}
+
+// Görüntülü soru + görsel birlikte üret (YENİ AKIŞ)
+export async function generateCompleteImageQuestion(
+  grade: number,
+  subject: string,
+  topic: string,
+  imageType: string,
+  difficulty: Difficulty = 'medium',
+  imageDescription?: string // Optional - artık dikkate alınmıyor, soru bazlı üretiliyor
+): Promise<GeneratedImageQuestion> {
+  const isHighSchool = grade >= 9
+  
+  console.log('🆕 YENİ AKIŞ: Önce soru, sonra soruya özel görsel üretiliyor...')
+  
+  // ADIM 1: Önce SADECE soru metnini ve şıklarını üret (görsel olmadan)
+  const questionPrompt = `Sen bir soru bankası yazarısın. ${grade}. sınıf ${subject} dersi için "${topic}" konusunda bir soru hazırla.
+
+ZORLUK: ${difficulty}
+GÖRSEL TİPİ: ${imageTypeDescriptions[imageType] || imageType} (görsel sonra eklenecek)
+
+Bu soru bir ${imageTypeDescriptions[imageType] || 'görsel'} eşliğinde sorulacak. Soruyu öyle yaz ki:
+1. Görsel verisi analiz edilmesi gereksin
+2. Soru çok genel değil, SPESİFİK bir durum/veri sorsun
+3. Tüm konuyu değil, konunun BELİRLİ BİR PARÇASINI test etsin
+
+SADECE JSON formatında yanıt ver:
+{
+  "question_text": "Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre... [SPESİFİK soru metni]",
+  "specific_data_needed": "Bu soruyu cevaplamak için görselde GÖSTERİLMESİ GEREKEN spesifik veri/bilgi",
+  "options": {
+    "A": "Şık A metni",
+    "B": "Şık B metni",
+    "C": "Şık C metni",
+    "D": "Şık D metni"${isHighSchool ? ',\n    "E": "Şık E metni"' : ''}
+  },
+  "correct_answer": "B",
+  "explanation": "Doğru cevap B çünkü... [açıklama]",
+  "bloom_level": "analiz"
+}
+
+KURALLAR:
+- Soru SPESİFİK olsun, genel konuyu değil belirli bir durumu test etsin
+- Doğru cevap rastgele bir şık olsun
+- specific_data_needed alanı ÇOK ÖNEMLİ - görsel tam buna göre üretilecek`
+
+  try {
+    console.log('ADIM 1: Soru metni üretiliyor...')
+    
+    const result = await geminiModel.generateContent(questionPrompt)
+    const response = await result.response
+    let text = response.text()
+    
+    // JSON'u temizle ve parse et
+    text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    
+    if (!jsonMatch) {
+      throw new Error('JSON format bulunamadı')
+    }
+    
+    let jsonStr = jsonMatch[0]
+      .replace(/,(\s*[}\]])/g, '$1')
+      .replace(/[\x00-\x1F\x7F]/g, ' ')
+    
+    const questionData = JSON.parse(jsonStr)
+    
+    console.log('Üretilen soru:', questionData.question_text?.substring(0, 80))
+    console.log('Gerekli veri:', questionData.specific_data_needed)
+    
+    // ADIM 2: Soruya ÖZEL görsel açıklaması üret
+    console.log('ADIM 2: Soruya özel görsel açıklaması üretiliyor...')
+    
+    const customImageDescription = await generateImageDescriptionForQuestion(
+      questionData.question_text,
+      questionData.options,
+      questionData.correct_answer,
+      subject,
+      topic,
+      imageType
+    )
+    
+    // Görüntü için prompt oluştur
+    const imagePrompt = createImagePrompt(imageType, subject, topic, customImageDescription, grade)
+    
+    // ADIM 3: Görsel üret
+    console.log('ADIM 3: Soruya özel görsel üretiliyor...')
+    
+    let image_base64: string | undefined
+    
+    try {
+      const imageResult = await generateEducationalImage(imagePrompt)
+      
+      if (imageResult) {
+        image_base64 = `data:${imageResult.mimeType};base64,${imageResult.base64}`
+        console.log('✅ Görsel başarıyla üretildi')
+      }
+    } catch (imageError) {
+      console.error('Görsel üretimi başarısız:', imageError)
+    }
+    
+    return {
+      question_text: questionData.question_text || 'Yukarıdaki görüntüye göre hangi ifade doğrudur?',
+      image_prompt: imagePrompt,
+      image_base64,
+      options: {
+        A: questionData.options?.A || 'Şık A',
+        B: questionData.options?.B || 'Şık B',
+        C: questionData.options?.C || 'Şık C',
+        D: questionData.options?.D || 'Şık D',
+        ...(isHighSchool && { E: questionData.options?.E || 'Şık E' })
+      },
+      correct_answer: (questionData.correct_answer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E',
+      explanation: questionData.explanation || '',
+      difficulty,
+      bloom_level: questionData.bloom_level || 'analiz'
+    }
+    
+  } catch (error: any) {
+    console.error('Görüntülü soru üretme hatası:', error)
+    
+    // Hata durumunda fallback
+    const fallbackImageDesc = `${topic} konusunda basit bir ${imageTypeDescriptions[imageType] || 'görsel'}`
+    const fallbackPrompt = createImagePrompt(imageType, subject, topic, fallbackImageDesc, grade)
+    
+    return {
+      question_text: `Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre aşağıdaki ifadelerden hangisi doğrudur?`,
+      image_prompt: fallbackPrompt,
+      options: {
+        A: 'I ve II',
+        B: 'I ve III', 
+        C: 'II ve III',
+        D: 'I, II ve III',
+        ...(isHighSchool && { E: 'Hiçbiri' })
+      },
+      correct_answer: 'C' as const,
+      explanation: 'Görüntü analiz edilerek doğru cevap belirlenmelidir.',
+      difficulty,
+      bloom_level: 'analiz'
+    }
   }
 }
 

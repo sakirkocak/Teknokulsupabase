@@ -3,6 +3,7 @@ import Script from 'next/script'
 import { Suspense } from 'react'
 import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import JsonLdSchema from '@/components/JsonLdSchema'
+import FeedbackWidget from '@/components/FeedbackWidget'
 import './globals.css'
 
 const baseUrl = 'https://www.teknokul.com.tr'
@@ -158,6 +159,9 @@ export default function RootLayout({
         </Suspense>
         
         {children}
+        
+        {/* Geri Bildirim Widget */}
+        <FeedbackWidget />
       </body>
     </html>
   )

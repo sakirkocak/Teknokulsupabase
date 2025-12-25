@@ -11,7 +11,7 @@ import {
   CheckCircle, XCircle, Save, X, Eye, EyeOff,
   ChevronDown, ChevronUp, Star, Zap, Crown, Sparkles,
   AlertCircle, ChevronLeft, ChevronRight, RefreshCw,
-  GraduationCap, Layers, BarChart3, Clock, Plus
+  GraduationCap, Layers, BarChart3, Clock, Plus, ImageIcon
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -70,6 +70,7 @@ export default function AdminSoruYonetimiPage() {
   const [filterSubject, setFilterSubject] = useState<string>('')
   const [filterDifficulty, setFilterDifficulty] = useState<string>('')
   const [filterTopic, setFilterTopic] = useState<string>('')
+  const [filterHasImage, setFilterHasImage] = useState(false) // Görüntülü soru filtresi
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(true)
   
@@ -82,6 +83,9 @@ export default function AdminSoruYonetimiPage() {
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
   const [editForm, setEditForm] = useState<any>(null)
   
+  // Önizleme
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null)
+  
   // İstatistikler
   const [stats, setStats] = useState({
     total: 0,
@@ -89,6 +93,7 @@ export default function AdminSoruYonetimiPage() {
     medium: 0,
     hard: 0,
     legendary: 0,
+    withImage: 0, // Görüntülü soru sayısı
     byGrade: {} as Record<number, number>
   })
   
@@ -103,7 +108,7 @@ export default function AdminSoruYonetimiPage() {
 
   useEffect(() => {
     loadQuestions()
-  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, currentPage])
+  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, filterHasImage, currentPage])
 
   useEffect(() => {
     if (filterGrade) {
@@ -171,54 +176,22 @@ export default function AdminSoruYonetimiPage() {
   }
 
   const loadStats = async () => {
-    // Toplam soru sayısı
-    const { count: total } = await supabase
-      .from('questions')
-      .select('*', { count: 'exact', head: true })
+    // RPC fonksiyonu ile tek sorguda tüm istatistikleri al
+    const { data, error } = await supabase.rpc('get_question_stats')
     
-    // Tüm soruları sayfalı olarak çek (pagination)
-    const PAGE_SIZE = 1000
-    let allQuestions: any[] = []
-    let page = 0
-    let hasMore = true
-
-    while (hasMore) {
-      const { data: questionsPage } = await supabase
-        .from('questions')
-        .select('difficulty, topic:topics(grade)')
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
-
-      if (questionsPage && questionsPage.length > 0) {
-        allQuestions = [...allQuestions, ...questionsPage]
-        hasMore = questionsPage.length === PAGE_SIZE
-        page++
-      } else {
-        hasMore = false
-      }
+    if (data && !error) {
+      setStats({
+        total: data.total || 0,
+        easy: data.easy || 0,
+        medium: data.medium || 0,
+        hard: data.hard || 0,
+        legendary: data.legendary || 0,
+        withImage: data.withImage || 0,
+        byGrade: data.byGrade || {}
+      })
+    } else {
+      console.error('İstatistik yüklenemedi:', error)
     }
-    
-    // Zorluk bazlı
-    const diffCounts = { easy: 0, medium: 0, hard: 0, legendary: 0 }
-    allQuestions.forEach(q => {
-      if (q.difficulty in diffCounts) {
-        diffCounts[q.difficulty as keyof typeof diffCounts]++
-      }
-    })
-    
-    // Sınıf bazlı
-    const gradeCounts: Record<number, number> = {}
-    allQuestions.forEach(q => {
-      const grade = (q.topic as any)?.grade
-      if (grade) {
-        gradeCounts[grade] = (gradeCounts[grade] || 0) + 1
-      }
-    })
-    
-    setStats({
-      total: total || 0,
-      ...diffCounts,
-      byGrade: gradeCounts
-    })
   }
 
   const loadQuestions = async () => {
@@ -262,6 +235,10 @@ export default function AdminSoruYonetimiPage() {
     if (searchQuery) {
       countQuery = countQuery.ilike('question_text', `%${searchQuery}%`)
     }
+    // Görüntülü soru filtresi
+    if (filterHasImage) {
+      countQuery = countQuery.not('question_image_url', 'is', null)
+    }
     
     const { count } = await countQuery
     setTotalCount(count || 0)
@@ -287,6 +264,10 @@ export default function AdminSoruYonetimiPage() {
     }
     if (searchQuery) {
       query = query.ilike('question_text', `%${searchQuery}%`)
+    }
+    // Görüntülü soru filtresi
+    if (filterHasImage) {
+      query = query.not('question_image_url', 'is', null)
     }
     
     const { data, error } = await query
@@ -370,6 +351,7 @@ export default function AdminSoruYonetimiPage() {
     setFilterSubject('')
     setFilterDifficulty('')
     setFilterTopic('')
+    setFilterHasImage(false)
     setSearchQuery('')
     setCurrentPage(1)
   }
@@ -453,7 +435,7 @@ export default function AdminSoruYonetimiPage() {
             <div className="flex items-center gap-2">
               <Filter className="h-5 w-5 text-primary-500" />
               <span className="font-medium text-surface-900 dark:text-white">Filtreler</span>
-              {(filterGrade || filterSubject || filterDifficulty || filterTopic || searchQuery) && (
+              {(filterGrade || filterSubject || filterDifficulty || filterTopic || filterHasImage || searchQuery) && (
                 <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">
                   Aktif
                 </span>
@@ -564,6 +546,28 @@ export default function AdminSoruYonetimiPage() {
                     </div>
                   </div>
                   
+                  {/* Görüntülü Soru Filtresi */}
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+                    <button
+                      onClick={() => {
+                        setFilterHasImage(!filterHasImage)
+                        setCurrentPage(1)
+                      }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                        filterHasImage
+                          ? 'bg-purple-500 text-white shadow-lg shadow-purple-200'
+                          : 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100'
+                      }`}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      Görüntülü Sorular
+                      {filterHasImage && <span className="ml-1">✓</span>}
+                      <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300">
+                        {stats.withImage}
+                      </span>
+                    </button>
+                  </div>
+                  
                   {/* Arama ve Butonlar */}
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1 relative">
@@ -652,6 +656,23 @@ export default function AdminSoruYonetimiPage() {
                         </span>
                       </div>
                       
+                      {/* Soru Görseli (varsa) */}
+                      {question.question_image_url && (
+                        <div className="mb-3 rounded-lg overflow-hidden border border-surface-200 dark:border-surface-600 bg-white">
+                          <div className="flex items-start gap-3 p-2">
+                            <img 
+                              src={question.question_image_url}
+                              alt="Soru görseli"
+                              className="w-24 h-24 object-contain rounded"
+                            />
+                            <span className="text-xs text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded-full flex items-center gap-1">
+                              <ImageIcon className="w-3 h-3" />
+                              Görüntülü Soru
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      
                       {/* Soru Metni */}
                       <div className="text-surface-900 dark:text-white mb-3">
                         <MathRenderer text={question.question_text || ''} />
@@ -705,6 +726,13 @@ export default function AdminSoruYonetimiPage() {
                     
                     {/* Aksiyonlar */}
                     <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPreviewQuestion(question)}
+                        className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                        title="Önizle"
+                      >
+                        <Eye className="h-5 w-5 text-blue-500" />
+                      </button>
                       <button
                         onClick={() => handleEdit(question)}
                         className="p-2 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-lg transition-colors"
@@ -910,6 +938,139 @@ export default function AdminSoruYonetimiPage() {
                   )}
                   Kaydet
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Önizleme Modal - Öğrenci Görünümü */}
+        {previewQuestion && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setPreviewQuestion(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Eye className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <span className="text-white font-medium">Öğrenci Görünümü</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${difficultyConfig[previewQuestion.difficulty].bgLight} ${difficultyConfig[previewQuestion.difficulty].textColor}`}>
+                        {difficultyConfig[previewQuestion.difficulty].emoji} {difficultyConfig[previewQuestion.difficulty].label}
+                      </span>
+                      {previewQuestion.topic?.subject && (
+                        <span className="text-xs text-white/50">
+                          {previewQuestion.topic.subject.name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setPreviewQuestion(null)} 
+                  className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Soru İçeriği */}
+              <div className="p-6">
+                {/* Soru Görseli */}
+                {previewQuestion.question_image_url && (
+                  <div className="mb-6 rounded-xl overflow-hidden border border-white/10 bg-white/5 p-3">
+                    <img 
+                      src={previewQuestion.question_image_url} 
+                      alt="Soru görseli" 
+                      className="max-w-full max-h-[300px] mx-auto object-contain rounded-lg"
+                    />
+                  </div>
+                )}
+
+                {/* Soru Metni */}
+                <div className="text-white text-lg leading-relaxed mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+                  <MathRenderer text={previewQuestion.question_text} />
+                </div>
+
+                {/* Şıklar */}
+                <div className="space-y-3">
+                  {Object.entries(previewQuestion.options).map(([key, value]) => (
+                    value && (
+                      <div
+                        key={key}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          key === previewQuestion.correct_answer
+                            ? 'bg-green-500/20 border-green-500/50 shadow-lg shadow-green-500/20'
+                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className={`font-bold text-lg ${
+                            key === previewQuestion.correct_answer 
+                              ? 'text-green-400' 
+                              : 'text-white/60'
+                          }`}>
+                            {key})
+                          </span>
+                          <span className={
+                            key === previewQuestion.correct_answer 
+                              ? 'text-green-300' 
+                              : 'text-white/80'
+                          }>
+                            <MathRenderer text={value} />
+                          </span>
+                          {key === previewQuestion.correct_answer && (
+                            <CheckCircle className="w-5 h-5 text-green-400 ml-auto flex-shrink-0" />
+                          )}
+                        </div>
+                      </div>
+                    )
+                  ))}
+                </div>
+
+                {/* Açıklama */}
+                {previewQuestion.explanation && (
+                  <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="w-4 h-4 text-blue-400" />
+                      <p className="text-blue-300 text-sm font-medium">Açıklama</p>
+                    </div>
+                    <p className="text-white/80 leading-relaxed">
+                      <MathRenderer text={previewQuestion.explanation} />
+                    </p>
+                  </div>
+                )}
+
+                {/* Konu Bilgisi */}
+                {previewQuestion.topic && (
+                  <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                    <div className="flex items-center gap-2 text-white/50 text-sm">
+                      <BookOpen className="w-4 h-4" />
+                      <span>{previewQuestion.topic.grade}. Sınıf</span>
+                      <span className="text-white/30">•</span>
+                      <span>{previewQuestion.topic.main_topic}</span>
+                      {previewQuestion.topic.sub_topic && (
+                        <>
+                          <span className="text-white/30">•</span>
+                          <span>{previewQuestion.topic.sub_topic}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

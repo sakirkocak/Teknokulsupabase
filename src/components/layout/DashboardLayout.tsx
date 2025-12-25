@@ -34,7 +34,8 @@ import {
   Wand2,
   Volume2,
   Flag,
-  Bot
+  Bot,
+  ImageIcon
 } from 'lucide-react'
 
 type NavItem = {
@@ -56,6 +57,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Kazançlar', href: '/koc/kazanclar', icon: TrendingUp },
     { label: 'Veli Raporları', href: '/koc/veli-raporlari', icon: Send },
     { label: 'Mesajlar', href: '/koc/mesajlar', icon: MessageSquare },
+    { label: 'Geri Bildirim', href: '/koc/geri-bildirim', icon: MessageSquare },
     { label: 'AI Araçları', href: '/koc/ai-araclar', icon: Brain },
     { label: 'Profil', href: '/koc/profil', icon: Settings },
   ],
@@ -75,6 +77,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Değerlendirme', href: '/ogrenci/degerlendirme', icon: Star },
     { label: 'AI Araçları', href: '/ogrenci/ai-araclar', icon: Brain },
     { label: 'Mesajlar', href: '/ogrenci/mesajlar', icon: MessageSquare },
+    { label: 'Geri Bildirim', href: '/ogrenci/geri-bildirim', icon: MessageSquare },
     { label: 'Profil', href: '/ogrenci/profil', icon: Settings },
   ],
   veli: [
@@ -88,7 +91,9 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
+    { label: 'Görüntülü Soru Üretici', href: '/admin/goruntulu-soru-uretici', icon: ImageIcon },
     { label: 'Soru Bildirimleri', href: '/admin/soru-bildirimleri', icon: Flag },
+    { label: 'Geri Bildirimler', href: '/admin/geri-bildirimler', icon: MessageSquare },
     { label: 'Sınav Takvimi', href: '/admin/sinav-takvimi', icon: Calendar },
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
