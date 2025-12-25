@@ -141,79 +141,38 @@ export async function generateStaticParams() {
 async function getGradesWithCounts(subjectCode: string) {
   const supabase = await createClient()
   
-  // Önce subject'i bul
-  const { data: subject } = await supabase
-    .from('subjects')
-    .select('id')
-    .eq('code', subjectCode)
-    .single()
+  // RPC fonksiyonu ile tek sorguda tüm sınıf istatistiklerini al
+  const { data, error } = await supabase
+    .rpc('get_subject_grade_stats', { p_subject_code: subjectCode })
   
-  if (!subject) return []
+  if (error) {
+    console.error('RPC error:', error)
+    return []
+  }
   
-  // Topic'leri grade'e göre grupla
-  const { data: topics } = await supabase
-    .from('topics')
-    .select('id, grade')
-    .eq('subject_id', subject.id)
-  
-  if (!topics) return []
-  
-  // Grade bazlı soru sayılarını hesapla
-  const gradeMap = new Map<number, string[]>()
-  topics.forEach(topic => {
-    const existing = gradeMap.get(topic.grade) || []
-    existing.push(topic.id)
-    gradeMap.set(topic.grade, existing)
-  })
-  
-  const gradesWithCounts = await Promise.all(
-    Array.from(gradeMap.entries()).map(async ([grade, topicIds]) => {
-      const { count } = await supabase
-        .from('questions')
-        .select('id', { count: 'exact', head: true })
-        .in('topic_id', topicIds)
-      
-      return {
-        grade,
-        topicCount: topicIds.length,
-        questionCount: count || 0,
-      }
-    })
-  )
-  
-  return gradesWithCounts
-    .filter(g => g.questionCount > 0)
-    .sort((a, b) => a.grade - b.grade)
+  return (data || []).map((row: { grade: number; topic_count: number; question_count: number }) => ({
+    grade: row.grade,
+    topicCount: row.topic_count,
+    questionCount: row.question_count,
+  }))
 }
 
 async function getSubjectStats(subjectCode: string) {
   const supabase = await createClient()
   
-  const { data: subject } = await supabase
-    .from('subjects')
-    .select('id')
-    .eq('code', subjectCode)
-    .single()
+  // RPC fonksiyonu ile tek sorguda toplam istatistikleri al
+  const { data, error } = await supabase
+    .rpc('get_subject_total_stats', { p_subject_code: subjectCode })
   
-  if (!subject) return { totalQuestions: 0, totalTopics: 0 }
+  if (error) {
+    console.error('RPC error:', error)
+    return { totalQuestions: 0, totalTopics: 0 }
+  }
   
-  const { data: topics } = await supabase
-    .from('topics')
-    .select('id')
-    .eq('subject_id', subject.id)
-  
-  if (!topics || topics.length === 0) return { totalQuestions: 0, totalTopics: 0 }
-  
-  const topicIds = topics.map(t => t.id)
-  
-  const { count: totalQuestions } = await supabase
-    .from('questions')
-    .select('id', { count: 'exact', head: true })
-    .in('topic_id', topicIds)
-  
+  const stats = data?.[0] || { total_questions: 0, total_topics: 0 }
   return {
-    totalQuestions: totalQuestions || 0,
-    totalTopics: topics.length,
+    totalQuestions: Number(stats.total_questions) || 0,
+    totalTopics: Number(stats.total_topics) || 0,
   }
 }
 
@@ -247,7 +206,7 @@ export default async function SubjectPage({ params }: Props) {
         name={`${meta.name} Soruları`}
         description={meta.description}
         url={`${baseUrl}/sorular/${subject}`}
-        items={grades.map((g, index) => ({
+        items={grades.map((g: { grade: number; topicCount: number; questionCount: number }, index: number) => ({
           name: `${gradeLabels[g.grade] || `${g.grade}. Sınıf`} ${meta.name}`,
           url: `/sorular/${subject}/${g.grade}-sinif`,
           position: index + 1,
@@ -323,7 +282,7 @@ export default async function SubjectPage({ params }: Props) {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {grades.map((g) => {
+              {grades.map((g: { grade: number; topicCount: number; questionCount: number }) => {
                 const label = gradeLabels[g.grade] || `${g.grade}. Sınıf`
                 const isLGS = g.grade === 8
                 const isYKS = g.grade === 12

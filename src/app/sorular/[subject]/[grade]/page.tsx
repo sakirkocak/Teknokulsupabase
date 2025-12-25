@@ -127,7 +127,7 @@ export async function generateStaticParams() {
 async function getQuestionsData(subjectCode: string, grade: number) {
   const supabase = await createClient()
   
-  // Subject ID'yi bul
+  // Subject bilgisini al
   const { data: subject } = await supabase
     .from('subjects')
     .select('id, name')
@@ -136,85 +136,59 @@ async function getQuestionsData(subjectCode: string, grade: number) {
   
   if (!subject) return null
   
-  // Bu sınıftaki topic'leri bul
-  const { data: topics } = await supabase
-    .from('topics')
-    .select('id, main_topic, sub_topic')
-    .eq('subject_id', subject.id)
-    .eq('grade', grade)
+  // 3 RPC sorgusunu paralel olarak çalıştır (eskiden 10+ sorgu vardı)
+  const [difficultyResult, topicGroupsResult, questionsResult] = await Promise.all([
+    // 1. Zorluk dağılımı (RPC ile tek sorgu)
+    supabase.rpc('get_grade_difficulty_stats', { 
+      p_subject_code: subjectCode, 
+      p_grade: grade 
+    }),
+    // 2. Topic grupları ve soru sayıları (RPC ile tek sorgu)
+    supabase.rpc('get_grade_topic_groups', { 
+      p_subject_code: subjectCode, 
+      p_grade: grade 
+    }),
+    // 3. İlk 20 soru (Schema için)
+    supabase
+      .from('questions')
+      .select(`
+        id, question_text, options, correct_answer, difficulty, topic_id,
+        topics!inner(subject_id, grade)
+      `)
+      .eq('topics.subject_id', subject.id)
+      .eq('topics.grade', grade)
+      .order('created_at', { ascending: false })
+      .limit(20)
+  ])
   
-  if (!topics || topics.length === 0) return null
+  // Zorluk istatistikleri
+  const diffStats = difficultyResult.data?.[0] || {
+    total_questions: 0,
+    easy_count: 0,
+    medium_count: 0,
+    hard_count: 0,
+    legendary_count: 0
+  }
   
-  const topicIds = topics.map(t => t.id)
-  
-  // Soruları getir (ilk 20 tanesi Schema için)
-  const { data: questions, count: totalCount } = await supabase
-    .from('questions')
-    .select('id, question_text, options, correct_answer, difficulty, topic_id', { count: 'exact' })
-    .in('topic_id', topicIds)
-    .order('created_at', { ascending: false })
-    .limit(20)
-  
-  // Zorluk dağılımını hesapla
   const difficultyStats = {
-    easy: 0,
-    medium: 0,
-    hard: 0,
-    legendary: 0,
+    easy: Number(diffStats.easy_count) || 0,
+    medium: Number(diffStats.medium_count) || 0,
+    hard: Number(diffStats.hard_count) || 0,
+    legendary: Number(diffStats.legendary_count) || 0,
   }
   
-  if (questions) {
-    // Tüm sorular için zorluk dağılımı
-    const { data: allQuestions } = await supabase
-      .from('questions')
-      .select('difficulty')
-      .in('topic_id', topicIds)
-    
-    allQuestions?.forEach((q) => {
-      if (q.difficulty in difficultyStats) {
-        difficultyStats[q.difficulty as keyof typeof difficultyStats]++
-      }
-    })
-  }
-  
-  // Topic'leri grupla
-  const topicGroups = new Map<string, { subTopics: string[]; questionCount: number }>()
-  
-  for (const topic of topics) {
-    const existing = topicGroups.get(topic.main_topic)
-    if (existing) {
-      if (topic.sub_topic && !existing.subTopics.includes(topic.sub_topic)) {
-        existing.subTopics.push(topic.sub_topic)
-      }
-    } else {
-      topicGroups.set(topic.main_topic, {
-        subTopics: topic.sub_topic ? [topic.sub_topic] : [],
-        questionCount: 0,
-      })
-    }
-  }
-  
-  // Her topic için soru sayısı
-  for (const topic of topics) {
-    const { count } = await supabase
-      .from('questions')
-      .select('id', { count: 'exact', head: true })
-      .eq('topic_id', topic.id)
-    
-    const group = topicGroups.get(topic.main_topic)
-    if (group) {
-      group.questionCount += count || 0
-    }
-  }
+  // Topic grupları
+  const topics = (topicGroupsResult.data || []).map((row: { main_topic: string; sub_topics: string[] | null; question_count: number }) => ({
+    name: row.main_topic,
+    subTopics: row.sub_topics || [],
+    questionCount: Number(row.question_count) || 0,
+  }))
   
   return {
     subject,
-    topics: Array.from(topicGroups.entries()).map(([name, data]) => ({
-      name,
-      ...data,
-    })),
-    questions: questions || [],
-    totalCount: totalCount || 0,
+    topics,
+    questions: questionsResult.data || [],
+    totalCount: Number(diffStats.total_questions) || 0,
     difficultyStats,
   }
 }
@@ -361,7 +335,7 @@ export default async function GradePage({ params }: Props) {
             Konular ({data.topics.length})
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.topics.map((topic, index) => (
+            {data.topics.map((topic: { name: string; subTopics: string[]; questionCount: number }, index: number) => (
               <div
                 key={index}
                 className={`p-5 rounded-xl ${colors.light} border border-gray-100 hover:shadow-md transition-all`}
