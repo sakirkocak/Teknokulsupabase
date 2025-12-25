@@ -368,9 +368,10 @@ export default async function GradePage({ params }: Props) {
               const options = question.options as { A: string; B: string; C: string; D: string; E?: string }
               
               return (
-                <div
+                <Link
                   key={question.id}
-                  className="p-6 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all"
+                  href={`/sorular/${subject}/${grade}-sinif/${question.id}`}
+                  className="block p-6 bg-white rounded-xl border border-gray-200 hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex items-center gap-2">
@@ -382,9 +383,13 @@ export default async function GradePage({ params }: Props) {
                         </span>
                       )}
                     </div>
+                    <span className="text-sm text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                      Detaylı Gör
+                      <ChevronRight className="w-4 h-4" />
+                    </span>
                   </div>
                   
-                  <p className="text-gray-800 mb-4 line-clamp-3">
+                  <p className="text-gray-800 mb-4 line-clamp-3 group-hover:text-gray-900 transition-colors">
                     {question.question_text}
                   </p>
                   
@@ -401,7 +406,7 @@ export default async function GradePage({ params }: Props) {
                       </div>
                     ))}
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>

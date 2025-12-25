@@ -259,6 +259,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Sınıf sayfaları sitemap hatası:', error)
   }
 
+  // ========== TEK SORU SAYFALARI (31.000+) ==========
+  let questionPages: MetadataRoute.Sitemap = []
+  
+  try {
+    // Tüm soruları topic ve subject bilgileriyle birlikte çek
+    const { data: questions } = await supabase
+      .from('questions')
+      .select(`
+        id,
+        created_at,
+        topics(
+          grade,
+          subjects(code)
+        )
+      `)
+      .order('created_at', { ascending: false })
+    
+    if (questions) {
+      questionPages = questions
+        .filter((q: any) => q.topics && q.topics.subjects)
+        .map((q: any) => ({
+          url: `${baseUrl}/sorular/${q.topics.subjects.code}/${q.topics.grade}-sinif/${q.id}`,
+          lastModified: q.created_at ? new Date(q.created_at) : new Date(),
+          changeFrequency: 'monthly' as const,
+          // LGS (8. sınıf) ve YKS (12. sınıf) sorularına yüksek öncelik
+          priority: q.topics.grade === 8 || q.topics.grade === 12 ? 0.65 : 0.5,
+        }))
+    }
+  } catch (error) {
+    console.error('Soru sayfaları sitemap hatası:', error)
+  }
+
   return [
     ...staticPages, 
     ...coachPages, 
@@ -267,6 +299,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...questionBankPages,
     ...subjectPages,
     ...gradePages,
+    ...questionPages,
   ]
 }
 
