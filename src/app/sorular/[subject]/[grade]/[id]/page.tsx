@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
 import { BreadcrumbSchema, QuizSchema } from '@/components/JsonLdSchema'
 import MathRenderer from '@/components/MathRenderer'
 import { 
@@ -12,8 +12,23 @@ import {
   Share2, Bookmark, ThumbsUp, MessageCircle
 } from 'lucide-react'
 
-// ISR: 24 saatte bir yenilenir
-export const revalidate = 86400
+// Fully dynamic - no caching issues
+export const dynamic = 'force-dynamic'
+
+// Cookie-free Supabase client for public pages
+function createPublicClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get: () => undefined,
+        set: () => {},
+        remove: () => {},
+      },
+    }
+  )
+}
 
 const subjectMeta: Record<string, { name: string; color: string }> = {
   'matematik': { name: 'Matematik', color: 'red' },
@@ -41,7 +56,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { subject, grade, id } = await params
-  const supabase = await createClient()
+  const supabase = createPublicClient()
   
   const { data } = await supabase.rpc('get_question_detail', { p_question_id: id })
   const question = data?.[0]
@@ -84,7 +99,7 @@ export async function generateStaticParams() {
 
 async function getQuestionData(questionId: string) {
   try {
-    const supabase = await createClient()
+    const supabase = createPublicClient()
     
     // Paralel sorgular
     const [questionResult, relatedResult] = await Promise.all([
