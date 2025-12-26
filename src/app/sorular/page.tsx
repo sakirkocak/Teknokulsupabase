@@ -1,13 +1,17 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuestionListSchema } from '@/components/JsonLdSchema'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
   ChevronRight, GraduationCap, Sparkles, TrendingUp,
-  Target, Star, Clock, Image as ImageIcon
+  Target, Star, Clock, Image as ImageIcon, Zap
 } from 'lucide-react'
+
+// ISR - Her saat yenile (cache için optimal)
+export const revalidate = 3600
 
 export const metadata: Metadata = {
   title: 'Soru Bankası - Tüm Dersler | Teknokul',
@@ -63,81 +67,165 @@ const subjectNames: Record<string, string> = {
   'din_kulturu': 'Din Kültürü',
 }
 
-async function getSubjectsWithCounts() {
+interface SubjectWithCount {
+  id: string
+  name: string
+  code: string
+  questionCount: number
+}
+
+interface Stats {
+  totalQuestions: number
+  totalTopics: number
+  imageQuestions: number
+  source: string
+  duration: number
+}
+
+// ⚡ TYPESENSE ile TEK SORGU - 20+ sorgudan 1 sorguya!
+async function getDataFromTypesense(): Promise<{ subjects: SubjectWithCount[], stats: Stats }> {
+  const startTime = Date.now()
+  
+  try {
+    // Tek facet sorgusu ile TÜM istatistikler
+    const result = await typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        per_page: 0,
+        facet_by: 'subject_code,subject_name,main_topic',
+        max_facet_values: 100
+      })
+
+    const facets = result.facet_counts || []
+    const totalQuestions = result.found || 0
+    
+    // Subject facet'lerini parse et
+    const subjectCodeFacet = facets.find((f: any) => f.field_name === 'subject_code')
+    const subjectNameFacet = facets.find((f: any) => f.field_name === 'subject_name')
+    const topicFacet = facets.find((f: any) => f.field_name === 'main_topic')
+    
+    const subjectCounts = subjectCodeFacet?.counts || []
+    const subjectNameCounts = subjectNameFacet?.counts || []
+    
+    // Subject listesi oluştur
+    const subjects: SubjectWithCount[] = subjectCounts.map((item: any, index: number) => {
+      // İsmi bul - aynı index'te veya count eşleşmesiyle
+      const nameEntry = subjectNameCounts.find((n: any) => n.count === item.count) || subjectNameCounts[index]
+      
+      return {
+        id: item.value,
+        code: item.value,
+        name: nameEntry?.value || subjectNames[item.value] || item.value,
+        questionCount: item.count
+      }
+    })
+    
+    // Soru sayısına göre sırala (çoktan aza)
+    subjects.sort((a, b) => b.questionCount - a.questionCount)
+    
+    const duration = Date.now() - startTime
+    console.log(`⚡ Soru Bankası: Typesense TEK sorgu - ${duration}ms`)
+    
+    return {
+      subjects,
+      stats: {
+        totalQuestions,
+        totalTopics: topicFacet?.counts?.length || 0,
+        imageQuestions: 0, // Typesense'de bu veri yok, gerekirse eklenebilir
+        source: 'typesense',
+        duration
+      }
+    }
+  } catch (error) {
+    console.error('Typesense error:', error)
+    throw error
+  }
+}
+
+// Supabase fallback (yavaş ama güvenilir)
+async function getDataFromSupabase(): Promise<{ subjects: SubjectWithCount[], stats: Stats }> {
+  const startTime = Date.now()
   const supabase = await createClient()
   
   // Dersleri getir
-  const { data: subjects } = await supabase
+  const { data: subjectsData } = await supabase
     .from('subjects')
     .select('id, name, code')
     .order('name')
   
-  if (!subjects) return []
+  const subjects: SubjectWithCount[] = []
   
-  // Her ders için soru sayısını hesapla
-  const subjectsWithCounts = await Promise.all(
-    subjects.map(async (subject) => {
-      const { count } = await supabase
-        .from('questions')
-        .select('id', { count: 'exact', head: true })
-        .eq('topic_id', subject.id)
-      
-      // Topic'lerden soru say
+  if (subjectsData) {
+    // Her ders için soru sayısını hesapla (N+1 problem - yavaş!)
+    for (const subject of subjectsData) {
       const { data: topics } = await supabase
         .from('topics')
         .select('id')
         .eq('subject_id', subject.id)
       
       let totalCount = 0
-      if (topics) {
+      if (topics && topics.length > 0) {
         const topicIds = topics.map(t => t.id)
-        if (topicIds.length > 0) {
-          const { count: questionCount } = await supabase
-            .from('questions')
-            .select('id', { count: 'exact', head: true })
-            .in('topic_id', topicIds)
-          totalCount = questionCount || 0
-        }
+        const { count } = await supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+          .in('topic_id', topicIds)
+        totalCount = count || 0
       }
       
-      return {
-        ...subject,
-        questionCount: totalCount,
+      if (totalCount > 0) {
+        subjects.push({
+          id: subject.id,
+          name: subject.name,
+          code: subject.code,
+          questionCount: totalCount
+        })
       }
-    })
-  )
+    }
+  }
   
-  return subjectsWithCounts.filter(s => s.questionCount > 0)
-}
-
-async function getStats() {
-  const supabase = await createClient()
+  // İstatistikler
+  const [questionsRes, topicsRes, imageRes] = await Promise.all([
+    supabase.from('questions').select('id', { count: 'exact', head: true }),
+    supabase.from('topics').select('id', { count: 'exact', head: true }),
+    supabase.from('questions').select('id', { count: 'exact', head: true }).not('question_image_url', 'is', null)
+  ])
   
-  const { count: totalQuestions } = await supabase
-    .from('questions')
-    .select('id', { count: 'exact', head: true })
-  
-  const { count: totalTopics } = await supabase
-    .from('topics')
-    .select('id', { count: 'exact', head: true })
-  
-  const { count: imageQuestions } = await supabase
-    .from('questions')
-    .select('id', { count: 'exact', head: true })
-    .not('question_image_url', 'is', null)
+  const duration = Date.now() - startTime
+  console.log(`📊 Soru Bankası: Supabase ${subjectsData?.length || 0} sorgu - ${duration}ms`)
   
   return {
-    totalQuestions: totalQuestions || 0,
-    totalTopics: totalTopics || 0,
-    imageQuestions: imageQuestions || 0,
+    subjects,
+    stats: {
+      totalQuestions: questionsRes.count || 0,
+      totalTopics: topicsRes.count || 0,
+      imageQuestions: imageRes.count || 0,
+      source: 'supabase',
+      duration
+    }
   }
 }
 
+// Ana data fetcher - Typesense öncelikli
+async function getData(): Promise<{ subjects: SubjectWithCount[], stats: Stats }> {
+  // Typesense aktif mi kontrol et
+  if (isTypesenseAvailable()) {
+    try {
+      return await getDataFromTypesense()
+    } catch {
+      console.log('⚠️ Typesense failed, falling back to Supabase')
+    }
+  }
+  
+  // Fallback: Supabase
+  return await getDataFromSupabase()
+}
+
 export default async function SorularPage() {
-  const [subjects, stats] = await Promise.all([
-    getSubjectsWithCounts(),
-    getStats(),
-  ])
+  const { subjects, stats } = await getData()
   
   const baseUrl = 'https://www.teknokul.com.tr'
   
@@ -211,8 +299,14 @@ export default async function SorularPage() {
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
             <div>
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 flex items-center gap-3">
                 Soru Bankası
+                {stats.source === 'typesense' && (
+                  <span className="inline-flex items-center gap-1 text-sm font-normal bg-white/20 px-3 py-1 rounded-full">
+                    <Zap className="w-4 h-4" />
+                    Turbo
+                  </span>
+                )}
               </h1>
               <p className="text-lg md:text-xl text-white/90 max-w-2xl">
                 MEB müfredatına uygun <strong>{stats.totalQuestions.toLocaleString('tr-TR')}+</strong> soru ile pratik yap. 
@@ -352,4 +446,3 @@ export default async function SorularPage() {
     </>
   )
 }
-
