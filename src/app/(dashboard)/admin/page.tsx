@@ -101,87 +101,74 @@ export default function AdminDashboard() {
 
   async function loadQuestionStats() {
     try {
+      // 🚀 Optimize: Sadece count sorguları - çok daha hızlı!
+      
       // Toplam soru sayısı
       const { count: totalQuestions } = await supabase
         .from('questions')
         .select('*', { count: 'exact', head: true })
+        .eq('is_active', true)
 
-      // Ders bazlı soru sayıları - tüm soruları sayfalı olarak çek
-      const PAGE_SIZE = 1000
-      let allQuestions: any[] = []
-      let page = 0
-      let hasMore = true
+      // Zorluk bazlı sayılar (paralel sorgular)
+      const [easyRes, mediumRes, hardRes, legendaryRes] = await Promise.all([
+        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'easy').eq('is_active', true),
+        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'medium').eq('is_active', true),
+        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'hard').eq('is_active', true),
+        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'legendary').eq('is_active', true),
+      ])
 
-      while (hasMore) {
-        const { data: questionsPage } = await supabase
-          .from('questions')
-          .select(`
-            id,
-            difficulty,
-            topic:topics(
-              grade,
-              subject:subjects(
-                name,
-                code,
-                icon,
-                color
-              )
-            )
-          `)
-          .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
-
-        if (questionsPage && questionsPage.length > 0) {
-          allQuestions = [...allQuestions, ...questionsPage]
-          hasMore = questionsPage.length === PAGE_SIZE
-          page++
-        } else {
-          hasMore = false
-        }
+      const difficultyCount = {
+        easy: easyRes.count || 0,
+        medium: mediumRes.count || 0,
+        hard: hardRes.count || 0,
+        legendary: legendaryRes.count || 0
       }
 
-      // Ders bazlı grupla
-      const subjectMap = new Map<string, SubjectStats>()
-      const gradeMap = new Map<number, number>()
-      const difficultyCount = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+      // Ders bazlı soru sayıları - subjects tablosundan
+      const { data: subjectsData } = await supabase
+        .from('subjects')
+        .select('id, name, code, icon, color')
 
-      allQuestions.forEach((q: any) => {
-        // Zorluk sayısı
-        if (q.difficulty && difficultyCount.hasOwnProperty(q.difficulty)) {
-          difficultyCount[q.difficulty as keyof typeof difficultyCount]++
-        }
+      const bySubject: SubjectStats[] = []
+      
+      if (subjectsData) {
+        // Her ders için soru sayısını paralel olarak çek
+        const subjectCounts = await Promise.all(
+          subjectsData.map(async (subject) => {
+            const { count } = await supabase
+              .from('questions')
+              .select('*, topic:topics!inner(subject_id)', { count: 'exact', head: true })
+              .eq('topics.subject_id', subject.id)
+              .eq('is_active', true)
+            
+            return {
+              subject_name: subject.name,
+              subject_code: subject.code,
+              question_count: count || 0,
+              icon: subject.icon || '📚',
+              color: subject.color || 'blue'
+            }
+          })
+        )
+        
+        // Soru sayısına göre sırala, 0 olanları filtrele
+        bySubject.push(...subjectCounts.filter(s => s.question_count > 0).sort((a, b) => b.question_count - a.question_count))
+      }
 
-        if (q.topic?.subject) {
-          const subj = q.topic.subject
-          const key = subj.code || subj.name
-          
-          if (subjectMap.has(key)) {
-            const existing = subjectMap.get(key)!
-            existing.question_count++
-          } else {
-            subjectMap.set(key, {
-              subject_name: subj.name,
-              subject_code: subj.code,
-              question_count: 1,
-              icon: subj.icon || '📚',
-              color: subj.color || 'blue'
-            })
-          }
-        }
-
-        // Sınıf bazlı
-        if (q.topic?.grade) {
-          gradeMap.set(q.topic.grade, (gradeMap.get(q.topic.grade) || 0) + 1)
-        }
+      // Sınıf bazlı soru sayıları
+      const byGrade: GradeStats[] = []
+      const gradePromises = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(async (grade) => {
+        const { count } = await supabase
+          .from('questions')
+          .select('*, topic:topics!inner(grade)', { count: 'exact', head: true })
+          .eq('topics.grade', grade)
+          .eq('is_active', true)
+        
+        return { grade, question_count: count || 0 }
       })
 
-      // Sınıf bazlı diziyi sırala
-      const byGrade = Array.from(gradeMap.entries())
-        .map(([grade, count]) => ({ grade, question_count: count }))
-        .sort((a, b) => a.grade - b.grade)
-
-      // Ders bazlı diziyi sırala (soru sayısına göre)
-      const bySubject = Array.from(subjectMap.values())
-        .sort((a, b) => b.question_count - a.question_count)
+      const gradeResults = await Promise.all(gradePromises)
+      byGrade.push(...gradeResults.filter(g => g.question_count > 0))
 
       setQuestionStats({
         total: totalQuestions || 0,
@@ -191,6 +178,16 @@ export default function AdminDashboard() {
       })
     } catch (error) {
       console.error('Soru istatistikleri yüklenirken hata:', error)
+      // Hata durumunda en azından toplam sayıyı göster
+      const { count } = await supabase
+        .from('questions')
+        .select('*', { count: 'exact', head: true })
+      setQuestionStats({
+        total: count || 0,
+        bySubject: [],
+        byGrade: [],
+        byDifficulty: { easy: 0, medium: 0, hard: 0, legendary: 0 }
+      })
     }
   }
 
