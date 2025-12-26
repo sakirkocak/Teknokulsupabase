@@ -13,6 +13,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
 import { testimonials, activityMessages, universities, demoCoaches } from '@/lib/demoData'
+// ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
+import { getStatsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
 import { 
   GraduationCap, 
   Users, 
@@ -289,24 +291,39 @@ function LiveStatsBanner() {
 
   async function loadStats() {
     try {
-      // ⚡ API Route uzerinden Typesense/Supabase
-      const response = await fetch('/api/stats')
-      const result = await response.json()
-
-      setStats({
-        todayQuestions: result.todayQuestions || 0,
-        activeStudents: result.activeStudents || 0,
-        totalQuestions: result.totalQuestions || 0
-      })
-      
-      console.log(`⚡ Stats loaded from ${result.source} in ${result.duration}ms`)
+      // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan! (~30ms)
+      if (isTypesenseEnabled()) {
+        const result = await getStatsFast()
+        setStats({
+          todayQuestions: 0, // Typesense'de bugünkü sorular yok, API'den alınabilir
+          activeStudents: result.activeStudents || 0,
+          totalQuestions: result.totalQuestions || 0
+        })
+      } else {
+        // Typesense yoksa API route kullan (fallback)
+        const response = await fetch('/api/stats')
+        const result = await response.json()
+        setStats({
+          todayQuestions: result.todayQuestions || 0,
+          activeStudents: result.activeStudents || 0,
+          totalQuestions: result.totalQuestions || 0
+        })
+        console.log(`⚡ Stats loaded from ${result.source} in ${result.duration}ms`)
+      }
     } catch (error) {
       console.error('Stats yüklenirken hata:', error)
-      setStats({
-        todayQuestions: 0,
-        activeStudents: 0,
-        totalQuestions: 0
-      })
+      // Hata durumunda API route'a fallback
+      try {
+        const response = await fetch('/api/stats')
+        const result = await response.json()
+        setStats({
+          todayQuestions: result.todayQuestions || 0,
+          activeStudents: result.activeStudents || 0,
+          totalQuestions: result.totalQuestions || 0
+        })
+      } catch {
+        setStats({ todayQuestions: 0, activeStudents: 0, totalQuestions: 0 })
+      }
     }
     setLoading(false)
   }

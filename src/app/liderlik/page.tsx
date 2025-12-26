@@ -12,6 +12,8 @@ import {
   Building2, School, Globe, Filter
 } from 'lucide-react'
 import { TurkeyCity, LeaderboardEntry, Subject } from '@/types/database'
+// ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
+import { getLeaderboardFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
 
 interface SubjectLeader {
   student_id: string
@@ -346,46 +348,85 @@ export default function LeaderboardPage() {
 
     if (activeTab === 'genel') {
       try {
-        // 🚀 API Route uzerinden Typesense/Supabase
-        const params = new URLSearchParams({
-          scope: activeScope,
-          ...(selectedCity && { cityId: selectedCity }),
-          ...(selectedDistrict && { districtId: selectedDistrict }),
-          ...(selectedSchool && { schoolId: selectedSchool }),
-          ...(gradeFilter && { grade: gradeFilter.toString() }),
-          limit: '100'
-        })
-        
-        const response = await fetch(`/api/leaderboard?${params}`)
-        const result = await response.json()
-        
-        if (result.data && result.data.length > 0) {
-          const formatted: LeaderboardEntry[] = result.data.map((item: any) => ({
-            student_id: item.student_id,
-            full_name: item.full_name || 'Anonim',
-            avatar_url: item.avatar_url,
-            grade: item.grade,
-            city_name: item.city_name || null,
-            district_name: item.district_name || null,
-            school_name: item.school_name || null,
-            total_points: item.total_points,
-            total_questions: item.total_questions,
-            total_correct: item.total_correct,
-            total_wrong: item.total_wrong,
-            max_streak: item.max_streak,
-            success_rate: Number(item.success_rate) || 0,
-            rank: Number(item.rank),
-          }))
-          setLeaderboard(formatted)
-          setTotalStudents(formatted.length)
-          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
+        if (isTypesenseEnabled()) {
+          const result = await getLeaderboardFast({
+            scope: activeScope as any,
+            cityId: selectedCity || null,
+            districtId: selectedDistrict || null,
+            schoolId: selectedSchool || null,
+            grade: gradeFilter,
+            limit: 100
+          })
           
-          // Log source for debugging
-          console.log(`Leaderboard loaded from ${result.source} in ${result.duration}ms`)
+          if (result.data && result.data.length > 0) {
+            const formatted: LeaderboardEntry[] = result.data.map((item) => ({
+              student_id: item.student_id,
+              full_name: item.full_name || 'Anonim',
+              avatar_url: item.avatar_url,
+              grade: item.grade,
+              city_name: item.city_name || null,
+              district_name: item.district_name || null,
+              school_name: item.school_name || null,
+              total_points: item.total_points,
+              total_questions: item.total_questions,
+              total_correct: item.total_correct,
+              total_wrong: item.total_wrong,
+              max_streak: item.max_streak,
+              success_rate: item.total_questions > 0 
+                ? (item.total_correct / item.total_questions) * 100 
+                : 0,
+              rank: item.rank,
+            }))
+            setLeaderboard(formatted)
+            setTotalStudents(result.total)
+            setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+          } else {
+            setLeaderboard([])
+            setTotalStudents(0)
+            setTotalQuestions(0)
+          }
         } else {
-          setLeaderboard([])
-          setTotalStudents(0)
-          setTotalQuestions(0)
+          // Typesense yoksa API route kullan (fallback)
+          const params = new URLSearchParams({
+            scope: activeScope,
+            ...(selectedCity && { cityId: selectedCity }),
+            ...(selectedDistrict && { districtId: selectedDistrict }),
+            ...(selectedSchool && { schoolId: selectedSchool }),
+            ...(gradeFilter && { grade: gradeFilter.toString() }),
+            limit: '100'
+          })
+          
+          const response = await fetch(`/api/leaderboard?${params}`)
+          const result = await response.json()
+          
+          if (result.data && result.data.length > 0) {
+            const formatted: LeaderboardEntry[] = result.data.map((item: any) => ({
+              student_id: item.student_id,
+              full_name: item.full_name || 'Anonim',
+              avatar_url: item.avatar_url,
+              grade: item.grade,
+              city_name: item.city_name || null,
+              district_name: item.district_name || null,
+              school_name: item.school_name || null,
+              total_points: item.total_points,
+              total_questions: item.total_questions,
+              total_correct: item.total_correct,
+              total_wrong: item.total_wrong,
+              max_streak: item.max_streak,
+              success_rate: Number(item.success_rate) || 0,
+              rank: Number(item.rank),
+            }))
+            setLeaderboard(formatted)
+            setTotalStudents(formatted.length)
+            setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+            
+            console.log(`Leaderboard loaded from ${result.source} in ${result.duration}ms`)
+          } else {
+            setLeaderboard([])
+            setTotalStudents(0)
+            setTotalQuestions(0)
+          }
         }
       } catch (error) {
         console.error('Liderlik tablosu yüklenirken hata:', error)
