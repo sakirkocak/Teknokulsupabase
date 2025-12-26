@@ -139,9 +139,11 @@ export async function GET(req: NextRequest) {
 
 // Typesense'den istatistikler
 async function getStatsFromTypesense(): Promise<StatsResponse> {
-  // Bugun icin tarih
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  // Bugün için tarih (Türkiye timezone UTC+3)
+  const now = new Date()
+  // Türkiye'de bugünün başlangıcı (UTC+3, yani UTC'de -3 saat)
+  const todayTR = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  todayTR.setHours(todayTR.getHours() - 3) // UTC+3 → UTC
 
   // ⚡ TUM SORGULARI PARALEL YAP - 3x hiz artisi!
   const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
@@ -167,11 +169,11 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         per_page: 0
       }),
     
-    // 3. Bugun cozulen sorular (Supabase)
+    // 3. Bugun cozulen sorular (Supabase) - Türkiye saati
     supabase
       .from('point_history')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', today.toISOString())
+      .gte('created_at', todayTR.toISOString())
       .eq('source', 'question')
   ])
 
@@ -225,6 +227,11 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
 
 // Supabase'den istatistikler (fallback)
 async function getStatsFromSupabase(): Promise<StatsResponse> {
+  // Türkiye timezone (UTC+3) için bugünün başlangıcı
+  const now = new Date()
+  const todayTR = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  todayTR.setHours(todayTR.getHours() - 3) // UTC+3 → UTC
+  
   // Paralel sorgular
   const [
     totalQuestionsRes,
@@ -235,7 +242,7 @@ async function getStatsFromSupabase(): Promise<StatsResponse> {
     supabase.from('questions').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('student_points').select('*', { count: 'exact', head: true }).gt('total_questions', 0),
     supabase.from('point_history').select('*', { count: 'exact', head: true })
-      .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+      .gte('created_at', todayTR.toISOString())
       .eq('source', 'question'),
     supabase.from('subjects').select('id, name, code, icon, color')
   ])
