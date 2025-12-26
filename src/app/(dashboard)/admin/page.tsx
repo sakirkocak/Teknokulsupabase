@@ -7,6 +7,7 @@ import Link from 'next/link'
 
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
+import { typesenseSearch, USE_TYPESENSE, COLLECTIONS } from '@/lib/typesense/client'
 import { motion } from 'framer-motion'
 import { 
   Users, 
@@ -20,7 +21,8 @@ import {
   HelpCircle,
   Sparkles,
   GraduationCap,
-  BarChart3
+  BarChart3,
+  Zap
 } from 'lucide-react'
 
 interface SubjectStats {
@@ -100,82 +102,80 @@ export default function AdminDashboard() {
   }
 
   async function loadQuestionStats() {
+    const startTime = performance.now()
+    
     try {
-      // 🚀 Optimize: Sadece count sorguları - çok daha hızlı!
-      
-      // Toplam soru sayısı
+      // ⚡ IŞIK HIZI: Typesense facet sorgusu - tek sorguda tüm istatistikler!
+      if (USE_TYPESENSE) {
+        const result = await typesenseSearch
+          .collections(COLLECTIONS.QUESTIONS)
+          .documents()
+          .search({
+            q: '*',
+            query_by: 'question_text',
+            per_page: 0, // Sadece facet sonuçları
+            facet_by: 'subject_name,subject_code,grade,difficulty',
+            max_facet_values: 50
+          })
+
+        const facets = result.facet_counts || []
+        
+        // Toplam soru sayısı
+        const total = result.found || 0
+        
+        // Ders bazlı dağılım
+        const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
+        const subjectCodeFacet = facets.find((f: any) => f.field_name === 'subject_code')
+        
+        const bySubject: SubjectStats[] = (subjectFacet?.counts || []).map((item: any, idx: number) => ({
+          subject_name: item.value,
+          subject_code: subjectCodeFacet?.counts?.[idx]?.value || item.value,
+          question_count: item.count,
+          icon: getSubjectIcon(item.value),
+          color: getSubjectColor(item.value)
+        })).sort((a: SubjectStats, b: SubjectStats) => b.question_count - a.question_count)
+        
+        // Sınıf bazlı dağılım
+        const gradeFacet = facets.find((f: any) => f.field_name === 'grade')
+        const byGrade: GradeStats[] = (gradeFacet?.counts || [])
+          .map((item: any) => ({
+            grade: parseInt(item.value),
+            question_count: item.count
+          }))
+          .sort((a: GradeStats, b: GradeStats) => a.grade - b.grade)
+        
+        // Zorluk bazlı dağılım
+        const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
+        const difficultyCount = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+        ;(difficultyFacet?.counts || []).forEach((item: any) => {
+          if (item.value in difficultyCount) {
+            difficultyCount[item.value as keyof typeof difficultyCount] = item.count
+          }
+        })
+
+        const endTime = performance.now()
+        console.log(`⚡ Typesense istatistik sorgusu: ${Math.round(endTime - startTime)}ms`)
+
+        setQuestionStats({ total, bySubject, byGrade, byDifficulty: difficultyCount })
+        return
+      }
+
+      // Fallback: Supabase (Typesense kapalıysa)
       const { count: totalQuestions } = await supabase
         .from('questions')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
 
-      // Zorluk bazlı sayılar (paralel sorgular)
-      const [easyRes, mediumRes, hardRes, legendaryRes] = await Promise.all([
-        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'easy').eq('is_active', true),
-        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'medium').eq('is_active', true),
-        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'hard').eq('is_active', true),
-        supabase.from('questions').select('*', { count: 'exact', head: true }).eq('difficulty', 'legendary').eq('is_active', true),
-      ])
-
-      const difficultyCount = {
-        easy: easyRes.count || 0,
-        medium: mediumRes.count || 0,
-        hard: hardRes.count || 0,
-        legendary: legendaryRes.count || 0
-      }
-
-      // Ders bazlı soru sayıları - subjects tablosundan
-      const { data: subjectsData } = await supabase
-        .from('subjects')
-        .select('id, name, code, icon, color')
-
-      const bySubject: SubjectStats[] = []
-      
-      if (subjectsData) {
-        // Her ders için soru sayısını paralel olarak çek
-        const subjectCounts = await Promise.all(
-          subjectsData.map(async (subject) => {
-            const { count } = await supabase
-              .from('questions')
-              .select('*, topic:topics!inner(subject_id)', { count: 'exact', head: true })
-              .eq('topics.subject_id', subject.id)
-              .eq('is_active', true)
-            
-            return {
-              subject_name: subject.name,
-              subject_code: subject.code,
-              question_count: count || 0,
-              icon: subject.icon || '📚',
-              color: subject.color || 'blue'
-            }
-          })
-        )
-        
-        // Soru sayısına göre sırala, 0 olanları filtrele
-        bySubject.push(...subjectCounts.filter(s => s.question_count > 0).sort((a, b) => b.question_count - a.question_count))
-      }
-
-      // Sınıf bazlı soru sayıları
-      const byGrade: GradeStats[] = []
-      const gradePromises = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(async (grade) => {
-        const { count } = await supabase
-          .from('questions')
-          .select('*, topic:topics!inner(grade)', { count: 'exact', head: true })
-          .eq('topics.grade', grade)
-          .eq('is_active', true)
-        
-        return { grade, question_count: count || 0 }
-      })
-
-      const gradeResults = await Promise.all(gradePromises)
-      byGrade.push(...gradeResults.filter(g => g.question_count > 0))
-
       setQuestionStats({
         total: totalQuestions || 0,
-        bySubject,
-        byGrade,
-        byDifficulty: difficultyCount
+        bySubject: [],
+        byGrade: [],
+        byDifficulty: { easy: 0, medium: 0, hard: 0, legendary: 0 }
       })
+      
+      const endTime = performance.now()
+      console.log(`📊 Supabase istatistik sorgusu: ${Math.round(endTime - startTime)}ms`)
+      
     } catch (error) {
       console.error('Soru istatistikleri yüklenirken hata:', error)
       // Hata durumunda en azından toplam sayıyı göster
@@ -189,6 +189,50 @@ export default function AdminDashboard() {
         byDifficulty: { easy: 0, medium: 0, hard: 0, legendary: 0 }
       })
     }
+  }
+
+  // Ders ikonları
+  function getSubjectIcon(subjectName: string): string {
+    const icons: Record<string, string> = {
+      'Matematik': '🔢',
+      'Fen Bilimleri': '🔬',
+      'Türkçe': '📖',
+      'İngilizce': '🇬🇧',
+      'Din Kültürü ve Ahlak Bilgisi': '☪️',
+      'Sosyal Bilgiler': '🌍',
+      'T.C. İnkılap Tarihi ve Atatürkçülük': '🏛️',
+      'Fizik': '⚡',
+      'Kimya': '🧪',
+      'Biyoloji': '🧬',
+      'Tarih': '📜',
+      'Coğrafya': '🗺️',
+      'Türk Dili ve Edebiyatı': '📚',
+      'Bilişim Teknolojileri': '💻',
+      'Felsefe': '🤔',
+    }
+    return icons[subjectName] || '📚'
+  }
+
+  // Ders renkleri
+  function getSubjectColor(subjectName: string): string {
+    const colors: Record<string, string> = {
+      'Matematik': 'blue',
+      'Fen Bilimleri': 'green',
+      'Türkçe': 'red',
+      'İngilizce': 'purple',
+      'Din Kültürü ve Ahlak Bilgisi': 'emerald',
+      'Sosyal Bilgiler': 'amber',
+      'T.C. İnkılap Tarihi ve Atatürkçülük': 'orange',
+      'Fizik': 'cyan',
+      'Kimya': 'pink',
+      'Biyoloji': 'lime',
+      'Tarih': 'yellow',
+      'Coğrafya': 'teal',
+      'Türk Dili ve Edebiyatı': 'indigo',
+      'Bilişim Teknolojileri': 'slate',
+      'Felsefe': 'violet',
+    }
+    return colors[subjectName] || 'gray'
   }
 
   if (profileLoading) {
