@@ -291,13 +291,18 @@ function LiveStatsBanner() {
 
   async function loadStats() {
     try {
-      // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan! (~30ms)
+      // ⚡ ŞIMŞEK HIZ - Typesense + API paralel çağrı
       if (isTypesenseEnabled()) {
-        const result = await getStatsFast()
+        // Typesense'den hızlı stats + API'den todayQuestions paralel
+        const [typesenseResult, apiResponse] = await Promise.all([
+          getStatsFast(),
+          fetch('/api/stats').then(r => r.json()).catch(() => ({ todayQuestions: 0 }))
+        ])
+        
         setStats({
-          todayQuestions: 0, // Typesense'de bugünkü sorular yok, API'den alınabilir
-          activeStudents: result.activeStudents || 0,
-          totalQuestions: result.totalQuestions || 0
+          todayQuestions: apiResponse.todayQuestions || 0,
+          activeStudents: typesenseResult.activeStudents || 0,
+          totalQuestions: typesenseResult.totalQuestions || 0
         })
       } else {
         // Typesense yoksa API route kullan (fallback)
