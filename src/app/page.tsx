@@ -618,24 +618,39 @@ export default function HomePage() {
   }, [])
 
   async function loadFeaturedCoaches() {
-    const { data: coachData } = await supabase
-      .from('teacher_profiles')
-      .select(`
-        id,
-        user_id,
-        headline,
-        bio,
-        subjects,
-        experience_years,
-        hourly_rate,
-        is_verified,
-        profile:profiles!teacher_profiles_user_id_fkey(id, full_name, avatar_url)
-      `)
-      .eq('is_coach', true)
-      .eq('is_listed', true)
-      .limit(6)
+    try {
+      const { data: coachData, error } = await supabase
+        .from('teacher_profiles')
+        .select(`
+          id,
+          user_id,
+          headline,
+          bio,
+          subjects,
+          experience_years,
+          hourly_rate,
+          is_verified,
+          profile:profiles!teacher_profiles_user_id_fkey(id, full_name, avatar_url)
+        `)
+        .eq('is_coach', true)
+        .eq('is_listed', true)
+        .limit(6)
 
-    if (coachData && coachData.length > 0) {
+      // Hata varsa veya veri yoksa demo veri kullan
+      if (error || !coachData || coachData.length === 0) {
+        if (error) console.log('Koçlar yüklenemedi, demo veri kullanılıyor')
+        setCoaches(demoCoaches.slice(0, 6).map((coach, i) => ({
+          id: `demo-${i}`,
+          ...coach,
+          profile: { full_name: coach.full_name, avatar_url: null },
+          avgRating: coach.rating,
+          reviewCount: coach.review_count,
+          isDemo: true,
+        })))
+        setLoadingCoaches(false)
+        return
+      }
+
       // N+1 Query Optimizasyonu: Tüm koçların review'larını tek sorguda çek
       const coachIds = coachData.map(c => c.id)
       const { data: allReviews } = await supabase
@@ -663,7 +678,9 @@ export default function HomePage() {
       })
 
       setCoaches(coachesWithReviews)
-    } else {
+    } catch (err) {
+      // Herhangi bir hata durumunda demo veri kullan
+      console.log('Koçlar yüklenemedi, demo veri kullanılıyor:', err)
       setCoaches(demoCoaches.slice(0, 6).map((coach, i) => ({
         id: `demo-${i}`,
         ...coach,
@@ -672,8 +689,9 @@ export default function HomePage() {
         reviewCount: coach.review_count,
         isDemo: true,
       })))
+    } finally {
+      setLoadingCoaches(false)
     }
-    setLoadingCoaches(false)
   }
 
   return (

@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { createClient } from '@supabase/supabase-js'
 
+// Edge runtime - daha hızlı cold start
+export const runtime = 'nodejs' // edge Typesense SDK ile uyumsuz, nodejs kalacak
+
 // Supabase service role client (server-side)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// In-memory cache (serverless instance başına)
+let statsCache: { data: any; timestamp: number } | null = null
+const CACHE_TTL = 60 * 1000 // 60 saniye
 
 export interface StatsResponse {
   totalQuestions: number
@@ -40,31 +47,70 @@ export interface StatsResponse {
 export async function GET(req: NextRequest) {
   const startTime = Date.now()
   
+  // ⚡ CACHE KONTROLU - 60 saniye içinde tekrar istek gelirse cache'den dön
+  const now = Date.now()
+  if (statsCache && (now - statsCache.timestamp) < CACHE_TTL) {
+    const duration = Date.now() - startTime
+    console.log(`⚡ Stats from CACHE: ${duration}ms (${Math.round((now - statsCache.timestamp) / 1000)}s old)`)
+    
+    return new NextResponse(JSON.stringify({
+      ...statsCache.data,
+      source: 'cache',
+      duration,
+      cacheAge: Math.round((now - statsCache.timestamp) / 1000)
+    }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        'CDN-Cache-Control': 'public, s-maxage=60',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=60'
+      }
+    })
+  }
+  
   try {
     // Typesense kullanilabilir mi kontrol et
     if (isTypesenseAvailable()) {
       const result = await getStatsFromTypesense()
       
+      // Cache'e kaydet
+      statsCache = { data: result, timestamp: now }
+      
       const duration = Date.now() - startTime
       console.log(`⚡ Stats from Typesense: ${duration}ms`)
       
-      return NextResponse.json({
+      return new NextResponse(JSON.stringify({
         ...result,
         source: 'typesense',
         duration
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          'CDN-Cache-Control': 'public, s-maxage=60',
+          'Vercel-CDN-Cache-Control': 'public, s-maxage=60'
+        }
       })
     }
     
     // Fallback to Supabase
     const result = await getStatsFromSupabase()
     
+    // Cache'e kaydet
+    statsCache = { data: result, timestamp: now }
+    
     const duration = Date.now() - startTime
     console.log(`📊 Stats from Supabase: ${duration}ms`)
     
-    return NextResponse.json({
+    return new NextResponse(JSON.stringify({
       ...result,
       source: 'supabase',
       duration
+    }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300'
+      }
     })
     
   } catch (error) {

@@ -8,6 +8,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// In-memory cache (query bazlı)
+const leaderboardCache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_TTL = 30 * 1000 // 30 saniye (leaderboard daha dinamik)
+
 export interface LeaderboardEntry {
   student_id: string
   full_name: string
@@ -50,6 +54,28 @@ export async function GET(req: NextRequest) {
   const subject = searchParams.get('subject')
   const limit = parseInt(searchParams.get('limit') || '100')
 
+  // ⚡ CACHE KEY - parametrelere göre unique key
+  const cacheKey = `${scope}-${cityId}-${districtId}-${schoolId}-${grade}-${subject}-${limit}`
+  const now = Date.now()
+  const cached = leaderboardCache.get(cacheKey)
+  
+  if (cached && (now - cached.timestamp) < CACHE_TTL) {
+    const duration = Date.now() - startTime
+    console.log(`⚡ Leaderboard from CACHE: ${duration}ms (${Math.round((now - cached.timestamp) / 1000)}s old)`)
+    
+    return new NextResponse(JSON.stringify({
+      ...cached.data,
+      source: 'cache',
+      duration,
+      cacheAge: Math.round((now - cached.timestamp) / 1000)
+    }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+      }
+    })
+  }
+
   try {
     // Typesense kullanilabilir mi kontrol et
     if (isTypesenseAvailable()) {
@@ -57,13 +83,24 @@ export async function GET(req: NextRequest) {
         scope, cityId, districtId, schoolId, grade, subject, limit
       })
       
+      // Cache'e kaydet
+      leaderboardCache.set(cacheKey, { 
+        data: { data: result }, 
+        timestamp: now 
+      })
+      
       const duration = Date.now() - startTime
       console.log(`⚡ Leaderboard from Typesense: ${duration}ms, ${result.length} entries`)
       
-      return NextResponse.json({
+      return new NextResponse(JSON.stringify({
         data: result,
         source: 'typesense',
         duration
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+        }
       })
     }
     
@@ -72,13 +109,24 @@ export async function GET(req: NextRequest) {
       scope, cityId, districtId, schoolId, grade, limit
     })
     
+    // Cache'e kaydet
+    leaderboardCache.set(cacheKey, { 
+      data: { data: result }, 
+      timestamp: now 
+    })
+    
     const duration = Date.now() - startTime
     console.log(`📊 Leaderboard from Supabase: ${duration}ms, ${result.length} entries`)
     
-    return NextResponse.json({
+    return new NextResponse(JSON.stringify({
       data: result,
       source: 'supabase',
       duration
+    }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+      }
     })
     
   } catch (error) {
