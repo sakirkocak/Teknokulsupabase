@@ -156,6 +156,7 @@ export default function LeaderboardPage() {
   // İlleri ve dersleri yükle
   useEffect(() => {
     async function loadCities() {
+      // TurkeyCity type requires: id, name, plate_code, created_at
       const { data } = await supabase
         .from('turkey_cities')
         .select('id, name, plate_code, created_at')
