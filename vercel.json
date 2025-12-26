@@ -2,8 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/flush-points",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
-
