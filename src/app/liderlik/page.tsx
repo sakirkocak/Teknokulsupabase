@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
@@ -119,7 +119,8 @@ export default function LeaderboardPage() {
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
 
-  const supabase = createClient()
+  // Supabase client - sadece bir kez oluştur
+  const supabase = useMemo(() => createClient(), [])
 
   // Auth durumunu kontrol et
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function LeaderboardPage() {
 
     loadCities()
     loadSubjects()
-  }, [])
+  }, [supabase])
 
   // İl seçildiğinde ilçeleri yükle
   useEffect(() => {
