@@ -282,39 +282,32 @@ function LiveStatsBanner() {
     activeStudents: 0,
     totalQuestions: 0
   })
-  const supabase = createClient()
 
   useEffect(() => {
     loadStats()
   }, [])
 
   async function loadStats() {
-    // Bugün çözülen sorular - point_history tablosundan gerçek sayı
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const { count: todayQuestions } = await supabase
-      .from('point_history')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', today.toISOString())
-      .eq('source', 'question')
+    try {
+      // ⚡ API Route uzerinden Typesense/Supabase
+      const response = await fetch('/api/stats')
+      const result = await response.json()
 
-    // Toplam soru sayısı
-    const { count: totalQuestions } = await supabase
-      .from('questions')
-      .select('*', { count: 'exact', head: true })
-
-    // Aktif öğrenci sayısı
-    const { count: activeStudents } = await supabase
-      .from('student_points')
-      .select('*', { count: 'exact', head: true })
-      .gt('total_questions', 0)
-
-    setStats({
-      todayQuestions: todayQuestions || 0,
-      activeStudents: activeStudents || 0,
-      totalQuestions: totalQuestions || 0
-    })
+      setStats({
+        todayQuestions: result.todayQuestions || 0,
+        activeStudents: result.activeStudents || 0,
+        totalQuestions: result.totalQuestions || 0
+      })
+      
+      console.log(`⚡ Stats loaded from ${result.source} in ${result.duration}ms`)
+    } catch (error) {
+      console.error('Stats yüklenirken hata:', error)
+      setStats({
+        todayQuestions: 0,
+        activeStudents: 0,
+        totalQuestions: 0
+      })
+    }
     setLoading(false)
   }
 

@@ -7,7 +7,6 @@ import Link from 'next/link'
 
 import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
-import { typesenseSearch, USE_TYPESENSE, COLLECTIONS } from '@/lib/typesense/client'
 import { motion } from 'framer-motion'
 import { 
   Users, 
@@ -105,76 +104,36 @@ export default function AdminDashboard() {
     const startTime = performance.now()
     
     try {
-      // ⚡ IŞIK HIZI: Typesense facet sorgusu - tek sorguda tüm istatistikler!
-      if (USE_TYPESENSE) {
-        const result = await typesenseSearch
-          .collections(COLLECTIONS.QUESTIONS)
-          .documents()
-          .search({
-            q: '*',
-            query_by: 'question_text',
-            per_page: 0, // Sadece facet sonuçları
-            facet_by: 'subject_name,subject_code,grade,difficulty',
-            max_facet_values: 50
-          })
+      // ⚡ IŞIK HIZI: API Route uzerinden Typesense
+      const response = await fetch('/api/stats')
+      const result = await response.json()
 
-        const facets = result.facet_counts || []
-        
-        // Toplam soru sayısı
-        const total = result.found || 0
-        
-        // Ders bazlı dağılım
-        const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
-        const subjectCodeFacet = facets.find((f: any) => f.field_name === 'subject_code')
-        
-        const bySubject: SubjectStats[] = (subjectFacet?.counts || []).map((item: any, idx: number) => ({
-          subject_name: item.value,
-          subject_code: subjectCodeFacet?.counts?.[idx]?.value || item.value,
-          question_count: item.count,
-          icon: getSubjectIcon(item.value),
-          color: getSubjectColor(item.value)
-        })).sort((a: SubjectStats, b: SubjectStats) => b.question_count - a.question_count)
-        
-        // Sınıf bazlı dağılım
-        const gradeFacet = facets.find((f: any) => f.field_name === 'grade')
-        const byGrade: GradeStats[] = (gradeFacet?.counts || [])
-          .map((item: any) => ({
-            grade: parseInt(item.value),
-            question_count: item.count
-          }))
-          .sort((a: GradeStats, b: GradeStats) => a.grade - b.grade)
-        
-        // Zorluk bazlı dağılım
-        const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
-        const difficultyCount = { easy: 0, medium: 0, hard: 0, legendary: 0 }
-        ;(difficultyFacet?.counts || []).forEach((item: any) => {
-          if (item.value in difficultyCount) {
-            difficultyCount[item.value as keyof typeof difficultyCount] = item.count
-          }
+      if (result.bySubject) {
+        // API'den gelen veriyi kullan
+        const bySubject: SubjectStats[] = result.bySubject.map((item: any) => ({
+          ...item,
+          icon: item.icon || getSubjectIcon(item.subject_name),
+          color: item.color || getSubjectColor(item.subject_name)
+        }))
+
+        setQuestionStats({
+          total: result.totalQuestions || 0,
+          bySubject,
+          byGrade: result.byGrade || [],
+          byDifficulty: result.byDifficulty || { easy: 0, medium: 0, hard: 0, legendary: 0 }
         })
 
         const endTime = performance.now()
-        console.log(`⚡ Typesense istatistik sorgusu: ${Math.round(endTime - startTime)}ms`)
-
-        setQuestionStats({ total, bySubject, byGrade, byDifficulty: difficultyCount })
-        return
+        console.log(`⚡ Stats loaded from ${result.source} in ${result.duration}ms (client: ${Math.round(endTime - startTime)}ms)`)
+      } else {
+        // Fallback: Basit toplam sayı
+        setQuestionStats({
+          total: result.totalQuestions || 0,
+          bySubject: [],
+          byGrade: [],
+          byDifficulty: { easy: 0, medium: 0, hard: 0, legendary: 0 }
+        })
       }
-
-      // Fallback: Supabase (Typesense kapalıysa)
-      const { count: totalQuestions } = await supabase
-        .from('questions')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true)
-
-      setQuestionStats({
-        total: totalQuestions || 0,
-        bySubject: [],
-        byGrade: [],
-        byDifficulty: { easy: 0, medium: 0, hard: 0, legendary: 0 }
-      })
-      
-      const endTime = performance.now()
-      console.log(`📊 Supabase istatistik sorgusu: ${Math.round(endTime - startTime)}ms`)
       
     } catch (error) {
       console.error('Soru istatistikleri yüklenirken hata:', error)

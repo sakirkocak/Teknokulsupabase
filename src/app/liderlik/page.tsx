@@ -12,8 +12,6 @@ import {
   Building2, School, Globe, Filter
 } from 'lucide-react'
 import { TurkeyCity, LeaderboardEntry, Subject } from '@/types/database'
-import { getLeaderboard, LeaderboardEntry as TypesenseLeaderboardEntry } from '@/lib/leaderboard'
-import { USE_TYPESENSE } from '@/lib/typesense/client'
 
 interface SubjectLeader {
   student_id: string
@@ -348,18 +346,21 @@ export default function LeaderboardPage() {
 
     if (activeTab === 'genel') {
       try {
-        // 🚀 Typesense/Supabase abstraction layer kullan
-        const data = await getLeaderboard({
-          scope: activeScope as 'turkey' | 'city' | 'district' | 'school',
-          cityId: selectedCity || undefined,
-          districtId: selectedDistrict || undefined,
-          schoolId: selectedSchool || undefined,
-          grade: gradeFilter || undefined,
-          limit: 100
+        // 🚀 API Route uzerinden Typesense/Supabase
+        const params = new URLSearchParams({
+          scope: activeScope,
+          ...(selectedCity && { cityId: selectedCity }),
+          ...(selectedDistrict && { districtId: selectedDistrict }),
+          ...(selectedSchool && { schoolId: selectedSchool }),
+          ...(gradeFilter && { grade: gradeFilter.toString() }),
+          limit: '100'
         })
-
-        if (data && data.length > 0) {
-          const formatted: LeaderboardEntry[] = data.map((item: TypesenseLeaderboardEntry) => ({
+        
+        const response = await fetch(`/api/leaderboard?${params}`)
+        const result = await response.json()
+        
+        if (result.data && result.data.length > 0) {
+          const formatted: LeaderboardEntry[] = result.data.map((item: any) => ({
             student_id: item.student_id,
             full_name: item.full_name || 'Anonim',
             avatar_url: item.avatar_url,
@@ -378,6 +379,9 @@ export default function LeaderboardPage() {
           setLeaderboard(formatted)
           setTotalStudents(formatted.length)
           setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+          
+          // Log source for debugging
+          console.log(`Leaderboard loaded from ${result.source} in ${result.duration}ms`)
         } else {
           setLeaderboard([])
           setTotalStudents(0)

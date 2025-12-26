@@ -2,8 +2,25 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Search, BookOpen, X, Loader2, Filter } from 'lucide-react'
-import { searchQuestions, SearchResult } from '@/lib/search'
 import Link from 'next/link'
+
+// SearchResult type - API route'dan gelen veri yapısı
+interface SearchResult {
+  id: string
+  question_id?: string
+  question_text: string
+  explanation: string | null
+  difficulty: string
+  subject_name: string
+  subject_code: string
+  main_topic: string
+  sub_topic: string | null
+  grade: number
+  times_answered: number
+  times_correct: number
+  success_rate: number
+  highlight?: string
+}
 
 interface Props {
   grade?: number
@@ -41,7 +58,7 @@ export default function QuestionSearch({
   // Debounce için timeout ref
   const timeoutRef = useRef<NodeJS.Timeout>()
   
-  // Arama fonksiyonu
+  // Arama fonksiyonu - API Route kullanıyor
   const performSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery || searchQuery.length < 2) {
       setResults([])
@@ -52,15 +69,25 @@ export default function QuestionSearch({
     setLoading(true)
     
     try {
-      const data = await searchQuestions({
-        query: searchQuery,
-        grade: selectedGrade,
-        subjectCode,
-        difficulty: selectedDifficulty,
-        limit: 10
+      const params = new URLSearchParams({
+        q: searchQuery,
+        ...(selectedGrade && { grade: selectedGrade.toString() }),
+        ...(subjectCode && { subject: subjectCode }),
+        ...(selectedDifficulty && { difficulty: selectedDifficulty }),
+        per_page: '10'
       })
       
-      setResults(data)
+      const response = await fetch(`/api/search/questions?${params}`)
+      const data = await response.json()
+      
+      // API'den gelen sonuçları formatla
+      const formattedResults = (data.results || []).map((item: SearchResult) => ({
+        ...item,
+        question_id: item.id || item.question_id
+      }))
+      
+      setResults(formattedResults)
+      console.log(`⚡ Search from ${data.source} in ${data.duration}ms`)
     } catch (error) {
       console.error('Search error:', error)
       setResults([])
@@ -201,19 +228,20 @@ export default function QuestionSearch({
               
               {results.map((result) => {
                 const difficultyInfo = difficultyLabels[result.difficulty] || difficultyLabels.medium
+                const questionId = result.question_id || result.id
                 
                 return onSelectQuestion ? (
                   <button
-                    key={result.question_id}
-                    onClick={() => handleSelectQuestion(result.question_id)}
+                    key={questionId}
+                    onClick={() => handleSelectQuestion(questionId)}
                     className="w-full p-4 text-left hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors"
                   >
                     <QuestionResultItem result={result} difficultyInfo={difficultyInfo} />
                   </button>
                 ) : (
                   <Link
-                    key={result.question_id}
-                    href={`/sorular/${result.subject_code}/${result.grade}-sinif/${result.question_id}`}
+                    key={questionId}
+                    href={`/sorular/${result.subject_code}/${result.grade}-sinif/${questionId}`}
                     onClick={() => setIsOpen(false)}
                     className="block p-4 hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors"
                   >

@@ -1,6 +1,13 @@
 // Typesense modülü - merkezi export
 
-export { typesenseAdmin, typesenseSearch, USE_TYPESENSE, COLLECTIONS } from './client'
+export { 
+  typesenseClient,
+  typesenseAdmin, 
+  USE_TYPESENSE, 
+  COLLECTIONS,
+  isTypesenseAvailable
+} from './client'
+
 export { 
   leaderboardSchema, 
   questionsSchema,
