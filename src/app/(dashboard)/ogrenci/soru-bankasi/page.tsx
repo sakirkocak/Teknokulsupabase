@@ -929,6 +929,23 @@ export default function SoruBankasiPage() {
       })
       .eq('id', currentQuestion.id)
 
+    // user_answers tablosuna kaydet (AI Koç ve analiz için)
+    if (studentProfile?.id) {
+      const answerDuration = questionStartTime > 0 
+        ? Math.round((Date.now() - questionStartTime) / 1000)
+        : null
+      
+      await supabase.from('user_answers').insert({
+        student_id: studentProfile.id,
+        question_id: currentQuestion.id,
+        selected_answer: selectedAnswer,
+        is_correct: correct,
+        time_spent_seconds: answerDuration
+      }).then(({ error }) => {
+        if (error) console.log('user_answers insert hatası (tablo henüz yok olabilir):', error.message)
+      })
+    }
+
     // Öğrenci puanlarını güncelle
     if (studentProfile && userId) {
       const subjectCode = currentQuestion.topic?.subject?.code || 'turkce'

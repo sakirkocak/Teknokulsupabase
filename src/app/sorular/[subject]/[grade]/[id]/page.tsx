@@ -198,7 +198,7 @@ export default async function SingleQuestionPage({ params }: Props) {
             
             <div className="flex items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <span className={`px-3 py-1 bg-white/20 rounded-full text-sm font-medium`}>
                     {meta.name}
                   </span>
@@ -206,6 +206,12 @@ export default async function SingleQuestionPage({ params }: Props) {
                     {difficulty.icon}
                     {difficulty.label}
                   </span>
+                  {question.solve_count > 0 && (
+                    <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium flex items-center gap-1">
+                      <Target className="w-3 h-3" />
+                      {question.solve_count.toLocaleString('tr-TR')} kez çözüldü
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-xl font-bold">{question.main_topic}</h1>
                 {question.sub_topic && (
