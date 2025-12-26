@@ -12,6 +12,8 @@ import {
   Building2, School, Globe, Filter
 } from 'lucide-react'
 import { TurkeyCity, LeaderboardEntry, Subject } from '@/types/database'
+import { getLeaderboard, LeaderboardEntry as TypesenseLeaderboardEntry } from '@/lib/leaderboard'
+import { USE_TYPESENSE } from '@/lib/typesense/client'
 
 interface SubjectLeader {
   student_id: string
@@ -345,78 +347,47 @@ export default function LeaderboardPage() {
     const gradeFilter = selectedGrade !== '' ? parseInt(selectedGrade) : null
 
     if (activeTab === 'genel') {
-      let data: any[] | null = null
-      let error: any = null
+      try {
+        // 🚀 Typesense/Supabase abstraction layer kullan
+        const data = await getLeaderboard({
+          scope: activeScope as 'turkey' | 'city' | 'district' | 'school',
+          cityId: selectedCity || undefined,
+          districtId: selectedDistrict || undefined,
+          schoolId: selectedSchool || undefined,
+          grade: gradeFilter || undefined,
+          limit: 100
+        })
 
-      // Veritabanı fonksiyonlarını kullanarak doğrudan filtrelenmiş veri çek
-      if (activeScope === 'turkey') {
-        // Türkiye liderliği - veritabanı fonksiyonu kullan
-        const result = await supabase.rpc('get_leaderboard_turkey', {
-          p_grade_filter: gradeFilter,
-          p_limit: 100
-        })
-        data = result.data
-        error = result.error
-      } else if (activeScope === 'city' && selectedCity) {
-        // İl liderliği - veritabanı fonksiyonu kullan
-        const result = await supabase.rpc('get_leaderboard_by_city', {
-          p_city_id: selectedCity,
-          p_grade_filter: gradeFilter,
-          p_limit: 100
-        })
-        data = result.data
-        error = result.error
-      } else if (activeScope === 'district' && selectedDistrict) {
-        // İlçe liderliği - veritabanı fonksiyonu kullan
-        const result = await supabase.rpc('get_leaderboard_by_district', {
-          p_district_id: selectedDistrict,
-          p_grade_filter: gradeFilter,
-          p_limit: 100
-        })
-        data = result.data
-        error = result.error
-      } else if (activeScope === 'school' && selectedSchool) {
-        // Okul liderliği - veritabanı fonksiyonu kullan
-        const result = await supabase.rpc('get_leaderboard_by_school', {
-          p_school_id: selectedSchool,
-          p_grade_filter: gradeFilter,
-          p_limit: 100
-        })
-        data = result.data
-        error = result.error
-      }
-
-      if (error) {
+        if (data && data.length > 0) {
+          const formatted: LeaderboardEntry[] = data.map((item: TypesenseLeaderboardEntry) => ({
+            student_id: item.student_id,
+            full_name: item.full_name || 'Anonim',
+            avatar_url: item.avatar_url,
+            grade: item.grade,
+            city_name: item.city_name || null,
+            district_name: item.district_name || null,
+            school_name: item.school_name || null,
+            total_points: item.total_points,
+            total_questions: item.total_questions,
+            total_correct: item.total_correct,
+            total_wrong: item.total_wrong,
+            max_streak: item.max_streak,
+            success_rate: Number(item.success_rate) || 0,
+            rank: Number(item.rank),
+          }))
+          setLeaderboard(formatted)
+          setTotalStudents(formatted.length)
+          setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
+        } else {
+          setLeaderboard([])
+          setTotalStudents(0)
+          setTotalQuestions(0)
+        }
+      } catch (error) {
         console.error('Liderlik tablosu yüklenirken hata:', error)
         // Hata durumunda fallback - eski yöntemle dene
         await loadLeaderboardFallback()
         return
-      }
-
-      if (data && data.length > 0) {
-        const formatted: LeaderboardEntry[] = data.map((item: any) => ({
-          student_id: item.student_id,
-          full_name: item.full_name || 'Anonim',
-          avatar_url: item.avatar_url,
-          grade: item.grade,
-          city_name: item.city_name || null,
-          district_name: item.district_name || null,
-          school_name: item.school_name || null,
-          total_points: item.total_points,
-          total_questions: item.total_questions,
-          total_correct: item.total_correct,
-          total_wrong: item.total_wrong,
-          max_streak: item.max_streak,
-          success_rate: Number(item.success_rate) || 0,
-          rank: Number(item.rank),
-        }))
-        setLeaderboard(formatted)
-        setTotalStudents(formatted.length)
-        setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
-      } else {
-        setLeaderboard([])
-        setTotalStudents(0)
-        setTotalQuestions(0)
       }
     } else {
       // Ders bazlı liderlik

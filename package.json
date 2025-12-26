@@ -29,7 +29,8 @@
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
     "remark-math": "^6.0.0",
-    "tailwind-merge": "^2.5.0"
+    "tailwind-merge": "^2.5.0",
+    "typesense": "^2.1.0"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",
@@ -43,6 +44,7 @@
     "pg": "^8.16.3",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5",
     "xlsx": "^0.18.5"
   }

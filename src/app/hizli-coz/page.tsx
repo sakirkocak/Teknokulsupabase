@@ -18,6 +18,7 @@ import confetti from 'canvas-confetti'
 import MathRenderer from '@/components/MathRenderer'
 import { SingleXPFloat, MotivationFloat } from '@/components/XPFloatingAnimation'
 import ComboIndicator from '@/components/ComboIndicator'
+import QuestionSearch from '@/components/QuestionSearch'
 import { 
   XP_REWARDS, 
   COMBO_SETTINGS,
