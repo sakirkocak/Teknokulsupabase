@@ -23,8 +23,7 @@ export const typesenseSearch = new Typesense.Client({
 })
 
 // Feature flag - Typesense aktif mi?
-// NOT: Vercel env variables düzgün ayarlanana kadar false
-export const USE_TYPESENSE = false // process.env.NEXT_PUBLIC_USE_TYPESENSE === 'true'
+export const USE_TYPESENSE = process.env.NEXT_PUBLIC_USE_TYPESENSE === 'true'
 
 // Collection isimleri
 export const COLLECTIONS = {
