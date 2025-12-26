@@ -1012,6 +1012,13 @@ export default function SoruBankasiPage() {
         } else {
           setStudentPoints({ ...existingPoints, ...updateData })
           
+          // ⚡ Typesense'e senkronize et (liderlik tablosu için)
+          fetch('/api/typesense/sync-student', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studentId: studentProfile.id })
+          }).catch(err => console.log('Typesense sync hatası:', err))
+          
           // Puan geçmişine ekle (günlük/haftalık/aylık liderlik için)
           await supabase.from('point_history').insert({
             student_id: studentProfile.id,
@@ -1095,6 +1102,13 @@ export default function SoruBankasiPage() {
           console.error('Puan ekleme hatası:', insertError)
         } else {
           setStudentPoints(insertData)
+          
+          // ⚡ Typesense'e senkronize et (liderlik tablosu için)
+          fetch('/api/typesense/sync-student', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ studentId: studentProfile.id })
+          }).catch(err => console.log('Typesense sync hatası:', err))
           
           // Puan geçmişine ekle (günlük/haftalık/aylık liderlik için)
           await supabase.from('point_history').insert({
