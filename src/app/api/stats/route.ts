@@ -93,27 +93,41 @@ export async function GET(req: NextRequest) {
 
 // Typesense'den istatistikler
 async function getStatsFromTypesense(): Promise<StatsResponse> {
-  // Questions collection'dan facet sorgusu
-  const questionsResult = await typesenseClient
-    .collections(COLLECTIONS.QUESTIONS)
-    .documents()
-    .search({
-      q: '*',
-      query_by: 'question_text',
-      per_page: 0,
-      facet_by: 'subject_name,subject_code,grade,difficulty',
-      max_facet_values: 50
-    })
+  // Bugun icin tarih
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
-  // Leaderboard collection'dan ogrenci sayisi
-  const leaderboardResult = await typesenseClient
-    .collections(COLLECTIONS.LEADERBOARD)
-    .documents()
-    .search({
-      q: '*',
-      query_by: 'full_name',
-      per_page: 0
-    })
+  // ⚡ TUM SORGULARI PARALEL YAP - 3x hiz artisi!
+  const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
+    // 1. Questions collection facet sorgusu
+    typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        per_page: 0,
+        facet_by: 'subject_name,subject_code,grade,difficulty',
+        max_facet_values: 50
+      }),
+    
+    // 2. Leaderboard collection ogrenci sayisi
+    typesenseClient
+      .collections(COLLECTIONS.LEADERBOARD)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'full_name',
+        per_page: 0
+      }),
+    
+    // 3. Bugun cozulen sorular (Supabase)
+    supabase
+      .from('point_history')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', today.toISOString())
+      .eq('source', 'question')
+  ])
 
   const facets = questionsResult.facet_counts || []
   
@@ -153,20 +167,10 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
     }
   })
 
-  // Bugun cozulen sorular (Supabase'den - Typesense'de bu veri yok)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  
-  const { count: todayQuestions } = await supabase
-    .from('point_history')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', today.toISOString())
-    .eq('source', 'question')
-
   return {
     totalQuestions,
     activeStudents,
-    todayQuestions: todayQuestions || 0,
+    todayQuestions: todayQuestionsResult.count || 0,
     bySubject,
     byGrade,
     byDifficulty
