@@ -158,31 +158,56 @@ export default function LeaderboardPage() {
   // İlleri ve dersleri yükle
   useEffect(() => {
     async function loadCities() {
-      // TurkeyCity type requires: id, name, plate_code, created_at
-      const { data } = await supabase
-        .from('turkey_cities')
-        .select('id, name, plate_code, created_at')
-        .order('name')
-      if (data) setCities(data)
+      try {
+        // TurkeyCity type requires: id, name, plate_code, created_at
+        const { data, error } = await supabase
+          .from('turkey_cities')
+          .select('id, name, plate_code, created_at')
+          .order('name')
+        
+        if (error) {
+          console.error('İller yüklenirken hata:', error)
+          return
+        }
+        
+        if (data && data.length > 0) {
+          setCities(data)
+          console.log(`✅ ${data.length} il yüklendi`)
+        } else {
+          console.warn('⚠️ İl verisi bulunamadı')
+        }
+      } catch (err) {
+        console.error('İller yüklenirken beklenmeyen hata:', err)
+      }
     }
 
     async function loadSubjects() {
-      // Sadece temel MEB müfredatı dersleri
-      const allowedSubjects = [
-        'turkce', 'matematik', 'hayat_bilgisi', 'fen_bilimleri', 
-        'sosyal_bilgiler', 'ingilizce', 'din_kulturu',
-        'edebiyat', 'fizik', 'kimya', 'biyoloji',
-        'tarih', 'cografya', 'inkilap_tarihi', 'felsefe',
-        'gorsel_sanatlar', 'muzik', 'beden_egitimi',
-        'bilisim', 'teknoloji_tasarim'
-      ]
-      
-      const { data } = await supabase
-        .from('subjects')
-        .select('id, name, code, icon, color')
-        .in('code', allowedSubjects)
-        .order('name')
-      if (data) setSubjects(data as SubjectOption[])
+      try {
+        // Sadece temel MEB müfredatı dersleri
+        const allowedSubjects = [
+          'turkce', 'matematik', 'hayat_bilgisi', 'fen_bilimleri', 
+          'sosyal_bilgiler', 'ingilizce', 'din_kulturu',
+          'edebiyat', 'fizik', 'kimya', 'biyoloji',
+          'tarih', 'cografya', 'inkilap_tarihi', 'felsefe',
+          'gorsel_sanatlar', 'muzik', 'beden_egitimi',
+          'bilisim', 'teknoloji_tasarim'
+        ]
+        
+        const { data, error } = await supabase
+          .from('subjects')
+          .select('id, name, code, icon, color')
+          .in('code', allowedSubjects)
+          .order('name')
+        
+        if (error) {
+          console.error('Dersler yüklenirken hata:', error)
+          return
+        }
+        
+        if (data) setSubjects(data as SubjectOption[])
+      } catch (err) {
+        console.error('Dersler yüklenirken beklenmeyen hata:', err)
+      }
     }
 
     loadCities()
@@ -200,13 +225,25 @@ export default function LeaderboardPage() {
         return
       }
       
-      const { data } = await supabase
-        .from('turkey_districts')
-        .select('id, name, city_id')
-        .eq('city_id', selectedCity)
-        .order('name')
-      
-      if (data) setDistricts(data)
+      try {
+        const { data, error } = await supabase
+          .from('turkey_districts')
+          .select('id, name, city_id')
+          .eq('city_id', selectedCity)
+          .order('name')
+        
+        if (error) {
+          console.error('İlçeler yüklenirken hata:', error)
+          return
+        }
+        
+        if (data) {
+          setDistricts(data)
+          console.log(`✅ ${data.length} ilçe yüklendi`)
+        }
+      } catch (err) {
+        console.error('İlçeler yüklenirken beklenmeyen hata:', err)
+      }
     }
     
     loadDistricts()
@@ -221,14 +258,26 @@ export default function LeaderboardPage() {
         return
       }
       
-      const { data: schoolsData } = await supabase
-        .from('schools')
-        .select('id, name, district_id')
-        .eq('district_id', selectedDistrict)
-        .order('name')
-        .limit(200)
-      
-      if (schoolsData) setSchools(schoolsData)
+      try {
+        const { data: schoolsData, error } = await supabase
+          .from('schools')
+          .select('id, name, district_id')
+          .eq('district_id', selectedDistrict)
+          .order('name')
+          .limit(200)
+        
+        if (error) {
+          console.error('Okullar yüklenirken hata:', error)
+          return
+        }
+        
+        if (schoolsData) {
+          setSchools(schoolsData)
+          console.log(`✅ ${schoolsData.length} okul yüklendi`)
+        }
+      } catch (err) {
+        console.error('Okullar yüklenirken beklenmeyen hata:', err)
+      }
     }
     
     loadSchools()
