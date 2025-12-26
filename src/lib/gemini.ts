@@ -44,6 +44,68 @@ export interface GeneratedQuestion {
   difficulty: Difficulty
 }
 
+/**
+ * JSON parse sonrası bozulan LaTeX escape karakterlerini düzeltir
+ * Sorun: JSON.parse() sırasında \t, \r, \f, \n gibi escape sequence'lar
+ * gerçek karakterlere dönüşüyor ve LaTeX kodları bozuluyor.
+ * 
+ * Örnek: "\\times" -> "\times" -> (tab)imes
+ */
+function fixLatexEscapes(obj: any): any {
+  if (typeof obj === 'string') {
+    let fixed = obj
+    
+    // Bozuk escape karakterlerini düzelt
+    // \t (tab) -> \t (literal)
+    fixed = fixed.replace(/\t/g, '\\t')
+    // \r (carriage return) -> \r (literal)  
+    fixed = fixed.replace(/\r/g, '\\r')
+    // \f (form feed) -> \f (literal)
+    fixed = fixed.replace(/\f/g, '\\f')
+    // \n (newline) zaten MathRenderer'da <br> yapılıyor, dokunmuyoruz
+    
+    // Yaygın bozuk pattern'leri düzelt
+    // "imes" -> "\times" (çarpma)
+    fixed = fixed.replace(/imes/g, '\\times')
+    // "rac{" -> "\frac{" (kesir)
+    fixed = fixed.replace(/rac\{/g, '\\frac{')
+    // "ightarrow" -> "\rightarrow" (ok)
+    fixed = fixed.replace(/ightarrow/g, '\\rightarrow')
+    // "ext{" -> "\text{" (metin)
+    fixed = fixed.replace(/ext\{/g, '\\text{')
+    // "sqrt{" -> "\sqrt{" (karekök)
+    fixed = fixed.replace(/sqrt\{/g, '\\sqrt{')
+    // "cdot" -> "\cdot" (nokta çarpım)
+    fixed = fixed.replace(/([^\\])cdot/g, '$1\\cdot')
+    // "div" -> "\div" (bölme) - sadece boşlukla çevrili olanlar
+    fixed = fixed.replace(/ div /g, ' \\div ')
+    // "pm" -> "\pm" (artı/eksi)
+    fixed = fixed.replace(/ pm /g, ' \\pm ')
+    // "leq" -> "\leq" (küçük eşit)
+    fixed = fixed.replace(/([^\\])leq/g, '$1\\leq')
+    // "geq" -> "\geq" (büyük eşit)
+    fixed = fixed.replace(/([^\\])geq/g, '$1\\geq')
+    // "neq" -> "\neq" (eşit değil)
+    fixed = fixed.replace(/([^\\])neq/g, '$1\\neq')
+    
+    return fixed
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(fixLatexEscapes)
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const fixed: any = {}
+    for (const key in obj) {
+      fixed[key] = fixLatexEscapes(obj[key])
+    }
+    return fixed
+  }
+  
+  return obj
+}
+
 // Soru üretici prompt
 export async function generateQuestions(
   subject: string,
@@ -109,7 +171,8 @@ Kurallar:
     
     try {
       const data = JSON.parse(jsonStr)
-      return data.questions as GeneratedQuestion[]
+      // LaTeX escape karakterlerini düzelt
+      return fixLatexEscapes(data.questions) as GeneratedQuestion[]
     } catch (parseError) {
       // İkinci deneme - daha agresif temizleme
       console.log('İlk parse başarısız, alternatif yöntem deneniyor...')
@@ -122,7 +185,8 @@ Kurallar:
       
       try {
         const data = JSON.parse(jsonStr)
-        return data.questions as GeneratedQuestion[]
+        // LaTeX escape karakterlerini düzelt
+        return fixLatexEscapes(data.questions) as GeneratedQuestion[]
       } catch (secondError) {
         console.error('JSON parse hatası, raw text:', text.substring(0, 500))
         throw new Error('AI yanıtı geçerli JSON formatında değil. Lütfen tekrar deneyin.')

@@ -19,6 +19,37 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     
     let result = inputText
     
+    // =====================================================
+    // BOZUK LATEX PATTERN DÜZELTME (Fallback)
+    // JSON parse sırasında bozulan escape karakterleri
+    // =====================================================
+    
+    // "imes" -> "\times" (çarpma işareti)
+    result = result.replace(/imes/g, '\\times')
+    // "\ rac" veya "rac{" -> "\frac{" (kesir)
+    result = result.replace(/\\ rac/g, '\\frac')
+    result = result.replace(/([^\\f])rac\{/g, '$1\\frac{')
+    // "ightarrow" -> "\rightarrow" (ok)
+    result = result.replace(/ightarrow/g, '\\rightarrow')
+    // "ext{" -> "\text{" (metin)
+    result = result.replace(/([^\\t])ext\{/g, '$1\\text{')
+    // "sqrt{" -> "\sqrt{" (karekök)
+    result = result.replace(/([^\\])sqrt\{/g, '$1\\sqrt{')
+    // "cdot" -> "\cdot" (nokta çarpım)
+    result = result.replace(/([^\\])cdot/g, '$1\\cdot')
+    // " div " -> " \div " (bölme)
+    result = result.replace(/ div /g, ' \\div ')
+    // " pm " -> " \pm " (artı/eksi)
+    result = result.replace(/ pm /g, ' \\pm ')
+    // "leq" -> "\leq" (küçük eşit)
+    result = result.replace(/([^\\])leq([^a-z])/g, '$1\\leq$2')
+    // "geq" -> "\geq" (büyük eşit)
+    result = result.replace(/([^\\])geq([^a-z])/g, '$1\\geq$2')
+    // "neq" -> "\neq" (eşit değil)
+    result = result.replace(/([^\\])neq([^a-z])/g, '$1\\neq$2')
+    
+    // =====================================================
+    
     // Çift ters eğik çizgiyi tek yap (JSON'dan gelen)
     // \\frac -> \frac, \\sqrt -> \sqrt vb.
     result = result.replace(/\\\\/g, '\\')
