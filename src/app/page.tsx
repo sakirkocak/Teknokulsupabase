@@ -58,7 +58,8 @@ import {
   PieChart,
   Award,
   User,
-  Calendar
+  Calendar,
+  Swords
 } from 'lucide-react'
 
 // Yeni Features Array
@@ -1009,6 +1010,11 @@ export default function HomePage() {
               <Link href="/liderlik" className="btn btn-outline btn-lg border-purple-300 text-purple-600 hover:bg-purple-50">
                 <Trophy className="w-5 h-5" />
                 Liderlik Tablosu
+              </Link>
+              <Link href="/ogrenci/duello" className="btn btn-outline btn-lg border-red-300 text-red-600 hover:bg-red-50 relative">
+                <Swords className="w-5 h-5" />
+                Canlı Düello
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
               </Link>
               <Link href="/koclar" className="btn btn-ghost btn-lg text-surface-600">
                 Koçunu Bul
