@@ -95,6 +95,7 @@ export default function JsonLdSchema() {
   }
 
   // SoftwareApplication Schema
+  // NOT: aggregateRating kaldırıldı - sahte veri Google cezasına neden olabilir
   const softwareSchema = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -105,13 +106,6 @@ export default function JsonLdSchema() {
       '@type': 'Offer',
       price: '0',
       priceCurrency: 'TRY',
-    },
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      ratingCount: '500',
-      bestRating: '5',
-      worstRating: '1',
     },
   }
 
