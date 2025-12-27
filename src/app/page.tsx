@@ -287,6 +287,10 @@ function LiveStatsBanner() {
 
   useEffect(() => {
     loadStats()
+    
+    // 🔄 Her 5 saniyede bir anlık güncelleme
+    const interval = setInterval(loadStats, 5000)
+    return () => clearInterval(interval)
   }, [])
 
   async function loadStats() {

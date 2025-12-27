@@ -13,7 +13,7 @@ const supabase = createClient(
 
 // In-memory cache (serverless instance başına)
 let statsCache: { data: any; timestamp: number } | null = null
-const CACHE_TTL = 60 * 1000 // 60 saniye
+const CACHE_TTL = 5 * 1000 // 5 saniye - anlık güncellemeler için
 
 export interface StatsResponse {
   totalQuestions: number
