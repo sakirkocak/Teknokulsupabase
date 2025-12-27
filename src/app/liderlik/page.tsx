@@ -100,7 +100,7 @@ const gradeSubjectsMap: Record<string, string[]> = {
   '6': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim'],
   '7': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'teknoloji_tasarim'],
   // 8. Sınıf (LGS + Diğer dersler)
-  '8': ['turkce', 'matematik', 'fen_bilimleri', 'inkilap_tarihi', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim'],
+  '8': ['turkce', 'matematik', 'fen_bilimleri', 'inkilap_tarihi', 'teknoloji_tasarim', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi'],
   // Lise 9-12
   '9': ['matematik', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu'],
   '10': ['matematik', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
