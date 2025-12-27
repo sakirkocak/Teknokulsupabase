@@ -17,6 +17,11 @@ export const leaderboardSchema: CollectionCreateSchema = {
     { name: 'max_streak', type: 'int32' },
     { name: 'current_streak', type: 'int32' },
     
+    // Günlük istatistikler (bugün çözülen sorular için)
+    { name: 'today_questions', type: 'int32', optional: true },
+    { name: 'today_correct', type: 'int32', optional: true },
+    { name: 'today_date', type: 'string', optional: true },  // "2025-12-27" formatında
+    
     // Filtreleme alanlari
     { name: 'grade', type: 'int32', facet: true },
     { name: 'city_id', type: 'string', facet: true, optional: true },
@@ -166,6 +171,10 @@ export interface LeaderboardDocument {
   total_wrong: number
   max_streak: number
   current_streak: number
+  // Günlük istatistikler
+  today_questions?: number
+  today_correct?: number
+  today_date?: string  // "2025-12-27" formatında
   grade: number
   city_id?: string
   city_name?: string

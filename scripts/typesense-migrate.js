@@ -74,33 +74,64 @@ async function migrateLeaderboard() {
   
   console.log(`  📥 ${studentPoints.length} öğrenci puanı bulundu`)
   
-  const documents = studentPoints.map(sp => ({
-    id: sp.student_id,
-    student_id: sp.student_id,
-    user_id: sp.student?.user_id || '',
-    full_name: sp.student?.profile?.full_name || 'Anonim',
-    avatar_url: sp.student?.profile?.avatar_url || '',
-    total_points: sp.total_points || 0,
-    total_questions: sp.total_questions || 0,
-    total_correct: sp.total_correct || 0,
-    total_wrong: sp.total_wrong || 0,
-    max_streak: sp.max_streak || 0,
-    current_streak: sp.current_streak || 0,
-    grade: sp.student?.grade || 0,
-    city_id: sp.student?.city_id || '',
-    city_name: sp.student?.city?.name || '',
-    district_id: sp.student?.district_id || '',
-    district_name: sp.student?.district?.name || '',
-    school_id: sp.student?.school_id || '',
-    school_name: sp.student?.school?.name || '',
-    matematik_points: sp.matematik_points || 0,
-    turkce_points: sp.turkce_points || 0,
-    fen_points: sp.fen_points || 0,
-    inkilap_points: sp.inkilap_points || 0,
-    din_points: sp.din_points || 0,
-    ingilizce_points: sp.ingilizce_points || 0,
-    last_activity_at: sp.last_activity_at ? new Date(sp.last_activity_at).getTime() : Date.now()
-  }))
+  // Bugünün tarihi (Türkiye saati)
+  const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  
+  // Her öğrenci için bugünkü soru sayısını al
+  console.log(`  📅 Bugünün tarihi: ${todayTR}`)
+  
+  const documents = []
+  for (const sp of studentPoints) {
+    // Bugün bu öğrencinin çözdüğü soru sayısını al
+    const { count: todayQuestionsCount } = await supabase
+      .from('point_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', sp.student_id)
+      .eq('source', 'question')
+      .gte('created_at', `${todayTR}T00:00:00+03:00`)
+    
+    const { count: todayCorrectCount } = await supabase
+      .from('point_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', sp.student_id)
+      .eq('source', 'question')
+      .eq('is_correct', true)
+      .gte('created_at', `${todayTR}T00:00:00+03:00`)
+    
+    documents.push({
+      id: sp.student_id,
+      student_id: sp.student_id,
+      user_id: sp.student?.user_id || '',
+      full_name: sp.student?.profile?.full_name || 'Anonim',
+      avatar_url: sp.student?.profile?.avatar_url || '',
+      total_points: sp.total_points || 0,
+      total_questions: sp.total_questions || 0,
+      total_correct: sp.total_correct || 0,
+      total_wrong: sp.total_wrong || 0,
+      max_streak: sp.max_streak || 0,
+      current_streak: sp.current_streak || 0,
+      // Günlük istatistikler
+      today_questions: todayQuestionsCount || 0,
+      today_correct: todayCorrectCount || 0,
+      today_date: todayTR,
+      grade: sp.student?.grade || 0,
+      city_id: sp.student?.city_id || '',
+      city_name: sp.student?.city?.name || '',
+      district_id: sp.student?.district_id || '',
+      district_name: sp.student?.district?.name || '',
+      school_id: sp.student?.school_id || '',
+      school_name: sp.student?.school?.name || '',
+      matematik_points: sp.matematik_points || 0,
+      turkce_points: sp.turkce_points || 0,
+      fen_points: sp.fen_points || 0,
+      inkilap_points: sp.inkilap_points || 0,
+      din_points: sp.din_points || 0,
+      ingilizce_points: sp.ingilizce_points || 0,
+      last_activity_at: sp.last_activity_at ? new Date(sp.last_activity_at).getTime() : Date.now()
+    })
+  }
+  
+  console.log(`  📊 Bugün toplam ${documents.reduce((sum, d) => sum + d.today_questions, 0)} soru çözülmüş`)
   
   let imported = 0
   for (let i = 0; i < documents.length; i += BATCH_SIZE) {

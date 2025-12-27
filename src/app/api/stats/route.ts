@@ -139,11 +139,8 @@ export async function GET(req: NextRequest) {
 
 // Typesense'den istatistikler
 async function getStatsFromTypesense(): Promise<StatsResponse> {
-  // Bugün için tarih (Türkiye timezone UTC+3)
-  const now = new Date()
-  // Türkiye'de bugünün başlangıcı (UTC+3, yani UTC'de -3 saat)
-  const todayTR = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  todayTR.setHours(todayTR.getHours() - 3) // UTC+3 → UTC
+  // Bugün için tarih (Türkiye saati) - "2025-12-27" formatında
+  const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
   // ⚡ TUM SORGULARI PARALEL YAP - 3x hiz artisi!
   const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
@@ -169,12 +166,17 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         per_page: 0
       }),
     
-    // 3. Bugun cozulen sorular (Supabase) - Türkiye saati
-    supabase
-      .from('point_history')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', todayTR.toISOString())
-      .eq('source', 'question')
+    // 3. Bugün çözülen sorular (Typesense'den - today_questions toplamı)
+    typesenseClient
+      .collections(COLLECTIONS.LEADERBOARD)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'full_name',
+        filter_by: `today_date:=${todayTR}`,
+        per_page: 250, // Max öğrenci sayısı
+        include_fields: 'today_questions'
+      })
   ])
 
   const facets = questionsResult.facet_counts || []
@@ -184,6 +186,14 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   
   // Aktif ogrenci sayisi
   const activeStudents = leaderboardResult.found || 0
+  
+  // Bugün çözülen toplam soru sayısı (tüm öğrencilerin today_questions toplamı)
+  let todayQuestions = 0
+  if (todayQuestionsResult.hits && todayQuestionsResult.hits.length > 0) {
+    todayQuestions = todayQuestionsResult.hits.reduce((sum: number, hit: any) => {
+      return sum + (hit.document?.today_questions || 0)
+    }, 0)
+  }
   
   // Ders bazli dagilim
   const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
@@ -218,7 +228,7 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   return {
     totalQuestions,
     activeStudents,
-    todayQuestions: todayQuestionsResult.count || 0,
+    todayQuestions,
     bySubject,
     byGrade,
     byDifficulty

@@ -67,6 +67,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Öğrenci profili bulunamadı' }, { status: 404 })
     }
 
+    // Bugünün tarihi (Türkiye saati)
+    const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+    // Format: "2025-12-27"
+    
+    // Bugün bu öğrencinin çözdüğü soru sayısını al
+    const { count: todayQuestionsCount } = await supabase
+      .from('point_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('source', 'question')
+      .gte('created_at', `${todayTR}T00:00:00+03:00`)
+    
+    const { count: todayCorrectCount } = await supabase
+      .from('point_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .eq('source', 'question')
+      .eq('is_correct', true)
+      .gte('created_at', `${todayTR}T00:00:00+03:00`)
+
     // Typesense dokümanı oluştur
     const document = {
       id: studentId,
@@ -80,6 +100,10 @@ export async function POST(req: NextRequest) {
       total_wrong: pointsData.total_wrong || 0,
       max_streak: pointsData.max_streak || 0,
       current_streak: pointsData.current_streak || 0,
+      // Günlük istatistikler
+      today_questions: todayQuestionsCount || 0,
+      today_correct: todayCorrectCount || 0,
+      today_date: todayTR,
       grade: studentData.grade || 0,
       city_id: studentData.city_id || '',
       city_name: (studentData.city as any)?.name || '',

@@ -40,6 +40,11 @@ const leaderboardSchema = {
     { name: 'max_streak', type: 'int32' },
     { name: 'current_streak', type: 'int32' },
     
+    // Günlük istatistikler
+    { name: 'today_questions', type: 'int32', optional: true },
+    { name: 'today_correct', type: 'int32', optional: true },
+    { name: 'today_date', type: 'string', optional: true },
+    
     { name: 'grade', type: 'int32', facet: true },
     { name: 'city_id', type: 'string', facet: true, optional: true },
     { name: 'city_name', type: 'string', facet: true, optional: true },
