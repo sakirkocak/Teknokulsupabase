@@ -53,12 +53,29 @@ const leaderboardSchema = {
     { name: 'school_id', type: 'string', facet: true, optional: true },
     { name: 'school_name', type: 'string', facet: true, optional: true },
     
+    // Ana dersler (LGS/Ortaokul)
     { name: 'matematik_points', type: 'int32', optional: true },
     { name: 'turkce_points', type: 'int32', optional: true },
     { name: 'fen_points', type: 'int32', optional: true },
     { name: 'inkilap_points', type: 'int32', optional: true },
     { name: 'din_points', type: 'int32', optional: true },
     { name: 'ingilizce_points', type: 'int32', optional: true },
+    { name: 'sosyal_points', type: 'int32', optional: true },
+    { name: 'hayat_points', type: 'int32', optional: true },
+    // Lise dersleri
+    { name: 'edebiyat_points', type: 'int32', optional: true },
+    { name: 'fizik_points', type: 'int32', optional: true },
+    { name: 'kimya_points', type: 'int32', optional: true },
+    { name: 'biyoloji_points', type: 'int32', optional: true },
+    { name: 'tarih_points', type: 'int32', optional: true },
+    { name: 'cografya_points', type: 'int32', optional: true },
+    { name: 'felsefe_points', type: 'int32', optional: true },
+    // Diğer dersler
+    { name: 'gorsel_points', type: 'int32', optional: true },
+    { name: 'muzik_points', type: 'int32', optional: true },
+    { name: 'beden_points', type: 'int32', optional: true },
+    { name: 'bilisim_points', type: 'int32', optional: true },
+    { name: 'teknoloji_points', type: 'int32', optional: true },
     
     { name: 'last_activity_at', type: 'int64' }
   ],

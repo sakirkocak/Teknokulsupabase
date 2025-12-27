@@ -121,12 +121,29 @@ async function migrateLeaderboard() {
       district_name: sp.student?.district?.name || '',
       school_id: sp.student?.school_id || '',
       school_name: sp.student?.school?.name || '',
+      // Ana dersler (LGS/Ortaokul)
       matematik_points: sp.matematik_points || 0,
       turkce_points: sp.turkce_points || 0,
       fen_points: sp.fen_points || 0,
       inkilap_points: sp.inkilap_points || 0,
       din_points: sp.din_points || 0,
       ingilizce_points: sp.ingilizce_points || 0,
+      sosyal_points: sp.sosyal_points || 0,
+      hayat_points: sp.hayat_points || 0,
+      // Lise dersleri
+      edebiyat_points: sp.edebiyat_points || 0,
+      fizik_points: sp.fizik_points || 0,
+      kimya_points: sp.kimya_points || 0,
+      biyoloji_points: sp.biyoloji_points || 0,
+      tarih_points: sp.tarih_points || 0,
+      cografya_points: sp.cografya_points || 0,
+      felsefe_points: sp.felsefe_points || 0,
+      // Diğer dersler
+      gorsel_points: sp.gorsel_points || 0,
+      muzik_points: sp.muzik_points || 0,
+      beden_points: sp.beden_points || 0,
+      bilisim_points: sp.bilisim_points || 0,
+      teknoloji_points: sp.teknoloji_points || 0,
       last_activity_at: sp.last_activity_at ? new Date(sp.last_activity_at).getTime() : Date.now()
     })
   }

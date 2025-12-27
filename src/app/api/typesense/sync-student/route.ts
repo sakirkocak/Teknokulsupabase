@@ -111,12 +111,29 @@ export async function POST(req: NextRequest) {
       district_name: (studentData.district as any)?.name || '',
       school_id: studentData.school_id || '',
       school_name: (studentData.school as any)?.name || '',
+      // Ana dersler (LGS/Ortaokul)
       matematik_points: pointsData.matematik_points || 0,
       turkce_points: pointsData.turkce_points || 0,
       fen_points: pointsData.fen_points || 0,
       inkilap_points: pointsData.inkilap_points || 0,
       din_points: pointsData.din_points || 0,
       ingilizce_points: pointsData.ingilizce_points || 0,
+      sosyal_points: pointsData.sosyal_points || 0,
+      hayat_points: pointsData.hayat_points || 0,
+      // Lise dersleri
+      edebiyat_points: pointsData.edebiyat_points || 0,
+      fizik_points: pointsData.fizik_points || 0,
+      kimya_points: pointsData.kimya_points || 0,
+      biyoloji_points: pointsData.biyoloji_points || 0,
+      tarih_points: pointsData.tarih_points || 0,
+      cografya_points: pointsData.cografya_points || 0,
+      felsefe_points: pointsData.felsefe_points || 0,
+      // Diğer dersler
+      gorsel_points: pointsData.gorsel_points || 0,
+      muzik_points: pointsData.muzik_points || 0,
+      beden_points: pointsData.beden_points || 0,
+      bilisim_points: pointsData.bilisim_points || 0,
+      teknoloji_points: pointsData.teknoloji_points || 0,
       last_activity_at: pointsData.last_activity_at 
         ? new Date(pointsData.last_activity_at).getTime() 
         : Date.now()

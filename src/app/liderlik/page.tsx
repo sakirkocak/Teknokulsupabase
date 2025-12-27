@@ -67,6 +67,26 @@ const colorMap: Record<string, string> = {
   gray: 'from-gray-500 to-gray-600',
 }
 
+// 🎯 Typesense'de liderlik puanı olan dersler (TÜM DERSLER!)
+const SUPPORTED_LEADERBOARD_SUBJECTS = [
+  // Ana dersler (LGS/Ortaokul)
+  'matematik', 'turkce', 'fen_bilimleri', 'inkilap_tarihi', 'din_kulturu', 'ingilizce',
+  'sosyal_bilgiler', 'hayat_bilgisi',
+  // Lise dersleri
+  'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'felsefe',
+  // Diğer dersler
+  'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim', 'teknoloji_tasarim'
+]
+
+// 📚 Varsayılan ders sıralaması - ortaokul dersleri önce!
+const DEFAULT_SUBJECT_ORDER = [
+  // Öncelikli dersler (ortaokul/LGS)
+  'matematik', 'turkce', 'fen_bilimleri', 'ingilizce', 'din_kulturu', 'inkilap_tarihi',
+  // Diğer dersler (lise/alfabetik)
+  'biyoloji', 'cografya', 'edebiyat', 'felsefe', 'fizik', 'kimya', 'tarih',
+  'hayat_bilgisi', 'sosyal_bilgiler', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim', 'teknoloji_tasarim'
+]
+
 // Sınıf bazlı ders filtreleme - MEB Müfredatı
 const gradeSubjectsMap: Record<string, string[]> = {
   // İlkokul 1-3: Temel dersler
@@ -74,19 +94,18 @@ const gradeSubjectsMap: Record<string, string[]> = {
   '2': ['turkce', 'matematik', 'hayat_bilgisi', 'ingilizce', 'gorsel_sanatlar', 'muzik', 'beden_egitimi'],
   '3': ['turkce', 'matematik', 'hayat_bilgisi', 'fen_bilimleri', 'ingilizce', 'gorsel_sanatlar', 'muzik', 'beden_egitimi'],
   // İlkokul 4: Hayat Bilgisi yerine Fen ve Sosyal
-  '4': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'trafik'],
+  '4': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi'],
   // Ortaokul 5-7
   '5': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim'],
   '6': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim'],
   '7': ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'teknoloji_tasarim'],
-  // 8. Sınıf (LGS)
-  '8': ['turkce', 'matematik', 'fen_bilimleri', 'inkilap_tarihi', 'ingilizce', 'din_kulturu'],
-  // Lise 9-11
-  '9': ['edebiyat', 'matematik', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi'],
-  '10': ['edebiyat', 'matematik', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
-  '11': ['edebiyat', 'matematik', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
-  // 12. Sınıf (YKS)
-  '12': ['edebiyat', 'matematik', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
+  // 8. Sınıf (LGS + Diğer dersler)
+  '8': ['turkce', 'matematik', 'fen_bilimleri', 'inkilap_tarihi', 'ingilizce', 'din_kulturu', 'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim'],
+  // Lise 9-12
+  '9': ['matematik', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu'],
+  '10': ['matematik', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
+  '11': ['matematik', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
+  '12': ['matematik', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
 }
 
 // SchoolOption ve DistrictOption interface'leri kaldırıldı
@@ -282,7 +301,7 @@ export default function LeaderboardPage() {
   }
 
   const getSelectedCityName = () => {
-    const city = cities.find(c => c.location_id === selectedCity)
+    const city = cities.find(c => c.id === selectedCity)
     return city?.name || 'İl'
   }
 
@@ -534,7 +553,7 @@ export default function LeaderboardPage() {
                 >
                   <option value="" className="bg-gray-900">{citiesLoading ? 'Yükleniyor...' : 'İl Seçin'}</option>
                   {cities.map(city => (
-                    <option key={city.location_id} value={city.location_id} className="bg-gray-900">{city.name}</option>
+                    <option key={city.id} value={city.id} className="bg-gray-900">{city.name}</option>
                   ))}
                 </select>
               </div>
@@ -557,7 +576,7 @@ export default function LeaderboardPage() {
                     >
                       <option value="" className="bg-gray-900">{districtsLoading ? 'Yükleniyor...' : `İlçe Seçin (${districts.length} ilçe)`}</option>
                       {districts.map(district => (
-                        <option key={district.location_id} value={district.location_id} className="bg-gray-900">{district.name}</option>
+                        <option key={district.id} value={district.id} className="bg-gray-900">{district.name}</option>
                       ))}
                     </select>
                   </div>
@@ -579,7 +598,7 @@ export default function LeaderboardPage() {
                     >
                       <option value="" className="bg-gray-900">{schoolsLoading ? 'Yükleniyor...' : `Okul Seçin (${schools.length} okul)`}</option>
                       {schools.map(school => (
-                        <option key={school.school_id} value={school.school_id} className="bg-gray-900">{school.name}</option>
+                        <option key={school.id} value={school.id} className="bg-gray-900">{school.name}</option>
                       ))}
                     </select>
                   </div>
@@ -612,33 +631,46 @@ export default function LeaderboardPage() {
               Genel
             </button>
             
-            {/* Dinamik dersler - sınıfa göre filtrelenmiş */}
+            {/* Dinamik dersler - sınıfa göre filtrelenmiş ve sıralanmış */}
             {subjects
               .filter(subject => {
-                // Sınıf seçilmemişse tüm temel dersleri göster
+                // Sınıf seçilmemişse sadece desteklenen dersleri göster (ortaokul öncelikli)
                 if (!selectedGrade) {
-                  // Sadece ana dersleri göster
-                  const mainSubjects = ['turkce', 'matematik', 'fen_bilimleri', 'sosyal_bilgiler', 'ingilizce', 'din_kulturu', 'inkilap_tarihi', 'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya']
-                  return mainSubjects.includes(subject.code)
+                  return SUPPORTED_LEADERBOARD_SUBJECTS.includes(subject.code)
                 }
                 // Sınıf seçilmişse sadece o sınıfın derslerini göster
                 const gradeSubjects = gradeSubjectsMap[selectedGrade]
                 return gradeSubjects?.includes(subject.code)
               })
-              .map((subject) => (
+              // Sırala - DEFAULT_SUBJECT_ORDER'a göre
+              .sort((a, b) => {
+                const aIndex = DEFAULT_SUBJECT_ORDER.indexOf(a.code)
+                const bIndex = DEFAULT_SUBJECT_ORDER.indexOf(b.code)
+                // Listede yoksa sona at
+                const aOrder = aIndex === -1 ? 999 : aIndex
+                const bOrder = bIndex === -1 ? 999 : bIndex
+                return aOrder - bOrder
+              })
+              .map((subject) => {
+                const isSupported = SUPPORTED_LEADERBOARD_SUBJECTS.includes(subject.code)
+                return (
               <button
                 key={subject.id}
                 onClick={() => setActiveTab(subject.code)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
                   activeTab === subject.code
                     ? `bg-gradient-to-r ${colorMap[subject.color] || 'from-indigo-500 to-indigo-600'} text-white shadow-lg`
-                    : 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'
+                    : isSupported 
+                      ? 'bg-white/10 text-white/60 hover:bg-white/20 hover:text-white'
+                      : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/60'
                 }`}
+                title={!isSupported ? 'Bu ders için henüz liderlik tablosu yok' : undefined}
               >
                 <span>{subject.icon}</span>
                 {subject.name}
+                {!isSupported && <span className="text-xs opacity-50">🔒</span>}
               </button>
-            ))}
+            )})}
           </div>
           
           {/* LGS/YKS Sınav Bilgisi */}
@@ -662,16 +694,16 @@ export default function LeaderboardPage() {
         {activeScope === 'city' && selectedCity && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <MapPin className="h-6 w-6 text-primary-400" />
-            {cities.find(c => c.location_id === selectedCity)?.name} İl Liderliği
+            {cities.find(c => c.id === selectedCity)?.name} İl Liderliği
           </h2>
         )}
 
         {activeScope === 'district' && selectedDistrict && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Building2 className="h-6 w-6 text-green-400" />
-            {districts.find(d => d.location_id === selectedDistrict)?.name} İlçe Liderliği
+            {districts.find(d => d.id === selectedDistrict)?.name} İlçe Liderliği
             <span className="text-sm font-normal text-white/50 ml-2">
-              ({cities.find(c => c.location_id === selectedCity)?.name})
+              ({cities.find(c => c.id === selectedCity)?.name})
             </span>
           </h2>
         )}
@@ -679,7 +711,7 @@ export default function LeaderboardPage() {
         {activeScope === 'school' && selectedSchool && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <School className="h-6 w-6 text-purple-400" />
-            {schools.find(s => s.school_id === selectedSchool)?.name} Okul Liderliği
+            {schools.find(s => s.id === selectedSchool)?.name} Okul Liderliği
           </h2>
         )}
 
@@ -917,34 +949,48 @@ export default function LeaderboardPage() {
               ))
             )}
 
-            {/* Liste Boş */}
-            {leaderboard.length === 0 && !loading && (
+            {/* Liste Boş veya Desteklenmeyen Ders */}
+            {(leaderboard.length === 0 && !loading) || (activeTab !== 'genel' && !SUPPORTED_LEADERBOARD_SUBJECTS.includes(activeTab)) ? (
               <div className="text-center py-16">
-                <Trophy className="h-16 w-16 text-white/20 mx-auto mb-4" />
-                <h3 className="text-xl font-medium text-white/60 mb-2">
-                  {activeScope === 'city' && !selectedCity 
-                    ? 'Lütfen bir il seçin' 
-                    : activeScope === 'district' && !selectedDistrict
-                    ? 'Lütfen bir ilçe seçin'
-                    : activeScope === 'school' && !selectedSchool
-                    ? 'Lütfen bir okul seçin'
-                    : activeTab !== 'genel' && !['matematik', 'turkce', 'fen_bilimleri', 'inkilap_tarihi', 'din_kulturu', 'ingilizce'].includes(activeTab)
-                    ? 'Bu ders için henüz liderlik tablosu oluşturulmadı'
-                    : 'Henüz veri yok'}
-                </h3>
-                <p className="text-white/40">
-                  {activeTab !== 'genel' && !['matematik', 'turkce', 'fen_bilimleri', 'inkilap_tarihi', 'din_kulturu', 'ingilizce'].includes(activeTab)
-                    ? 'Yakında bu ders için de liderlik tablosu eklenecek!'
-                    : activeScope === 'city' && !selectedCity 
-                    ? '81 il arasından seçim yapın'
-                    : activeScope === 'district' && !selectedDistrict
-                    ? 'Önce il seçin, sonra ilçe seçin'
-                    : activeScope === 'school' && !selectedSchool
-                    ? 'Önce il ve ilçe seçin, sonra okul seçin'
-                    : 'İlk soru çözen sen ol!'}
-                </p>
+                {activeTab !== 'genel' && !SUPPORTED_LEADERBOARD_SUBJECTS.includes(activeTab) ? (
+                  // Desteklenmeyen ders
+                  <>
+                    <div className="text-6xl mb-4">🔒</div>
+                    <h3 className="text-xl font-medium text-white/60 mb-2">
+                      Bu ders için henüz liderlik tablosu yok
+                    </h3>
+                    <p className="text-white/40 max-w-md mx-auto">
+                      Şu an sadece <span className="text-indigo-400">Matematik, Türkçe, Fen Bilimleri, İngilizce, Din Kültürü ve İnkılap Tarihi</span> dersleri için liderlik tablosu var.
+                      <br /><br />
+                      Yakında diğer dersler de eklenecek! 🚀
+                    </p>
+                  </>
+                ) : (
+                  // Boş liste
+                  <>
+                    <Trophy className="h-16 w-16 text-white/20 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-white/60 mb-2">
+                      {activeScope === 'city' && !selectedCity 
+                        ? 'Lütfen bir il seçin' 
+                        : activeScope === 'district' && !selectedDistrict
+                        ? 'Lütfen bir ilçe seçin'
+                        : activeScope === 'school' && !selectedSchool
+                        ? 'Lütfen bir okul seçin'
+                        : 'Henüz veri yok'}
+                    </h3>
+                    <p className="text-white/40">
+                      {activeScope === 'city' && !selectedCity 
+                        ? '81 il arasından seçim yapın'
+                        : activeScope === 'district' && !selectedDistrict
+                        ? 'Önce il seçin, sonra ilçe seçin'
+                        : activeScope === 'school' && !selectedSchool
+                        ? 'Önce il ve ilçe seçin, sonra okul seçin'
+                        : 'İlk soru çözen sen ol!'}
+                    </p>
+                  </>
+                )}
               </div>
-            )}
+            ) : null}
           </div>
         )}
 

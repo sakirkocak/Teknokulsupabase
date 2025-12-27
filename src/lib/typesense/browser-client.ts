@@ -531,6 +531,43 @@ export async function searchSchoolsFast(
 // 🏆 DERS BAZLI LİDERLİK
 // =====================================================
 
+// Ders kodu -> Typesense field mapping
+// Frontend'den gelen uzun ders kodlarını Typesense'deki kısa alan adlarına çevirir
+const subjectFieldMap: Record<string, string> = {
+  // Ana dersler (LGS/Ortaokul)
+  'matematik': 'matematik',
+  'turkce': 'turkce',
+  'fen_bilimleri': 'fen',
+  'inkilap_tarihi': 'inkilap',
+  'din_kulturu': 'din',
+  'ingilizce': 'ingilizce',
+  'sosyal_bilgiler': 'sosyal',
+  'hayat_bilgisi': 'hayat',
+  // Lise dersleri
+  'edebiyat': 'edebiyat',
+  'fizik': 'fizik',
+  'kimya': 'kimya',
+  'biyoloji': 'biyoloji',
+  'tarih': 'tarih',
+  'cografya': 'cografya',
+  'felsefe': 'felsefe',
+  // Diğer dersler
+  'gorsel_sanatlar': 'gorsel',
+  'muzik': 'muzik',
+  'beden_egitimi': 'beden',
+  'bilisim': 'bilisim',
+  'teknoloji_tasarim': 'teknoloji',
+  // Kısa kodlar da çalışsın
+  'fen': 'fen',
+  'inkilap': 'inkilap',
+  'din': 'din',
+  'sosyal': 'sosyal',
+  'hayat': 'hayat',
+  'gorsel': 'gorsel',
+  'beden': 'beden',
+  'teknoloji': 'teknoloji'
+}
+
 export interface SubjectLeaderEntry extends LeaderboardEntry {
   subject_points: number
 }
@@ -574,8 +611,11 @@ export async function getSubjectLeaderboardFast(
     filterParts.push(`grade:=${grade}`)
   }
 
-  // Ders puanı alanı
-  const subjectPointsField = `${subjectCode}_points`
+  // Ders puanı alanı - mapping kullan
+  const mappedSubject = subjectFieldMap[subjectCode] || subjectCode
+  const subjectPointsField = `${mappedSubject}_points`
+  
+  console.log(`📚 Subject mapping: ${subjectCode} -> ${mappedSubject} -> ${subjectPointsField}`)
   
   // Sadece bu derste puanı olanları getir
   filterParts.push(`${subjectPointsField}:>0`)

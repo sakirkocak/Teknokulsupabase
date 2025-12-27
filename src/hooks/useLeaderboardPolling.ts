@@ -130,6 +130,14 @@ export function useLeaderboardPolling({
     }
   }, [subject])
 
+  // Typesense'de liderlik puanı olan dersler (TÜM DERSLER!)
+  const SUPPORTED_SUBJECTS = [
+    'matematik', 'turkce', 'fen_bilimleri', 'inkilap_tarihi', 'din_kulturu', 'ingilizce',
+    'sosyal_bilgiler', 'hayat_bilgisi',
+    'edebiyat', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'felsefe',
+    'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'bilisim', 'teknoloji_tasarim'
+  ]
+
   // Veri çekme fonksiyonu
   const fetchLeaderboard = useCallback(async () => {
     try {
@@ -137,6 +145,16 @@ export function useLeaderboardPolling({
       
       // Ders bazlı mı genel mi?
       const isSubjectBased = subject && subject !== 'genel' && subject !== 'general'
+      
+      // Desteklenmeyen ders kontrolü
+      if (isSubjectBased && !SUPPORTED_SUBJECTS.includes(subject)) {
+        // Desteklenmeyen ders - boş veri döndür
+        console.log(`⚠️ Unsupported subject for leaderboard: ${subject}`)
+        setLeaderboard([])
+        setStats({ totalStudents: 0, totalQuestions: 0, highestPoints: 0, longestStreak: 0 })
+        setLoading(false)
+        return
+      }
       
       if (isSubjectBased) {
         // Ders bazlı liderlik
