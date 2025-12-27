@@ -4,16 +4,27 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Trophy, Medal, Crown, Star, Target, Zap,
   TrendingUp, Users, BookOpen, GraduationCap,
   ChevronRight, Flame, Award, BarChart3, MapPin,
-  Building2, School, Globe, Filter
+  Building2, School, Globe, Filter, Radio
 } from 'lucide-react'
 import { TurkeyCity, LeaderboardEntry, Subject } from '@/types/database'
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
 import { getLeaderboardFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
+// 🎮 Real-time özellikler
+import { useLeaderboardPolling, LeaderboardDiff } from '@/hooks/useLeaderboardPolling'
+import { 
+  AnimatedNumber, 
+  LiveActivityFeed, 
+  RankChangeIndicator,
+  RankHighlight,
+  LeaderBadges,
+  StreakIndicator,
+  LeaderboardConfetti
+} from '@/components/leaderboard'
 
 interface SubjectLeader {
   student_id: string
@@ -118,6 +129,67 @@ export default function LeaderboardPage() {
   // Auth state
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
+  
+  // 🎮 Real-time polling - Typesense'den her 5 saniyede güncelleme
+  const pollingFilters = useMemo(() => ({
+    scope: activeScope as 'turkey' | 'city' | 'district' | 'school',
+    cityId: selectedCity || null,
+    districtId: selectedDistrict || null,
+    schoolId: selectedSchool || null,
+    grade: selectedGrade ? parseInt(selectedGrade) : null,
+    limit: 100
+  }), [activeScope, selectedCity, selectedDistrict, selectedSchool, selectedGrade])
+  
+  // Polling sadece "genel" tab'ında ve Typesense aktifken çalışır
+  const shouldPoll = activeTab === 'genel' && isTypesenseEnabled()
+  
+  const { 
+    leaderboard: polledLeaderboard,
+    stats: polledStats,
+    diffs,
+    activities,
+    loading: pollingLoading,
+    lastUpdated
+  } = useLeaderboardPolling({
+    filters: pollingFilters,
+    pollingInterval: 5000, // 5 saniye
+    enabled: shouldPoll
+  })
+  
+  // Polling verilerini kullan (genel tab'ında)
+  useEffect(() => {
+    if (shouldPoll && polledLeaderboard.length > 0) {
+      const formatted: LeaderboardEntry[] = polledLeaderboard.map((item) => ({
+        student_id: item.student_id,
+        full_name: item.full_name || 'Anonim',
+        avatar_url: item.avatar_url,
+        grade: item.grade,
+        city_name: item.city_name || null,
+        district_name: item.district_name || null,
+        school_name: item.school_name || null,
+        total_points: item.total_points,
+        total_questions: item.total_questions,
+        total_correct: item.total_correct,
+        total_wrong: item.total_wrong,
+        max_streak: item.max_streak,
+        success_rate: item.total_questions > 0 
+          ? (item.total_correct / item.total_questions) * 100 
+          : 0,
+        rank: item.rank,
+      }))
+      setLeaderboard(formatted)
+      setTotalStudents(polledStats.totalStudents)
+      setTotalQuestions(polledStats.totalQuestions)
+      setLoading(false)
+    }
+  }, [shouldPoll, polledLeaderboard, polledStats])
+  
+  // Diff'leri sıra değişimi için map'e dönüştür
+  const diffMap = useMemo(() => {
+    const map = new Map<string, LeaderboardDiff>()
+    diffs.forEach(diff => map.set(diff.studentId, diff))
+    return map
+  }, [diffs])
 
   // Supabase client - sadece bir kez oluştur
   const supabase = useMemo(() => createClient(), [])
@@ -644,72 +716,110 @@ export default function LeaderboardPage() {
           </p>
         </div>
 
-        {/* İstatistikler */}
+        {/* 🔴 Canlı Gösterge */}
+        {shouldPoll && (
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <motion.div
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="w-2 h-2 bg-green-500 rounded-full"
+            />
+            <span className="text-sm text-green-400 font-medium">CANLI</span>
+            <span className="text-xs text-white/40">
+              • Her 5 saniyede güncelleniyor
+              {lastUpdated && ` • Son: ${lastUpdated.toLocaleTimeString('tr-TR')}`}
+            </span>
+          </div>
+        )}
+
+        {/* İstatistikler - Animasyonlu */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+          <motion.div 
+            className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 relative overflow-hidden"
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
                 <Users className="h-5 w-5 text-indigo-400" />
               </div>
               <div>
-                {loading ? (
+                {loading && !shouldPoll ? (
                   <div className="h-8 w-16 bg-white/10 rounded animate-pulse" />
                 ) : (
-                  <div className="text-2xl font-bold text-white">{totalStudents}</div>
+                  <div className="text-2xl font-bold text-white">
+                    <AnimatedNumber value={totalStudents} />
+                  </div>
                 )}
                 <div className="text-xs text-white/50">Aktif Öğrenci</div>
               </div>
             </div>
-          </div>
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+          </motion.div>
+          <motion.div 
+            className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 relative overflow-hidden"
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
                 <Target className="h-5 w-5 text-green-400" />
               </div>
               <div>
-                {loading ? (
+                {loading && !shouldPoll ? (
                   <div className="h-8 w-16 bg-white/10 rounded animate-pulse" />
                 ) : (
-                  <div className="text-2xl font-bold text-white">{totalQuestions.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-white">
+                    <AnimatedNumber value={totalQuestions} />
+                  </div>
                 )}
                 <div className="text-xs text-white/50">Çözülen Soru</div>
               </div>
             </div>
-          </div>
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+          </motion.div>
+          <motion.div 
+            className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 relative overflow-hidden"
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
                 <Trophy className="h-5 w-5 text-yellow-400" />
               </div>
               <div>
-                {loading ? (
+                {loading && !shouldPoll ? (
                   <div className="h-8 w-16 bg-white/10 rounded animate-pulse" />
                 ) : (
                   <div className="text-2xl font-bold text-white">
-                    {leaderboard[0]?.total_points?.toLocaleString() || '-'}
+                    <AnimatedNumber value={leaderboard[0]?.total_points || 0} />
                   </div>
                 )}
                 <div className="text-xs text-white/50">En Yüksek Puan</div>
               </div>
             </div>
-          </div>
-          <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+          </motion.div>
+          <motion.div 
+            className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 relative overflow-hidden"
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
                 <Flame className="h-5 w-5 text-orange-400" />
               </div>
               <div>
-                {loading ? (
+                {loading && !shouldPoll ? (
                   <div className="h-8 w-16 bg-white/10 rounded animate-pulse" />
                 ) : (
                   <div className="text-2xl font-bold text-white">
-                    {leaderboard.length > 0 ? Math.max(...leaderboard.map(l => l.max_streak || 0)) : '-'}
+                    <AnimatedNumber 
+                      value={leaderboard.length > 0 ? Math.max(...leaderboard.map(l => l.max_streak || 0)) : 0} 
+                    />
                   </div>
                 )}
                 <div className="text-xs text-white/50">En Uzun Seri</div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         {/* Sınıf Filtresi */}
@@ -740,6 +850,13 @@ export default function LeaderboardPage() {
             </select>
           </div>
         </div>
+
+        {/* 🎮 Canlı Aktivite Akışı */}
+        {shouldPoll && activities.length > 0 && (
+          <div className="mb-6">
+            <LiveActivityFeed activities={activities} maxItems={5} />
+          </div>
+        )}
 
         {/* Scope ve Tab Seçimi */}
         <div className="flex flex-col gap-4 mb-8">
@@ -975,34 +1092,60 @@ export default function LeaderboardPage() {
 
                 {/* 1. Sıra (Ortada - En büyük) */}
                 {leaderboard[0] && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-gradient-to-br from-yellow-500/20 to-amber-500/20 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-yellow-400/10 to-transparent"></div>
-                    <div className="text-center relative">
-                      <Crown className="h-10 w-10 text-yellow-400 mx-auto mb-3" />
-                      <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white shadow-lg shadow-yellow-500/30 overflow-hidden">
-                        {leaderboard[0].avatar_url ? (
-                          <img src={leaderboard[0].avatar_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          getInitials(leaderboard[0].full_name)
+                  <RankHighlight change={diffMap.get(leaderboard[0].student_id)?.rankChange || 'same'}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-br from-yellow-500/20 to-amber-500/20 backdrop-blur-sm rounded-2xl p-8 border border-yellow-500/30 relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-yellow-400/10 to-transparent"></div>
+                      <div className="text-center relative">
+                        <motion.div
+                          animate={{ rotate: [0, -10, 10, -10, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                        >
+                          <Crown className="h-10 w-10 text-yellow-400 mx-auto mb-3" />
+                        </motion.div>
+                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl font-bold text-white shadow-lg shadow-yellow-500/30 overflow-hidden">
+                          {leaderboard[0].avatar_url ? (
+                            <img src={leaderboard[0].avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            getInitials(leaderboard[0].full_name)
+                          )}
+                        </div>
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <span className="text-xl font-bold text-white">{leaderboard[0].full_name}</span>
+                          <LeaderBadges isKing={true} />
+                        </div>
+                        {leaderboard[0].city_name && (
+                          <div className="text-sm text-white/60 mb-2">{leaderboard[0].city_name}</div>
+                        )}
+                        <div className="text-3xl font-bold text-yellow-400">
+                          <AnimatedNumber value={leaderboard[0].total_points} showDelta />
+                        </div>
+                        <div className="text-sm text-white/50">puan</div>
+                        {leaderboard[0].max_streak && leaderboard[0].max_streak >= 5 && (
+                          <div className="mt-2">
+                            <StreakIndicator streak={leaderboard[0].max_streak} />
+                          </div>
+                        )}
+                        <div className="flex items-center justify-center gap-4 mt-4 text-sm">
+                          <span className="text-green-400">{leaderboard[0].total_correct} doğru</span>
+                          <span className="text-white/30">|</span>
+                          <span className="text-white/60">{leaderboard[0].total_questions} soru</span>
+                        </div>
+                        {/* Sıra değişim göstergesi */}
+                        {diffMap.get(leaderboard[0].student_id) && (
+                          <div className="mt-2">
+                            <RankChangeIndicator 
+                              change={diffMap.get(leaderboard[0].student_id)!.rankChange}
+                              delta={diffMap.get(leaderboard[0].student_id)!.rankDelta}
+                            />
+                          </div>
                         )}
                       </div>
-                      <div className="text-xl font-bold text-white mb-1">{leaderboard[0].full_name}</div>
-                      {leaderboard[0].city_name && (
-                        <div className="text-sm text-white/60 mb-2">{leaderboard[0].city_name}</div>
-                      )}
-                      <div className="text-3xl font-bold text-yellow-400">{leaderboard[0].total_points}</div>
-                      <div className="text-sm text-white/50">puan</div>
-                      <div className="flex items-center justify-center gap-4 mt-4 text-sm">
-                        <span className="text-green-400">{leaderboard[0].total_correct} doğru</span>
-                        <span className="text-white/30">|</span>
-                        <span className="text-white/60">{leaderboard[0].total_questions} soru</span>
-                      </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  </RankHighlight>
                 )}
 
                 {/* 3. Sıra (Sağda) */}
@@ -1036,38 +1179,80 @@ export default function LeaderboardPage() {
 
             {/* Diğer Sıralar */}
             {activeTab === 'genel' ? (
-              leaderboard.slice(3).map((entry, index) => (
-                <motion.div
-                  key={entry.student_id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                  className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${getRankStyle(entry.rank)}`}
-                >
-                  <div className="w-10 h-10 flex items-center justify-center">
-                    {getRankIcon(entry.rank)}
-                  </div>
-                  <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center font-bold text-white overflow-hidden">
-                    {entry.avatar_url ? (
-                      <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      getInitials(entry.full_name)
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium text-white">{entry.full_name}</div>
-                    <div className="text-sm text-white/50">
-                      {entry.city_name && <span className="mr-2">{entry.city_name}</span>}
-                      {entry.grade && <span className="mr-2">{entry.grade}. Sınıf</span>}
-                      • {entry.total_questions} soru • %{entry.success_rate} başarı
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-white">{entry.total_points}</div>
-                    <div className="text-xs text-white/50">puan</div>
-                  </div>
-                </motion.div>
-              ))
+              <AnimatePresence mode="popLayout">
+                {leaderboard.slice(3).map((entry, index) => {
+                  const diff = diffMap.get(entry.student_id)
+                  return (
+                    <RankHighlight key={entry.student_id} change={diff?.rankChange || 'same'}>
+                      <motion.div
+                        layout
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ delay: index * 0.03 }}
+                        className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${getRankStyle(entry.rank)}`}
+                      >
+                        <div className="w-10 h-10 flex items-center justify-center relative">
+                          {getRankIcon(entry.rank)}
+                          {/* Sıra değişim göstergesi */}
+                          {diff && diff.rankChange !== 'same' && (
+                            <div className="absolute -top-1 -right-1">
+                              <RankChangeIndicator 
+                                change={diff.rankChange}
+                                delta={diff.rankDelta}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center font-bold text-white overflow-hidden">
+                          {entry.avatar_url ? (
+                            <img src={entry.avatar_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            getInitials(entry.full_name)
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-white">{entry.full_name}</span>
+                            {/* Hot streak ve roket badge'leri */}
+                            <LeaderBadges 
+                              rocketLevel={diff?.rankDelta}
+                              isHot={diff && diff.pointsGained > 50}
+                            />
+                          </div>
+                          <div className="text-sm text-white/50">
+                            {entry.city_name && <span className="mr-2">{entry.city_name}</span>}
+                            {entry.grade && <span className="mr-2">{entry.grade}. Sınıf</span>}
+                            • {entry.total_questions} soru • %{Math.round(entry.success_rate)} başarı
+                            {entry.max_streak >= 5 && (
+                              <span className="ml-2">
+                                <StreakIndicator streak={entry.max_streak} />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-white relative">
+                            <AnimatedNumber value={entry.total_points} />
+                            {/* Puan artış göstergesi */}
+                            {diff && diff.pointsGained > 0 && (
+                              <motion.span
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="absolute -top-4 right-0 text-xs text-green-400 font-medium"
+                              >
+                                +{diff.pointsGained}
+                              </motion.span>
+                            )}
+                          </div>
+                          <div className="text-xs text-white/50">puan</div>
+                        </div>
+                      </motion.div>
+                    </RankHighlight>
+                  )
+                })}
+              </AnimatePresence>
             ) : (
               subjectLeaders.map((entry, index) => (
                 <motion.div
@@ -1209,6 +1394,14 @@ export default function LeaderboardPage() {
           </div>
         </div>
       </div>
+      
+      {/* 🎊 Konfeti Efektleri - Sıra değişikliklerinde tetiklenir */}
+      {shouldPoll && (
+        <LeaderboardConfetti 
+          diffs={diffs} 
+          currentUserId={user?.id}
+        />
+      )}
     </div>
   )
 }
