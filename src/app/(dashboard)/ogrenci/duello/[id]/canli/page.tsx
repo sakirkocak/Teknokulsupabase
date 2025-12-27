@@ -16,6 +16,7 @@ import {
   ChevronRight, Users, Timer
 } from 'lucide-react'
 import { getInitials } from '@/lib/utils'
+import MathRenderer from '@/components/MathRenderer'
 
 interface DuelQuestion {
   id: string
@@ -109,7 +110,9 @@ export default function LiveDuelPage() {
       }
     },
     onOpponentDisconnect: () => {
-      alert('Rakip bağlantıyı kaybetti!')
+      // Sayfa geçişlerinde kısa süreli bağlantı kopmaları olabilir
+      // Hemen uyarı verme, bekle
+      console.log('⚠️ Rakip bağlantısı kesildi, bekliyor...')
     }
   })
 
@@ -133,6 +136,8 @@ export default function LiveDuelPage() {
       })
 
       const data = await response.json()
+      console.log('📋 API Response:', data)
+      console.log('📋 İlk soru:', data.questions?.[0])
 
       if (data.success) {
         setQuestions(data.questions)
@@ -202,6 +207,12 @@ export default function LiveDuelPage() {
   // Cevap ver
   const handleAnswer = async (answer: string | null) => {
     if (showResult || selectedAnswer) return
+    
+    // Güvenlik kontrolü
+    if (!correctAnswers || correctAnswers.length === 0) {
+      console.error('correctAnswers yüklenmedi!')
+      return
+    }
     
     const timeTaken = Date.now() - questionStartTimeRef.current
     setSelectedAnswer(answer)
@@ -374,8 +385,38 @@ export default function LiveDuelPage() {
 
   // Oyun ekranı
   if (gamePhase === 'playing' || gamePhase === 'result') {
+    // Sorular yüklenmeden bu faza geçildiyse loading göster
+    if (!questions || questions.length === 0 || !correctAnswers || correctAnswers.length === 0) {
+      return (
+        <DashboardLayout role="ogrenci">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <Loader2 className="w-12 h-12 animate-spin text-primary-500 mb-4" />
+            <p className="text-surface-600">Sorular yükleniyor...</p>
+          </div>
+        </DashboardLayout>
+      )
+    }
+
     const question = questions[currentQuestionIndex]
     const correctAnswer = correctAnswers[currentQuestionIndex]
+
+    // Soru bulunamadıysa
+    if (!question) {
+      return (
+        <DashboardLayout role="ogrenci">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+            <p className="text-surface-600">Soru yüklenemedi</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="btn btn-primary mt-4"
+            >
+              Yeniden Dene
+            </button>
+          </div>
+        </DashboardLayout>
+      )
+    }
 
     return (
       <DashboardLayout role="ogrenci">
@@ -478,9 +519,9 @@ export default function LiveDuelPage() {
             </div>
 
             {/* Soru */}
-            <p className="text-lg text-surface-900 dark:text-white mb-6">
-              {question.question_text}
-            </p>
+            <div className="text-lg text-surface-900 dark:text-white mb-6">
+              <MathRenderer text={question.question_text} />
+            </div>
 
             {/* Görsel */}
             {question.image_url && (
@@ -531,7 +572,7 @@ export default function LiveDuelPage() {
                          isWrongSelected ? <X className="w-4 h-4" /> : option}
                       </span>
                       <span className="flex-1 text-surface-900 dark:text-white">
-                        {optionText}
+                        <MathRenderer text={optionText || ''} />
                       </span>
                     </div>
                   </motion.button>

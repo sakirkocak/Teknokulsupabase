@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { duelRateLimits, getRateLimitHeaders } from '@/lib/rate-limit'
 
 // Supabase service role client
 const supabase = createClient(
@@ -28,6 +29,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'duelId, studentId ve questionIndex gerekli' },
         { status: 400 }
+      )
+    }
+
+    // Rate limit kontrolü (anti-cheat)
+    const rateLimit = duelRateLimits.answer(studentId)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Çok hızlı cevap gönderiyorsunuz.' },
+        { status: 429, headers: getRateLimitHeaders(rateLimit) }
       )
     }
 

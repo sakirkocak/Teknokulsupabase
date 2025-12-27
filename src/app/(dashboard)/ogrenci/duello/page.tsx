@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile, useStudentProfile } from '@/hooks/useProfile'
@@ -11,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Swords, Trophy, Users, Clock, Target, Zap, Crown,
   Play, Check, X, AlertCircle, Search, Send, Shield,
-  Flame, Star, Award, ChevronRight, RefreshCw
+  Flame, Star, Award, ChevronRight, RefreshCw, Trash2
 } from 'lucide-react'
 import { Duel, DuelStats } from '@/types/database'
 
@@ -30,9 +31,23 @@ interface DuelWithProfiles extends Duel {
 
 const subjects = [
   { key: 'all', label: 'Karışık', color: 'from-purple-500 to-indigo-500' },
-  { key: 'Matematik', label: 'Matematik', color: 'from-red-500 to-rose-500' },
-  { key: 'Türkçe', label: 'Türkçe', color: 'from-blue-500 to-indigo-500' },
-  { key: 'Fen Bilimleri', label: 'Fen', color: 'from-green-500 to-emerald-500' },
+  // Ana Dersler (LGS)
+  { key: 'Matematik', label: 'Matematik', color: 'from-blue-500 to-indigo-500' },
+  { key: 'Türkçe', label: 'Türkçe', color: 'from-red-500 to-rose-500' },
+  { key: 'Fen Bilimleri', label: 'Fen Bilimleri', color: 'from-green-500 to-emerald-500' },
+  { key: 'T.C. İnkılap Tarihi ve Atatürkçülük', label: 'İnkılap Tarihi', color: 'from-orange-500 to-amber-500' },
+  { key: 'İngilizce', label: 'İngilizce', color: 'from-violet-500 to-purple-500' },
+  { key: 'Din Kültürü ve Ahlak Bilgisi', label: 'Din Kültürü', color: 'from-emerald-500 to-teal-500' },
+  // Ortaokul Dersleri
+  { key: 'Sosyal Bilgiler', label: 'Sosyal Bilgiler', color: 'from-amber-500 to-yellow-500' },
+  // Lise Dersleri
+  { key: 'Fizik', label: 'Fizik', color: 'from-cyan-500 to-blue-500' },
+  { key: 'Kimya', label: 'Kimya', color: 'from-pink-500 to-rose-500' },
+  { key: 'Biyoloji', label: 'Biyoloji', color: 'from-lime-500 to-green-500' },
+  { key: 'Tarih', label: 'Tarih', color: 'from-yellow-500 to-orange-500' },
+  { key: 'Coğrafya', label: 'Coğrafya', color: 'from-teal-500 to-cyan-500' },
+  { key: 'Türk Dili ve Edebiyatı', label: 'Edebiyat', color: 'from-indigo-500 to-violet-500' },
+  { key: 'Felsefe', label: 'Felsefe', color: 'from-fuchsia-500 to-pink-500' },
 ]
 
 export default function DuelPage() {
@@ -49,8 +64,37 @@ export default function DuelPage() {
   const [selectedSubject, setSelectedSubject] = useState('all')
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  // Düello silme fonksiyonu
+  const deleteDuel = async (duelId: string) => {
+    if (!confirm('Bu düelloyu silmek istediğinize emin misiniz?')) return
+    
+    setDeleting(duelId)
+    try {
+      const response = await fetch('/api/duel/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duelId, studentId: studentProfile?.id })
+      })
+      
+      if (response.ok) {
+        // Listelerden kaldır
+        setPendingDuels(prev => prev.filter(d => d.id !== duelId))
+        setActiveDuels(prev => prev.filter(d => d.id !== duelId))
+        setCompletedDuels(prev => prev.filter(d => d.id !== duelId))
+      } else {
+        alert('Düello silinemedi')
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Bir hata oluştu')
+    }
+    setDeleting(null)
+  }
 
   useEffect(() => {
     if (studentProfile?.id) {
@@ -102,7 +146,7 @@ export default function DuelPage() {
         )
       `)
       .or(`challenger_id.eq.${studentProfile.id},opponent_id.eq.${studentProfile.id}`)
-      .eq('status', 'active')
+      .eq('status', 'active') // Aktif düellolar
       .order('created_at', { ascending: false })
 
     if (activeData) setActiveDuels(activeData)
@@ -176,7 +220,9 @@ export default function DuelPage() {
       setSearchQuery('')
       setSearchResults([])
       loadData()
-      alert('Düello daveti gönderildi!')
+      setSuccessMessage('🎉 Düello daveti gönderildi! Rakibinin kabul etmesini bekle.')
+      // 5 saniye sonra mesajı kaldır
+      setTimeout(() => setSuccessMessage(null), 5000)
     } else {
       alert('Hata: ' + error.message)
     }
@@ -185,16 +231,23 @@ export default function DuelPage() {
   }
 
   const acceptDuel = async (duelId: string) => {
-    const { error } = await supabase
-      .from('duels')
-      .update({
-        status: 'active',
-        started_at: new Date().toISOString(),
+    try {
+      const response = await fetch('/api/duel/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duelId, studentId: studentProfile?.id })
       })
-      .eq('id', duelId)
 
-    if (!error) {
-      loadData()
+      if (response.ok) {
+        // Bekleme odasına yönlendir
+        window.location.href = `/ogrenci/duello/${duelId}/bekle`
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Düello kabul edilemedi')
+      }
+    } catch (error) {
+      console.error('Accept error:', error)
+      alert('Bir hata oluştu')
     }
   }
 
@@ -410,6 +463,32 @@ export default function DuelPage() {
               </div>
             </div>
 
+            {/* Başarı Mesajı */}
+            <AnimatePresence>
+              {successMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="card p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-500 mb-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                      <Check className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-green-800 dark:text-green-200">
+                        {successMessage}
+                      </p>
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        Aktif sekmesinden takip edebilirsin.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Rakip Ara */}
             <div className="card p-6">
               <h3 className="font-semibold text-surface-900 dark:text-white mb-4">
@@ -531,6 +610,7 @@ export default function DuelPage() {
                         <button
                           onClick={() => rejectDuel(duel.id)}
                           className="btn bg-red-100 text-red-600 hover:bg-red-200"
+                          title="Reddet"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -540,6 +620,18 @@ export default function DuelPage() {
                         >
                           <Check className="h-4 w-4 mr-1" />
                           Kabul Et
+                        </button>
+                        <button
+                          onClick={() => deleteDuel(duel.id)}
+                          disabled={deleting === duel.id}
+                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                          title="Düelloyu Sil"
+                        >
+                          {deleting === duel.id ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -589,9 +681,24 @@ export default function DuelPage() {
                             <div className="text-lg font-bold text-red-500">{getOpponentScore(duel)}</div>
                             <div className="text-xs text-surface-500">Rakip</div>
                           </div>
-                          <button className="btn btn-primary">
+                          <Link 
+                            href={`/ogrenci/duello/${duel.id}/bekle`} 
+                            className="btn btn-primary"
+                          >
                             <Play className="h-4 w-4 mr-1" />
-                            Devam Et
+                            Hazırlan
+                          </Link>
+                          <button
+                            onClick={() => deleteDuel(duel.id)}
+                            disabled={deleting === duel.id}
+                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Düelloyu Sil"
+                          >
+                            {deleting === duel.id ? (
+                              <RefreshCw className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-5 w-5" />
+                            )}
                           </button>
                         </div>
                       </div>

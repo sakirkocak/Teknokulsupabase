@@ -70,6 +70,14 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'question_text', type: 'string' },
     { name: 'explanation', type: 'string', optional: true },
     
+    // Şıklar
+    { name: 'option_a', type: 'string' },
+    { name: 'option_b', type: 'string' },
+    { name: 'option_c', type: 'string' },
+    { name: 'option_d', type: 'string' },
+    { name: 'correct_answer', type: 'string' },
+    { name: 'image_url', type: 'string', optional: true },
+    
     // Filtreleme alanlari
     { name: 'difficulty', type: 'string', facet: true },
     { name: 'subject_id', type: 'string', facet: true },

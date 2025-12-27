@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { typesenseClient, COLLECTIONS, isTypesenseAvailable } from '@/lib/typesense/client'
+import { duelRateLimits, getRateLimitHeaders } from '@/lib/rate-limit'
 
 // Supabase service role client
 const supabase = createClient(
@@ -29,6 +30,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Rate limit kontrolü
+    const rateLimit = duelRateLimits.start(studentId)
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Çok fazla istek gönderdiniz. Lütfen biraz bekleyin.' },
+        { status: 429, headers: getRateLimitHeaders(rateLimit) }
+      )
+    }
+
     // Düelloyu kontrol et
     const { data: duel, error: duelError } = await supabase
       .from('duels')
@@ -51,12 +61,14 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Zaten aktif mi?
+    // Zaten aktif mi? (DB'deki sorulara bak)
     if (duel.status === 'active' && duel.questions && duel.questions.length > 0) {
+      console.log('⚡ Düello zaten aktif, mevcut sorular döndürülüyor')
       return NextResponse.json({
         success: true,
         duel,
         questions: duel.questions,
+        correctAnswers: duel.correct_answers || duel.questions.map((q: any) => q.correct_answer),
         message: 'Düello zaten başlamış'
       })
     }
@@ -73,30 +85,70 @@ export async function POST(req: NextRequest) {
     // Soruları çek (Typesense veya Supabase)
     let questions: any[] = []
     
-    if (isTypesenseAvailable()) {
-      questions = await getQuestionsFromTypesense(grade, duel.subject, duel.question_count || 10)
-    } else {
-      questions = await getQuestionsFromSupabase(grade, duel.subject, duel.question_count || 10)
+    console.log('🎮 Duel start params:', {
+      grade,
+      subject: duel.subject,
+      questionCount: duel.question_count,
+      typesenseAvailable: isTypesenseAvailable()
+    })
+    
+    // Düello için Supabase kullan (şıklar Typesense'e migrate edilmedi)
+    questions = await getQuestionsFromSupabase(grade, duel.subject, duel.question_count || 10)
+    console.log(`📚 Supabase questions found: ${questions.length}`)
+    if (questions.length > 0) {
+      console.log('📋 İlk soru şıkları:', {
+        option_a: questions[0].option_a?.substring(0, 30),
+        option_b: questions[0].option_b?.substring(0, 30)
+      })
+    }
+
+    // Eğer soru bulunamazsa, sınıf filtresi olmadan tekrar dene
+    if (questions.length === 0) {
+      console.log('⚠️ No questions for grade', grade, '- trying without grade filter')
+      if (isTypesenseAvailable()) {
+        questions = await getQuestionsFromTypesense(null, duel.subject, duel.question_count || 10)
+      } else {
+        questions = await getQuestionsFromSupabase(null, duel.subject, duel.question_count || 10)
+      }
+      console.log(`📚 Without grade filter: ${questions.length} questions`)
     }
 
     if (questions.length === 0) {
+      console.log('❌ No questions found for:', { grade, subject: duel.subject })
       return NextResponse.json(
-        { error: 'Yeterli soru bulunamadı' },
+        { error: `"${duel.subject || 'Karışık'}" dersi için yeterli soru bulunamadı. Başka bir ders deneyin.` },
         { status: 400 }
       )
     }
 
-    // Düelloyu güncelle
+    // Soruları hazırla
+    const preparedQuestions = questions.map(q => ({
+      id: q.id,
+      question_text: q.question_text,
+      option_a: q.option_a,
+      option_b: q.option_b,
+      option_c: q.option_c,
+      option_d: q.option_d,
+      image_url: q.image_url,
+      subject_name: q.subject_name,
+      subject_code: q.subject_code,
+      topic_name: q.topic_name,
+      grade: q.grade,
+      difficulty: q.difficulty,
+      correct_answer: q.correct_answer
+    }))
+    
+    const correctAnswersArray = preparedQuestions.map(q => q.correct_answer)
+
+    // Düelloyu güncelle ve soruları DB'ye kaydet
     const { data: updatedDuel, error: updateError } = await supabase
       .from('duels')
       .update({
         status: 'active',
         started_at: new Date().toISOString(),
-        questions: questions,
-        is_realtime: true,
-        game_mode: 'realtime',
         current_question: 0,
-        question_started_at: new Date().toISOString()
+        questions: preparedQuestions,
+        correct_answers: correctAnswersArray
       })
       .eq('id', duelId)
       .select()
@@ -109,6 +161,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       )
     }
+    
+    console.log(`💾 Sorular DB'ye kaydedildi: ${duelId}`)
 
     const duration = Date.now() - startTime
     console.log(`⚡ Duel started: ${duelId} in ${duration}ms`)
@@ -116,7 +170,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       duel: updatedDuel,
-      questions: questions.map(q => ({
+      questions: preparedQuestions.map(q => ({
         id: q.id,
         question_text: q.question_text,
         option_a: q.option_a,
@@ -128,7 +182,7 @@ export async function POST(req: NextRequest) {
         difficulty: q.difficulty
         // correct_answer dahil değil - güvenlik için
       })),
-      correctAnswers: questions.map(q => q.correct_answer), // Sadece doğrulama için kullanılacak
+      correctAnswers: preparedQuestions.map(q => q.correct_answer), // Sadece doğrulama için kullanılacak
       duration
     })
 
@@ -144,23 +198,32 @@ export async function POST(req: NextRequest) {
 /**
  * Typesense'den sorular çek (~130ms)
  */
-async function getQuestionsFromTypesense(grade: number, subject: string | null, count: number) {
-  const filters: string[] = [`grade:=${grade}`]
+async function getQuestionsFromTypesense(grade: number | null, subject: string | null, count: number) {
+  const filters: string[] = []
   
-  if (subject && subject !== 'Karışık') {
+  if (grade) {
+    filters.push(`grade:=${grade}`)
+  }
+  
+  if (subject && subject !== 'Karışık' && subject !== 'all') {
     filters.push(`subject_name:=${subject}`)
+  }
+
+  const searchParams: any = {
+    q: '*',
+    query_by: 'question_text',
+    per_page: count * 3,
+    include_fields: 'id,question_text,option_a,option_b,option_c,option_d,correct_answer,explanation,image_url,subject_name,subject_code,topic_name,grade,difficulty'
+  }
+  
+  if (filters.length > 0) {
+    searchParams.filter_by = filters.join(' && ')
   }
 
   const result = await typesenseClient
     .collections(COLLECTIONS.QUESTIONS)
     .documents()
-    .search({
-      q: '*',
-      query_by: 'question_text',
-      filter_by: filters.join(' && '),
-      per_page: count * 3, // Fazladan çek
-      include_fields: 'id,question_text,option_a,option_b,option_c,option_d,correct_answer,explanation,image_url,subject_name,subject_code,topic_name,grade,difficulty'
-    })
+    .search(searchParams)
 
   const questions = (result.hits || []).map((hit: any) => hit.document)
   
@@ -170,28 +233,79 @@ async function getQuestionsFromTypesense(grade: number, subject: string | null, 
 }
 
 /**
- * Supabase'den sorular çek (fallback)
+ * Supabase'den sorular çek (topics ile JOIN)
  */
-async function getQuestionsFromSupabase(grade: number, subject: string | null, count: number) {
+async function getQuestionsFromSupabase(grade: number | null, subject: string | null, count: number) {
+  console.log('🔍 Supabase query params:', { grade, subject, count })
+  
+  // questions -> topics -> subjects JOIN yapısı
   let query = supabase
     .from('questions')
-    .select('id, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, image_url, subject_name, subject_code, topic_name, grade, difficulty')
-    .eq('grade', grade)
+    .select(`
+      id, 
+      question_text, 
+      options, 
+      correct_answer, 
+      explanation, 
+      question_image_url,
+      difficulty,
+      topic:topics!inner(
+        id,
+        main_topic,
+        grade,
+        subject:subjects!inner(
+          name,
+          code
+        )
+      )
+    `)
     .eq('is_active', true)
     .limit(count * 3)
 
-  if (subject && subject !== 'Karışık') {
-    query = query.eq('subject_name', subject)
+  // Sınıf filtresi (topics üzerinden)
+  if (grade) {
+    query = query.eq('topic.grade', grade)
+  }
+
+  // Ders filtresi (subjects üzerinden)
+  if (subject && subject !== 'Karışık' && subject !== 'all') {
+    query = query.eq('topic.subject.name', subject)
   }
 
   const { data, error } = await query
 
-  if (error || !data) {
-    console.error('Supabase soru çekme hatası:', error)
+  if (error) {
+    console.error('❌ Supabase soru çekme hatası:', error)
     return []
   }
+  
+  console.log(`✅ Supabase sorgu sonucu: ${data?.length || 0} soru`)
+  if (data && data.length > 0) {
+    console.log('📋 Options formatı:', JSON.stringify(data[0].options))
+  }
+  
+  // Flatten ve options'ı ayrıştır
+  const questionsWithOptions = (data || []).map((q: any) => {
+    const options = q.options || {}
+    return {
+      id: q.id,
+      question_text: q.question_text,
+      correct_answer: q.correct_answer,
+      explanation: q.explanation,
+      image_url: q.question_image_url,
+      difficulty: q.difficulty,
+      topic_name: q.topic?.main_topic,
+      grade: q.topic?.grade,
+      subject_name: q.topic?.subject?.name,
+      subject_code: q.topic?.subject?.code,
+      option_a: options.A || options.a || '',
+      option_b: options.B || options.b || '',
+      option_c: options.C || options.c || '',
+      option_d: options.D || options.d || ''
+    }
+  })
 
-  const shuffled = shuffleArray(data)
+  const shuffled = shuffleArray(questionsWithOptions)
   return shuffled.slice(0, count)
 }
 

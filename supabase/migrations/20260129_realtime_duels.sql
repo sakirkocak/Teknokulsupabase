@@ -37,14 +37,19 @@ CREATE INDEX IF NOT EXISTS idx_duels_game_mode ON duels(game_mode);
 -- 4. RLS (Row Level Security) politikaları
 ALTER TABLE duel_answers ENABLE ROW LEVEL SECURITY;
 
+-- Mevcut policy'leri sil (varsa)
+DROP POLICY IF EXISTS "Players can view their duel answers" ON duel_answers;
+DROP POLICY IF EXISTS "Players can insert their answers" ON duel_answers;
+
 -- Oyuncular kendi düellolarının cevaplarını görebilir
 CREATE POLICY "Players can view their duel answers" ON duel_answers
   FOR SELECT
   USING (
     EXISTS (
       SELECT 1 FROM duels d
+      JOIN student_profiles sp ON (sp.id = d.challenger_id OR sp.id = d.opponent_id)
       WHERE d.id = duel_answers.duel_id
-      AND (d.challenger_id = auth.uid()::text OR d.opponent_id = auth.uid()::text)
+      AND sp.user_id = auth.uid()
     )
   );
 
@@ -52,12 +57,17 @@ CREATE POLICY "Players can view their duel answers" ON duel_answers
 CREATE POLICY "Players can insert their answers" ON duel_answers
   FOR INSERT
   WITH CHECK (
-    student_id::text = auth.uid()::text
+    EXISTS (
+      SELECT 1 FROM student_profiles sp
+      WHERE sp.id = duel_answers.student_id
+      AND sp.user_id = auth.uid()
+    )
     AND EXISTS (
       SELECT 1 FROM duels d
+      JOIN student_profiles sp ON (sp.id = d.challenger_id OR sp.id = d.opponent_id)
       WHERE d.id = duel_answers.duel_id
       AND d.status = 'active'
-      AND (d.challenger_id = auth.uid()::text OR d.opponent_id = auth.uid()::text)
+      AND sp.user_id = auth.uid()
     )
   );
 
