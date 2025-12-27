@@ -11,11 +11,12 @@ import {
   ChevronRight, Flame, Award, BarChart3, MapPin,
   Building2, School, Globe, Filter, Radio
 } from 'lucide-react'
-import { TurkeyCity, LeaderboardEntry, Subject } from '@/types/database'
+import { LeaderboardEntry } from '@/types/database'
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
-import { getLeaderboardFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
+import { isTypesenseEnabled } from '@/lib/typesense/browser-client'
 // 🎮 Real-time özellikler
 import { useLeaderboardPolling, LeaderboardDiff } from '@/hooks/useLeaderboardPolling'
+import { useTypesenseLocations } from '@/hooks/useTypesenseLocations'
 import { 
   AnimatedNumber, 
   LiveActivityFeed, 
@@ -26,17 +27,8 @@ import {
   LeaderboardConfetti
 } from '@/components/leaderboard'
 
-interface SubjectLeader {
-  student_id: string
-  full_name: string
-  avatar_url: string | null
-  points: number
-  correct: number
-  wrong: number
-  total: number
-  success_rate: number
-  rank: number
-}
+// SubjectLeader interface kaldırıldı - artık ders bazlı liderlik de
+// LeaderboardEntry tipini kullanıyor (Typesense polling ile)
 
 interface SubjectOption {
   id: string
@@ -97,31 +89,15 @@ const gradeSubjectsMap: Record<string, string[]> = {
   '12': ['edebiyat', 'matematik', 'fizik', 'kimya', 'biyoloji', 'tarih', 'cografya', 'ingilizce', 'din_kulturu', 'felsefe'],
 }
 
-interface SchoolOption {
-  id: string
-  name: string
-  district_id: string
-}
-
-interface DistrictOption {
-  id: string
-  name: string
-  city_id: string
-}
+// SchoolOption ve DistrictOption interface'leri kaldırıldı
+// Artık useTypesenseLocations hook'tan LocationEntry ve SchoolEntry kullanılıyor
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState('genel')
   const [activeScope, setActiveScope] = useState('turkey')
-  const [selectedCity, setSelectedCity] = useState<string>('')
-  const [selectedDistrict, setSelectedDistrict] = useState<string>('')
-  const [selectedSchool, setSelectedSchool] = useState<string>('')
   const [selectedGrade, setSelectedGrade] = useState<string>('') // '' = tümü
-  const [cities, setCities] = useState<TurkeyCity[]>([])
-  const [districts, setDistricts] = useState<DistrictOption[]>([])
-  const [schools, setSchools] = useState<SchoolOption[]>([])
   const [subjects, setSubjects] = useState<SubjectOption[]>([])
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [subjectLeaders, setSubjectLeaders] = useState<SubjectLeader[]>([])
   const [loading, setLoading] = useState(true)
   const [totalStudents, setTotalStudents] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
@@ -129,6 +105,23 @@ export default function LeaderboardPage() {
   // Auth state
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
+  
+  // 🗺️ Typesense'den il/ilçe/okul - Artık tamamen Typesense!
+  const {
+    cities,
+    districts,
+    schools,
+    selectedCity,
+    selectedDistrict,
+    selectedSchool,
+    setSelectedCity,
+    setSelectedDistrict,
+    setSelectedSchool,
+    citiesLoading,
+    districtsLoading,
+    schoolsLoading,
+    resetSelection
+  } = useTypesenseLocations()
   
   // 🎮 Real-time polling - Typesense'den her 5 saniyede güncelleme
   const pollingFilters = useMemo(() => ({
@@ -140,8 +133,11 @@ export default function LeaderboardPage() {
     limit: 100
   }), [activeScope, selectedCity, selectedDistrict, selectedSchool, selectedGrade])
   
-  // Polling sadece "genel" tab'ında ve Typesense aktifken çalışır
-  const shouldPoll = activeTab === 'genel' && isTypesenseEnabled()
+  // Polling her zaman aktif (genel ve ders bazlı)
+  const shouldPoll = isTypesenseEnabled()
+  
+  // Ders kodu (genel ise null)
+  const currentSubject = activeTab === 'genel' ? null : activeTab
   
   const { 
     leaderboard: polledLeaderboard,
@@ -152,11 +148,12 @@ export default function LeaderboardPage() {
     lastUpdated
   } = useLeaderboardPolling({
     filters: pollingFilters,
+    subject: currentSubject,
     pollingInterval: 5000, // 5 saniye
     enabled: shouldPoll
   })
   
-  // Polling verilerini kullan (genel tab'ında)
+  // Polling verilerini kullan (hem genel hem ders bazlı)
   useEffect(() => {
     if (shouldPoll && polledLeaderboard.length > 0) {
       const formatted: LeaderboardEntry[] = polledLeaderboard.map((item) => ({
@@ -181,8 +178,13 @@ export default function LeaderboardPage() {
       setTotalStudents(polledStats.totalStudents)
       setTotalQuestions(polledStats.totalQuestions)
       setLoading(false)
+    } else if (shouldPoll && polledLeaderboard.length === 0 && !pollingLoading) {
+      setLeaderboard([])
+      setTotalStudents(0)
+      setTotalQuestions(0)
+      setLoading(false)
     }
-  }, [shouldPoll, polledLeaderboard, polledStats])
+  }, [shouldPoll, polledLeaderboard, polledStats, pollingLoading])
   
   // Diff'leri sıra değişimi için map'e dönüştür
   const diffMap = useMemo(() => {
@@ -228,32 +230,8 @@ export default function LeaderboardPage() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // İlleri ve dersleri yükle
+  // 📚 Dersleri yükle (Supabase'den - sabit veri)
   useEffect(() => {
-    async function loadCities() {
-      try {
-        // TurkeyCity type requires: id, name, plate_code, created_at
-        const { data, error } = await supabase
-          .from('turkey_cities')
-          .select('id, name, plate_code, created_at')
-          .order('name')
-        
-        if (error) {
-          console.error('İller yüklenirken hata:', error)
-          return
-        }
-        
-        if (data && data.length > 0) {
-          setCities(data)
-          console.log(`✅ ${data.length} il yüklendi`)
-        } else {
-          console.warn('⚠️ İl verisi bulunamadı')
-        }
-      } catch (err) {
-        console.error('İller yüklenirken beklenmeyen hata:', err)
-      }
-    }
-
     async function loadSubjects() {
       try {
         // Sadece temel MEB müfredatı dersleri
@@ -283,359 +261,11 @@ export default function LeaderboardPage() {
       }
     }
 
-    loadCities()
     loadSubjects()
   }, [supabase])
 
-  // İl seçildiğinde ilçeleri yükle
-  useEffect(() => {
-    async function loadDistricts() {
-      if (!selectedCity) {
-        setDistricts([])
-        setSelectedDistrict('')
-        setSchools([])
-        setSelectedSchool('')
-        return
-      }
-      
-      try {
-        const { data, error } = await supabase
-          .from('turkey_districts')
-          .select('id, name, city_id')
-          .eq('city_id', selectedCity)
-          .order('name')
-        
-        if (error) {
-          console.error('İlçeler yüklenirken hata:', error)
-          return
-        }
-        
-        if (data) {
-          setDistricts(data)
-          console.log(`✅ ${data.length} ilçe yüklendi`)
-        }
-      } catch (err) {
-        console.error('İlçeler yüklenirken beklenmeyen hata:', err)
-      }
-    }
-    
-    loadDistricts()
-  }, [selectedCity])
-
-  // İlçe seçildiğinde okulları yükle
-  useEffect(() => {
-    async function loadSchools() {
-      if (!selectedDistrict) {
-        setSchools([])
-        setSelectedSchool('')
-        return
-      }
-      
-      try {
-        const { data: schoolsData, error } = await supabase
-          .from('schools')
-          .select('id, name, district_id')
-          .eq('district_id', selectedDistrict)
-          .order('name')
-          .limit(200)
-        
-        if (error) {
-          console.error('Okullar yüklenirken hata:', error)
-          return
-        }
-        
-        if (schoolsData) {
-          setSchools(schoolsData)
-          console.log(`✅ ${schoolsData.length} okul yüklendi`)
-        }
-      } catch (err) {
-        console.error('Okullar yüklenirken beklenmeyen hata:', err)
-      }
-    }
-    
-    loadSchools()
-  }, [selectedDistrict])
-
-  useEffect(() => {
-    loadLeaderboard()
-  }, [activeTab, activeScope, selectedCity, selectedDistrict, selectedSchool, selectedGrade])
-
-  // Fallback fonksiyonu - veritabanı fonksiyonları yoksa kullanılır
-  const loadLeaderboardFallback = async () => {
-    const gradeFilter = selectedGrade !== '' ? parseInt(selectedGrade) : null
-    
-    // Eski yöntem ile veri çek
-    const { data } = await supabase
-      .from('student_points')
-      .select(`
-        student_id,
-        total_points,
-        total_questions,
-        total_correct,
-        total_wrong,
-        max_streak,
-        student:student_profiles!student_points_student_id_fkey(
-          user_id,
-          grade,
-          city_id,
-          district_id,
-          school_id,
-          profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url),
-          city:turkey_cities!student_profiles_city_id_fkey(name),
-          district:turkey_districts!student_profiles_district_id_fkey(name),
-          school:schools!student_profiles_school_id_fkey(name)
-        )
-      `)
-      .gt('total_questions', 0)
-      .order('total_points', { ascending: false })
-      .limit(100)
-
-    if (data) {
-      let filteredData = data
-
-      // Scope'a göre filtrele
-      if (activeScope === 'city' && selectedCity) {
-        filteredData = filteredData.filter((item: any) => item.student?.city_id === selectedCity)
-      } else if (activeScope === 'district' && selectedDistrict) {
-        filteredData = filteredData.filter((item: any) => item.student?.district_id === selectedDistrict)
-      } else if (activeScope === 'school' && selectedSchool) {
-        filteredData = filteredData.filter((item: any) => item.student?.school_id === selectedSchool)
-      }
-
-      // Sınıf filtrelemesi
-      if (gradeFilter) {
-        filteredData = filteredData.filter((item: any) => item.student?.grade === gradeFilter)
-      }
-
-      const formatted: LeaderboardEntry[] = filteredData.map((item: any, index: number) => ({
-        student_id: item.student_id,
-        full_name: item.student?.profile?.full_name || 'Anonim',
-        avatar_url: item.student?.profile?.avatar_url,
-        grade: item.student?.grade,
-        city_name: item.student?.city?.name || null,
-        district_name: item.student?.district?.name || null,
-        school_name: item.student?.school?.name || null,
-        total_points: item.total_points,
-        total_questions: item.total_questions,
-        total_correct: item.total_correct,
-        total_wrong: item.total_wrong,
-        max_streak: item.max_streak,
-        success_rate: item.total_questions > 0 
-          ? Math.round((item.total_correct / item.total_questions) * 100) 
-          : 0,
-        rank: index + 1,
-      }))
-      setLeaderboard(formatted)
-      setTotalStudents(formatted.length)
-      setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
-    }
-    setLoading(false)
-  }
-
-  const loadLeaderboard = async () => {
-    setLoading(true)
-
-    // 🔒 GUARD: İl bazlı modda il seçilmeden veri gösterme
-    if (activeScope === 'city' && !selectedCity) {
-      setLeaderboard([])
-      setSubjectLeaders([])
-      setTotalStudents(0)
-      setTotalQuestions(0)
-      setLoading(false)
-      return
-    }
-
-    // 🔒 GUARD: İlçe bazlı modda il veya ilçe seçilmeden veri gösterme
-    if (activeScope === 'district' && (!selectedCity || !selectedDistrict)) {
-      setLeaderboard([])
-      setSubjectLeaders([])
-      setTotalStudents(0)
-      setTotalQuestions(0)
-      setLoading(false)
-      return
-    }
-
-    // 🔒 GUARD: Okul bazlı modda il, ilçe veya okul seçilmeden veri gösterme
-    if (activeScope === 'school' && (!selectedCity || !selectedDistrict || !selectedSchool)) {
-      setLeaderboard([])
-      setSubjectLeaders([])
-      setTotalStudents(0)
-      setTotalQuestions(0)
-      setLoading(false)
-      return
-    }
-
-    // Sınıf filtresi - null veya number
-    const gradeFilter = selectedGrade !== '' ? parseInt(selectedGrade) : null
-
-    if (activeTab === 'genel') {
-      try {
-        // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
-        if (isTypesenseEnabled()) {
-          const result = await getLeaderboardFast({
-            scope: activeScope as any,
-            cityId: selectedCity || null,
-            districtId: selectedDistrict || null,
-            schoolId: selectedSchool || null,
-            grade: gradeFilter,
-            limit: 100
-          })
-          
-          if (result.data && result.data.length > 0) {
-            const formatted: LeaderboardEntry[] = result.data.map((item) => ({
-              student_id: item.student_id,
-              full_name: item.full_name || 'Anonim',
-              avatar_url: item.avatar_url,
-              grade: item.grade,
-              city_name: item.city_name || null,
-              district_name: item.district_name || null,
-              school_name: item.school_name || null,
-              total_points: item.total_points,
-              total_questions: item.total_questions,
-              total_correct: item.total_correct,
-              total_wrong: item.total_wrong,
-              max_streak: item.max_streak,
-              success_rate: item.total_questions > 0 
-                ? (item.total_correct / item.total_questions) * 100 
-                : 0,
-              rank: item.rank,
-            }))
-            setLeaderboard(formatted)
-            setTotalStudents(result.total)
-            setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
-          } else {
-            setLeaderboard([])
-            setTotalStudents(0)
-            setTotalQuestions(0)
-          }
-        } else {
-          // Typesense yoksa API route kullan (fallback)
-          const params = new URLSearchParams({
-            scope: activeScope,
-            ...(selectedCity && { cityId: selectedCity }),
-            ...(selectedDistrict && { districtId: selectedDistrict }),
-            ...(selectedSchool && { schoolId: selectedSchool }),
-            ...(gradeFilter && { grade: gradeFilter.toString() }),
-            limit: '100'
-          })
-          
-          const response = await fetch(`/api/leaderboard?${params}`)
-          const result = await response.json()
-          
-          if (result.data && result.data.length > 0) {
-            const formatted: LeaderboardEntry[] = result.data.map((item: any) => ({
-              student_id: item.student_id,
-              full_name: item.full_name || 'Anonim',
-              avatar_url: item.avatar_url,
-              grade: item.grade,
-              city_name: item.city_name || null,
-              district_name: item.district_name || null,
-              school_name: item.school_name || null,
-              total_points: item.total_points,
-              total_questions: item.total_questions,
-              total_correct: item.total_correct,
-              total_wrong: item.total_wrong,
-              max_streak: item.max_streak,
-              success_rate: Number(item.success_rate) || 0,
-              rank: Number(item.rank),
-            }))
-            setLeaderboard(formatted)
-            setTotalStudents(formatted.length)
-            setTotalQuestions(formatted.reduce((acc, item) => acc + item.total_questions, 0))
-            
-            console.log(`Leaderboard loaded from ${result.source} in ${result.duration}ms`)
-          } else {
-            setLeaderboard([])
-            setTotalStudents(0)
-            setTotalQuestions(0)
-          }
-        }
-      } catch (error) {
-        console.error('Liderlik tablosu yüklenirken hata:', error)
-        // Hata durumunda fallback - eski yöntemle dene
-        await loadLeaderboardFallback()
-        return
-      }
-    } else {
-      // Ders bazlı liderlik
-      // Mevcut student_points tablosunda desteklenen dersler
-      const subjectMap: Record<string, { points: string; correct: string; wrong: string }> = {
-        'matematik': { points: 'matematik_points', correct: 'matematik_correct', wrong: 'matematik_wrong' },
-        'turkce': { points: 'turkce_points', correct: 'turkce_correct', wrong: 'turkce_wrong' },
-        'fen_bilimleri': { points: 'fen_points', correct: 'fen_correct', wrong: 'fen_wrong' },
-        'inkilap_tarihi': { points: 'inkilap_points', correct: 'inkilap_correct', wrong: 'inkilap_wrong' },
-        'din_kulturu': { points: 'din_points', correct: 'din_correct', wrong: 'din_wrong' },
-        'ingilizce': { points: 'ingilizce_points', correct: 'ingilizce_correct', wrong: 'ingilizce_wrong' },
-      }
-
-      const cols = subjectMap[activeTab]
-      if (cols) {
-        const { data } = await supabase
-          .from('student_points')
-          .select(`
-            student_id,
-            ${cols.points},
-            ${cols.correct},
-            ${cols.wrong},
-            student:student_profiles!student_points_student_id_fkey(
-              user_id,
-              grade,
-              city_id,
-              district_id,
-              school_id,
-              profile:profiles!student_profiles_user_id_fkey(full_name, avatar_url)
-            )
-          `)
-          .gt(cols.correct, 0)
-          .order(cols.points, { ascending: false })
-          .limit(100)
-
-        if (data) {
-          let filteredData = data
-
-          // Scope filtreleri - DERS BAZLI LİDERLİK İÇİN DE UYGULA
-          if (activeScope === 'city' && selectedCity) {
-            filteredData = filteredData.filter((item: any) => item.student?.city_id === selectedCity)
-          } else if (activeScope === 'district' && selectedDistrict) {
-            filteredData = filteredData.filter((item: any) => item.student?.district_id === selectedDistrict)
-          } else if (activeScope === 'school' && selectedSchool) {
-            filteredData = filteredData.filter((item: any) => item.student?.school_id === selectedSchool)
-          }
-          
-          // Sınıf filtrelemesi
-          if (selectedGrade !== '') {
-            const gradeNum = parseInt(selectedGrade)
-            if (!isNaN(gradeNum)) {
-              filteredData = filteredData.filter((item: any) => item.student?.grade === gradeNum)
-            }
-          }
-
-          const formatted = filteredData.slice(0, 100).map((item: any, index: number) => {
-            const correct = item[cols.correct] || 0
-            const wrong = item[cols.wrong] || 0
-            const total = correct + wrong
-            return {
-              student_id: item.student_id,
-              full_name: item.student?.profile?.full_name || 'Anonim',
-              avatar_url: item.student?.profile?.avatar_url,
-              points: item[cols.points] || 0,
-              correct,
-              wrong,
-              total,
-              success_rate: total > 0 ? Math.round((correct / total) * 100) : 0,
-              rank: index + 1
-            }
-          })
-          setSubjectLeaders(formatted)
-        }
-      } else {
-        // Bu ders için henüz ayrı istatistik yok
-        setSubjectLeaders([])
-      }
-    }
-
-    setLoading(false)
-  }
+  // 🗺️ İl/İlçe/Okul artık useTypesenseLocations hook'undan geliyor
+  // 🎮 Liderlik verisi useLeaderboardPolling hook'undan geliyor (hem genel hem ders bazlı)
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Crown className="h-6 w-6 text-yellow-400" />
@@ -652,7 +282,7 @@ export default function LeaderboardPage() {
   }
 
   const getSelectedCityName = () => {
-    const city = cities.find(c => c.id === selectedCity)
+    const city = cities.find(c => c.location_id === selectedCity)
     return city?.name || 'İl'
   }
 
@@ -902,9 +532,9 @@ export default function LeaderboardPage() {
                   }}
                   className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[160px]"
                 >
-                  <option value="" className="bg-gray-900">İl Seçin</option>
+                  <option value="" className="bg-gray-900">{citiesLoading ? 'Yükleniyor...' : 'İl Seçin'}</option>
                   {cities.map(city => (
-                    <option key={city.id} value={city.id} className="bg-gray-900">{city.name}</option>
+                    <option key={city.location_id} value={city.location_id} className="bg-gray-900">{city.name}</option>
                   ))}
                 </select>
               </div>
@@ -925,9 +555,9 @@ export default function LeaderboardPage() {
                       }}
                       className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[180px]"
                     >
-                      <option value="" className="bg-gray-900">İlçe Seçin ({districts.length} ilçe)</option>
+                      <option value="" className="bg-gray-900">{districtsLoading ? 'Yükleniyor...' : `İlçe Seçin (${districts.length} ilçe)`}</option>
                       {districts.map(district => (
-                        <option key={district.id} value={district.id} className="bg-gray-900">{district.name}</option>
+                        <option key={district.location_id} value={district.location_id} className="bg-gray-900">{district.name}</option>
                       ))}
                     </select>
                   </div>
@@ -947,9 +577,9 @@ export default function LeaderboardPage() {
                       onChange={(e) => setSelectedSchool(e.target.value)}
                       className="px-4 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:border-primary-500 min-w-[280px]"
                     >
-                      <option value="" className="bg-gray-900">Okul Seçin ({schools.length} okul)</option>
+                      <option value="" className="bg-gray-900">{schoolsLoading ? 'Yükleniyor...' : `Okul Seçin (${schools.length} okul)`}</option>
                       {schools.map(school => (
-                        <option key={school.id} value={school.id} className="bg-gray-900">{school.name}</option>
+                        <option key={school.school_id} value={school.school_id} className="bg-gray-900">{school.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1032,16 +662,16 @@ export default function LeaderboardPage() {
         {activeScope === 'city' && selectedCity && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <MapPin className="h-6 w-6 text-primary-400" />
-            {cities.find(c => c.id === selectedCity)?.name} İl Liderliği
+            {cities.find(c => c.location_id === selectedCity)?.name} İl Liderliği
           </h2>
         )}
 
         {activeScope === 'district' && selectedDistrict && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <Building2 className="h-6 w-6 text-green-400" />
-            {districts.find(d => d.id === selectedDistrict)?.name} İlçe Liderliği
+            {districts.find(d => d.location_id === selectedDistrict)?.name} İlçe Liderliği
             <span className="text-sm font-normal text-white/50 ml-2">
-              ({cities.find(c => c.id === selectedCity)?.name})
+              ({cities.find(c => c.location_id === selectedCity)?.name})
             </span>
           </h2>
         )}
@@ -1049,7 +679,7 @@ export default function LeaderboardPage() {
         {activeScope === 'school' && selectedSchool && (
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
             <School className="h-6 w-6 text-purple-400" />
-            {schools.find(s => s.id === selectedSchool)?.name} Okul Liderliği
+            {schools.find(s => s.school_id === selectedSchool)?.name} Okul Liderliği
           </h2>
         )}
 
@@ -1254,7 +884,8 @@ export default function LeaderboardPage() {
                 })}
               </AnimatePresence>
             ) : (
-              subjectLeaders.map((entry, index) => (
+              /* Ders bazlı liderlik - artık aynı leaderboard verisi kullanılıyor (Typesense polling) */
+              leaderboard.map((entry, index) => (
                 <motion.div
                   key={entry.student_id}
                   initial={{ opacity: 0, x: -20 }}
@@ -1275,11 +906,11 @@ export default function LeaderboardPage() {
                   <div className="flex-1">
                     <div className="font-medium text-white">{entry.full_name}</div>
                     <div className="text-sm text-white/50">
-                      {entry.correct} doğru / {entry.total} soru • %{entry.success_rate} başarı
+                      {entry.total_correct} doğru / {entry.total_questions} soru • %{Math.round(entry.success_rate || 0)} başarı
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-white">{entry.points}</div>
+                    <div className="text-xl font-bold text-white">{entry.total_points}</div>
                     <div className="text-xs text-white/50">puan</div>
                   </div>
                 </motion.div>
@@ -1287,8 +918,7 @@ export default function LeaderboardPage() {
             )}
 
             {/* Liste Boş */}
-            {((activeTab === 'genel' && leaderboard.length === 0) || 
-              (activeTab !== 'genel' && subjectLeaders.length === 0)) && (
+            {leaderboard.length === 0 && !loading && (
               <div className="text-center py-16">
                 <Trophy className="h-16 w-16 text-white/20 mx-auto mb-4" />
                 <h3 className="text-xl font-medium text-white/60 mb-2">

@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getLeaderboardFast, LeaderboardEntry, LeaderboardFilters } from '@/lib/typesense/browser-client'
+import { 
+  getLeaderboardFast, 
+  getSubjectLeaderboardFast,
+  LeaderboardEntry, 
+  LeaderboardFilters,
+  SubjectLeaderEntry
+} from '@/lib/typesense/browser-client'
 
 export interface LeaderboardDiff {
   studentId: string
@@ -25,6 +31,7 @@ export interface LeaderboardStats {
 
 interface UseLeaderboardPollingOptions {
   filters?: LeaderboardFilters
+  subject?: string | null // Ders kodu (matematik, turkce, vb.) - null veya 'genel' ise genel sıralama
   pollingInterval?: number // ms cinsinden, default 5000
   enabled?: boolean
 }
@@ -42,6 +49,7 @@ interface UseLeaderboardPollingResult {
 
 export function useLeaderboardPolling({
   filters = {},
+  subject = null,
   pollingInterval = 5000,
   enabled = true
 }: UseLeaderboardPollingOptions = {}): UseLeaderboardPollingResult {
@@ -61,6 +69,9 @@ export function useLeaderboardPolling({
   // Önceki state'i ref'te tut (diff hesaplamak için)
   const previousLeaderboardRef = useRef<Map<string, LeaderboardEntry>>(new Map())
   const isFirstLoadRef = useRef(true)
+  
+  // Ders değiştiğinde state'leri sıfırla
+  const prevSubjectRef = useRef<string | null>(subject)
 
   // Diff hesaplama fonksiyonu
   const calculateDiffs = useCallback((
@@ -107,10 +118,34 @@ export function useLeaderboardPolling({
     return newDiffs
   }, [])
 
+  // Ders değiştiğinde state'leri sıfırla
+  useEffect(() => {
+    if (subject !== prevSubjectRef.current) {
+      prevSubjectRef.current = subject
+      isFirstLoadRef.current = true
+      previousLeaderboardRef.current = new Map()
+      setDiffs([])
+      setActivities([])
+      setLoading(true)
+    }
+  }, [subject])
+
   // Veri çekme fonksiyonu
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const result = await getLeaderboardFast(filters)
+      let result: { data: LeaderboardEntry[]; total: number }
+      
+      // Ders bazlı mı genel mi?
+      const isSubjectBased = subject && subject !== 'genel' && subject !== 'general'
+      
+      if (isSubjectBased) {
+        // Ders bazlı liderlik
+        const subjectResult = await getSubjectLeaderboardFast(subject, filters)
+        result = { data: subjectResult.data, total: subjectResult.total }
+      } else {
+        // Genel liderlik
+        result = await getLeaderboardFast(filters)
+      }
       
       if (result.data && result.data.length > 0) {
         // Diff hesapla (ilk yüklemede değil)
@@ -148,6 +183,15 @@ export function useLeaderboardPolling({
         setStats(newStats)
         
         isFirstLoadRef.current = false
+      } else {
+        // Veri yoksa boş array
+        setLeaderboard([])
+        setStats({
+          totalStudents: 0,
+          totalQuestions: 0,
+          highestPoints: 0,
+          longestStreak: 0
+        })
       }
       
       setLastUpdated(new Date())
@@ -158,7 +202,7 @@ export function useLeaderboardPolling({
     } finally {
       setLoading(false)
     }
-  }, [filters, calculateDiffs])
+  }, [filters, subject, calculateDiffs])
 
   // İlk yükleme
   useEffect(() => {
