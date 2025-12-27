@@ -170,6 +170,7 @@ export async function getLeaderboardFast(filters: LeaderboardFilters = {}): Prom
 export interface StatsResult {
   totalQuestions: number
   activeStudents: number
+  todayQuestions: number
   bySubject: Array<{
     subject_code: string
     subject_name: string
@@ -188,10 +189,13 @@ export interface StatsResult {
 export async function getStatsFast(): Promise<StatsResult> {
   const startTime = performance.now()
   const client = getTypesenseBrowserClient()
+  
+  // Bugünün tarihi (Türkiye saati) - "2025-12-27" formatında
+  const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
   try {
     // Paralel sorgular
-    const [questionsResult, leaderboardResult] = await Promise.all([
+    const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
       client
         .collections(COLLECTIONS.QUESTIONS)
         .documents()
@@ -209,6 +213,17 @@ export async function getStatsFast(): Promise<StatsResult> {
           q: '*',
           query_by: 'full_name',
           per_page: 0
+        }),
+      // Bugün çözülen sorular (today_questions toplamı)
+      client
+        .collections(COLLECTIONS.LEADERBOARD)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'full_name',
+          filter_by: `today_date:=${todayTR}`,
+          per_page: 250,
+          include_fields: 'today_questions'
         })
     ])
 
@@ -230,12 +245,18 @@ export async function getStatsFast(): Promise<StatsResult> {
       }))
       .sort((a: any, b: any) => a.grade - b.grade)
 
+    // Bugün çözülen toplam soru sayısı
+    const todayQuestions = (todayQuestionsResult.hits || []).reduce((sum: number, hit: any) => {
+      return sum + (hit.document?.today_questions || 0)
+    }, 0)
+
     const duration = Math.round(performance.now() - startTime)
-    console.log(`⚡ Stats (browser): ${duration}ms`)
+    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions}`)
 
     return {
       totalQuestions: questionsResult.found || 0,
       activeStudents: leaderboardResult.found || 0,
+      todayQuestions,
       bySubject,
       byGrade,
       duration

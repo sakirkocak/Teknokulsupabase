@@ -295,19 +295,15 @@ function LiveStatsBanner() {
 
   async function loadStats() {
     try {
-      // ⚡ ŞIMŞEK HIZ - Typesense + API paralel çağrı
+      // ⚡ ŞIMŞEK HIZ - Doğrudan client-side Typesense (liderlik tablosu gibi)
       if (isTypesenseEnabled()) {
-        // Typesense'den hızlı stats + API'den todayQuestions paralel
-        const [typesenseResult, apiResponse] = await Promise.all([
-          getStatsFast(),
-          fetch('/api/stats').then(r => r.json()).catch(() => ({ todayQuestions: 0 }))
-        ])
-        
+        const result = await getStatsFast()
         setStats({
-          todayQuestions: apiResponse.todayQuestions || 0,
-          activeStudents: typesenseResult.activeStudents || 0,
-          totalQuestions: typesenseResult.totalQuestions || 0
+          todayQuestions: result.todayQuestions || 0,
+          activeStudents: result.activeStudents || 0,
+          totalQuestions: result.totalQuestions || 0
         })
+        console.log(`⚡ Stats (client-side): ${result.duration}ms, todayQuestions: ${result.todayQuestions}`)
       } else {
         // Typesense yoksa API route kullan (fallback)
         const response = await fetch('/api/stats')
