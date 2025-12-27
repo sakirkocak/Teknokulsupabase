@@ -28,9 +28,42 @@ import {
   Phone,
   Mail,
   Trophy,
-  BookOpen
+  BookOpen,
+  BarChart3,
+  Zap,
+  RefreshCw,
+  Award,
+  ChevronUp,
+  ChevronDown,
+  Minus
 } from 'lucide-react'
 import { useGamification } from '@/hooks/useGamification'
+
+// Typesense Dashboard Data Interface
+interface TypesenseDashboardData {
+  topicProgress: {
+    all: any[]
+    weak: any[]
+    strong: any[]
+    reviewDue: any[]
+    subjectMastery: { code: string; name: string; total: number; mastered: number; percentage: number }[]
+  }
+  leaderboard: {
+    myRank: number | null
+    totalStudents: number
+    nearbyRivals: any[]
+    myPoints: number
+  }
+  recommendedQuestions: any[]
+  stats: {
+    totalQuestions: number
+    totalCorrect: number
+    successRate: number
+    currentStreak: number
+    maxStreak: number
+    totalPoints: number
+  } | null
+}
 
 export default function StudentDashboard() {
   const { profile, loading: profileLoading } = useProfile()
@@ -42,6 +75,10 @@ export default function StudentDashboard() {
   const [parentRequests, setParentRequests] = useState<any[]>([])
   const [approvedParents, setApprovedParents] = useState<any[]>([])
   const [processingRequest, setProcessingRequest] = useState<string | null>(null)
+  
+  // Typesense Dashboard Data
+  const [typesenseData, setTypesenseData] = useState<TypesenseDashboardData | null>(null)
+  const [typesenseLoading, setTypesenseLoading] = useState(true)
   
   // AI Koç entegrasyonu - birleşik analiz verileri
   const [aiCoachData, setAiCoachData] = useState<{
@@ -76,8 +113,27 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (studentProfile?.id) {
       loadDashboardData()
+      loadTypesenseData()
     }
   }, [studentProfile?.id])
+
+  // Typesense verilerini yükle
+  async function loadTypesenseData() {
+    try {
+      setTypesenseLoading(true)
+      const response = await fetch('/api/student-dashboard')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          setTypesenseData(result.data)
+        }
+      }
+    } catch (error) {
+      console.error('Typesense veri yükleme hatası:', error)
+    } finally {
+      setTypesenseLoading(false)
+    }
+  }
 
   async function loadDashboardData() {
     if (!studentProfile?.id) return
@@ -562,16 +618,84 @@ export default function StudentDashboard() {
               </div>
             )}
             
-            {/* GamificationPanel - Basitleştirilmiş */}
+            {/* Liderlik Kartı - Typesense ile zenginleştirilmiş */}
             {studentProfile?.id && (
-              <div className="card p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Trophy className="w-6 h-6 text-yellow-500" />
-                  <h3 className="font-semibold">Liderlik</h3>
+              <div className="card overflow-hidden">
+                <div className="bg-gradient-to-r from-yellow-500 to-orange-500 p-4 text-white">
+                  <div className="flex items-center gap-2">
+                    <Trophy className="w-5 h-5" />
+                    <h3 className="font-semibold">Liderlik Tablosu</h3>
+                  </div>
                 </div>
-                <Link href="/ogrenci/liderlik" className="btn btn-primary btn-sm w-full justify-center">
-                  Sıralamayı Gör
-                </Link>
+                <div className="p-4">
+                  {typesenseLoading ? (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full" />
+                    </div>
+                  ) : typesenseData?.leaderboard?.myRank ? (
+                    <div className="space-y-4">
+                      {/* Sıralama */}
+                      <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                            #{typesenseData.leaderboard.myRank}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-surface-900">Sıralaman</div>
+                            <div className="text-sm text-surface-500">
+                              {typesenseData.leaderboard.totalStudents} öğrenci arasında
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xl font-bold text-orange-600">{typesenseData.leaderboard.myPoints}</div>
+                          <div className="text-xs text-surface-500">puan</div>
+                        </div>
+                      </div>
+
+                      {/* Yakın Rakipler */}
+                      {typesenseData.leaderboard.nearbyRivals.length > 0 && (
+                        <div>
+                          <div className="text-xs font-medium text-surface-500 mb-2">Yakın Rakiplerin</div>
+                          <div className="space-y-1">
+                            {typesenseData.leaderboard.nearbyRivals.slice(0, 3).map((rival: any, index: number) => {
+                              const isMe = rival.student_id === studentProfile.id
+                              const rankDiff = typesenseData!.leaderboard.myRank! - (typesenseData!.leaderboard.myRank! - 2 + index + 1)
+                              return (
+                                <div 
+                                  key={rival.student_id || index}
+                                  className={`flex items-center justify-between p-2 rounded-lg ${isMe ? 'bg-primary-50 border border-primary-200' : 'bg-surface-50'}`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${isMe ? 'bg-primary-500 text-white' : 'bg-surface-200 text-surface-600'}`}>
+                                      {typesenseData!.leaderboard.myRank! - 2 + index + 1}
+                                    </span>
+                                    <span className={`text-sm ${isMe ? 'font-semibold text-primary-700' : 'text-surface-700'}`}>
+                                      {isMe ? 'Sen' : (rival.full_name || rival.student_name)?.split(' ')[0] || 'Öğrenci'}
+                                    </span>
+                                  </div>
+                                  <span className="text-sm font-medium text-surface-600">{rival.total_points} XP</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <Link href="/ogrenci/liderlik" className="btn btn-primary btn-sm w-full justify-center">
+                        Tam Sıralamayı Gör
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <Trophy className="w-10 h-10 mx-auto text-surface-300 mb-2" />
+                      <p className="text-sm text-surface-500 mb-3">Soru çözerek liderlik tablosuna gir!</p>
+                      <Link href="/ogrenci/soru-bankasi" className="btn btn-primary btn-sm">
+                        Soru Çöz
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -697,10 +821,186 @@ export default function StudentDashboard() {
               )}
             </div>
 
-            {/* Quick Stats */}
+            {/* Konu Haritası - Typesense'den */}
+            {typesenseData?.topicProgress?.subjectMastery && typesenseData.topicProgress.subjectMastery.length > 0 && (
+              <div className="card overflow-hidden">
+                <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5" />
+                    <h3 className="font-semibold">Konu Haritam</h3>
+                  </div>
+                  <p className="text-xs text-emerald-100 mt-1">Derslerdeki hakimiyet durumun</p>
+                </div>
+                <div className="p-4 space-y-3">
+                  {typesenseData.topicProgress.subjectMastery.slice(0, 5).map((subject) => (
+                    <div key={subject.code} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-surface-700">{subject.name}</span>
+                        <span className={`font-semibold ${
+                          subject.percentage >= 70 ? 'text-green-600' :
+                          subject.percentage >= 40 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          %{subject.percentage}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-surface-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            subject.percentage >= 70 ? 'bg-gradient-to-r from-green-400 to-green-500' :
+                            subject.percentage >= 40 ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' : 
+                            'bg-gradient-to-r from-red-400 to-red-500'
+                          }`}
+                          style={{ width: `${subject.percentage}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-surface-400">
+                        {subject.mastered}/{subject.total} konu tamamlandı
+                      </div>
+                    </div>
+                  ))}
+                  <Link href="/ogrenci/ilerleme" className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 mt-2">
+                    Detaylı analiz <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Tekrar Zamanı Gelmiş Konular */}
+            {typesenseData?.topicProgress?.reviewDue && typesenseData.topicProgress.reviewDue.length > 0 && (
+              <div className="card overflow-hidden">
+                <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4 text-white">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-5 h-5" />
+                    <h3 className="font-semibold">Tekrar Zamanı!</h3>
+                  </div>
+                  <p className="text-xs text-amber-100 mt-1">Unutmamak için tekrar et</p>
+                </div>
+                <div className="p-4">
+                  <div className="space-y-2">
+                    {typesenseData.topicProgress.reviewDue.slice(0, 4).map((topic: any) => {
+                      const daysOverdue = Math.floor((Date.now() - topic.next_review_at) / (1000 * 60 * 60 * 24))
+                      return (
+                        <div key={topic.id} className="flex items-center justify-between p-2 bg-amber-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${daysOverdue > 3 ? 'bg-red-500' : 'bg-amber-500'}`} />
+                            <span className="text-sm text-surface-700">{topic.main_topic || topic.subject_name}</span>
+                          </div>
+                          <span className="text-xs text-surface-500">
+                            {daysOverdue > 0 ? `${daysOverdue} gün geçti` : 'Bugün'}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <Link 
+                    href="/ogrenci/soru-bankasi" 
+                    className="mt-3 flex items-center justify-center gap-2 w-full p-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg text-sm font-medium hover:from-amber-600 hover:to-orange-600 transition-all"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Şimdi Tekrar Et
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Sana Özel Soru Önerileri */}
+            {typesenseData?.recommendedQuestions && typesenseData.recommendedQuestions.length > 0 && (
+              <div className="card overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 text-white">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-5 h-5" />
+                    <h3 className="font-semibold">Sana Özel Sorular</h3>
+                  </div>
+                  <p className="text-xs text-blue-100 mt-1">Zayıf konularından seçildi</p>
+                </div>
+                <div className="p-4">
+                  <div className="space-y-2">
+                    {typesenseData.recommendedQuestions.slice(0, 3).map((question: any, index: number) => (
+                      <Link 
+                        key={question.question_id || index}
+                        href={`/ogrenci/soru-bankasi?questionId=${question.question_id}`}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm text-surface-700 truncate">
+                            {question.subject_name} - {question.main_topic}
+                          </div>
+                          <div className="text-xs text-surface-400 flex items-center gap-2">
+                            <span className={`px-1.5 py-0.5 rounded text-xs ${
+                              question.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                              question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              question.difficulty === 'hard' ? 'bg-red-100 text-red-700' :
+                              'bg-purple-100 text-purple-700'
+                            }`}>
+                              {question.difficulty === 'easy' ? 'Kolay' :
+                               question.difficulty === 'medium' ? 'Orta' :
+                               question.difficulty === 'hard' ? 'Zor' : 'Efsanevi'}
+                            </span>
+                            {question.times_answered > 0 && (
+                              <span>{question.times_answered} çözüm</span>
+                            )}
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-surface-400 group-hover:text-blue-500" />
+                      </Link>
+                    ))}
+                  </div>
+                  <Link 
+                    href="/ogrenci/soru-bankasi" 
+                    className="mt-3 flex items-center justify-center gap-2 w-full p-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm font-medium hover:from-blue-600 hover:to-indigo-600 transition-all"
+                  >
+                    <Zap className="w-4 h-4" />
+                    Tümünü Çöz
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Stats - Zenginleştirilmiş */}
             <div className="card p-6">
               <h3 className="font-semibold text-surface-900 mb-4">İstatistiklerim</h3>
               <div className="space-y-4">
+                {/* Typesense'den gelen soru istatistikleri */}
+                {typesenseData?.stats && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-5 h-5 text-blue-500" />
+                        <span className="text-surface-600">Çözülen Soru</span>
+                      </div>
+                      <span className="font-bold text-surface-900">{typesenseData.stats.totalQuestions}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <span className="text-surface-600">Doğru Cevap</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-surface-900">{typesenseData.stats.totalCorrect}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          typesenseData.stats.successRate >= 70 ? 'bg-green-100 text-green-700' :
+                          typesenseData.stats.successRate >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          %{Math.round(typesenseData.stats.successRate)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Flame className="w-5 h-5 text-orange-500" />
+                        <span className="text-surface-600">En Uzun Seri</span>
+                      </div>
+                      <span className="font-bold text-surface-900">{typesenseData.stats.maxStreak} gün</span>
+                    </div>
+                    <div className="border-t border-surface-100 my-2" />
+                  </>
+                )}
+                
+                {/* Görev istatistikleri */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <ClipboardList className="w-5 h-5 text-accent-500" />
@@ -710,7 +1010,7 @@ export default function StudentDashboard() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-secondary-500" />
+                    <Award className="w-5 h-5 text-secondary-500" />
                     <span className="text-surface-600">Tamamlanan</span>
                   </div>
                   <span className="font-bold text-surface-900">{completedTasks.length}</span>

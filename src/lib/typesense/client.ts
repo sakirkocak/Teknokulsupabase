@@ -28,7 +28,11 @@ export const USE_TYPESENSE = typeof window === 'undefined'
 // Collection isimleri
 export const COLLECTIONS = {
   LEADERBOARD: 'leaderboard',
-  QUESTIONS: 'questions'
+  QUESTIONS: 'questions',
+  LOCATIONS: 'locations',
+  SCHOOLS: 'schools',
+  STUDENT_STATS: 'student_stats',
+  STUDENT_TOPIC_PROGRESS: 'student_topic_progress'
 } as const
 
 /**
@@ -37,4 +41,3 @@ export const COLLECTIONS = {
 export function isTypesenseAvailable(): boolean {
   return USE_TYPESENSE && !!process.env.TYPESENSE_HOST && !!process.env.TYPESENSE_API_KEY
 }
-

@@ -2,6 +2,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
+import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
 import { 
   ChevronRight, ImageIcon, Play, ArrowLeft, 
@@ -32,10 +33,92 @@ const difficultyConfig = {
   legendary: { label: 'Efsane', color: 'bg-purple-100 text-purple-700', icon: Crown },
 }
 
-async function getImageQuestions() {
+interface ImageQuestion {
+  id: string
+  question_text: string
+  options: { A: string; B: string; C: string; D: string; E?: string }
+  correct_answer: string
+  difficulty: string
+  question_image_url?: string
+  times_answered: number
+  times_correct: number
+  success_rate: number
+  subject_name: string
+}
+
+// Typesense'den görselli soruları getir
+async function getImageQuestionsFromTypesense(): Promise<{
+  questions: ImageQuestion[]
+  totalCount: number
+  subjectStats: Record<string, number>
+  source: string
+}> {
+  const startTime = Date.now()
+  
+  try {
+    const result = await typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        sort_by: 'times_answered:desc',
+        per_page: 100,
+        filter_by: 'has_image:=true',
+        facet_by: 'subject_name,difficulty',
+        max_facet_values: 20
+      })
+    
+    const hits = result.hits || []
+    const totalCount = result.found || 0
+    
+    // Subject stats from facets
+    const subjectStats: Record<string, number> = {}
+    const subjectFacet = result.facet_counts?.find((f: any) => f.field_name === 'subject_name')
+    if (subjectFacet?.counts) {
+      subjectFacet.counts.forEach((item: any) => {
+        subjectStats[item.value] = item.count
+      })
+    }
+    
+    const questions: ImageQuestion[] = hits.map((hit: any) => {
+      const doc = hit.document
+      const timesAnswered = doc.times_answered || 0
+      const timesCorrect = doc.times_correct || 0
+      
+      return {
+        id: doc.question_id || doc.id,
+        question_text: doc.question_text || '',
+        options: { A: '', B: '', C: '', D: '' },
+        correct_answer: '',
+        difficulty: doc.difficulty || 'medium',
+        times_answered: timesAnswered,
+        times_correct: timesCorrect,
+        success_rate: doc.success_rate || (timesAnswered > 0 ? Math.round((timesCorrect / timesAnswered) * 100) : 0),
+        subject_name: doc.subject_name || ''
+      }
+    })
+    
+    const duration = Date.now() - startTime
+    console.log(`⚡ Görselli Sorular: Typesense ${duration}ms, ${questions.length} soru`)
+    
+    return { questions, totalCount, subjectStats, source: 'typesense' }
+  } catch (error) {
+    console.error('Typesense error:', error)
+    throw error
+  }
+}
+
+// Supabase fallback
+async function getImageQuestionsFromSupabase(): Promise<{
+  questions: ImageQuestion[]
+  totalCount: number
+  subjectStats: Record<string, number>
+  source: string
+}> {
+  const startTime = Date.now()
   const supabase = await createClient()
   
-  // Görselli soruları getir
   const { data: questions, count } = await supabase
     .from('questions')
     .select(`
@@ -45,6 +128,8 @@ async function getImageQuestions() {
       correct_answer, 
       difficulty,
       question_image_url,
+      times_answered,
+      times_correct,
       topic:topics(
         main_topic,
         grade,
@@ -52,39 +137,62 @@ async function getImageQuestions() {
       )
     `, { count: 'exact' })
     .not('question_image_url', 'is', null)
-    .order('created_at', { ascending: false })
+    .order('times_answered', { ascending: false })
     .limit(100)
   
-  // Ders bazlı istatistik
   const subjectStats: Record<string, number> = {}
   
-  questions?.forEach(q => {
-    const subjectName = (q.topic as any)?.subject?.name
+  const formattedQuestions: ImageQuestion[] = (questions || []).map((q: any) => {
+    const subjectName = q.topic?.subject?.name || ''
     if (subjectName) {
       subjectStats[subjectName] = (subjectStats[subjectName] || 0) + 1
     }
+    
+    const timesAnswered = q.times_answered || 0
+    const timesCorrect = q.times_correct || 0
+    
+    return {
+      id: q.id,
+      question_text: q.question_text,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      difficulty: q.difficulty,
+      question_image_url: q.question_image_url,
+      times_answered: timesAnswered,
+      times_correct: timesCorrect,
+      success_rate: timesAnswered > 0 ? Math.round((timesCorrect / timesAnswered) * 100) : 0,
+      subject_name: subjectName
+    }
   })
   
-  return {
-    questions: questions || [],
-    totalCount: count || 0,
-    subjectStats,
+  const duration = Date.now() - startTime
+  console.log(`📊 Görselli Sorular: Supabase ${duration}ms, ${formattedQuestions.length} soru`)
+  
+  return { questions: formattedQuestions, totalCount: count || 0, subjectStats, source: 'supabase' }
+}
+
+// Ana data fetcher
+async function getImageQuestions() {
+  if (isTypesenseAvailable()) {
+    try {
+      return await getImageQuestionsFromTypesense()
+    } catch {
+      console.log('⚠️ Typesense failed, falling back to Supabase')
+    }
   }
+  return await getImageQuestionsFromSupabase()
 }
 
 export default async function GorselliSorularPage() {
-  const { questions, totalCount, subjectStats } = await getImageQuestions()
+  const { questions, totalCount, subjectStats, source } = await getImageQuestions()
   const baseUrl = 'https://www.teknokul.com.tr'
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {
-    const options = q.options as { A: string; B: string; C: string; D: string; E?: string }
-    const correctAnswer = options[q.correct_answer as keyof typeof options] || ''
-    
     return {
       text: q.question_text,
-      options: Object.values(options).filter(Boolean) as string[],
-      correctAnswer,
+      options: q.options ? Object.values(q.options).filter(Boolean) as string[] : [],
+      correctAnswer: q.options?.[q.correct_answer as keyof typeof q.options] || '',
     }
   })
 
@@ -128,9 +236,12 @@ export default async function GorselliSorularPage() {
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">
                     Görselli Sorular
                   </h1>
-                  <span className="px-3 py-1 bg-amber-400 text-white text-sm font-semibold rounded-full">
-                    Görsel
-                  </span>
+                  {source === 'typesense' && (
+                    <span className="px-3 py-1 bg-amber-400 text-white text-sm font-semibold rounded-full flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Turbo
+                    </span>
+                  )}
                 </div>
                 <p className="text-lg text-white/90 max-w-2xl">
                   Grafik, tablo, şema ve diyagram içeren <strong>{totalCount.toLocaleString('tr-TR')}</strong> soru. 
@@ -221,8 +332,6 @@ export default async function GorselliSorularPage() {
             {questions.slice(0, 4).map((question, index) => {
               const difficulty = difficultyConfig[question.difficulty as keyof typeof difficultyConfig]
               const DiffIcon = difficulty?.icon || Star
-              const options = question.options as { A: string; B: string; C: string; D: string; E?: string }
-              const subjectName = (question.topic as any)?.subject?.name || 'Genel'
               
               return (
                 <div
@@ -236,9 +345,11 @@ export default async function GorselliSorularPage() {
                         <ImageIcon className="w-3 h-3" />
                         Görselli
                       </span>
-                      <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
-                        {subjectName}
-                      </span>
+                      {question.subject_name && (
+                        <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+                          {question.subject_name}
+                        </span>
+                      )}
                       {difficulty && (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${difficulty.color}`}>
                           <DiffIcon className="w-3 h-3" />
@@ -246,6 +357,19 @@ export default async function GorselliSorularPage() {
                         </span>
                       )}
                     </div>
+                    {/* İstatistikler */}
+                    {question.times_answered > 0 && (
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <BarChart3 className="w-3 h-3" />
+                          {question.times_answered.toLocaleString('tr-TR')}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          %{question.success_rate}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Görsel */}
@@ -273,19 +397,21 @@ export default async function GorselliSorularPage() {
                     {question.question_text}
                   </p>
                   
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.entries(options).filter(([_, v]) => v).slice(0, 4).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
-                      >
-                        <span className="w-5 h-5 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
-                          {key}
-                        </span>
-                        <span className="text-gray-700 line-clamp-1 text-xs">{value}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {question.options && Object.keys(question.options).length > 0 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(question.options).filter(([_, v]) => v).slice(0, 4).map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
+                        >
+                          <span className="w-5 h-5 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
+                            {key}
+                          </span>
+                          <span className="text-gray-700 line-clamp-1 text-xs">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -379,4 +505,3 @@ export default async function GorselliSorularPage() {
     </>
   )
 }
-

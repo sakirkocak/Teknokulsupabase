@@ -1,10 +1,11 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
 import { 
   ChevronRight, Sparkles, Play, ArrowLeft, 
-  Star, CheckCircle, Zap, Crown, Calendar
+  Star, CheckCircle, Zap, Crown, Calendar, BarChart3
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -31,7 +32,98 @@ const difficultyConfig = {
   legendary: { label: 'Efsane', color: 'bg-purple-100 text-purple-700', icon: Crown },
 }
 
-async function getNewQuestions() {
+interface NewQuestion {
+  id: string
+  question_text: string
+  options: { A: string; B: string; C: string; D: string; E?: string }
+  correct_answer: string
+  difficulty: string
+  times_answered: number
+  times_correct: number
+  success_rate: number
+  subject_name: string
+  subject_code: string
+  main_topic: string
+  created_at: number
+}
+
+// Typesense'den yeni soruları getir
+async function getNewQuestionsFromTypesense(): Promise<{
+  questions: NewQuestion[]
+  totalCount: number
+  subjectStats: Record<string, number>
+  source: string
+}> {
+  const startTime = Date.now()
+  
+  // Son 7 gün timestamp
+  const oneWeekAgo = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000)
+  
+  try {
+    const result = await typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        sort_by: 'created_at:desc',  // EN YENİYE GÖRE SIRALA
+        per_page: 100,
+        filter_by: `created_at:>=${oneWeekAgo}`,
+        facet_by: 'subject_name,difficulty',
+        max_facet_values: 20
+      })
+    
+    const hits = result.hits || []
+    const totalCount = result.found || 0
+    
+    // Subject stats from facets
+    const subjectStats: Record<string, number> = {}
+    const subjectFacet = result.facet_counts?.find((f: any) => f.field_name === 'subject_name')
+    if (subjectFacet?.counts) {
+      subjectFacet.counts.forEach((item: any) => {
+        subjectStats[item.value] = item.count
+      })
+    }
+    
+    const questions: NewQuestion[] = hits.map((hit: any) => {
+      const doc = hit.document
+      const timesAnswered = doc.times_answered || 0
+      const timesCorrect = doc.times_correct || 0
+      
+      return {
+        id: doc.question_id || doc.id,
+        question_text: doc.question_text || '',
+        options: { A: '', B: '', C: '', D: '' },
+        correct_answer: '',
+        difficulty: doc.difficulty || 'medium',
+        times_answered: timesAnswered,
+        times_correct: timesCorrect,
+        success_rate: doc.success_rate || (timesAnswered > 0 ? Math.round((timesCorrect / timesAnswered) * 100) : 0),
+        subject_name: doc.subject_name || '',
+        subject_code: doc.subject_code || '',
+        main_topic: doc.main_topic || '',
+        created_at: doc.created_at || 0
+      }
+    })
+    
+    const duration = Date.now() - startTime
+    console.log(`⚡ Yeni Sorular: Typesense ${duration}ms, ${questions.length} soru`)
+    
+    return { questions, totalCount, subjectStats, source: 'typesense' }
+  } catch (error) {
+    console.error('Typesense error:', error)
+    throw error
+  }
+}
+
+// Supabase fallback
+async function getNewQuestionsFromSupabase(): Promise<{
+  questions: NewQuestion[]
+  totalCount: number
+  subjectStats: Record<string, number>
+  source: string
+}> {
+  const startTime = Date.now()
   const supabase = await createClient()
   
   // Son 7 gün
@@ -47,6 +139,8 @@ async function getNewQuestions() {
       correct_answer, 
       difficulty,
       created_at,
+      times_answered,
+      times_correct,
       topic:topics(
         main_topic,
         grade,
@@ -57,41 +151,61 @@ async function getNewQuestions() {
     .order('created_at', { ascending: false })
     .limit(100)
   
-  // Ders ve gün bazlı istatistik
   const subjectStats: Record<string, number> = {}
-  const dayStats: Record<string, number> = {}
   
-  questions?.forEach(q => {
-    const subjectName = (q.topic as any)?.subject?.name
+  const formattedQuestions: NewQuestion[] = (questions || []).map((q: any) => {
+    const subjectName = q.topic?.subject?.name || ''
     if (subjectName) {
       subjectStats[subjectName] = (subjectStats[subjectName] || 0) + 1
     }
     
-    const day = new Date(q.created_at).toLocaleDateString('tr-TR', { weekday: 'long' })
-    dayStats[day] = (dayStats[day] || 0) + 1
+    const timesAnswered = q.times_answered || 0
+    const timesCorrect = q.times_correct || 0
+    
+    return {
+      id: q.id,
+      question_text: q.question_text,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      difficulty: q.difficulty,
+      times_answered: timesAnswered,
+      times_correct: timesCorrect,
+      success_rate: timesAnswered > 0 ? Math.round((timesCorrect / timesAnswered) * 100) : 0,
+      subject_name: subjectName,
+      subject_code: q.topic?.subject?.code || '',
+      main_topic: q.topic?.main_topic || '',
+      created_at: new Date(q.created_at).getTime()
+    }
   })
   
-  return {
-    questions: questions || [],
-    totalCount: count || 0,
-    subjectStats,
-    dayStats,
+  const duration = Date.now() - startTime
+  console.log(`📊 Yeni Sorular: Supabase ${duration}ms, ${formattedQuestions.length} soru`)
+  
+  return { questions: formattedQuestions, totalCount: count || 0, subjectStats, source: 'supabase' }
+}
+
+// Ana data fetcher
+async function getNewQuestions() {
+  if (isTypesenseAvailable()) {
+    try {
+      return await getNewQuestionsFromTypesense()
+    } catch {
+      console.log('⚠️ Typesense failed, falling back to Supabase')
+    }
   }
+  return await getNewQuestionsFromSupabase()
 }
 
 export default async function YeniSorularPage() {
-  const { questions, totalCount, subjectStats, dayStats } = await getNewQuestions()
+  const { questions, totalCount, subjectStats, source } = await getNewQuestions()
   const baseUrl = 'https://www.teknokul.com.tr'
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {
-    const options = q.options as { A: string; B: string; C: string; D: string; E?: string }
-    const correctAnswer = options[q.correct_answer as keyof typeof options] || ''
-    
     return {
       text: q.question_text,
-      options: Object.values(options).filter(Boolean) as string[],
-      correctAnswer,
+      options: q.options ? Object.values(q.options).filter(Boolean) as string[] : [],
+      correctAnswer: q.options?.[q.correct_answer as keyof typeof q.options] || '',
     }
   })
 
@@ -135,9 +249,12 @@ export default async function YeniSorularPage() {
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">
                     Yeni Eklenen Sorular
                   </h1>
-                  <span className="px-3 py-1 bg-pink-400 text-white text-sm font-semibold rounded-full animate-pulse">
-                    Taze!
-                  </span>
+                  {source === 'typesense' && (
+                    <span className="px-3 py-1 bg-pink-400 text-white text-sm font-semibold rounded-full flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Turbo
+                    </span>
+                  )}
                 </div>
                 <p className="text-lg text-white/90 max-w-2xl">
                   Bu hafta eklenen <strong>{totalCount.toLocaleString('tr-TR')}</strong> yeni soru ile pratik yap.
@@ -235,12 +352,9 @@ export default async function YeniSorularPage() {
             {questions.slice(0, 5).map((question, index) => {
               const difficulty = difficultyConfig[question.difficulty as keyof typeof difficultyConfig]
               const DiffIcon = difficulty?.icon || Star
-              const options = question.options as { A: string; B: string; C: string; D: string; E?: string }
-              const subjectName = (question.topic as any)?.subject?.name || 'Genel'
-              const addedDate = new Date(question.created_at).toLocaleDateString('tr-TR', {
-                day: 'numeric',
-                month: 'long',
-              })
+              const addedDate = question.created_at 
+                ? new Date(question.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
+                : ''
               
               return (
                 <div
@@ -250,12 +364,16 @@ export default async function YeniSorularPage() {
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-gray-500">Soru {index + 1}</span>
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
-                        {addedDate}
-                      </span>
-                      <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
-                        {subjectName}
-                      </span>
+                      {addedDate && (
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                          {addedDate}
+                        </span>
+                      )}
+                      {question.subject_name && (
+                        <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+                          {question.subject_name}
+                        </span>
+                      )}
                       {difficulty && (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${difficulty.color}`}>
                           <DiffIcon className="w-3 h-3" />
@@ -263,25 +381,40 @@ export default async function YeniSorularPage() {
                         </span>
                       )}
                     </div>
+                    {/* İstatistikler */}
+                    {question.times_answered > 0 && (
+                      <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <BarChart3 className="w-3 h-3" />
+                          {question.times_answered.toLocaleString('tr-TR')} çözüm
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                          %{question.success_rate} başarı
+                        </span>
+                      </div>
+                    )}
                   </div>
                   
                   <p className="text-gray-800 mb-4 line-clamp-3">
                     {question.question_text}
                   </p>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {Object.entries(options).filter(([_, v]) => v).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
-                      >
-                        <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
-                          {key}
-                        </span>
-                        <span className="text-gray-700 line-clamp-1">{value}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {question.options && Object.keys(question.options).length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {Object.entries(question.options).filter(([_, v]) => v).map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
+                        >
+                          <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
+                            {key}
+                          </span>
+                          <span className="text-gray-700 line-clamp-1">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -348,4 +481,3 @@ export default async function YeniSorularPage() {
     </>
   )
 }
-

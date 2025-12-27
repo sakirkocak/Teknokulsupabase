@@ -1,10 +1,11 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
 import { 
   ChevronRight, TrendingUp, Play, ArrowLeft, 
-  Star, CheckCircle, Zap, Crown, Users, Trophy
+  Star, CheckCircle, Zap, Crown, Users, Trophy, BarChart3
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -31,11 +32,95 @@ const difficultyConfig = {
   legendary: { label: 'Efsane', color: 'bg-purple-100 text-purple-700', icon: Crown },
 }
 
-async function getPopularQuestions() {
+interface PopularQuestion {
+  id: string
+  question_text: string
+  options: { A: string; B: string; C: string; D: string; E?: string }
+  correct_answer: string
+  difficulty: string
+  times_answered: number
+  times_correct: number
+  success_rate: number
+  subject_name: string
+  subject_code: string
+  main_topic: string
+  grade: number
+}
+
+// Typesense'den en çok çözülen soruları getir
+async function getPopularQuestionsFromTypesense(): Promise<{
+  questions: PopularQuestion[]
+  totalCount: number
+  subjectStats: Record<string, number>
+  source: string
+}> {
+  const startTime = Date.now()
+  
+  try {
+    const result = await typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        sort_by: 'times_answered:desc',  // EN ÇOK ÇÖZÜLENE GÖRE SIRALA
+        per_page: 100,
+        filter_by: 'times_answered:>0',  // En az 1 kez çözülmüş
+        facet_by: 'subject_name,difficulty',
+        max_facet_values: 20
+      })
+    
+    const hits = result.hits || []
+    const totalCount = result.found || 0
+    
+    // Subject stats from facets
+    const subjectStats: Record<string, number> = {}
+    const subjectFacet = result.facet_counts?.find((f: any) => f.field_name === 'subject_name')
+    if (subjectFacet?.counts) {
+      subjectFacet.counts.forEach((item: any) => {
+        subjectStats[item.value] = item.count
+      })
+    }
+    
+    // Questions
+    const questions: PopularQuestion[] = hits.map((hit: any) => {
+      const doc = hit.document
+      return {
+        id: doc.question_id || doc.id,
+        question_text: doc.question_text || '',
+        options: { A: '', B: '', C: '', D: '' }, // Typesense'de options yok, placeholder
+        correct_answer: '',
+        difficulty: doc.difficulty || 'medium',
+        times_answered: doc.times_answered || 0,
+        times_correct: doc.times_correct || 0,
+        success_rate: doc.success_rate || 0,
+        subject_name: doc.subject_name || '',
+        subject_code: doc.subject_code || '',
+        main_topic: doc.main_topic || '',
+        grade: doc.grade || 0
+      }
+    })
+    
+    const duration = Date.now() - startTime
+    console.log(`⚡ En Çok Çözülen: Typesense ${duration}ms, ${questions.length} soru`)
+    
+    return { questions, totalCount, subjectStats, source: 'typesense' }
+  } catch (error) {
+    console.error('Typesense error:', error)
+    throw error
+  }
+}
+
+// Supabase fallback
+async function getPopularQuestionsFromSupabase(): Promise<{
+  questions: PopularQuestion[]
+  totalCount: number
+  subjectStats: Record<string, number>
+  source: string
+}> {
+  const startTime = Date.now()
   const supabase = await createClient()
   
-  // En çok çözülen sorular (student_question_history'den)
-  // Alternatif: questions tablosunda solve_count kolonu varsa onu kullan
   const { data: questions, count } = await supabase
     .from('questions')
     .select(`
@@ -44,47 +129,83 @@ async function getPopularQuestions() {
       options, 
       correct_answer, 
       difficulty,
+      times_answered,
+      times_correct,
       topic:topics(
         main_topic,
         grade,
         subject:subjects(name, code)
       )
     `, { count: 'exact' })
-    .order('created_at', { ascending: false }) // Normalde solve_count'a göre sıralanır
+    .gt('times_answered', 0)
+    .order('times_answered', { ascending: false })
     .limit(100)
   
-  // Ders bazlı istatistik
   const subjectStats: Record<string, number> = {}
   
-  questions?.forEach(q => {
-    const subjectName = (q.topic as any)?.subject?.name
+  const formattedQuestions: PopularQuestion[] = (questions || []).map((q: any) => {
+    const subjectName = q.topic?.subject?.name || ''
     if (subjectName) {
       subjectStats[subjectName] = (subjectStats[subjectName] || 0) + 1
     }
+    
+    const timesAnswered = q.times_answered || 0
+    const timesCorrect = q.times_correct || 0
+    
+    return {
+      id: q.id,
+      question_text: q.question_text,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      difficulty: q.difficulty,
+      times_answered: timesAnswered,
+      times_correct: timesCorrect,
+      success_rate: timesAnswered > 0 ? Math.round((timesCorrect / timesAnswered) * 100) : 0,
+      subject_name: subjectName,
+      subject_code: q.topic?.subject?.code || '',
+      main_topic: q.topic?.main_topic || '',
+      grade: q.topic?.grade || 0
+    }
   })
   
-  return {
-    questions: questions || [],
-    totalCount: count || 0,
+  const duration = Date.now() - startTime
+  console.log(`📊 En Çok Çözülen: Supabase ${duration}ms, ${formattedQuestions.length} soru`)
+  
+  return { 
+    questions: formattedQuestions, 
+    totalCount: count || 0, 
     subjectStats,
+    source: 'supabase'
   }
 }
 
+// Ana data fetcher
+async function getPopularQuestions() {
+  if (isTypesenseAvailable()) {
+    try {
+      return await getPopularQuestionsFromTypesense()
+    } catch {
+      console.log('⚠️ Typesense failed, falling back to Supabase')
+    }
+  }
+  return await getPopularQuestionsFromSupabase()
+}
+
 export default async function EnCokCozulenPage() {
-  const { questions, totalCount, subjectStats } = await getPopularQuestions()
+  const { questions, totalCount, subjectStats, source } = await getPopularQuestions()
   const baseUrl = 'https://www.teknokul.com.tr'
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {
-    const options = q.options as { A: string; B: string; C: string; D: string; E?: string }
-    const correctAnswer = options[q.correct_answer as keyof typeof options] || ''
-    
     return {
       text: q.question_text,
-      options: Object.values(options).filter(Boolean) as string[],
-      correctAnswer,
+      options: q.options ? Object.values(q.options).filter(Boolean) as string[] : [],
+      correctAnswer: q.options?.[q.correct_answer as keyof typeof q.options] || '',
     }
   })
+
+  // Toplam çözüm sayısı
+  const totalSolves = questions.reduce((acc, q) => acc + q.times_answered, 0)
 
   return (
     <>
@@ -126,12 +247,15 @@ export default async function EnCokCozulenPage() {
                   <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold">
                     En Çok Çözülen Sorular
                   </h1>
-                  <span className="px-3 py-1 bg-emerald-400 text-white text-sm font-semibold rounded-full">
-                    Popüler
-                  </span>
+                  {source === 'typesense' && (
+                    <span className="px-3 py-1 bg-emerald-400 text-white text-sm font-semibold rounded-full flex items-center gap-1">
+                      <Zap className="w-3 h-3" />
+                      Turbo
+                    </span>
+                  )}
                 </div>
                 <p className="text-lg text-white/90 max-w-2xl">
-                  Öğrencilerin favorisi! En çok tercih edilen <strong>{questions.length}</strong> soru.
+                  Öğrencilerin favorisi! Toplam <strong>{totalSolves.toLocaleString('tr-TR')}</strong> kez çözülmüş <strong>{questions.length}</strong> popüler soru.
                 </p>
               </div>
             </div>
@@ -160,7 +284,7 @@ export default async function EnCokCozulenPage() {
 
         {/* Stats */}
         <section className="mb-12">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border border-green-100">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-5 h-5 text-green-600" />
@@ -171,8 +295,16 @@ export default async function EnCokCozulenPage() {
             </div>
             <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
               <div className="flex items-center gap-2 mb-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-700">Ders Çeşidi</span>
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                <span className="font-medium text-blue-700">Toplam Çözüm</span>
+              </div>
+              <div className="text-3xl font-bold text-gray-900">{totalSolves.toLocaleString('tr-TR')}</div>
+              <div className="text-sm text-gray-500">kez çözüldü</div>
+            </div>
+            <div className="p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border border-purple-100">
+              <div className="flex items-center gap-2 mb-2">
+                <Users className="w-5 h-5 text-purple-600" />
+                <span className="font-medium text-purple-700">Ders Çeşidi</span>
               </div>
               <div className="text-3xl font-bold text-gray-900">{Object.keys(subjectStats).length}</div>
               <div className="text-sm text-gray-500">farklı ders</div>
@@ -218,8 +350,6 @@ export default async function EnCokCozulenPage() {
             {questions.slice(0, 5).map((question, index) => {
               const difficulty = difficultyConfig[question.difficulty as keyof typeof difficultyConfig]
               const DiffIcon = difficulty?.icon || Star
-              const options = question.options as { A: string; B: string; C: string; D: string; E?: string }
-              const subjectName = (question.topic as any)?.subject?.name || 'Genel'
               
               return (
                 <div
@@ -233,7 +363,7 @@ export default async function EnCokCozulenPage() {
                         #{index + 1}
                       </span>
                       <span className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
-                        {subjectName}
+                        {question.subject_name || 'Genel'}
                       </span>
                       {difficulty && (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${difficulty.color}`}>
@@ -242,25 +372,38 @@ export default async function EnCokCozulenPage() {
                         </span>
                       )}
                     </div>
+                    {/* İstatistikler */}
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <BarChart3 className="w-3 h-3" />
+                        {question.times_answered.toLocaleString('tr-TR')} çözüm
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3 text-green-500" />
+                        %{question.success_rate} başarı
+                      </span>
+                    </div>
                   </div>
                   
                   <p className="text-gray-800 mb-4 line-clamp-3">
                     {question.question_text}
                   </p>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {Object.entries(options).filter(([_, v]) => v).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
-                      >
-                        <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
-                          {key}
-                        </span>
-                        <span className="text-gray-700 line-clamp-1">{value}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {question.options && Object.keys(question.options).length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {Object.entries(question.options).filter(([_, v]) => v).map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
+                        >
+                          <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
+                            {key}
+                          </span>
+                          <span className="text-gray-700 line-clamp-1">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -327,4 +470,3 @@ export default async function EnCokCozulenPage() {
     </>
   )
 }
-

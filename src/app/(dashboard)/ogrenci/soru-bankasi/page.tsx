@@ -788,6 +788,12 @@ export default function SoruBankasiPage() {
     }
   }
 
+  // Adaptive learning state
+  const [adaptiveDifficulty, setAdaptiveDifficulty] = useState('medium')
+  const [answeredQuestionIds, setAnsweredQuestionIds] = useState<string[]>([])
+  const [consecutiveCorrectCount, setConsecutiveCorrectCount] = useState(0)
+  const [consecutiveWrongCount, setConsecutiveWrongCount] = useState(0)
+
   const loadNextQuestion = async (topic?: Topic) => {
     setSelectedAnswer(null)
     setShowResult(false)
@@ -797,6 +803,49 @@ export default function SoruBankasiPage() {
 
     const topicToUse = topic || selectedTopic
 
+    // Adaptive Learning: Önce API'den akıllı soru seç
+    if (studentProfile?.id && !selectedDifficulty) {
+      try {
+        const response = await fetch('/api/adaptive-question', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: studentProfile.id,
+            topicId: topicToUse?.id,
+            subjectCode: selectedSubject?.subject?.code,
+            grade: selectedGrade,
+            consecutiveCorrect: consecutiveCorrectCount,
+            consecutiveWrong: consecutiveWrongCount,
+            currentDifficulty: adaptiveDifficulty,
+            excludeQuestionIds: answeredQuestionIds.slice(-50) // Son 50 soruyu hariç tut
+          })
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          if (result.success && result.question) {
+            // Full question data'yı Supabase'den çek (options, correct_answer vb.)
+            const { data: fullQuestion } = await supabase
+              .from('questions')
+              .select('*, topic:topics(*, subject:subjects(*))')
+              .eq('id', result.question.id)
+              .single()
+
+            if (fullQuestion) {
+              setCurrentQuestion(fullQuestion as any)
+              setQuestionIndex(prev => prev + 1)
+              setAdaptiveDifficulty(result.adaptiveDifficulty)
+              console.log(`🎯 Adaptive: ${result.adaptiveDifficulty} zorluk (${result.source})`)
+              return
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Adaptive question error, falling back:', error)
+      }
+    }
+
+    // Fallback: Normal sorgu
     let query = supabase
       .from('questions')
       .select('*, topic:topics(*, subject:subjects(*))')
@@ -863,6 +912,20 @@ export default function SoruBankasiPage() {
       correct: prev.correct + (correct ? 1 : 0),
       wrong: prev.wrong + (correct ? 0 : 1)
     }))
+
+    // Adaptive Learning: Track consecutive correct/wrong
+    if (correct) {
+      setConsecutiveCorrectCount(prev => prev + 1)
+      setConsecutiveWrongCount(0)
+    } else {
+      setConsecutiveWrongCount(prev => prev + 1)
+      setConsecutiveCorrectCount(0)
+    }
+    
+    // Track answered question IDs
+    if (currentQuestion?.id) {
+      setAnsweredQuestionIds(prev => [...prev, currentQuestion.id])
+    }
 
     // Combo bonus hesapla
     let comboBonus = 0
