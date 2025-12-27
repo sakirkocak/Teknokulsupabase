@@ -222,11 +222,21 @@ async function handleQuestionsSync(
       .single()
     
     if (topicData) {
+      // Options JSONB'den şıkları çıkar
+      const options = record.options || {}
+      
       const document = {
         id: record.id,
         question_id: record.id,
         question_text: record.question_text || '',
         explanation: record.explanation || '',
+        // Şıklar (4 şık ortaokul, 5 şık lise)
+        option_a: options.A || options.a || '',
+        option_b: options.B || options.b || '',
+        option_c: options.C || options.c || '',
+        option_d: options.D || options.d || '',
+        option_e: options.E || options.e || '',  // Lise için 5. şık
+        correct_answer: record.correct_answer || '',
         difficulty: record.difficulty || 'medium',
         subject_id: (topicData.subject as any)?.id || '',
         subject_code: (topicData.subject as any)?.code || '',
@@ -235,7 +245,8 @@ async function handleQuestionsSync(
         main_topic: topicData.main_topic || '',
         sub_topic: topicData.sub_topic || '',
         grade: topicData.grade || 0,
-        has_image: !!record.image_url,
+        has_image: !!record.question_image_url,
+        image_url: record.question_image_url || '',
         times_answered: record.times_answered || 0,
         times_correct: record.times_correct || 0,
         success_rate: record.times_answered > 0 
