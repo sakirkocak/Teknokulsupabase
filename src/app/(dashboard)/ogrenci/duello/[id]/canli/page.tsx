@@ -25,6 +25,7 @@ interface DuelQuestion {
   option_b: string
   option_c: string
   option_d: string
+  option_e?: string | null  // Lise için 5. şık
   image_url?: string
   subject_name: string
   difficulty: string
@@ -532,11 +533,15 @@ export default function LiveDuelPage() {
               />
             )}
 
-            {/* Seçenekler */}
+            {/* Seçenekler (4 veya 5 şık) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {['A', 'B', 'C', 'D'].map((option) => {
+              {['A', 'B', 'C', 'D', 'E'].map((option) => {
                 const optionKey = `option_${option.toLowerCase()}` as keyof DuelQuestion
-                const optionText = question[optionKey] as string
+                const optionText = question[optionKey] as string | null | undefined
+                
+                // E şıkkı yoksa gösterme (ortaokul soruları)
+                if (option === 'E' && !optionText) return null
+                
                 const isSelected = selectedAnswer === option
                 const isCorrectOption = showResult && option === correctAnswer
                 const isWrongSelected = showResult && isSelected && option !== correctAnswer

@@ -70,11 +70,12 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'question_text', type: 'string' },
     { name: 'explanation', type: 'string', optional: true },
     
-    // Şıklar
-    { name: 'option_a', type: 'string' },
-    { name: 'option_b', type: 'string' },
-    { name: 'option_c', type: 'string' },
-    { name: 'option_d', type: 'string' },
+    // Şıklar (4 şık ortaokul, 5 şık lise)
+    { name: 'option_a', type: 'string', optional: true },
+    { name: 'option_b', type: 'string', optional: true },
+    { name: 'option_c', type: 'string', optional: true },
+    { name: 'option_d', type: 'string', optional: true },
+    { name: 'option_e', type: 'string', optional: true },  // Lise için 5. şık
     { name: 'correct_answer', type: 'string' },
     { name: 'image_url', type: 'string', optional: true },
     

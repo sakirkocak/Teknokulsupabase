@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
       option_b: q.option_b,
       option_c: q.option_c,
       option_d: q.option_d,
+      option_e: q.option_e || null,  // Lise için 5. şık
       image_url: q.image_url,
       subject_name: q.subject_name,
       difficulty: q.difficulty

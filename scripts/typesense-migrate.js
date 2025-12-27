@@ -192,7 +192,16 @@ async function migrateQuestions() {
     const { data: questions, error } = await supabase
       .from('questions')
       .select(`
-        *,
+        id,
+        question_text,
+        explanation,
+        options,
+        correct_answer,
+        difficulty,
+        question_image_url,
+        times_answered,
+        times_correct,
+        created_at,
         topic:topics!inner(
           id,
           main_topic,
@@ -211,25 +220,38 @@ async function migrateQuestions() {
     
     if (!questions || questions.length === 0) break
     
-    const documents = questions.map(q => ({
-      id: q.id,
-      question_id: q.id,
-      question_text: q.question_text || '',
-      explanation: q.explanation || '',
-      difficulty: q.difficulty || 'medium',
-      subject_id: q.topic?.subject?.id || '',
-      subject_code: q.topic?.subject?.code || '',
-      subject_name: q.topic?.subject?.name || '',
-      topic_id: q.topic?.id || '',
-      main_topic: q.topic?.main_topic || '',
-      sub_topic: q.topic?.sub_topic || '',
-      grade: q.topic?.grade || 0,
-      has_image: q.image_url ? true : false,
-      times_answered: q.times_answered || 0,
-      times_correct: q.times_correct || 0,
-      success_rate: q.times_answered > 0 ? (q.times_correct / q.times_answered) * 100 : 0,
-      created_at: q.created_at ? new Date(q.created_at).getTime() : Date.now()
-    }))
+    const documents = questions.map(q => {
+      // Options JSONB'den şıkları çıkar
+      const options = q.options || {}
+      
+      return {
+        id: q.id,
+        question_id: q.id,
+        question_text: q.question_text || '',
+        explanation: q.explanation || '',
+        // Şıklar (4 şık ortaokul, 5 şık lise)
+        option_a: options.A || options.a || '',
+        option_b: options.B || options.b || '',
+        option_c: options.C || options.c || '',
+        option_d: options.D || options.d || '',
+        option_e: options.E || options.e || '',  // Lise için 5. şık
+        correct_answer: q.correct_answer || '',
+        difficulty: q.difficulty || 'medium',
+        subject_id: q.topic?.subject?.id || '',
+        subject_code: q.topic?.subject?.code || '',
+        subject_name: q.topic?.subject?.name || '',
+        topic_id: q.topic?.id || '',
+        main_topic: q.topic?.main_topic || '',
+        sub_topic: q.topic?.sub_topic || '',
+        grade: q.topic?.grade || 0,
+        has_image: q.question_image_url ? true : false,
+        image_url: q.question_image_url || '',
+        times_answered: q.times_answered || 0,
+        times_correct: q.times_correct || 0,
+        success_rate: q.times_answered > 0 ? (q.times_correct / q.times_answered) * 100 : 0,
+        created_at: q.created_at ? new Date(q.created_at).getTime() : Date.now()
+      }
+    })
     
     try {
       const result = await typesense.collections('questions').documents().import(documents, { action: 'upsert' })

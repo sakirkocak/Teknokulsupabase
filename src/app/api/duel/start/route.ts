@@ -92,22 +92,26 @@ export async function POST(req: NextRequest) {
       typesenseAvailable: isTypesenseAvailable()
     })
     
-    // Düello için Supabase kullan (şıklar Typesense'e migrate edilmedi)
-    questions = await getQuestionsFromSupabase(grade, duel.subject, duel.question_count || 10)
-    console.log(`📚 Supabase questions found: ${questions.length}`)
-    if (questions.length > 0) {
-      console.log('📋 İlk soru şıkları:', {
-        option_a: questions[0].option_a?.substring(0, 30),
-        option_b: questions[0].option_b?.substring(0, 30)
-      })
+    // Önce Typesense'den dene (hızlı ~130ms)
+    if (isTypesenseAvailable()) {
+      questions = await getQuestionsFromTypesense(grade, duel.subject, duel.question_count || 10)
+      console.log(`⚡ Typesense questions found: ${questions.length}`)
+    }
+    
+    // Typesense'de soru yoksa veya hata varsa Supabase fallback
+    if (questions.length === 0) {
+      console.log('⚠️ Typesense\'de soru yok, Supabase\'e geçiliyor...')
+      questions = await getQuestionsFromSupabase(grade, duel.subject, duel.question_count || 10)
+      console.log(`📚 Supabase questions found: ${questions.length}`)
     }
 
-    // Eğer soru bulunamazsa, sınıf filtresi olmadan tekrar dene
+    // Hala soru yoksa, sınıf filtresi olmadan tekrar dene
     if (questions.length === 0) {
       console.log('⚠️ No questions for grade', grade, '- trying without grade filter')
       if (isTypesenseAvailable()) {
         questions = await getQuestionsFromTypesense(null, duel.subject, duel.question_count || 10)
-      } else {
+      }
+      if (questions.length === 0) {
         questions = await getQuestionsFromSupabase(null, duel.subject, duel.question_count || 10)
       }
       console.log(`📚 Without grade filter: ${questions.length} questions`)
@@ -121,7 +125,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Soruları hazırla
+    // Soruları hazırla (4 veya 5 şık)
     const preparedQuestions = questions.map(q => ({
       id: q.id,
       question_text: q.question_text,
@@ -129,6 +133,7 @@ export async function POST(req: NextRequest) {
       option_b: q.option_b,
       option_c: q.option_c,
       option_d: q.option_d,
+      option_e: q.option_e || null,  // Lise için 5. şık
       image_url: q.image_url,
       subject_name: q.subject_name,
       subject_code: q.subject_code,
@@ -177,6 +182,7 @@ export async function POST(req: NextRequest) {
         option_b: q.option_b,
         option_c: q.option_c,
         option_d: q.option_d,
+        option_e: q.option_e,  // Lise için 5. şık
         image_url: q.image_url,
         subject_name: q.subject_name,
         difficulty: q.difficulty
@@ -213,7 +219,7 @@ async function getQuestionsFromTypesense(grade: number | null, subject: string |
     q: '*',
     query_by: 'question_text',
     per_page: count * 3,
-    include_fields: 'id,question_text,option_a,option_b,option_c,option_d,correct_answer,explanation,image_url,subject_name,subject_code,topic_name,grade,difficulty'
+    include_fields: 'id,question_text,option_a,option_b,option_c,option_d,option_e,correct_answer,explanation,image_url,subject_name,subject_code,main_topic,grade,difficulty'
   }
   
   if (filters.length > 0) {
@@ -301,7 +307,8 @@ async function getQuestionsFromSupabase(grade: number | null, subject: string | 
       option_a: options.A || options.a || '',
       option_b: options.B || options.b || '',
       option_c: options.C || options.c || '',
-      option_d: options.D || options.d || ''
+      option_d: options.D || options.d || '',
+      option_e: options.E || options.e || null  // Lise için 5. şık
     }
   })
 
