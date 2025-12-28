@@ -4,6 +4,12 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { 
+  searchQuestionsForAdmin, 
+  getQuestionStatsFast,
+  isTypesenseEnabled,
+  type AdminQuestionResult 
+} from '@/lib/typesense/browser-client'
 
 import MathRenderer from '@/components/MathRenderer'
 import { 
@@ -176,7 +182,27 @@ export default function AdminSoruYonetimiPage() {
   }
 
   const loadStats = async () => {
-    // RPC fonksiyonu ile tek sorguda tüm istatistikleri al
+    // ⚡ Typesense'den istatistikleri al (daha hızlı!)
+    if (isTypesenseEnabled()) {
+      try {
+        const statsData = await getQuestionStatsFast()
+        setStats({
+          total: statsData.total,
+          easy: statsData.easy,
+          medium: statsData.medium,
+          hard: statsData.hard,
+          legendary: statsData.legendary,
+          withImage: statsData.withImage,
+          byGrade: statsData.byGrade
+        })
+        console.log(`⚡ Stats loaded from Typesense in ${statsData.duration}ms`)
+        return
+      } catch (error) {
+        console.error('Typesense stats error, falling back to Supabase:', error)
+      }
+    }
+    
+    // Fallback: Supabase RPC
     const { data, error } = await supabase.rpc('get_question_stats')
     
     if (data && !error) {
@@ -197,6 +223,74 @@ export default function AdminSoruYonetimiPage() {
   const loadQuestions = async () => {
     setLoading(true)
     
+    // ⚡ Typesense'den soru ara (çok daha hızlı!)
+    if (isTypesenseEnabled()) {
+      try {
+        // Subject code'u al (filterSubject = subject id, subject_code lazım)
+        let subjectCode = ''
+        if (filterSubject) {
+          const subject = subjects.find(s => s.id === filterSubject)
+          subjectCode = subject?.code || ''
+        }
+        
+        const result = await searchQuestionsForAdmin({
+          grade: filterGrade,
+          subjectCode,
+          difficulty: filterDifficulty,
+          topicId: filterTopic,
+          hasImage: filterHasImage,
+          searchQuery,
+          page: currentPage,
+          pageSize
+        })
+        
+        // AdminQuestionResult → Question formatına çevir
+        const mappedQuestions: Question[] = result.questions.map(q => ({
+          id: q.question_id,
+          topic_id: q.topic_id,
+          difficulty: q.difficulty as any,
+          question_text: q.question_text,
+          question_image_url: q.image_url,
+          options: {
+            A: q.option_a,
+            B: q.option_b,
+            C: q.option_c,
+            D: q.option_d,
+            E: q.option_e
+          },
+          correct_answer: q.correct_answer as any,
+          explanation: q.explanation,
+          source: null,
+          times_answered: q.times_answered,
+          times_correct: q.times_correct,
+          created_at: new Date(q.created_at).toISOString(),
+          topic: {
+            id: q.topic_id,
+            subject_id: '',
+            grade: q.grade,
+            main_topic: q.main_topic,
+            sub_topic: q.sub_topic,
+            learning_outcome: null,
+            subject: {
+              id: '',
+              name: q.subject_name,
+              code: q.subject_code,
+              icon: null
+            }
+          }
+        }))
+        
+        setQuestions(mappedQuestions)
+        setTotalCount(result.total)
+        console.log(`⚡ Questions loaded from Typesense in ${result.duration}ms`)
+        setLoading(false)
+        return
+      } catch (error) {
+        console.error('Typesense questions error, falling back to Supabase:', error)
+      }
+    }
+    
+    // Fallback: Supabase (eski yöntem)
     // Önce topic_id'leri filtrele
     let topicIds: string[] | null = null
     

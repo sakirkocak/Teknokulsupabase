@@ -727,3 +727,233 @@ export async function getSubjectLeaderboardFast(
   }
 }
 
+
+// =====================================================
+// 📚 ADMIN SORU YÖNETİMİ
+// =====================================================
+
+export interface AdminQuestionResult {
+  question_id: string
+  topic_id: string
+  question_text: string
+  image_url: string | null
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  option_e?: string
+  correct_answer: string
+  explanation: string | null
+  difficulty: string
+  grade: number
+  subject_name: string
+  subject_code: string
+  main_topic: string
+  sub_topic: string | null
+  times_answered: number
+  times_correct: number
+  created_at: number
+}
+
+export interface AdminQuestionFilters {
+  grade?: number | ''
+  subjectCode?: string
+  difficulty?: string
+  topicId?: string
+  hasImage?: boolean
+  searchQuery?: string
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * ⚡ Admin için soru arama - Typesense'den (~50ms)
+ */
+export async function searchQuestionsForAdmin(
+  filters: AdminQuestionFilters = {}
+): Promise<{
+  questions: AdminQuestionResult[]
+  total: number
+  stats: {
+    total: number
+    easy: number
+    medium: number
+    hard: number
+    legendary: number
+    withImage: number
+    byGrade: Record<number, number>
+  }
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const {
+    grade,
+    subjectCode,
+    difficulty,
+    topicId,
+    hasImage,
+    searchQuery,
+    page = 1,
+    pageSize = 20
+  } = filters
+
+  // Filter oluştur
+  const filterParts: string[] = []
+  if (grade) filterParts.push(`grade:=${grade}`)
+  if (subjectCode) filterParts.push(`subject_code:=${subjectCode}`)
+  if (difficulty) filterParts.push(`difficulty:=${difficulty}`)
+  if (topicId) filterParts.push(`topic_id:=${topicId}`)
+  if (hasImage) filterParts.push(`image_url:!=null`)
+
+  try {
+    const result = await client
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: searchQuery || '*',
+        query_by: 'question_text,main_topic,sub_topic',
+        filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
+        sort_by: 'created_at:desc',
+        page,
+        per_page: pageSize,
+        facet_by: 'difficulty,grade,subject_name',
+        max_facet_values: 20,
+        num_typos: searchQuery ? 2 : 0
+      })
+
+    // Soruları parse et
+    const questions: AdminQuestionResult[] = (result.hits || []).map(hit => {
+      const doc = hit.document as any
+      return {
+        question_id: doc.question_id || doc.id,
+        topic_id: doc.topic_id,
+        question_text: doc.question_text,
+        image_url: doc.image_url || null,
+        option_a: doc.option_a || '',
+        option_b: doc.option_b || '',
+        option_c: doc.option_c || '',
+        option_d: doc.option_d || '',
+        option_e: doc.option_e || undefined,
+        correct_answer: doc.correct_answer,
+        explanation: doc.explanation || null,
+        difficulty: doc.difficulty,
+        grade: doc.grade,
+        subject_name: doc.subject_name,
+        subject_code: doc.subject_code,
+        main_topic: doc.main_topic,
+        sub_topic: doc.sub_topic || null,
+        times_answered: doc.times_answered || 0,
+        times_correct: doc.times_correct || 0,
+        created_at: doc.created_at || 0
+      }
+    })
+
+    // Facet'lerden istatistikleri çıkar
+    const facets = result.facet_counts || []
+    const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
+    const gradeFacet = facets.find((f: any) => f.field_name === 'grade')
+
+    const diffStats: Record<string, number> = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+    ;(difficultyFacet?.counts || []).forEach((item: any) => {
+      if (item.value in diffStats) {
+        diffStats[item.value] = item.count
+      }
+    })
+
+    const byGrade: Record<number, number> = {}
+    ;(gradeFacet?.counts || []).forEach((item: any) => {
+      byGrade[parseInt(item.value)] = item.count
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ Admin Questions (browser): ${duration}ms, ${questions.length}/${result.found} questions`)
+
+    return {
+      questions,
+      total: result.found || 0,
+      stats: {
+        total: result.found || 0,
+        easy: diffStats.easy, medium: diffStats.medium, hard: diffStats.hard, legendary: diffStats.legendary,
+        withImage: 0,
+        byGrade
+      },
+      duration
+    }
+  } catch (error) {
+    console.error('Typesense admin questions error:', error)
+    throw error
+  }
+}
+
+/**
+ * ⚡ Admin için soru istatistikleri - Typesense'den (~30ms)
+ */
+export async function getQuestionStatsFast(): Promise<{
+  total: number
+  easy: number
+  medium: number
+  hard: number
+  legendary: number
+  withImage: number
+  byGrade: Record<number, number>
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  try {
+    const [allResult, imageResult] = await Promise.all([
+      client
+        .collections(COLLECTIONS.QUESTIONS)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'question_text',
+          per_page: 0,
+          facet_by: 'difficulty,grade',
+          max_facet_values: 20
+        }),
+      client
+        .collections(COLLECTIONS.QUESTIONS)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'question_text',
+          filter_by: 'image_url:!=null',
+          per_page: 0
+        })
+    ])
+
+    const facets = allResult.facet_counts || []
+    const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
+    const gradeFacet = facets.find((f: any) => f.field_name === 'grade')
+
+    const diffStats: Record<string, number> = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+    ;(difficultyFacet?.counts || []).forEach((item: any) => {
+      if (item.value in diffStats) {
+        diffStats[item.value] = item.count
+      }
+    })
+
+    const byGrade: Record<number, number> = {}
+    ;(gradeFacet?.counts || []).forEach((item: any) => {
+      byGrade[parseInt(item.value)] = item.count
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ Question Stats (browser): ${duration}ms, total: ${allResult.found}, withImage: ${imageResult.found}`)
+
+    return {
+      total: allResult.found || 0,
+      easy: diffStats.easy, medium: diffStats.medium, hard: diffStats.hard, legendary: diffStats.legendary,
+      withImage: imageResult.found || 0,
+      byGrade,
+      duration
+    }
+  } catch (error) {
+    console.error('Typesense question stats error:', error)
+    throw error
+  }
+}
