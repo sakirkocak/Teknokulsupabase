@@ -7,20 +7,24 @@ import {
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
   ChevronRight, CheckCircle, Star, Zap, Crown,
-  ArrowLeft, Play, Target, Sparkles
+  ArrowLeft, Play, Target, Sparkles, Monitor, Palette, 
+  Music, Dumbbell, HeartPulse, Hammer
 } from 'lucide-react'
 
-const subjectMeta: Record<string, { name: string }> = {
-  'matematik': { name: 'Matematik' },
-  'turkce': { name: 'Türkçe' },
-  'fen_bilimleri': { name: 'Fen Bilimleri' },
-  'sosyal_bilgiler': { name: 'Sosyal Bilgiler' },
-  'ingilizce': { name: 'İngilizce' },
-  'fizik': { name: 'Fizik' },
-  'kimya': { name: 'Kimya' },
-  'biyoloji': { name: 'Biyoloji' },
-  'inkilap_tarihi': { name: 'İnkılap Tarihi' },
-  'din_kulturu': { name: 'Din Kültürü' },
+// ISR - 1 saat cache
+export const revalidate = 3600
+
+// Veritabanından ders bilgisini çek
+async function getSubjectInfo(subjectCode: string) {
+  const supabase = await createClient()
+  
+  const { data } = await supabase
+    .from('subjects')
+    .select('id, name, code')
+    .eq('code', subjectCode)
+    .single()
+  
+  return data
 }
 
 const subjectIcons: Record<string, React.ReactNode> = {
@@ -34,6 +38,12 @@ const subjectIcons: Record<string, React.ReactNode> = {
   'biyoloji': <Leaf className="w-6 h-6" />,
   'inkilap_tarihi': <History className="w-6 h-6" />,
   'din_kulturu': <BookOpen className="w-6 h-6" />,
+  'bilisim': <Monitor className="w-6 h-6" />,
+  'gorsel_sanatlar': <Palette className="w-6 h-6" />,
+  'muzik': <Music className="w-6 h-6" />,
+  'beden_egitimi': <Dumbbell className="w-6 h-6" />,
+  'saglik_bilgisi': <HeartPulse className="w-6 h-6" />,
+  'teknoloji_tasarim': <Hammer className="w-6 h-6" />,
 }
 
 const subjectColors: Record<string, { gradient: string; light: string; text: string }> = {
@@ -47,7 +57,16 @@ const subjectColors: Record<string, { gradient: string; light: string; text: str
   'biyoloji': { gradient: 'from-emerald-500 to-teal-600', light: 'bg-emerald-50', text: 'text-emerald-600' },
   'inkilap_tarihi': { gradient: 'from-amber-500 to-orange-600', light: 'bg-amber-50', text: 'text-amber-600' },
   'din_kulturu': { gradient: 'from-teal-500 to-cyan-600', light: 'bg-teal-50', text: 'text-teal-600' },
+  'bilisim': { gradient: 'from-cyan-500 to-blue-600', light: 'bg-cyan-50', text: 'text-cyan-600' },
+  'gorsel_sanatlar': { gradient: 'from-fuchsia-500 to-pink-600', light: 'bg-fuchsia-50', text: 'text-fuchsia-600' },
+  'muzik': { gradient: 'from-violet-500 to-purple-600', light: 'bg-violet-50', text: 'text-violet-600' },
+  'beden_egitimi': { gradient: 'from-lime-500 to-green-600', light: 'bg-lime-50', text: 'text-lime-600' },
+  'saglik_bilgisi': { gradient: 'from-rose-500 to-red-600', light: 'bg-rose-50', text: 'text-rose-600' },
+  'teknoloji_tasarim': { gradient: 'from-slate-500 to-gray-600', light: 'bg-slate-50', text: 'text-slate-600' },
 }
+
+// Varsayılan renkler
+const defaultColors = { gradient: 'from-gray-500 to-gray-600', light: 'bg-gray-50', text: 'text-gray-600' }
 
 const difficultyConfig = {
   easy: { label: 'Kolay', color: 'bg-green-100 text-green-700', icon: CheckCircle },
@@ -74,26 +93,32 @@ function parseGrade(gradeParam: string): number | null {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { subject, grade: gradeParam } = await params
-  const meta = subjectMeta[subject]
   const grade = parseGrade(gradeParam)
   
-  if (!meta || !grade) {
+  if (!grade) {
     return { title: 'Sayfa Bulunamadı' }
+  }
+  
+  // Veritabanından ders bilgisini çek
+  const subjectInfo = await getSubjectInfo(subject)
+  
+  if (!subjectInfo) {
+    return { title: 'Ders Bulunamadı' }
   }
   
   const isLGS = grade === 8
   const isYKS = grade === 12
   const examLabel = isLGS ? ' (LGS)' : isYKS ? ' (YKS)' : ''
   
-  const title = `${grade}. Sınıf ${meta.name} Soruları${examLabel} | Teknokul`
-  const description = `${grade}. sınıf ${meta.name} soruları - MEB müfredatına uygun, zorluk seviyelerine göre ayrılmış kapsamlı soru bankası.${isLGS ? ' LGS hazırlık soruları.' : ''}${isYKS ? ' YKS hazırlık soruları.' : ''}`
+  const title = `${grade}. Sınıf ${subjectInfo.name} Soruları${examLabel} | Teknokul`
+  const description = `${grade}. sınıf ${subjectInfo.name} soruları - MEB müfredatına uygun, zorluk seviyelerine göre ayrılmış kapsamlı soru bankası.${isLGS ? ' LGS hazırlık soruları.' : ''}${isYKS ? ' YKS hazırlık soruları.' : ''}`
   
   return {
     title,
     description,
     keywords: [
-      `${grade}. sınıf ${meta.name.toLowerCase()} soruları`,
-      `${meta.name.toLowerCase()} test`,
+      `${grade}. sınıf ${subjectInfo.name.toLowerCase()} soruları`,
+      `${subjectInfo.name.toLowerCase()} test`,
       isLGS ? 'LGS soruları' : '',
       isYKS ? 'YKS soruları' : '',
     ].filter(Boolean),
@@ -110,13 +135,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  const subjects = Object.keys(subjectMeta)
-  const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  // Popüler kombinasyonları statik olarak oluştur
+  const popularSubjects = [
+    'matematik', 'turkce', 'fen_bilimleri', 'sosyal_bilgiler', 
+    'ingilizce', 'fizik', 'kimya', 'biyoloji', 
+    'inkilap_tarihi', 'din_kulturu'
+  ]
+  const popularGrades = [5, 6, 7, 8, 9, 10, 11, 12] // En popüler sınıflar
   
   const params: { subject: string; grade: string }[] = []
   
-  subjects.forEach((subject) => {
-    grades.forEach((grade) => {
+  popularSubjects.forEach((subject) => {
+    popularGrades.forEach((grade) => {
       params.push({ subject, grade: `${grade}-sinif` })
     })
   })
@@ -195,10 +225,9 @@ async function getQuestionsData(subjectCode: string, grade: number) {
 
 export default async function GradePage({ params }: Props) {
   const { subject, grade: gradeParam } = await params
-  const meta = subjectMeta[subject]
   const grade = parseGrade(gradeParam)
   
-  if (!meta || !grade) {
+  if (!grade) {
     notFound()
   }
   
@@ -208,7 +237,10 @@ export default async function GradePage({ params }: Props) {
     notFound()
   }
   
-  const colors = subjectColors[subject] || { gradient: 'from-gray-500 to-gray-600', light: 'bg-gray-50', text: 'text-gray-600' }
+  // Subject bilgisi artık data içinden geliyor
+  const subjectName = data.subject.name
+  
+  const colors = subjectColors[subject] || defaultColors
   const icon = subjectIcons[subject] || <BookOpen className="w-6 h-6" />
   const baseUrl = 'https://www.teknokul.com.tr'
   
@@ -234,14 +266,14 @@ export default async function GradePage({ params }: Props) {
         items={[
           { name: 'Ana Sayfa', url: '/' },
           { name: 'Soru Bankası', url: '/sorular' },
-          { name: meta.name, url: `/sorular/${subject}` },
+          { name: subjectName, url: `/sorular/${subject}` },
           { name: `${grade}. Sınıf`, url: `/sorular/${subject}/${grade}-sinif` },
         ]}
       />
       <QuizSchema
-        name={`${grade}. Sınıf ${meta.name} Soruları${examLabel}`}
-        description={`${grade}. sınıf ${meta.name} soruları - MEB müfredatına uygun ${data.totalCount} soru`}
-        subject={meta.name}
+        name={`${grade}. Sınıf ${subjectName} Soruları${examLabel}`}
+        description={`${grade}. sınıf ${subjectName} soruları - MEB müfredatına uygun ${data.totalCount} soru`}
+        subject={subjectName}
         grade={grade}
         questionCount={data.totalCount}
         questions={quizQuestions}
@@ -257,7 +289,7 @@ export default async function GradePage({ params }: Props) {
             <ChevronRight className="w-4 h-4" />
             <Link href="/sorular" className="hover:text-white transition-colors">Soru Bankası</Link>
             <ChevronRight className="w-4 h-4" />
-            <Link href={`/sorular/${subject}`} className="hover:text-white transition-colors">{meta.name}</Link>
+            <Link href={`/sorular/${subject}`} className="hover:text-white transition-colors">{subjectName}</Link>
             <ChevronRight className="w-4 h-4" />
             <span className="text-white font-medium">{grade}. Sınıf</span>
           </nav>
@@ -270,7 +302,7 @@ export default async function GradePage({ params }: Props) {
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold">
-                    {grade}. Sınıf {meta.name}
+                    {grade}. Sınıf {subjectName}
                   </h1>
                   {(isLGS || isYKS) && (
                     <span className={`px-3 py-1 ${isLGS ? 'bg-orange-500' : 'bg-purple-500'} text-white text-sm font-semibold rounded-full`}>
@@ -303,7 +335,7 @@ export default async function GradePage({ params }: Props) {
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          {meta.name} - Tüm Sınıflara Dön
+          {subjectName} - Tüm Sınıflara Dön
         </Link>
 
         {/* Zorluk Dağılımı */}
@@ -433,7 +465,7 @@ export default async function GradePage({ params }: Props) {
                 href={`/sorular/${subject}/${grade - 1}-sinif`}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
               >
-                ← {grade - 1}. Sınıf {meta.name}
+                ← {grade - 1}. Sınıf {subjectName}
               </Link>
             )}
             {grade < 12 && (
@@ -441,7 +473,7 @@ export default async function GradePage({ params }: Props) {
                 href={`/sorular/${subject}/${grade + 1}-sinif`}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
               >
-                {grade + 1}. Sınıf {meta.name} →
+                {grade + 1}. Sınıf {subjectName} →
               </Link>
             )}
             <Link
