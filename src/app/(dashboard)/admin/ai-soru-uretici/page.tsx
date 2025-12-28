@@ -326,10 +326,11 @@ export default function AIQuestionGeneratorPage() {
     setSaving(true)
     let successCount = 0
     let failedCount = 0
+    const savedQuestionIds: string[] = []
 
     try {
       for (const question of generatedQuestions) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('questions')
           .insert({
             topic_id: selectedTopic,
@@ -342,12 +343,32 @@ export default function AIQuestionGeneratorPage() {
             is_active: true,
             created_by: profile?.id
           })
+          .select('id')
+          .single()
 
         if (error) {
           console.error('Soru kaydetme hatası:', error)
           failedCount++
         } else {
           successCount++
+          if (data?.id) {
+            savedQuestionIds.push(data.id)
+          }
+        }
+      }
+
+      // 🔄 Typesense'e otomatik senkronize et
+      if (savedQuestionIds.length > 0) {
+        try {
+          await fetch('/api/admin/questions/sync', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questionIds: savedQuestionIds })
+          })
+          console.log(`✅ ${savedQuestionIds.length} soru Typesense'e senkronize edildi`)
+        } catch (syncError) {
+          console.error('Typesense sync hatası:', syncError)
+          // Sync hatası kritik değil, devam et
         }
       }
 

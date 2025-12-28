@@ -352,10 +352,24 @@ export default function ImageQuestionGeneratorPage() {
           is_active: true,
           created_by: profile?.id
         })
-        .select()
+        .select('id')
         .single()
 
       if (error) throw error
+
+      // 🔄 Typesense'e otomatik senkronize et
+      if (data?.id) {
+        try {
+          await fetch('/api/admin/questions/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questionId: data.id, action: 'upsert' })
+          })
+          console.log('✅ Soru Typesense\'e senkronize edildi')
+        } catch (syncError) {
+          console.error('Typesense sync hatası:', syncError)
+        }
+      }
 
       setSuccessMessage('Soru başarıyla kaydedildi!')
       setTimeout(() => setSuccessMessage(null), 3000)
@@ -495,7 +509,7 @@ export default function ImageQuestionGeneratorPage() {
     if (!question || question.status !== 'completed') return
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('questions')
         .insert({
           topic_id: selectedTopic,
@@ -508,8 +522,23 @@ export default function ImageQuestionGeneratorPage() {
           is_active: true,
           created_by: profile?.id
         })
+        .select('id')
+        .single()
 
       if (error) throw error
+
+      // 🔄 Typesense'e otomatik senkronize et
+      if (data?.id) {
+        try {
+          await fetch('/api/admin/questions/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questionId: data.id, action: 'upsert' })
+          })
+        } catch (syncError) {
+          console.error('Typesense sync hatası:', syncError)
+        }
+      }
 
       setBatchQuestions(prev => prev.map((q, idx) => 
         idx === index ? { ...q, status: 'saved' as const } : q
