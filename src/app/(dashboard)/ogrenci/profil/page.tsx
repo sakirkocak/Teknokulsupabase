@@ -73,9 +73,9 @@ function StudentProfileContent() {
     async function loadCities() {
       const { data } = await supabase
         .from('turkey_cities')
-        .select('*')
+        .select('id, name') // OPTIMIZE: Sadece gerekli alanlar
         .order('name')
-      if (data) setCities(data)
+      if (data) setCities(data as any)
     }
     loadCities()
   }, [])
@@ -89,10 +89,10 @@ function StudentProfileContent() {
       }
       const { data } = await supabase
         .from('turkey_districts')
-        .select('*')
+        .select('id, name, city_id') // OPTIMIZE: Sadece gerekli alanlar
         .eq('city_id', formData.city_id)
         .order('name')
-      if (data) setDistricts(data)
+      if (data) setDistricts(data as any)
     }
     loadDistricts()
   }, [formData.city_id])

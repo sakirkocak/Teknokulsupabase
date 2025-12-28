@@ -120,7 +120,7 @@ export default function StudentMessagesPage() {
 
     const { data } = await supabase
       .from('messages')
-      .select('*')
+      .select('id, content, sender_id, receiver_id, created_at') // OPTIMIZE: Sadece gerekli alanlar
       .or(`and(sender_id.eq.${profile.id},receiver_id.eq.${coach.profile_id}),and(sender_id.eq.${coach.profile_id},receiver_id.eq.${profile.id})`)
       .order('created_at', { ascending: true })
 
