@@ -15,6 +15,7 @@ import { getInitials } from '@/lib/utils'
 import { testimonials, activityMessages, universities, demoCoaches } from '@/lib/demoData'
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
 import { getStatsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
+import { MagicSearchHero } from '@/components/magic-search'
 import { 
   GraduationCap, 
   Users, 
@@ -1143,6 +1144,9 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
+
+      {/* 🔮 SİHİRLİ SORU ARAMA - TYPESENSE */}
+      <MagicSearchHero />
 
       {/* HIZLI BAŞLA KARTLARI */}
       <section className="py-8 px-4">
