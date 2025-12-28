@@ -64,6 +64,19 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
   const [stats, setStats] = useState(getGuestStats())
   const [showMembershipPrompt, setShowMembershipPrompt] = useState(false)
   const [membershipType, setMembershipType] = useState<'soft' | 'hard'>('soft')
+  const [user, setUser] = useState<any>(null)
+  const [earnedXP, setEarnedXP] = useState(0)
+  
+  const supabase = createClient()
+  
+  // Auth durumunu kontrol et
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    checkUser()
+  }, [])
 
   // Soru yükle (Supabase'den - sadece bu endpoint)
   const loadQuestion = useCallback(async (id: string) => {
@@ -127,16 +140,12 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
   }
 
   // Cevabı kontrol et
-  const handleSubmitAnswer = () => {
+  const handleSubmitAnswer = async () => {
     if (!selectedAnswer || !question) return
 
     const correct = selectedAnswer === question.correct_answer
     setIsCorrect(correct)
     setShowResult(true)
-
-    // Guest progress kaydet
-    const newProgress = recordAnswer(question.id, correct)
-    setStats(getGuestStats())
 
     // Doğruysa confetti
     if (correct) {
@@ -147,16 +156,58 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
       })
     }
 
-    // Membership prompt kontrolü
-    setTimeout(() => {
-      if (shouldShowHardPrompt()) {
-        setMembershipType('hard')
-        setShowMembershipPrompt(true)
-      } else if (shouldShowSoftPrompt()) {
-        setMembershipType('soft')
-        setShowMembershipPrompt(true)
+    // Login olan kullanıcı için gerçek puan kaydet
+    if (user) {
+      try {
+        // XP hesapla
+        const baseXP = correct ? 10 : 2
+        const difficultyBonus = question.difficulty === 'hard' ? 5 : question.difficulty === 'legendary' ? 10 : 0
+        const xp = baseXP + difficultyBonus
+        setEarnedXP(xp)
+        
+        // user_answers tablosuna kaydet
+        await supabase.from('user_answers').insert({
+          user_id: user.id,
+          question_id: question.id,
+          selected_answer: selectedAnswer,
+          is_correct: correct,
+          time_spent: 0 // Drawer'da timer yok
+        })
+        
+        // Puan güncelle (API üzerinden)
+        await fetch('/api/gamification/add-xp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            xp,
+            source: 'quick_solve',
+            questionId: question.id,
+            isCorrect: correct
+          })
+        })
+        
+        console.log(`✅ XP earned: ${xp}`)
+      } catch (error) {
+        console.error('Failed to save answer:', error)
       }
-    }, 1500)
+    } else {
+      // Guest için local storage'a kaydet
+      recordAnswer(question.id, correct)
+      setStats(getGuestStats())
+      setEarnedXP(correct ? 10 : 2) // Guest için de göster ama kaydetme
+      
+      // Membership prompt kontrolü (sadece guest için)
+      setTimeout(() => {
+        if (shouldShowHardPrompt()) {
+          setMembershipType('hard')
+          setShowMembershipPrompt(true)
+        } else if (shouldShowSoftPrompt()) {
+          setMembershipType('soft')
+          setShowMembershipPrompt(true)
+        }
+      }, 1500)
+    }
   }
 
   // Drawer'ı kapat
@@ -371,7 +422,9 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
                           </div>
                           <div>
                             <p className="font-semibold text-green-800">Harika! Doğru cevap! 🎉</p>
-                            <p className="text-sm text-green-700">+10 XP kazandın</p>
+                            <p className="text-sm text-green-700">
+                              {user ? `+${earnedXP} XP kazandın` : 'Kayıt ol ve XP kazan!'}
+                            </p>
                           </div>
                         </>
                       ) : (
@@ -383,6 +436,7 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
                             <p className="font-semibold text-red-800">Yanlış cevap</p>
                             <p className="text-sm text-red-700">
                               Doğru cevap: {question.correct_answer}
+                              {user && ` (+${earnedXP} XP)`}
                             </p>
                           </div>
                         </>
@@ -430,13 +484,15 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
         </div>
       </motion.div>
 
-      {/* Membership Prompt */}
-      <MembershipPrompt
-        isOpen={showMembershipPrompt}
-        type={membershipType}
-        stats={stats}
-        onClose={handleMembershipDismiss}
-      />
+      {/* Membership Prompt - Sadece guest kullanıcılar için */}
+      {!user && (
+        <MembershipPrompt
+          isOpen={showMembershipPrompt}
+          type={membershipType}
+          stats={stats}
+          onClose={handleMembershipDismiss}
+        />
+      )}
     </>
   )
 }

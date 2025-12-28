@@ -6,10 +6,11 @@ import {
   Search, Sparkles, Zap, BookOpen, Star, 
   TrendingUp, ArrowRight, Loader2, X,
   Calculator, Microscope, Globe, Languages,
-  ChevronRight
+  ChevronRight, ChevronDown, GraduationCap
 } from 'lucide-react'
 import { searchQuestionsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
 import QuestionSolveDrawer from './QuestionSolveDrawer'
+import MathRenderer from '@/components/MathRenderer'
 
 interface SearchResult {
   question_id: string
@@ -46,13 +47,16 @@ export default function MagicSearchHero() {
   const [isFocused, setIsFocused] = useState(false)
   const [selectedQuestion, setSelectedQuestion] = useState<SearchResult | null>(null)
   const [showDrawer, setShowDrawer] = useState(false)
+  const [selectedGrade, setSelectedGrade] = useState<number | null>(null) // null = tüm sınıflar
+  const [showGradeDropdown, setShowGradeDropdown] = useState(false)
   
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const gradeDropdownRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout>()
 
   // Typesense ile arama
-  const performSearch = useCallback(async (searchQuery: string) => {
+  const performSearch = useCallback(async (searchQuery: string, grade: number | null) => {
     if (!searchQuery || searchQuery.length < 2) {
       setResults([])
       setLoading(false)
@@ -69,10 +73,11 @@ export default function MagicSearchHero() {
 
     try {
       const { results: searchResults, duration } = await searchQuestionsFast(searchQuery, {
-        limit: 8
+        limit: 8,
+        grade: grade || undefined // Sınıf filtresi ekle
       })
       
-      console.log(`⚡ Magic Search: ${duration}ms, ${searchResults.length} results`)
+      console.log(`⚡ Magic Search: ${duration}ms, ${searchResults.length} results, grade: ${grade || 'all'}`)
       setResults(searchResults)
     } catch (error) {
       console.error('Search error:', error)
@@ -91,7 +96,7 @@ export default function MagicSearchHero() {
     if (query.length >= 2) {
       setLoading(true)
       timeoutRef.current = setTimeout(() => {
-        performSearch(query)
+        performSearch(query, selectedGrade)
       }, 200) // 200ms debounce - çok hızlı!
     } else {
       setResults([])
@@ -103,7 +108,18 @@ export default function MagicSearchHero() {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [query, performSearch])
+  }, [query, selectedGrade, performSearch])
+  
+  // Grade dropdown dışına tıklanınca kapat
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (gradeDropdownRef.current && !gradeDropdownRef.current.contains(event.target as Node)) {
+        setShowGradeDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   // Click outside to close
   useEffect(() => {
@@ -176,11 +192,63 @@ export default function MagicSearchHero() {
               {/* Input Container */}
               <div className="relative bg-white rounded-2xl shadow-xl border border-gray-100">
                 <div className="flex items-center">
-                  <div className="pl-5">
+                  {/* Sınıf Seçici */}
+                  <div ref={gradeDropdownRef} className="relative pl-3">
+                    <button
+                      onClick={() => setShowGradeDropdown(!showGradeDropdown)}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition-colors text-sm font-medium"
+                    >
+                      <GraduationCap className="w-4 h-4" />
+                      <span>{selectedGrade ? `${selectedGrade}. Sınıf` : 'Tümü'}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${showGradeDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {/* Grade Dropdown */}
+                    <AnimatePresence>
+                      {showGradeDropdown && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute top-full left-0 mt-2 w-36 bg-white rounded-xl shadow-xl border border-gray-200 z-[100] overflow-hidden max-h-80 overflow-y-auto"
+                        >
+                          <button
+                            onClick={() => {
+                              setSelectedGrade(null)
+                              setShowGradeDropdown(false)
+                            }}
+                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-indigo-50 transition-colors ${
+                              selectedGrade === null ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            Tüm Sınıflar
+                          </button>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(grade => (
+                            <button
+                              key={grade}
+                              onClick={() => {
+                                setSelectedGrade(grade)
+                                setShowGradeDropdown(false)
+                              }}
+                              className={`w-full px-4 py-2.5 text-left text-sm hover:bg-indigo-50 transition-colors ${
+                                selectedGrade === grade ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-gray-700'
+                              }`}
+                            >
+                              {grade}. Sınıf
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  
+                  <div className="w-px h-8 bg-gray-200 mx-2" />
+                  
+                  <div className="pl-2">
                     {loading ? (
-                      <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" />
                     ) : (
-                      <Search className="w-6 h-6 text-gray-400" />
+                      <Search className="w-5 h-5 text-gray-400" />
                     )}
                   </div>
                   <input
@@ -196,8 +264,8 @@ export default function MagicSearchHero() {
                       setIsOpen(true)
                     }}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="Konu ara... üçgenler, newton, hücre, kesirler..."
-                    className="flex-1 px-4 py-5 text-lg bg-transparent border-none focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-400"
+                    placeholder={selectedGrade ? `${selectedGrade}. sınıf konuları ara...` : 'Konu ara... fotosentez, üçgenler, newton...'}
+                    className="flex-1 px-3 py-5 text-lg bg-transparent border-none focus:outline-none focus:ring-0 text-gray-900 placeholder-gray-400"
                   />
                   {query && (
                     <button
@@ -254,10 +322,9 @@ export default function MagicSearchHero() {
                                     <BookOpen className="w-4 h-4 text-indigo-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p 
-                                      className="text-gray-800 line-clamp-2 text-sm"
-                                      dangerouslySetInnerHTML={{ __html: result.highlight }}
-                                    />
+                                    <div className="text-gray-800 line-clamp-2 text-sm">
+                                      <MathRenderer text={result.question_text} />
+                                    </div>
                                     <div className="flex items-center flex-wrap gap-2 mt-2">
                                       <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                                         {result.subject_name}

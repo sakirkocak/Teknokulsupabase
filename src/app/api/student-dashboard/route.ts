@@ -161,10 +161,21 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Zayıf konulardan soru önerileri getir
+// Zayıf konulardan soru önerileri getir (çözülmüş soruları hariç tut)
 async function getRecommendedQuestions(studentId: string) {
   try {
-    // Önce öğrencinin zayıf konularını bul
+    const supabase = await createClient()
+    
+    // 1. Kullanıcının daha önce çözdüğü soruları al
+    const { data: answeredQuestions } = await supabase
+      .from('user_answers')
+      .select('question_id')
+      .eq('user_id', studentId)
+      .limit(500) // Son 500 cevabı kontrol et
+    
+    const answeredIds = answeredQuestions?.map(a => a.question_id) || []
+    
+    // 2. Öğrencinin zayıf konularını bul
     const progressResult = await typesenseClient.collections(COLLECTIONS.STUDENT_TOPIC_PROGRESS).documents().search({
       q: '*',
       query_by: 'subject_name',
@@ -175,27 +186,45 @@ async function getRecommendedQuestions(studentId: string) {
 
     const weakTopicIds = progressResult.hits?.map(h => (h.document as any).topic_id) || []
 
+    // 3. Filter oluştur - çözülmüş soruları hariç tut
+    let filterBy = ''
+    if (answeredIds.length > 0) {
+      // Typesense'de NOT IN yerine tüm soruları alıp JS'te filtreliyoruz
+      // Çünkü Typesense id:[...]:! syntax'ını tam desteklemiyor
+    }
+
     if (weakTopicIds.length === 0) {
       // Zayıf konu yoksa popüler sorular getir
       const randomResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
         q: '*',
         query_by: 'question_text',
         sort_by: 'times_answered:desc',
-        per_page: 5
+        per_page: 100 // Daha fazla çek, sonra filtrele
       })
-      return randomResult.hits?.map(h => h.document) || []
+      
+      // Çözülmüş soruları JS'te filtrele
+      const allQuestions = randomResult.hits?.map(h => h.document as any) || []
+      const answeredIdSet = new Set(answeredIds)
+      const filteredQuestions = allQuestions.filter(q => !answeredIdSet.has(q.question_id))
+      
+      return filteredQuestions.slice(0, 20)
     }
 
-    // Zayıf konulardan sorular getir
+    // Zayıf konulardan sorular getir (daha fazla çek, sonra filtrele)
     const questionsResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
       q: '*',
       query_by: 'question_text',
       filter_by: `topic_id:[${weakTopicIds.join(',')}]`,
       sort_by: 'times_answered:desc',
-      per_page: 5
+      per_page: 100 // Daha fazla çek
     })
 
-    return questionsResult.hits?.map(h => h.document) || []
+    // Çözülmüş soruları JS'te filtrele
+    const allQuestions = questionsResult.hits?.map(h => h.document as any) || []
+    const answeredIdSet = new Set(answeredIds)
+    const filteredQuestions = allQuestions.filter(q => !answeredIdSet.has(q.question_id))
+
+    return filteredQuestions.slice(0, 20)
 
   } catch (error) {
     console.error('Error fetching recommended questions:', error)

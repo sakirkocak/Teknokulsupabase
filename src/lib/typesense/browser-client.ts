@@ -496,6 +496,48 @@ export async function getSchoolsFast(districtId: string): Promise<{
 }
 
 /**
+ * ⚡ Sınıf ve ders bazında soru sayılarını getir - Typesense'den (~30ms)
+ */
+export async function getQuestionCountsByGradeFast(grade: number): Promise<{
+  bySubject: Record<string, number>
+  total: number
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  try {
+    const result = await client
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        filter_by: `grade:=${grade}`,
+        per_page: 0,
+        facet_by: 'subject_name',
+        max_facet_values: 50
+      })
+
+    const facets = result.facet_counts || []
+    const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
+    
+    const bySubject: Record<string, number> = {}
+    ;(subjectFacet?.counts || []).forEach((item: any) => {
+      bySubject[item.value] = item.count
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ Question counts (browser): ${duration}ms, grade ${grade}, ${Object.keys(bySubject).length} subjects`)
+
+    return { bySubject, total: result.found || 0, duration }
+  } catch (error) {
+    console.error('Typesense question counts error:', error)
+    throw error
+  }
+}
+
+/**
  * ⚡ Okul arama (autocomplete) - Typesense'den (~15ms)
  */
 export async function searchSchoolsFast(

@@ -35,8 +35,11 @@ import {
   Award,
   ChevronUp,
   ChevronDown,
-  Minus
+  Minus,
+  Play
 } from 'lucide-react'
+import { QuestionSolveDrawer } from '@/components/magic-search'
+import RecommendedQuizMode from '@/components/RecommendedQuizMode'
 import { useGamification } from '@/hooks/useGamification'
 
 // Typesense Dashboard Data Interface
@@ -79,6 +82,13 @@ export default function StudentDashboard() {
   // Typesense Dashboard Data
   const [typesenseData, setTypesenseData] = useState<TypesenseDashboardData | null>(null)
   const [typesenseLoading, setTypesenseLoading] = useState(true)
+  
+  // Quick Solve Drawer
+  const [showQuickSolve, setShowQuickSolve] = useState(false)
+  const [quickSolveQuestionId, setQuickSolveQuestionId] = useState<string | null>(null)
+  
+  // Recommended Quiz Mode
+  const [showRecommendedQuiz, setShowRecommendedQuiz] = useState(false)
   
   // AI Koç entegrasyonu - birleşik analiz verileri
   const [aiCoachData, setAiCoachData] = useState<{
@@ -905,23 +915,31 @@ export default function StudentDashboard() {
 
             {/* Sana Özel Soru Önerileri */}
             {typesenseData?.recommendedQuestions && typesenseData.recommendedQuestions.length > 0 && (
-              <div className="card overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 text-white">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-5 h-5" />
-                    <h3 className="font-semibold">Sana Özel Sorular</h3>
+              <button 
+                onClick={() => setShowRecommendedQuiz(true)}
+                className="card overflow-hidden w-full text-left hover:shadow-lg transition-shadow cursor-pointer group"
+              >
+                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 text-white group-hover:from-blue-600 group-hover:to-indigo-600 transition-all">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-5 h-5" />
+                      <h3 className="font-semibold">Sana Özel Sorular</h3>
+                    </div>
+                    <div className="flex items-center gap-1 px-2 py-1 bg-white/20 rounded-lg text-sm">
+                      <Play className="w-4 h-4" />
+                      <span>{typesenseData.recommendedQuestions.length} soru</span>
+                    </div>
                   </div>
-                  <p className="text-xs text-blue-100 mt-1">Zayıf konularından seçildi</p>
+                  <p className="text-xs text-blue-100 mt-1">Zayıf konularından seçildi • Tıkla ve hemen çöz!</p>
                 </div>
                 <div className="p-4">
                   <div className="space-y-2">
                     {typesenseData.recommendedQuestions.slice(0, 3).map((question: any, index: number) => (
-                      <Link 
+                      <div
                         key={question.question_id || index}
-                        href={`/ogrenci/soru-bankasi?questionId=${question.question_id}`}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 transition-colors group"
+                        className="flex items-center gap-3 p-2 rounded-lg bg-surface-50"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                        <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-medium">
                           {index + 1}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -944,19 +962,16 @@ export default function StudentDashboard() {
                             )}
                           </div>
                         </div>
-                        <ArrowRight className="w-4 h-4 text-surface-400 group-hover:text-blue-500" />
-                      </Link>
+                        <ArrowRight className="w-4 h-4 text-surface-400" />
+                      </div>
                     ))}
                   </div>
-                  <Link 
-                    href="/ogrenci/soru-bankasi" 
-                    className="mt-3 flex items-center justify-center gap-2 w-full p-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm font-medium hover:from-blue-600 hover:to-indigo-600 transition-all"
-                  >
+                  <div className="mt-3 flex items-center justify-center gap-2 w-full p-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg text-sm font-medium group-hover:from-blue-600 group-hover:to-indigo-600 transition-all">
                     <Zap className="w-4 h-4" />
-                    Tümünü Çöz
-                  </Link>
+                    Hemen Başla ve XP Kazan!
+                  </div>
                 </div>
-              </div>
+              </button>
             )}
 
             {/* Quick Stats - Zenginleştirilmiş */}
@@ -1055,6 +1070,30 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+      
+      {/* Quick Solve Drawer */}
+      <QuestionSolveDrawer
+        isOpen={showQuickSolve}
+        onClose={() => {
+          setShowQuickSolve(false)
+          setQuickSolveQuestionId(null)
+        }}
+        questionId={quickSolveQuestionId}
+      />
+      
+      {/* Recommended Quiz Mode - Tam Ekran */}
+      {profile?.id && typesenseData?.recommendedQuestions && (
+        <RecommendedQuizMode
+          isOpen={showRecommendedQuiz}
+          onClose={() => {
+            setShowRecommendedQuiz(false)
+            // Verileri yenile
+            loadTypesenseData()
+          }}
+          questions={typesenseData.recommendedQuestions}
+          userId={profile.id}
+        />
+      )}
     </DashboardLayout>
   )
 }

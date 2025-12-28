@@ -14,7 +14,7 @@ import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
 import { testimonials, activityMessages, universities, demoCoaches } from '@/lib/demoData'
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
-import { getStatsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
+import { getStatsFast, isTypesenseEnabled, getQuestionCountsByGradeFast } from '@/lib/typesense/browser-client'
 import { MagicSearchHero } from '@/components/magic-search'
 import { 
   GraduationCap, 
@@ -500,7 +500,7 @@ export default function HomePage() {
     window.location.href = `/hizli-coz?${params.toString()}`
   }
 
-  // Soru sayılarını yükle - PARALEL sorgular ile hızlı
+  // Soru sayılarını yükle - ⚡ TYPESENSE ile tek sorgu!
   async function loadSubjectQuestionCounts(subjectsToCount: {id: string, name: string}[]) {
     if (!subjectsToCount || subjectsToCount.length === 0) {
       setSubjectQuestionCounts({})
@@ -510,28 +510,44 @@ export default function HomePage() {
     setSubjectCountsLoading(true)
     
     try {
-      // Tüm derslerin soru sayılarını PARALEL olarak çek
-      const countPromises = subjectsToCount.map(async (subject) => {
-        const { count } = await supabase
-          .from('questions')
-          .select('id', { count: 'exact', head: true })
-          .eq('topic.subject_id', subject.id)
-          .eq('topic.grade', selectedGrade)
-          .eq('is_active', true)
+      // ⚡ Typesense ile tek sorguda tüm sınıfın soru sayılarını al
+      if (isTypesenseEnabled()) {
+        const { bySubject, duration } = await getQuestionCountsByGradeFast(selectedGrade)
+        console.log(`⚡ Subject counts from Typesense: ${duration}ms`)
         
-        return { id: subject.id, name: subject.name, count: count || 0 }
-      })
+        // Ders adı bazlı map oluştur (Typesense subject_name ile döner)
+        const counts: Record<string, number> = {}
+        subjectsToCount.forEach(subject => {
+          // Hem ID hem isim bazlı ekle
+          const count = bySubject[subject.name] || 0
+          counts[subject.id] = count
+          counts[subject.name] = count
+        })
+        
+        setSubjectQuestionCounts(counts)
+      } else {
+        // Fallback: Supabase ile paralel sorgular
+        const countPromises = subjectsToCount.map(async (subject) => {
+          const { count } = await supabase
+            .from('questions')
+            .select('id', { count: 'exact', head: true })
+            .eq('topic.subject_id', subject.id)
+            .eq('topic.grade', selectedGrade)
+            .eq('is_active', true)
+          
+          return { id: subject.id, name: subject.name, count: count || 0 }
+        })
 
-      const results = await Promise.all(countPromises)
-      
-      // ID bazlı ve isim bazlı map oluştur
-      const counts: Record<string, number> = {}
-      results.forEach(r => {
-        counts[r.id] = r.count
-        counts[r.name] = r.count
-      })
-      
-      setSubjectQuestionCounts(counts)
+        const results = await Promise.all(countPromises)
+        
+        const counts: Record<string, number> = {}
+        results.forEach(r => {
+          counts[r.id] = r.count
+          counts[r.name] = r.count
+        })
+        
+        setSubjectQuestionCounts(counts)
+      }
     } catch (error) {
       console.error('Soru sayıları yüklenirken hata:', error)
     } finally {
