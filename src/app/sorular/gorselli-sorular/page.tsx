@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
+import { QuestionText, OptionText } from '@/components/QuestionCard'
 import { 
   ChevronRight, ImageIcon, Play, ArrowLeft, 
   Star, CheckCircle, Zap, Crown, BarChart3, Table2
@@ -89,9 +90,16 @@ async function getImageQuestionsFromTypesense(): Promise<{
       return {
         id: doc.question_id || doc.id,
         question_text: doc.question_text || '',
-        options: { A: '', B: '', C: '', D: '' },
-        correct_answer: '',
+        options: { 
+          A: doc.option_a || '', 
+          B: doc.option_b || '', 
+          C: doc.option_c || '', 
+          D: doc.option_d || '',
+          E: doc.option_e || ''
+        },
+        correct_answer: doc.correct_answer || '',
         difficulty: doc.difficulty || 'medium',
+        question_image_url: doc.image_url || doc.question_image_url || '',
         times_answered: timesAnswered,
         times_correct: timesCorrect,
         success_rate: doc.success_rate || (timesAnswered > 0 ? Math.round((timesCorrect / timesAnswered) * 100) : 0),
@@ -393,9 +401,10 @@ export default async function GorselliSorularPage() {
                     </div>
                   )}
                   
-                  <p className="text-gray-800 mb-4 line-clamp-2">
-                    {question.question_text}
-                  </p>
+                  <QuestionText 
+                    text={question.question_text} 
+                    className="text-gray-800 mb-4 line-clamp-2" 
+                  />
                   
                   {question.options && Object.keys(question.options).length > 0 && (
                     <div className="grid grid-cols-2 gap-2">
@@ -407,7 +416,7 @@ export default async function GorselliSorularPage() {
                           <span className="w-5 h-5 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
                             {key}
                           </span>
-                          <span className="text-gray-700 line-clamp-1 text-xs">{value}</span>
+                          <OptionText text={value} className="text-gray-700 line-clamp-1 text-xs" />
                         </div>
                       ))}
                     </div>
