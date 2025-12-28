@@ -156,6 +156,30 @@ export default function DuelWaitingRoom() {
     
     setMyReady(true)
     
+    // API ile ready durumunu güncelle
+    try {
+      const response = await fetch('/api/duel/ready', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          duelId,
+          studentId: studentProfile.id,
+          ready: true
+        })
+      })
+      
+      const data = await response.json()
+      console.log('Ready response:', data)
+      
+      // Her iki taraf hazırsa geri sayımı başlat
+      if (data.bothReady) {
+        startCountdown()
+      }
+    } catch (err) {
+      console.error('Ready API error:', err)
+    }
+    
+    // Broadcast gönder (yedek olarak)
     const channelName = `duel_waiting_${duelId}`
     const channel = supabase.channel(channelName)
     
@@ -167,16 +191,6 @@ export default function DuelWaitingRoom() {
         ready: true
       }
     })
-
-    // Her iki taraf hazırsa geri sayımı başlat
-    if (opponentReady) {
-      await channel.send({
-        type: 'broadcast',
-        event: 'countdown_start',
-        payload: {}
-      })
-      startCountdown()
-    }
   }
 
   // Rakip hazır olduğunda kontrol
@@ -185,6 +199,45 @@ export default function DuelWaitingRoom() {
       startCountdown()
     }
   }, [myReady, opponentReady])
+
+  // Polling ile ready durumunu kontrol et
+  useEffect(() => {
+    if (!duel || !studentProfile || starting) return
+
+    const checkReadyStatus = async () => {
+      try {
+        const response = await fetch(`/api/duel/ready?duelId=${duelId}`)
+        const data = await response.json()
+
+        if (data) {
+          const isChallenger = duel.challenger_id === studentProfile.id
+          const myReadyStatus = isChallenger ? data.challengerReady : data.opponentReady
+          const opponentReadyStatus = isChallenger ? data.opponentReady : data.challengerReady
+          
+          if (myReadyStatus) setMyReady(true)
+          if (opponentReadyStatus) {
+            setOpponentReady(true)
+            setOpponentOnline(true)
+          }
+          
+          // Her iki taraf hazırsa geri sayımı başlat
+          if (data.bothReady && !starting) {
+            console.log('İki taraf da hazır, geri sayım başlıyor!')
+            startCountdown()
+          }
+        }
+      } catch (err) {
+        console.error('Ready check error:', err)
+      }
+    }
+
+    // İlk kontrol
+    checkReadyStatus()
+    
+    // Her 1.5 saniyede bir kontrol et
+    const interval = setInterval(checkReadyStatus, 1500)
+    return () => clearInterval(interval)
+  }, [duel, studentProfile, duelId, starting])
 
   // Geri sayım
   const startCountdown = async () => {
@@ -364,8 +417,7 @@ export default function DuelWaitingRoom() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleReady}
-                disabled={!opponentOnline}
-                className="btn btn-primary w-full disabled:opacity-50"
+                className="btn btn-primary w-full"
               >
                 <Zap className="w-4 h-4 mr-2" />
                 HAZIRIM

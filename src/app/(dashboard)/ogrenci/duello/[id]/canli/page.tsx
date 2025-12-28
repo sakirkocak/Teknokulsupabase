@@ -421,12 +421,12 @@ export default function LiveDuelPage() {
 
     return (
       <DashboardLayout role="ogrenci">
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Üst bar - Skorlar */}
-          <div className="flex items-center justify-between">
+        <div className="max-w-6xl mx-auto space-y-4">
+          {/* Üst bar - Skorlar ve Timer birleşik */}
+          <div className="card p-3 flex items-center justify-between">
             {/* Ben */}
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -434,41 +434,56 @@ export default function LiveDuelPage() {
                 )}
               </div>
               <div>
-                <div className="font-medium text-surface-900 dark:text-white">
+                <div className="text-sm font-medium text-surface-900 dark:text-white">
                   {profile?.full_name?.split(' ')[0]}
                 </div>
-                <div className="text-2xl font-bold text-primary-500">{myScore}</div>
+                <div className="text-xl font-bold text-primary-500">{myScore}</div>
               </div>
               {myStreak >= 2 && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full">
-                  <Flame className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-bold text-orange-500">{myStreak}</span>
+                <div className="flex items-center gap-1 px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 rounded-full">
+                  <Flame className="w-3 h-3 text-orange-500" />
+                  <span className="text-xs font-bold text-orange-500">{myStreak}</span>
                 </div>
               )}
             </div>
 
-            {/* Soru sayacı */}
-            <div className="text-center">
-              <div className="text-sm text-surface-500">Soru</div>
-              <div className="text-2xl font-bold text-surface-900 dark:text-white">
-                {currentQuestionIndex + 1}/{questions.length}
+            {/* Ortada - Soru sayacı ve Timer */}
+            <div className="flex flex-col items-center">
+              <div className="text-sm text-surface-500">
+                Soru <span className="font-bold text-surface-900 dark:text-white">{currentQuestionIndex + 1}/{questions.length}</span>
               </div>
+              {/* Timer bar */}
+              <div className="w-32 h-1.5 bg-surface-200 dark:bg-surface-600 rounded-full overflow-hidden mt-1">
+                <motion.div
+                  className={`h-full ${
+                    timeLeft > 10 ? 'bg-green-500' : timeLeft > 5 ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}
+                  initial={{ width: '100%' }}
+                  animate={{ width: `${(timeLeft / 30) * 100}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+              <span className={`text-lg font-bold ${
+                timeLeft > 10 ? 'text-green-500' : timeLeft > 5 ? 'text-yellow-500' : 'text-red-500'
+              }`}>
+                {timeLeft}s
+              </span>
             </div>
 
             {/* Rakip */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {opponentAnswered && (
-                <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
-                  <Check className="w-4 h-4 text-green-500" />
+                <div className="px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 rounded-full">
+                  <Check className="w-3 h-3 text-green-500" />
                 </div>
               )}
               <div className="text-right">
-                <div className="font-medium text-surface-900 dark:text-white">
+                <div className="text-sm font-medium text-surface-900 dark:text-white">
                   {opponent?.name?.split(' ')[0] || 'Rakip'}
                 </div>
-                <div className="text-2xl font-bold text-orange-500">{opponentScore}</div>
+                <div className="text-xl font-bold text-orange-500">{opponentScore}</div>
               </div>
-              <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
+              <div className="w-10 h-10 bg-orange-500 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden">
                 {opponent?.avatarUrl ? (
                   <img src={opponent.avatarUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -478,41 +493,22 @@ export default function LiveDuelPage() {
             </div>
           </div>
 
-          {/* Timer */}
-          <div className="relative h-2 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
-            <motion.div
-              className={`absolute left-0 top-0 h-full ${
-                timeLeft > 10 ? 'bg-green-500' : timeLeft > 5 ? 'bg-yellow-500' : 'bg-red-500'
-              }`}
-              initial={{ width: '100%' }}
-              animate={{ width: `${(timeLeft / 30) * 100}%` }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-          <div className="text-center">
-            <span className={`text-xl font-bold ${
-              timeLeft > 10 ? 'text-green-500' : timeLeft > 5 ? 'text-yellow-500' : 'text-red-500'
-            }`}>
-              {timeLeft}s
-            </span>
-          </div>
-
           {/* Soru kartı */}
           <motion.div
             key={currentQuestionIndex}
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
-            className="card p-6"
+            className="card p-8"
           >
             {/* Soru bilgisi */}
-            <div className="flex items-center gap-2 mb-4">
-              <span className="px-2 py-1 bg-surface-100 dark:bg-surface-700 rounded text-sm">
+            <div className="flex items-center gap-2 mb-6">
+              <span className="px-3 py-1.5 bg-surface-100 dark:bg-surface-700 rounded-lg text-sm font-medium">
                 {question.subject_name}
               </span>
-              <span className={`px-2 py-1 rounded text-sm ${
-                question.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-red-100 text-red-700'
+              <span className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                question.difficulty === 'easy' ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300' :
+                question.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300' :
+                'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
               }`}>
                 {question.difficulty === 'easy' ? 'Kolay' : 
                  question.difficulty === 'medium' ? 'Orta' : 'Zor'}
@@ -520,21 +516,23 @@ export default function LiveDuelPage() {
             </div>
 
             {/* Soru */}
-            <div className="text-lg text-surface-900 dark:text-white mb-6">
+            <div className="text-lg md:text-xl lg:text-2xl leading-relaxed text-surface-900 dark:text-white mb-8">
               <MathRenderer text={question.question_text} />
             </div>
 
             {/* Görsel */}
             {question.image_url && (
-              <img 
-                src={question.image_url} 
-                alt="Soru görseli" 
-                className="max-w-full max-h-64 mx-auto mb-6 rounded-lg"
-              />
+              <div className="flex justify-center mb-8">
+                <img 
+                  src={question.image_url} 
+                  alt="Soru görseli" 
+                  className="w-full max-w-3xl h-auto max-h-[500px] object-contain rounded-xl shadow-lg"
+                />
+              </div>
             )}
 
             {/* Seçenekler (4 veya 5 şık) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {['A', 'B', 'C', 'D', 'E'].map((option) => {
                 const optionKey = `option_${option.toLowerCase()}` as keyof DuelQuestion
                 const optionText = question[optionKey] as string | null | undefined
@@ -553,18 +551,18 @@ export default function LiveDuelPage() {
                     disabled={showResult}
                     whileHover={!showResult ? { scale: 1.02 } : {}}
                     whileTap={!showResult ? { scale: 0.98 } : {}}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                    className={`p-5 rounded-xl border-2 text-left transition-all ${
                       isCorrectOption
                         ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
                         : isWrongSelected
                         ? 'border-red-500 bg-red-50 dark:bg-red-900/30'
                         : isSelected
                         ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30'
-                        : 'border-surface-200 dark:border-surface-700 hover:border-primary-300'
+                        : 'border-surface-200 dark:border-surface-700 hover:border-primary-300 hover:shadow-md'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                    <div className="flex items-start gap-4">
+                      <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base flex-shrink-0 ${
                         isCorrectOption
                           ? 'bg-green-500 text-white'
                           : isWrongSelected
@@ -573,10 +571,10 @@ export default function LiveDuelPage() {
                           ? 'bg-primary-500 text-white'
                           : 'bg-surface-100 dark:bg-surface-700 text-surface-600'
                       }`}>
-                        {isCorrectOption ? <Check className="w-4 h-4" /> :
-                         isWrongSelected ? <X className="w-4 h-4" /> : option}
+                        {isCorrectOption ? <Check className="w-5 h-5" /> :
+                         isWrongSelected ? <X className="w-5 h-5" /> : option}
                       </span>
-                      <span className="flex-1 text-surface-900 dark:text-white">
+                      <span className="flex-1 text-base text-surface-900 dark:text-white leading-relaxed">
                         <MathRenderer text={optionText || ''} />
                       </span>
                     </div>

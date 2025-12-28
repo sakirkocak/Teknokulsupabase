@@ -48,6 +48,7 @@ const subjects = [
   { key: 'Coğrafya', label: 'Coğrafya', color: 'from-teal-500 to-cyan-500' },
   { key: 'Türk Dili ve Edebiyatı', label: 'Edebiyat', color: 'from-indigo-500 to-violet-500' },
   { key: 'Felsefe', label: 'Felsefe', color: 'from-fuchsia-500 to-pink-500' },
+  { key: 'Teknoloji ve Tasarım', label: 'Teknoloji Tasarım', color: 'from-slate-500 to-zinc-500' },
 ]
 
 export default function DuelPage() {
@@ -489,10 +490,59 @@ export default function DuelPage() {
               )}
             </AnimatePresence>
 
-            {/* Rakip Ara */}
+            {/* Düello Lobisi */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="card p-6 bg-gradient-to-br from-purple-500/10 via-indigo-500/10 to-blue-500/10 border-2 border-purple-500/30"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center">
+                    <Users className="h-7 w-7 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-surface-900 dark:text-white">
+                      Düello Lobisi
+                    </h3>
+                    <p className="text-sm text-surface-500">
+                      Lobiye gir, online oyuncuları gör, istediğine düello at!
+                    </p>
+                  </div>
+                </div>
+                <Link href="/ogrenci/duello/lobi">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Zap className="h-5 w-5" />
+                      Lobiye Git
+                    </span>
+                  </motion.button>
+                </Link>
+              </div>
+              <div className="mt-4 flex items-center gap-6 text-sm text-surface-500">
+                <span className="flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  Online oyuncuları gör
+                </span>
+                <span className="flex items-center gap-1">
+                  <Swords className="h-4 w-4" />
+                  İstediğine düello at
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  30 saniye kabul süresi
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Arkadaşa Düello Gönder */}
             <div className="card p-6">
               <h3 className="font-semibold text-surface-900 dark:text-white mb-4">
-                Rakip Bul
+                Arkadaşına Meydan Oku
               </h3>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400" />

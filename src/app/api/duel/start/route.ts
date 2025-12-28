@@ -212,7 +212,8 @@ async function getQuestionsFromTypesense(grade: number | null, subject: string |
   }
   
   if (subject && subject !== 'Karışık' && subject !== 'all') {
-    filters.push(`subject_name:=${subject}`)
+    // Boşluk içeren ders isimleri için backtick kullan
+    filters.push(`subject_name:\`${subject}\``)
   }
 
   const searchParams: any = {
@@ -239,10 +240,33 @@ async function getQuestionsFromTypesense(grade: number | null, subject: string |
 }
 
 /**
- * Supabase'den sorular çek (topics ile JOIN)
+ * Supabase'den rastgele sorular çek (topics ile JOIN)
+ * Rastgele offset kullanarak her seferinde farklı sorular getirir
  */
 async function getQuestionsFromSupabase(grade: number | null, subject: string | null, count: number) {
   console.log('🔍 Supabase query params:', { grade, subject, count })
+  
+  // Önce toplam soru sayısını al (filtrelere göre)
+  let countQuery = supabase
+    .from('questions')
+    .select('id, topic:topics!inner(grade, subject:subjects!inner(name))', { count: 'exact', head: true })
+    .eq('is_active', true)
+  
+  if (grade) {
+    countQuery = countQuery.eq('topic.grade', grade)
+  }
+  if (subject && subject !== 'Karışık' && subject !== 'all') {
+    countQuery = countQuery.eq('topic.subject.name', subject)
+  }
+  
+  const { count: totalCount } = await countQuery
+  console.log(`📊 Toplam uygun soru sayısı: ${totalCount}`)
+  
+  // Rastgele offset hesapla (çok sayıda soru varsa rastgele bir yerden başla)
+  const maxOffset = Math.max(0, (totalCount || 0) - (count * 10))
+  const randomOffset = Math.floor(Math.random() * maxOffset)
+  
+  console.log(`🎲 Rastgele offset: ${randomOffset} / ${maxOffset}`)
   
   // questions -> topics -> subjects JOIN yapısı
   let query = supabase
@@ -266,7 +290,7 @@ async function getQuestionsFromSupabase(grade: number | null, subject: string | 
       )
     `)
     .eq('is_active', true)
-    .limit(count * 3)
+    .range(randomOffset, randomOffset + (count * 10) - 1)  // Rastgele offset'ten başla
 
   // Sınıf filtresi (topics üzerinden)
   if (grade) {
@@ -285,10 +309,7 @@ async function getQuestionsFromSupabase(grade: number | null, subject: string | 
     return []
   }
   
-  console.log(`✅ Supabase sorgu sonucu: ${data?.length || 0} soru`)
-  if (data && data.length > 0) {
-    console.log('📋 Options formatı:', JSON.stringify(data[0].options))
-  }
+  console.log(`✅ Supabase sorgu sonucu: ${data?.length || 0} soru (offset: ${randomOffset})`)
   
   // Flatten ve options'ı ayrıştır
   const questionsWithOptions = (data || []).map((q: any) => {
@@ -312,6 +333,7 @@ async function getQuestionsFromSupabase(grade: number | null, subject: string | 
     }
   })
 
+  // Shuffle ve istenen sayıda al
   const shuffled = shuffleArray(questionsWithOptions)
   return shuffled.slice(0, count)
 }
