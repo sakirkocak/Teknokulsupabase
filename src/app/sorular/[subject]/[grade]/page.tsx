@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
+import QuestionPreviewList from '@/components/QuestionPreviewList'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
@@ -10,6 +11,8 @@ import {
   ArrowLeft, Play, Target, Sparkles, Monitor, Palette, 
   Music, Dumbbell, HeartPulse, Hammer
 } from 'lucide-react'
+
+// difficultyConfig kaldırıldı - QuestionPreviewList'te kullanılıyor
 
 // ISR - 1 saat cache
 export const revalidate = 3600
@@ -393,55 +396,17 @@ export default async function GradePage({ params }: Props) {
             <Sparkles className="w-5 h-5 text-amber-500" />
             Örnek Sorular
           </h2>
-          <div className="space-y-4">
-            {data.questions.slice(0, 5).map((question, index) => {
-              const difficulty = difficultyConfig[question.difficulty as keyof typeof difficultyConfig]
-              const DiffIcon = difficulty?.icon || Star
-              const options = question.options as { A: string; B: string; C: string; D: string; E?: string }
-              
-              return (
-                <Link
-                  key={question.id}
-                  href={`/sorular/${subject}/${grade}-sinif/${question.id}`}
-                  className="block p-6 bg-white rounded-xl border border-gray-200 hover:shadow-md hover:border-indigo-200 transition-all group"
-                >
-                  <div className="flex items-start justify-between gap-4 mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-500">Soru {index + 1}</span>
-                      {difficulty && (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${difficulty.color}`}>
-                          <DiffIcon className="w-3 h-3" />
-                          {difficulty.label}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-sm text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      Detaylı Gör
-                      <ChevronRight className="w-4 h-4" />
-                    </span>
-                  </div>
-                  
-                  <p className="text-gray-800 mb-4 line-clamp-3 group-hover:text-gray-900 transition-colors">
-                    {question.question_text}
-                  </p>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {Object.entries(options).filter(([_, v]) => v).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="flex items-center gap-2 p-2 rounded-lg bg-gray-50 text-sm"
-                      >
-                        <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
-                          {key}
-                        </span>
-                        <span className="text-gray-700 line-clamp-1">{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
+          
+          <QuestionPreviewList 
+            questions={data.questions.map(q => ({
+              id: q.id,
+              question_text: q.question_text,
+              options: q.options as { A: string; B: string; C: string; D: string; E?: string },
+              difficulty: q.difficulty
+            }))}
+            subject={subject}
+            grade={grade}
+          />
           
           {data.totalCount > 5 && (
             <div className="text-center mt-6">
