@@ -30,18 +30,28 @@ function createPublicClient() {
   )
 }
 
-const subjectMeta: Record<string, { name: string; color: string }> = {
-  'matematik': { name: 'Matematik', color: 'red' },
-  'turkce': { name: 'Türkçe', color: 'blue' },
-  'fen_bilimleri': { name: 'Fen Bilimleri', color: 'green' },
-  'sosyal_bilgiler': { name: 'Sosyal Bilgiler', color: 'orange' },
-  'ingilizce': { name: 'İngilizce', color: 'purple' },
-  'fizik': { name: 'Fizik', color: 'indigo' },
-  'kimya': { name: 'Kimya', color: 'pink' },
-  'biyoloji': { name: 'Biyoloji', color: 'emerald' },
-  'inkilap_tarihi': { name: 'İnkılap Tarihi', color: 'amber' },
-  'din_kulturu': { name: 'Din Kültürü', color: 'teal' },
+// Ders renkleri (dinamik dersler için de varsayılan mevcut)
+const subjectColors: Record<string, string> = {
+  'matematik': 'red',
+  'turkce': 'blue',
+  'fen_bilimleri': 'green',
+  'sosyal_bilgiler': 'orange',
+  'ingilizce': 'purple',
+  'fizik': 'indigo',
+  'kimya': 'pink',
+  'biyoloji': 'emerald',
+  'inkilap_tarihi': 'amber',
+  'din_kulturu': 'teal',
+  'bilisim': 'cyan',
+  'gorsel_sanatlar': 'fuchsia',
+  'muzik': 'violet',
+  'beden_egitimi': 'lime',
+  'saglik_bilgisi': 'rose',
+  'teknoloji_tasarim': 'slate',
 }
+
+// Varsayılan renk
+const defaultColor = 'gray'
 
 const difficultyConfig: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   'easy': { label: 'Kolay', color: 'green', icon: <Star className="w-4 h-4" /> },
@@ -129,11 +139,6 @@ async function getQuestionData(questionId: string) {
 
 export default async function SingleQuestionPage({ params }: Props) {
   const { subject, grade, id } = await params
-  const meta = subjectMeta[subject]
-  
-  if (!meta) {
-    notFound()
-  }
   
   const gradeNum = parseInt(grade.replace('-sinif', ''))
   if (isNaN(gradeNum)) {
@@ -145,6 +150,10 @@ export default async function SingleQuestionPage({ params }: Props) {
   if (!question) {
     notFound()
   }
+  
+  // Ders bilgisi artık question'dan geliyor (RPC'den)
+  const subjectName = question.subject_name
+  const subjectColor = subjectColors[subject] || defaultColor
   
   const difficulty = difficultyConfig[question.difficulty] || difficultyConfig['medium']
   const baseUrl = 'https://www.teknokul.com.tr'
@@ -160,15 +169,15 @@ export default async function SingleQuestionPage({ params }: Props) {
         items={[
           { name: 'Ana Sayfa', url: '/' },
           { name: 'Soru Bankası', url: '/sorular' },
-          { name: meta.name, url: `/sorular/${subject}` },
+          { name: subjectName, url: `/sorular/${subject}` },
           { name: `${gradeNum}. Sınıf`, url: `/sorular/${subject}/${grade}` },
           { name: question.main_topic, url: `/sorular/${subject}/${grade}` },
         ]}
       />
       <QuizSchema
-        name={`${gradeNum}. Sınıf ${meta.name} - ${question.main_topic}`}
+        name={`${gradeNum}. Sınıf ${subjectName} - ${question.main_topic}`}
         description={question.question_text.substring(0, 200)}
-        subject={meta.name}
+        subject={subjectName}
         grade={gradeNum}
         questionCount={1}
         url={`${baseUrl}/sorular/${subject}/${grade}/${id}`}
@@ -181,7 +190,7 @@ export default async function SingleQuestionPage({ params }: Props) {
       
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
         {/* Header */}
-        <header className={`bg-gradient-to-r from-${meta.color}-500 to-${meta.color}-600 text-white`}>
+        <header className={`bg-gradient-to-r from-${subjectColor}-500 to-${subjectColor}-600 text-white`}>
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {/* Breadcrumb */}
             <nav className="flex items-center gap-2 text-white/70 text-sm mb-4 flex-wrap">
@@ -189,7 +198,7 @@ export default async function SingleQuestionPage({ params }: Props) {
               <ChevronRight className="w-4 h-4" />
               <Link href="/sorular" className="hover:text-white transition-colors">Soru Bankası</Link>
               <ChevronRight className="w-4 h-4" />
-              <Link href={`/sorular/${subject}`} className="hover:text-white transition-colors">{meta.name}</Link>
+              <Link href={`/sorular/${subject}`} className="hover:text-white transition-colors">{subjectName}</Link>
               <ChevronRight className="w-4 h-4" />
               <Link href={`/sorular/${subject}/${grade}`} className="hover:text-white transition-colors">{gradeNum}. Sınıf</Link>
               <ChevronRight className="w-4 h-4" />
@@ -200,7 +209,7 @@ export default async function SingleQuestionPage({ params }: Props) {
               <div>
                 <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <span className={`px-3 py-1 bg-white/20 rounded-full text-sm font-medium`}>
-                    {meta.name}
+                    {subjectName}
                   </span>
                   <span className={`px-3 py-1 bg-${difficulty.color}-500/30 rounded-full text-sm font-medium flex items-center gap-1`}>
                     {difficulty.icon}
@@ -236,10 +245,10 @@ export default async function SingleQuestionPage({ params }: Props) {
             <div className="p-6 border-b border-gray-100">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <span className={`p-2 bg-${meta.color}-100 text-${meta.color}-600 rounded-lg`}>
+                  <span className={`p-2 bg-${subjectColor}-100 text-${subjectColor}-600 rounded-lg`}>
                     <BookOpen className="w-5 h-5" />
                   </span>
-                  <span className="text-sm text-gray-500">{gradeNum}. Sınıf {meta.name}</span>
+                  <span className="text-sm text-gray-500">{gradeNum}. Sınıf {subjectName}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Paylaş">
@@ -350,7 +359,7 @@ export default async function SingleQuestionPage({ params }: Props) {
                       className="p-4 bg-white rounded-xl border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all group"
                     >
                       <div className="flex items-start gap-3">
-                        <span className={`p-2 bg-${meta.color}-100 text-${meta.color}-600 rounded-lg`}>
+                        <span className={`p-2 bg-${subjectColor}-100 text-${subjectColor}-600 rounded-lg`}>
                           <BookOpen className="w-4 h-4" />
                         </span>
                         <div className="flex-1 min-w-0">
@@ -380,13 +389,13 @@ export default async function SingleQuestionPage({ params }: Props) {
               className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              Tüm {gradeNum}. Sınıf {meta.name} Soruları
+              Tüm {gradeNum}. Sınıf {subjectName} Soruları
             </Link>
             <Link
               href={`/sorular/${subject}`}
               className="flex items-center gap-2 text-gray-600 hover:text-indigo-600 transition-colors"
             >
-              Tüm {meta.name} Soruları
+              Tüm {subjectName} Soruları
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
