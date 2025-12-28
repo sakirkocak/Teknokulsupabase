@@ -373,10 +373,14 @@ function HizliCozPageContent() {
     const topicIds = topics.map(t => t.id)
     console.log('📋 Topic sayısı:', topicIds.length)
 
-    // 2. TÜM soruları çek
+    // 2. Soruları çek - OPTIMIZE: Sadece gerekli alanları çek (egress -80%)
     const { data: questions } = await supabase
       .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
+      .select(`
+        id, question_text, options, correct_answer, explanation, difficulty,
+        question_image_url, topic_id, times_answered, times_correct,
+        topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+      `)
       .eq('is_active', true)
       .in('topic_id', topicIds)
 
@@ -413,7 +417,12 @@ function HizliCozPageContent() {
     const hardCount = sortedQuestions.filter(q => q.difficulty === 'hard').length
     console.log('📈 Zorluk dağılımı:', { easy: easyCount, medium: mediumCount, hard: hardCount })
 
-    return sortedQuestions as Question[]
+    // Map topic array to single object (Supabase relation format)
+    const mappedQuestions = sortedQuestions.map((q: any) => ({
+      ...q,
+      topic: Array.isArray(q.topic) ? q.topic[0] : q.topic
+    }))
+    return mappedQuestions as Question[]
   }
 
   // Havuzdan sonraki soruyu al

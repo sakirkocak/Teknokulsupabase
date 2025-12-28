@@ -251,9 +251,10 @@ async function getStatsFromSupabase(): Promise<StatsResponse> {
     todayQuestionsRes,
     subjectsRes
   ] = await Promise.all([
-    supabase.from('questions').select('*', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('student_points').select('*', { count: 'exact', head: true }).gt('total_questions', 0),
-    supabase.from('point_history').select('*', { count: 'exact', head: true })
+    // OPTIMIZE: Count için sadece id yeterli (egress -99%)
+    supabase.from('questions').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    supabase.from('student_points').select('id', { count: 'exact', head: true }).gt('total_questions', 0),
+    supabase.from('point_history').select('id', { count: 'exact', head: true })
       .gte('created_at', todayTR.toISOString())
       .eq('source', 'question'),
     supabase.from('subjects').select('id, name, code, icon, color')

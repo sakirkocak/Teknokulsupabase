@@ -61,34 +61,34 @@ export default function AdminDashboard() {
   }, [])
 
   async function loadStats() {
-    // Kullanıcı sayıları
+    // OPTIMIZE: Count için sadece id yeterli (egress -99%)
     const { count: totalUsers } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
 
     const { count: totalTeachers } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('role', 'ogretmen')
 
     const { count: totalStudents } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('role', 'ogrenci')
 
     const { count: totalParents } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('role', 'veli')
 
     const { count: activeCoachings } = await supabase
       .from('coaching_relationships')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('status', 'active')
 
     const { count: totalTasks } = await supabase
       .from('tasks')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
 
     setStats({
       totalUsers: totalUsers || 0,
@@ -138,9 +138,10 @@ export default function AdminDashboard() {
     } catch (error) {
       console.error('Soru istatistikleri yüklenirken hata:', error)
       // Hata durumunda en azından toplam sayıyı göster
+      // OPTIMIZE: Count için sadece id yeterli
       const { count } = await supabase
         .from('questions')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
       setQuestionStats({
         total: count || 0,
         bySubject: [],

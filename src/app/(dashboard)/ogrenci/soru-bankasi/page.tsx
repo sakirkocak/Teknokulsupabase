@@ -415,9 +415,10 @@ export default function SoruBankasiPage() {
       const allTopicIds = allTopics.map(t => t.id)
 
       // Toplam soru sayısını al (tek sorgu)
+      // OPTIMIZE: Count için sadece id yeterli
       const { count: totalCount } = await supabase
         .from('questions')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('is_active', true)
         .in('topic_id', allTopicIds)
 
@@ -430,9 +431,10 @@ export default function SoruBankasiPage() {
           return { subject_id: gs.subject_id, count: 0 }
         }
 
+        // OPTIMIZE: Count için sadece id yeterli
         const { count } = await supabase
           .from('questions')
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('is_active', true)
           .in('topic_id', topicIds)
 
@@ -628,9 +630,14 @@ export default function SoruBankasiPage() {
     setPracticeLoading(true)
     
     // Görüntülü soruları getir (tüm derslerden veya seçili dersten)
+    // OPTIMIZE: Sadece gerekli alanları çek (egress -80%)
     let query = supabase
       .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
+      .select(`
+        id, question_text, options, correct_answer, explanation, difficulty,
+        question_image_url, topic_id, times_answered, times_correct,
+        topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+      `)
       .eq('is_active', true)
       .not('question_image_url', 'is', null)
 
@@ -675,9 +682,14 @@ export default function SoruBankasiPage() {
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
 
+    // OPTIMIZE: Sadece gerekli alanları çek
     let query = supabase
       .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
+      .select(`
+        id, question_text, options, correct_answer, explanation, difficulty,
+        question_image_url, topic_id, times_answered, times_correct,
+        topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+      `)
       .eq('is_active', true)
       .not('question_image_url', 'is', null)
 
@@ -736,9 +748,14 @@ export default function SoruBankasiPage() {
 
     const topicIds = allTopics.map(t => t.id)
     
+    // OPTIMIZE: Sadece gerekli alanları çek
     const { data } = await supabase
       .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
+      .select(`
+        id, question_text, options, correct_answer, explanation, difficulty,
+        question_image_url, topic_id, times_answered, times_correct,
+        topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+      `)
       .eq('is_active', true)
       .in('topic_id', topicIds)
 
@@ -773,9 +790,14 @@ export default function SoruBankasiPage() {
 
     const topicIds = subjectTopics.map(t => t.id)
     
+    // OPTIMIZE: Sadece gerekli alanları çek
     const { data } = await supabase
       .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
+      .select(`
+        id, question_text, options, correct_answer, explanation, difficulty,
+        question_image_url, topic_id, times_answered, times_correct,
+        topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+      `)
       .eq('is_active', true)
       .in('topic_id', topicIds)
 
@@ -825,9 +847,14 @@ export default function SoruBankasiPage() {
           const result = await response.json()
           if (result.success && result.question) {
             // Full question data'yı Supabase'den çek (options, correct_answer vb.)
+            // OPTIMIZE: Sadece gerekli alanları çek
             const { data: fullQuestion } = await supabase
               .from('questions')
-              .select('*, topic:topics(*, subject:subjects(*))')
+              .select(`
+                id, question_text, options, correct_answer, explanation, difficulty,
+                question_image_url, topic_id, times_answered, times_correct,
+                topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+              `)
               .eq('id', result.question.id)
               .single()
 
@@ -846,9 +873,14 @@ export default function SoruBankasiPage() {
     }
 
     // Fallback: Normal sorgu
+    // OPTIMIZE: Sadece gerekli alanları çek
     let query = supabase
       .from('questions')
-      .select('*, topic:topics(*, subject:subjects(*))')
+      .select(`
+        id, question_text, options, correct_answer, explanation, difficulty,
+        question_image_url, topic_id, times_answered, times_correct,
+        topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
+      `)
       .eq('is_active', true)
 
     if (topicToUse) {

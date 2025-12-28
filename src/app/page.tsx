@@ -513,7 +513,7 @@ export default function HomePage() {
       const countPromises = subjectsToCount.map(async (subject) => {
         const { count } = await supabase
           .from('questions')
-          .select('*, topic:topics!inner(grade, subject_id)', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq('topic.subject_id', subject.id)
           .eq('topic.grade', selectedGrade)
           .eq('is_active', true)
