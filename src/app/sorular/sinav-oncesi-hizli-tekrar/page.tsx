@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
+import { QuestionText, OptionText } from '@/components/QuestionCard'
 import { 
   ChevronRight, Clock, Play, ArrowLeft, 
   Star, CheckCircle, Zap, Crown, Sparkles, BarChart3
@@ -375,9 +376,10 @@ export default async function HizliTekrarPage() {
                     )}
                   </div>
                   
-                  <p className="text-gray-800 mb-4 line-clamp-3">
-                    {question.question_text}
-                  </p>
+                  <QuestionText 
+                    text={question.question_text} 
+                    className="text-gray-800 mb-4 line-clamp-3" 
+                  />
                   
                   {question.options && Object.keys(question.options).length > 0 && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -389,7 +391,7 @@ export default async function HizliTekrarPage() {
                           <span className="w-6 h-6 flex items-center justify-center bg-gray-200 rounded-full text-xs font-medium">
                             {key}
                           </span>
-                          <span className="text-gray-700 line-clamp-1">{value}</span>
+                          <OptionText text={value} className="text-gray-700 line-clamp-1" />
                         </div>
                       ))}
                     </div>
