@@ -41,11 +41,13 @@ import SpeakButton from '@/components/SpeakButton'
 
 // Otomatik üretim yapılandırması
 const AUTO_GEN_CONFIG = {
-  DELAY_BETWEEN_REQUESTS: 5000,  // 5 saniye
-  ERROR_RETRY_DELAY: 30000,      // 30 saniye
-  MAX_RETRIES: 3,
+  DELAY_BETWEEN_REQUESTS: 8000,  // 8 saniye (rate limit için artırıldı)
+  ERROR_RETRY_DELAY: 45000,      // 45 saniye (rate limit sonrası daha uzun bekle)
+  MAX_RETRIES: 5,                // 5 deneme (artırıldı)
   MAX_QUESTIONS_PER_TOPIC: 10,
   DAILY_LIMIT: 1000,
+  DB_RETRY_DELAY: 2000,          // DB hatası sonrası 2 saniye bekle
+  DB_MAX_RETRIES: 3,             // DB için 3 deneme
 }
 
 // Toplu üretim durumu
@@ -462,51 +464,148 @@ export default function AIQuestionGeneratorPage() {
     const subject = subjects.find(s => s.id === topic.subject_id)
     if (!subject) throw new Error('Ders bulunamadı')
 
-    const response = await fetch('/api/ai/generate-curriculum-questions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grade: selectedGrade,
-        subject: subject.name,
-        topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
-        learningOutcome: topic.learning_outcome || topic.main_topic,
-        difficulty: difficulty,
-        count: batchQuestionsPerTopic
-      })
-    })
+    // AbortController ile timeout ekle (60 saniye)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
 
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Soru üretme hatası')
-    return data.questions || []
+    try {
+      const response = await fetch('/api/ai/generate-curriculum-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grade: selectedGrade,
+          subject: subject.name,
+          topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
+          learningOutcome: topic.learning_outcome || topic.main_topic,
+          difficulty: difficulty,
+          count: batchQuestionsPerTopic
+        }),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMsg = errorData.error || `HTTP ${response.status}`
+        
+        // Rate limit kontrolü
+        if (response.status === 429 || errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('quota')) {
+          throw new Error(`429: Rate limit aşıldı`)
+        }
+        
+        throw new Error(errorMsg)
+      }
+
+      const data = await response.json()
+      return data.questions || []
+      
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      
+      // Abort hatası (timeout)
+      if (error.name === 'AbortError') {
+        throw new Error('Timeout: AI yanıt vermedi (60s)')
+      }
+      
+      // Network hatası
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Network hatası: Bağlantı kurulamadı')
+      }
+      
+      throw error
+    }
   }
 
-  const saveQuestionsToDb = async (questions: GeneratedQuestion[], topicId: string): Promise<{ success: number; failed: number }> => {
+  const saveQuestionsToDb = async (questions: GeneratedQuestion[], topicId: string): Promise<{ success: number; failed: number; savedIds: string[] }> => {
     let success = 0
     let failed = 0
+    const savedIds: string[] = []
+    const failedQuestions: { question: GeneratedQuestion; error: string }[] = []
 
     for (const question of questions) {
-      const { error } = await supabase
-        .from('questions')
-        .insert({
-          topic_id: topicId,
-          difficulty: question.difficulty,
-          question_text: question.question_text,
-          options: question.options,
-          correct_answer: question.correct_answer,
-          explanation: question.explanation,
-          source: 'AI Generated (Batch)',
-          is_active: true,
-          created_by: profile?.id
-        })
+      let retries = 0
+      let saved = false
+      
+      while (retries < AUTO_GEN_CONFIG.DB_MAX_RETRIES && !saved) {
+        const { data, error } = await supabase
+          .from('questions')
+          .insert({
+            topic_id: topicId,
+            difficulty: question.difficulty,
+            question_text: question.question_text,
+            options: question.options,
+            correct_answer: question.correct_answer,
+            explanation: question.explanation,
+            source: 'AI Generated (Batch)',
+            is_active: true,
+            created_by: profile?.id
+          })
+          .select('id')
+          .single()
 
-      if (error) {
-        failed++
-      } else {
-        success++
+        if (error) {
+          retries++
+          const errorMsg = error.message || error.code || 'Bilinmeyen hata'
+          
+          // Duplicate kontrolü - tekrar denemeye gerek yok
+          if (errorMsg.includes('duplicate') || errorMsg.includes('unique')) {
+            console.warn(`⚠️ Duplicate soru atlandı: ${question.question_text.substring(0, 50)}...`)
+            addBatchLog(`⚠️ Duplicate soru atlandı`, 'warning')
+            break
+          }
+          
+          // Son deneme değilse bekle ve tekrar dene
+          if (retries < AUTO_GEN_CONFIG.DB_MAX_RETRIES) {
+            console.log(`🔄 DB hatası, tekrar deneniyor (${retries}/${AUTO_GEN_CONFIG.DB_MAX_RETRIES}): ${errorMsg}`)
+            await sleep(AUTO_GEN_CONFIG.DB_RETRY_DELAY)
+          } else {
+            console.error(`❌ Soru kaydedilemedi: ${errorMsg}`)
+            failedQuestions.push({ question, error: errorMsg })
+            failed++
+          }
+        } else {
+          saved = true
+          success++
+          if (data?.id) {
+            savedIds.push(data.id)
+          }
+        }
       }
     }
 
-    return { success, failed }
+    // Başarısız soruları logla
+    if (failedQuestions.length > 0) {
+      console.error(`📋 Başarısız sorular (${failedQuestions.length}):`, 
+        failedQuestions.map(f => ({ 
+          text: f.question.question_text.substring(0, 30), 
+          error: f.error 
+        }))
+      )
+      addBatchLog(`⚠️ ${failedQuestions.length} soru kaydedilemedi - detaylar konsolda`, 'warning')
+    }
+
+    // 🔄 Typesense'e senkronize et
+    if (savedIds.length > 0) {
+      try {
+        const syncResponse = await fetch('/api/admin/questions/sync', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questionIds: savedIds })
+        })
+        
+        if (syncResponse.ok) {
+          console.log(`✅ ${savedIds.length} soru Typesense'e senkronize edildi`)
+        } else {
+          console.warn(`⚠️ Typesense sync başarısız:`, await syncResponse.text())
+        }
+      } catch (syncError) {
+        console.error('Typesense sync hatası:', syncError)
+        // Sync hatası kritik değil, devam et
+      }
+    }
+
+    return { success, failed, savedIds }
   }
 
   const startBatchGeneration = async () => {
@@ -559,12 +658,14 @@ export default function AIQuestionGeneratorPage() {
 
         let retries = 0
         let success = false
+        let consecutiveRateLimits = 0
 
         while (retries < AUTO_GEN_CONFIG.MAX_RETRIES && !success) {
           try {
             // Soru üret
             const questions = await generateQuestionsForTopic(topic, difficulty)
             totalGenerated += questions.length
+            consecutiveRateLimits = 0 // Başarılı olunca sıfırla
 
             // Veritabanına kaydet
             const saveResult = await saveQuestionsToDb(questions, topic.id)
@@ -583,21 +684,32 @@ export default function AIQuestionGeneratorPage() {
 
           } catch (error: any) {
             retries++
-            const isRateLimit = error.message?.includes('429') || error.message?.includes('rate')
+            const errorMsg = error.message || 'Bilinmeyen hata'
+            const isRateLimit = errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('quota')
+            const isTimeout = errorMsg.includes('Timeout') || errorMsg.includes('timeout')
+            const isNetwork = errorMsg.includes('Network') || errorMsg.includes('fetch')
             
             if (isRateLimit) {
-              addBatchLog(`⚠️ Rate limit! ${AUTO_GEN_CONFIG.ERROR_RETRY_DELAY / 1000} saniye bekleniyor...`, 'warning')
-              await sleep(AUTO_GEN_CONFIG.ERROR_RETRY_DELAY)
+              consecutiveRateLimits++
+              // Exponential backoff - her rate limit'te bekleme süresini 1.5x artır
+              const waitTime = AUTO_GEN_CONFIG.ERROR_RETRY_DELAY * Math.pow(1.5, consecutiveRateLimits - 1)
+              const waitSeconds = Math.round(waitTime / 1000)
+              addBatchLog(`⚠️ Rate limit! ${waitSeconds} saniye bekleniyor (${consecutiveRateLimits}. kez)...`, 'warning')
+              await sleep(waitTime)
+            } else if (isTimeout || isNetwork) {
+              // Network/Timeout hataları için daha kısa bekle
+              addBatchLog(`⚠️ ${isTimeout ? 'Timeout' : 'Network'} hatası. 10 saniye bekleniyor...`, 'warning')
+              await sleep(10000)
             } else if (retries < AUTO_GEN_CONFIG.MAX_RETRIES) {
-              addBatchLog(`⚠️ Hata: ${error.message}. Tekrar deneniyor (${retries}/${AUTO_GEN_CONFIG.MAX_RETRIES})...`, 'warning')
+              addBatchLog(`⚠️ Hata: ${errorMsg}. Tekrar deneniyor (${retries}/${AUTO_GEN_CONFIG.MAX_RETRIES})...`, 'warning')
               await sleep(5000)
             } else {
               failedTopics.push(topicKey)
-              addBatchLog(`❌ ${topic.main_topic.substring(0, 30)}... başarısız: ${error.message}`, 'error')
+              addBatchLog(`❌ ${topic.main_topic.substring(0, 30)}... başarısız: ${errorMsg}`, 'error')
               setBatchProgress(prev => ({
                 ...prev,
                 failedTopics: [...failedTopics],
-                lastError: error.message,
+                lastError: errorMsg,
               }))
             }
           }
