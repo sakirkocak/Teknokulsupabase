@@ -4,7 +4,7 @@ import { generateCurriculumQuestions, Difficulty } from '@/lib/gemini'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { grade, subject, topic, learningOutcome, difficulty, count } = body
+    const { grade, subject, topic, learningOutcome, difficulty, count, lang } = body
 
     // Validasyon
     if (!grade || !subject || !topic || !learningOutcome) {
@@ -34,8 +34,11 @@ export async function POST(request: NextRequest) {
 
     // Soru sayısı kontrolü
     const questionCount = count ? Math.min(Math.max(parseInt(count), 1), 20) : 5
+    
+    // Dil kontrolü (varsayılan: tr)
+    const language = lang === 'en' ? 'en' : 'tr'
 
-    console.log(`AI Soru Üretimi: ${gradeNum}. Sınıf - ${subject} - ${topic}`)
+    console.log(`AI Soru Üretimi: ${gradeNum}. Sınıf - ${subject} - ${topic} [${language.toUpperCase()}]`)
 
     const questions = await generateCurriculumQuestions(
       gradeNum,
@@ -43,7 +46,8 @@ export async function POST(request: NextRequest) {
       topic,
       learningOutcome,
       (difficulty as Difficulty) || 'medium',
-      questionCount
+      questionCount,
+      language  // 🌍 Questly Global için dil desteği
     )
 
     return NextResponse.json({ 
@@ -56,7 +60,8 @@ export async function POST(request: NextRequest) {
         learningOutcome,
         difficulty: difficulty || 'medium',
         count: questions.length,
-        optionCount: gradeNum >= 9 ? 5 : 4
+        optionCount: gradeNum >= 9 ? 5 : 4,
+        lang: language
       }
     })
   } catch (error: any) {

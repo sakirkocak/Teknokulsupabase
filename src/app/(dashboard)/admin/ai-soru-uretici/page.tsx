@@ -164,6 +164,9 @@ export default function AIQuestionGeneratorPage() {
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
 
+  // ========== DİL SEÇİMİ (QUESTLY GLOBAL) ==========
+  const [selectedLanguage, setSelectedLanguage] = useState<'tr' | 'en'>('tr')
+  
   // ========== TOPLU ÜRETİM MODÜ ==========
   const [generationMode, setGenerationMode] = useState<'single' | 'batch'>('single')
   const [batchSelectedSubjects, setBatchSelectedSubjects] = useState<string[]>([])
@@ -478,7 +481,8 @@ export default function AIQuestionGeneratorPage() {
           topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
           learningOutcome: topic.learning_outcome || topic.main_topic,
           difficulty: difficulty,
-          count: batchQuestionsPerTopic
+          count: batchQuestionsPerTopic,
+          lang: selectedLanguage  // 🌍 Questly Global için dil desteği
         }),
         signal: controller.signal
       })
@@ -537,9 +541,10 @@ export default function AIQuestionGeneratorPage() {
             options: question.options,
             correct_answer: question.correct_answer,
             explanation: question.explanation,
-            source: 'AI Generated (Batch)',
+            source: selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated (Batch)',
             is_active: true,
-            created_by: profile?.id
+            created_by: profile?.id,
+            lang: selectedLanguage  // 🌍 Questly Global için dil desteği
           })
           .select('id')
           .single()
@@ -797,6 +802,30 @@ export default function AIQuestionGeneratorPage() {
                   MEB müfredatına uygun sorular üretin
                 </p>
               </div>
+            </div>
+
+            {/* 🌍 Language Toggle - Questly Global */}
+            <div className="flex bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 mr-4">
+              <button
+                onClick={() => setSelectedLanguage('tr')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  selectedLanguage === 'tr'
+                    ? 'bg-white text-red-600 shadow ring-2 ring-red-200'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🇹🇷 Türkçe
+              </button>
+              <button
+                onClick={() => setSelectedLanguage('en')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  selectedLanguage === 'en'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow ring-2 ring-purple-200'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🌍 English <span className="text-xs bg-green-500 text-white px-1 rounded">Questly</span>
+              </button>
             </div>
 
             {/* Mode Toggle */}

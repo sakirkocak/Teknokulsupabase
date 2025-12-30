@@ -24,12 +24,21 @@ export const leaderboardSchema: CollectionCreateSchema = {
     
     // Filtreleme alanlari
     { name: 'grade', type: 'int32', facet: true },
+    
+    // Türkiye lokasyon (mevcut)
     { name: 'city_id', type: 'string', facet: true, optional: true },
     { name: 'city_name', type: 'string', facet: true, optional: true },
     { name: 'district_id', type: 'string', facet: true, optional: true },
     { name: 'district_name', type: 'string', facet: true, optional: true },
     { name: 'school_id', type: 'string', facet: true, optional: true },
     { name: 'school_name', type: 'string', facet: true, optional: true },
+    
+    // Global lokasyon (yeni - Questly için)
+    { name: 'country_code', type: 'string', facet: true, optional: true },  // 'IN', 'PK', 'NG', 'TR'
+    { name: 'country_name', type: 'string', facet: true, optional: true },  // 'India', 'Pakistan'
+    { name: 'city_global_id', type: 'string', facet: true, optional: true },
+    { name: 'city_global_name', type: 'string', facet: true, optional: true },
+    { name: 'region', type: 'string', facet: true, optional: true },  // 'tr' veya 'global'
     
     // Ders bazli puanlar - TÜM DERSLER
     // Ana dersler (LGS/Ortaokul)
@@ -78,6 +87,10 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'option_e', type: 'string', optional: true },  // Lise için 5. şık
     { name: 'correct_answer', type: 'string' },
     { name: 'image_url', type: 'string', optional: true },
+    
+    // Dil desteği (yeni - Questly için)
+    { name: 'lang', type: 'string', facet: true, optional: true },  // 'tr' veya 'en'
+    { name: 'is_global', type: 'bool', facet: true, optional: true },  // Global derse mi ait?
     
     // Filtreleme alanlari
     { name: 'difficulty', type: 'string', facet: true },
@@ -202,12 +215,20 @@ export interface LeaderboardDocument {
   today_correct?: number
   today_date?: string  // "2025-12-27" formatında
   grade: number
+  // Türkiye lokasyon
   city_id?: string
   city_name?: string
   district_id?: string
   district_name?: string
   school_id?: string
   school_name?: string
+  // Global lokasyon (Questly için)
+  country_code?: string  // 'IN', 'PK', 'NG', 'TR'
+  country_name?: string  // 'India', 'Pakistan'
+  city_global_id?: string
+  city_global_name?: string
+  region?: string  // 'tr' veya 'global'
+  // Ders puanları
   matematik_points?: number
   turkce_points?: number
   fen_points?: number
@@ -223,6 +244,10 @@ export interface QuestionDocument {
   question_id: string
   question_text: string
   explanation?: string
+  // Dil desteği (Questly için)
+  lang?: string  // 'tr' veya 'en'
+  is_global?: boolean  // Global derse mi ait?
+  // Filtreleme
   difficulty: string
   subject_id: string
   subject_code: string

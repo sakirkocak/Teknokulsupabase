@@ -613,6 +613,149 @@ const getSubjectGuidelines = (subject: string, grade: number): string => {
    • Gerçek hayatla ilişkilendirme`
 }
 
+// 🌍 QUESTLY GLOBAL: İngilizce soru prompt'u oluştur
+function generateEnglishPrompt(
+  grade: number,
+  subject: string,
+  topic: string,
+  learningOutcome: string,
+  difficulty: Difficulty,
+  count: number,
+  optionCount: number,
+  isHighSchool: boolean,
+  bloomPriority: Record<Difficulty, string[]>
+): string {
+  // Zorluk açıklaması (İngilizce)
+  const difficultyDetailsEN: Record<Difficulty, string> = {
+    easy: 'Basic level - recall, simple application',
+    medium: 'Intermediate level - comprehension, two-step problems',
+    hard: 'Advanced level - analysis, multi-step reasoning',
+    legendary: 'Expert level - synthesis, creative thinking'
+  }
+  
+  // Bloom Taksonomisi (İngilizce)
+  const bloomEN: Record<string, string> = {
+    bilgi: 'knowledge',
+    kavrama: 'comprehension',
+    uygulama: 'application',
+    analiz: 'analysis',
+    sentez: 'synthesis',
+    değerlendirme: 'evaluation'
+  }
+  
+  // Yaş grubu belirleme
+  const ageGroup = grade <= 6 ? '6-12 years old (elementary)' 
+    : grade <= 8 ? '12-14 years old (middle school)' 
+    : grade <= 10 ? '14-16 years old (high school)' 
+    : '16-18 years old (advanced high school)'
+    
+  // Ders İngilizce karşılığı
+  const subjectEN: Record<string, string> = {
+    'Matematik': 'Mathematics',
+    'Fizik': 'Physics',
+    'Kimya': 'Chemistry',
+    'Biyoloji': 'Biology',
+    'Fen Bilimleri': 'Science',
+    'İngilizce': 'English',
+    'Coğrafya': 'Geography',
+    'Tarih': 'History',
+    'Bilişim': 'Computer Science'
+  }
+  
+  const subjectName = subjectEN[subject] || subject
+
+  return `YOU ARE A WORLD-CLASS EDUCATION QUESTION WRITER for Questly - a global learning platform.
+Create ORIGINAL, high-quality multiple choice questions in ENGLISH.
+
+════════════════════════════════════════════════════════════
+🎯 TASK: Generate ${count} ${subjectName.toUpperCase()} questions
+════════════════════════════════════════════════════════════
+
+📚 QUESTION PARAMETERS:
+┌─────────────────────────────────────────────────────────┐
+│ Grade Level: Grade ${grade} (${ageGroup})
+│ Subject: ${subjectName}
+│ Topic: ${topic}
+│ Learning Outcome: "${learningOutcome}"
+│ Difficulty: ${difficulty.toUpperCase()} - ${difficultyDetailsEN[difficulty]}
+│ Number of Options: ${optionCount}
+│ Questions to Generate: ${count}
+└─────────────────────────────────────────────────────────┘
+
+🌍 GLOBAL EDUCATION STANDARDS:
+• Questions must be INTERNATIONALLY RELEVANT (no country-specific curriculum)
+• Use METRIC SYSTEM for measurements (meters, kilograms, liters)
+• Use UNIVERSAL EXAMPLES (global cities, international contexts)
+• Avoid cultural biases or region-specific references
+• Language should be clear, grammatically correct English
+
+🎓 BLOOM'S TAXONOMY (for ${difficulty}):
+   Prioritize: ${bloomPriority[difficulty].map(b => bloomEN[b] || b).join(', ')}
+   
+   • knowledge: Recognizing, listing, recalling
+   • comprehension: Explaining, giving examples, interpreting
+   • application: Calculating, problem-solving, using
+   • analysis: Comparing, relating, distinguishing
+   • synthesis: Designing, planning, creating
+   • evaluation: Critiquing, judging, defending
+
+⚡ QUESTION WRITING RULES:
+
+1. QUESTION STEM:
+   ✓ Clear, unambiguous, single-meaning
+   ✓ Age-appropriate vocabulary for Grade ${grade}
+   ✓ Directly tests the learning outcome
+   ✓ No unnecessary information
+   ${grade <= 6 ? '✓ Short, simple sentences' : grade >= 9 ? '✓ Academic language acceptable' : '✓ Medium-length, clear statements'}
+
+2. OPTIONS (${optionCount} total):
+   ✓ All options plausible and logical
+   ✓ Wrong answers reflect common student mistakes
+   ✓ Similar length across options
+   ✓ "None of the above" or "All of the above" FORBIDDEN
+   ✓ Correct answer should be RANDOMLY distributed (A,B,C,D${isHighSchool ? ',E' : ''})
+
+3. EXPLANATION:
+   ✓ Justify why the answer is correct
+   ✓ Explain why other options are wrong
+   ✓ Educational and encouraging tone
+   ✓ ${grade <= 6 ? 'Simple language' : 'Academic but clear'}
+
+📐 MATH/SCIENCE FORMATTING (LaTeX):
+   • Fraction: $$\\\\frac{a}{b}$$
+   • Root: $$\\\\sqrt{x}$$, $$\\\\sqrt[3]{x}$$
+   • Exponent: $$x^{2}$$, $$e^{x}$$
+   • Subscript: $$x_{1}$$, $$a_{n}$$
+   • Operations: $$\\\\times$$, $$\\\\div$$, $$\\\\pm$$
+   • Special: $$\\\\pi$$, $$\\\\infty$$, $$\\\\sum$$, $$\\\\int$$
+   • Inequality: $$\\\\leq$$, $$\\\\geq$$, $$\\\\neq$$
+
+════════════════════════════════════════════════════════════
+📤 OUTPUT - JSON ONLY (no other text allowed)
+════════════════════════════════════════════════════════════
+{"questions":[{"question_text":"Question text here","options":{"A":"Option A","B":"Option B","C":"Option C","D":"Option D"${isHighSchool ? ',"E":"Option E"' : ''}},"correct_answer":"B","explanation":"Explanation here","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"}]}
+
+⛔ FORBIDDEN:
+• Any text outside JSON
+• Trailing commas
+• Single backslash (use double \\\\ for LaTeX)
+• "None of the above" or "All of the above" options
+• Same letter always being correct
+
+🚫 MEDIA RESTRICTION (IMPORTANT):
+• DO NOT create questions requiring images, tables, graphs, charts
+• DO NOT use "Look at the diagram...", "According to the table...", "The graph shows..."
+• ALL questions must be TEXT-ONLY
+• For visual concepts, describe them in words
+
+✅ REQUIRED:
+• correct_answer: ${isHighSchool ? 'A, B, C, D, or E' : 'A, B, C, or D'}
+• bloom_level: knowledge, comprehension, application, analysis, synthesis, evaluation
+• ALL text in proper English
+
+NOW GENERATE ${count} EXCELLENT ${subjectName.toUpperCase()} QUESTIONS:`
+}
+
 // Sınav formatı ve sınıf özelliklerini belirle
 const getExamContext = (grade: number): { examType: string; format: string; tips: string } => {
   if (grade <= 4) {
@@ -680,7 +823,8 @@ export async function generateCurriculumQuestions(
   topic: string,
   learningOutcome: string,
   difficulty: Difficulty,
-  count: number = 5
+  count: number = 5,
+  lang: 'tr' | 'en' = 'tr'  // 🌍 Questly Global için dil desteği
 ): Promise<CurriculumQuestion[]> {
   // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5)
   const isHighSchool = grade >= 9
@@ -707,7 +851,10 @@ export async function generateCurriculumQuestions(
     ? { easy: ['bilgi', 'kavrama'], medium: ['kavrama', 'uygulama', 'analiz'], hard: ['analiz', 'sentez'], legendary: ['sentez', 'değerlendirme'] }
     : { easy: ['kavrama', 'uygulama'], medium: ['uygulama', 'analiz'], hard: ['analiz', 'sentez'], legendary: ['sentez', 'değerlendirme'] }
 
-  const prompt = `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.
+  // 🌍 QUESTLY GLOBAL: Dile göre prompt oluştur
+  const prompt = lang === 'en' 
+    ? generateEnglishPrompt(grade, subject, topic, learningOutcome, difficulty, count, optionCount, isHighSchool, bloomPriority)
+    : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.
 
 ════════════════════════════════════════════════════════════
 🎯 GÖREV: ${grade}. SINIF ${subject.toUpperCase()} SORUSU ÜRET
