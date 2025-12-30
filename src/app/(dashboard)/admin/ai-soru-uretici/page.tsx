@@ -226,24 +226,37 @@ export default function AIQuestionGeneratorPage() {
           subjects (
             id,
             name,
+            name_en,
             slug,
             icon,
-            color
+            color,
+            is_global
           )
         `)
         .eq('grade_id', selectedGrade)
 
       if (error) throw error
 
-      const subjectList = data
+      // Filter subjects based on language selection
+      // English: show only is_global=true subjects
+      // Turkish: show all subjects
+      let subjectList = data
         ?.map((gs: any) => ({
           id: gs.subjects?.id,
-          name: gs.subjects?.name,
+          name: selectedLanguage === 'en' && gs.subjects?.name_en 
+            ? gs.subjects.name_en 
+            : gs.subjects?.name,
           code: gs.subjects?.slug,
           icon: gs.subjects?.icon || '📖',
-          color: gs.subjects?.color || 'blue'
+          color: gs.subjects?.color || 'blue',
+          is_global: gs.subjects?.is_global || false
         }))
         .filter((s: any) => s.id) || []
+
+      // For English, only show global subjects
+      if (selectedLanguage === 'en') {
+        subjectList = subjectList.filter((s: any) => s.is_global)
+      }
 
       setSubjects(subjectList)
       setSelectedSubject('')
@@ -253,7 +266,7 @@ export default function AIQuestionGeneratorPage() {
     } finally {
       setLoadingSubjects(false)
     }
-  }, [selectedGrade, supabase])
+  }, [selectedGrade, selectedLanguage, supabase])
 
   const loadTopics = useCallback(async () => {
     if (!selectedSubject || !selectedGrade) return
@@ -303,7 +316,8 @@ export default function AIQuestionGeneratorPage() {
           topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
           learningOutcome: topic.learning_outcome || topic.main_topic,
           difficulty: selectedDifficulty,
-          count: questionCount
+          count: questionCount,
+          lang: selectedLanguage  // 🌍 Questly Global için dil desteği
         })
       })
 
@@ -344,9 +358,10 @@ export default function AIQuestionGeneratorPage() {
             options: question.options,
             correct_answer: question.correct_answer,
             explanation: question.explanation,
-            source: 'AI Generated',
+            source: selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated',
             is_active: true,
-            created_by: profile?.id
+            created_by: profile?.id,
+            lang: selectedLanguage  // 🌍 Questly Global için dil desteği
           })
           .select('id')
           .single()
@@ -804,28 +819,37 @@ export default function AIQuestionGeneratorPage() {
               </div>
             </div>
 
-            {/* 🌍 Language Toggle - Questly Global */}
-            <div className="flex bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl p-1 mr-4">
-              <button
-                onClick={() => setSelectedLanguage('tr')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  selectedLanguage === 'tr'
-                    ? 'bg-white text-red-600 shadow ring-2 ring-red-200'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🇹🇷 Türkçe
-              </button>
-              <button
-                onClick={() => setSelectedLanguage('en')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                  selectedLanguage === 'en'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow ring-2 ring-purple-200'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                🌍 English <span className="text-xs bg-green-500 text-white px-1 rounded">Questly</span>
-              </button>
+            {/* 🌍 Language Toggle - Questly Global - BÜYÜK VE BELİRGİN */}
+            <div className="flex flex-col items-end gap-2 mr-4">
+              <div className="flex bg-gradient-to-r from-gray-100 to-gray-50 rounded-2xl p-1.5 shadow-lg border-2 border-gray-200">
+                <button
+                  onClick={() => setSelectedLanguage('tr')}
+                  className={`px-6 py-3 rounded-xl font-bold text-lg transition-all flex items-center gap-3 ${
+                    selectedLanguage === 'tr'
+                      ? 'bg-white text-red-600 shadow-lg ring-2 ring-red-300 scale-105'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  🇹🇷 Türkçe
+                  {selectedLanguage === 'tr' && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Teknokul</span>}
+                </button>
+                <button
+                  onClick={() => setSelectedLanguage('en')}
+                  className={`px-6 py-3 rounded-xl font-bold text-lg transition-all flex items-center gap-3 ${
+                    selectedLanguage === 'en'
+                      ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg ring-2 ring-purple-300 scale-105'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  🌍 English
+                  {selectedLanguage === 'en' && <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">Questly Global</span>}
+                </button>
+              </div>
+              {selectedLanguage === 'en' && (
+                <div className="text-xs text-purple-600 bg-purple-50 px-3 py-1 rounded-full border border-purple-200 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> Sorular questlyonline.com'da yayınlanacak
+                </div>
+              )}
             </div>
 
             {/* Mode Toggle */}
