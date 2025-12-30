@@ -66,6 +66,7 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
   const [membershipType, setMembershipType] = useState<'soft' | 'hard'>('soft')
   const [user, setUser] = useState<any>(null)
   const [earnedXP, setEarnedXP] = useState(0)
+  const [questionShownAt, setQuestionShownAt] = useState<number>(Date.now()) // Anti-bot timestamp
   
   const supabase = createClient()
   
@@ -83,6 +84,7 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
     setLoading(true)
     setSelectedAnswer(null)
     setShowResult(false)
+    setQuestionShownAt(Date.now()) // Anti-bot: soru gösterilme zamanı
 
     try {
       const supabase = createClient()
@@ -165,17 +167,19 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
         const xp = baseXP + difficultyBonus
         setEarnedXP(xp)
         
+        const answerTimeMs = Date.now() - questionShownAt
+        
         // user_answers tablosuna kaydet
         await supabase.from('user_answers').insert({
           user_id: user.id,
           question_id: question.id,
           selected_answer: selectedAnswer,
           is_correct: correct,
-          time_spent: 0 // Drawer'da timer yok
+          time_spent: answerTimeMs
         })
         
-        // Puan güncelle (API üzerinden)
-        await fetch('/api/gamification/add-xp', {
+        // Puan güncelle (API üzerinden) - Anti-bot timestamp ile
+        const response = await fetch('/api/gamification/add-xp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -183,11 +187,19 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
             xp,
             source: 'quick_solve',
             questionId: question.id,
-            isCorrect: correct
+            isCorrect: correct,
+            questionShownAt // Anti-bot: zaman doğrulaması
           })
         })
         
-        console.log(`✅ XP earned: ${xp}`)
+        const result = await response.json()
+        
+        // Rate limit kontrolü
+        if (response.status === 429) {
+          console.warn('⚠️ Rate limit:', result.error)
+        }
+        
+        console.log(`✅ XP earned: ${xp} (${answerTimeMs}ms)`)
       } catch (error) {
         console.error('Failed to save answer:', error)
       }

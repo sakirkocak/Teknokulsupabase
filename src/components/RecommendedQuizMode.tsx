@@ -72,6 +72,7 @@ export default function RecommendedQuizMode({ isOpen, onClose, questions, userId
   const [todaySolved, setTodaySolved] = useState(0)
   const [isFinished, setIsFinished] = useState(false)
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
+  const [questionShownAt, setQuestionShownAt] = useState<number>(Date.now()) // Anti-bot: soru gösterilme zamanı
   
   const supabase = createClient()
   const currentQuestion = questions[currentIndex]
@@ -139,11 +140,11 @@ export default function RecommendedQuizMode({ isOpen, onClose, questions, userId
         question_id: questionId,
         selected_answer: answer,
         is_correct: correct,
-        time_spent: 0
+        time_spent: Date.now() - questionShownAt // Gerçek cevap süresi
       })
 
-      // XP ekle (API üzerinden)
-      await fetch('/api/gamification/add-xp', {
+      // XP ekle (API üzerinden) - Anti-bot timestamp ile
+      const response = await fetch('/api/gamification/add-xp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -151,9 +152,21 @@ export default function RecommendedQuizMode({ isOpen, onClose, questions, userId
           xp: earnedXP,
           source: 'recommended_quiz',
           questionId,
-          isCorrect: correct
+          isCorrect: correct,
+          questionShownAt // Anti-bot: zaman doğrulaması için
         })
       })
+
+      const result = await response.json()
+      
+      // Rate limit veya şüpheli aktivite uyarısı
+      if (response.status === 429) {
+        console.warn('Rate limit:', result.error)
+      }
+      
+      if (result.warning) {
+        console.warn('Uyarı:', result.warning)
+      }
 
       return earnedXP
     } catch (error) {
@@ -206,6 +219,7 @@ export default function RecommendedQuizMode({ isOpen, onClose, questions, userId
       setCurrentIndex(prev => prev + 1)
       setSelectedAnswer(null)
       setShowResult(false)
+      setQuestionShownAt(Date.now()) // Anti-bot: yeni soru için timestamp sıfırla
     } else {
       // Quiz bitti
       setIsFinished(true)

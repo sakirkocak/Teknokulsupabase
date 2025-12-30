@@ -58,9 +58,20 @@ export async function middleware(request: NextRequest) {
   if (user && (isProtectedPath || isAuthPath)) {
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_suspended, suspension_reason')
       .eq('id', user.id)
       .single()
+
+    // Askıya alınmış kullanıcı kontrolü
+    if (profile?.is_suspended) {
+      // Sadece bilgilendirme sayfasına yönlendir
+      if (!pathname.startsWith('/askiya-alindi')) {
+        const suspendUrl = new URL('/askiya-alindi', request.url)
+        suspendUrl.searchParams.set('reason', profile.suspension_reason || 'Şüpheli aktivite tespit edildi')
+        return NextResponse.redirect(suspendUrl)
+      }
+      return response
+    }
 
     if (profile) {
       const roleRoutes: Record<string, string> = {
