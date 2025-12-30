@@ -5,15 +5,16 @@ import { createClient } from '@supabase/supabase-js'
 // Edge runtime - daha hızlı cold start
 export const runtime = 'nodejs' // edge Typesense SDK ile uyumsuz, nodejs kalacak
 
+// ⚠️ CACHE DEVRE DIŞI - Vercel serverless instance'ları eski veri tutuyor!
+// Typesense zaten çok hızlı (100-400ms), cache'e gerek yok
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Supabase service role client (server-side)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-// In-memory cache (serverless instance başına)
-let statsCache: { data: any; timestamp: number } | null = null
-const CACHE_TTL = 2 * 1000 // 2 saniye - anlık güncellemeler için (daha agresif)
 
 export interface StatsResponse {
   totalQuestions: number
@@ -47,48 +48,28 @@ export interface StatsResponse {
 export async function GET(req: NextRequest) {
   const startTime = Date.now()
   
-  // ⚡ CACHE KONTROLU - 60 saniye içinde tekrar istek gelirse cache'den dön
-  const now = Date.now()
-  if (statsCache && (now - statsCache.timestamp) < CACHE_TTL) {
-    const duration = Date.now() - startTime
-    console.log(`⚡ Stats from CACHE: ${duration}ms (${Math.round((now - statsCache.timestamp) / 1000)}s old)`)
-    
-    return new NextResponse(JSON.stringify({
-      ...statsCache.data,
-      source: 'cache',
-      duration,
-      cacheAge: Math.round((now - statsCache.timestamp) / 1000)
-    }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'CDN-Cache-Control': 'no-cache',
-        'Vercel-CDN-Cache-Control': 'no-cache'
-      }
-    })
-  }
-  
+  // ⚠️ CACHE YOK - Her istekte fresh sorgu (Typesense çok hızlı)
   try {
     // Typesense kullanilabilir mi kontrol et
     if (isTypesenseAvailable()) {
       const result = await getStatsFromTypesense()
       
-      // Cache'e kaydet
-      statsCache = { data: result, timestamp: now }
-      
       const duration = Date.now() - startTime
-      console.log(`⚡ Stats from Typesense: ${duration}ms`)
+      console.log(`⚡ Stats from Typesense: ${duration}ms, todayQuestions: ${result.todayQuestions}`)
       
       return new NextResponse(JSON.stringify({
         ...result,
         source: 'typesense',
-        duration
+        duration,
+        timestamp: Date.now() // Debug için
       }), {
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'CDN-Cache-Control': 'no-cache',
-          'Vercel-CDN-Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+          'CDN-Cache-Control': 'no-cache, no-store',
+          'Vercel-CDN-Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache',
+          'Expires': '0'
         }
       })
     }
@@ -96,22 +77,22 @@ export async function GET(req: NextRequest) {
     // Fallback to Supabase
     const result = await getStatsFromSupabase()
     
-    // Cache'e kaydet
-    statsCache = { data: result, timestamp: now }
-    
     const duration = Date.now() - startTime
     console.log(`📊 Stats from Supabase: ${duration}ms`)
     
     return new NextResponse(JSON.stringify({
       ...result,
       source: 'supabase',
-      duration
+      duration,
+      timestamp: Date.now()
     }), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'CDN-Cache-Control': 'no-cache',
-        'Vercel-CDN-Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+        'CDN-Cache-Control': 'no-cache, no-store',
+        'Vercel-CDN-Cache-Control': 'no-cache, no-store',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     })
     
@@ -128,7 +109,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         ...result,
         source: 'supabase_fallback',
-        duration
+        duration,
+        timestamp: Date.now()
+      }, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0'
+        }
       })
     } catch (fallbackError) {
       return NextResponse.json(
