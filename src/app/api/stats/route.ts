@@ -13,7 +13,7 @@ const supabase = createClient(
 
 // In-memory cache (serverless instance başına)
 let statsCache: { data: any; timestamp: number } | null = null
-const CACHE_TTL = 5 * 1000 // 5 saniye - anlık güncellemeler için
+const CACHE_TTL = 2 * 1000 // 2 saniye - anlık güncellemeler için (daha agresif)
 
 export interface StatsResponse {
   totalQuestions: number
@@ -61,9 +61,9 @@ export async function GET(req: NextRequest) {
     }), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
-        'CDN-Cache-Control': 'public, s-maxage=5',
-        'Vercel-CDN-Cache-Control': 'public, s-maxage=5'
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'CDN-Cache-Control': 'no-cache',
+        'Vercel-CDN-Cache-Control': 'no-cache'
       }
     })
   }
@@ -86,9 +86,9 @@ export async function GET(req: NextRequest) {
       }), {
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
-          'CDN-Cache-Control': 'public, s-maxage=5',
-          'Vercel-CDN-Cache-Control': 'public, s-maxage=5'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'CDN-Cache-Control': 'no-cache',
+          'Vercel-CDN-Cache-Control': 'no-cache'
         }
       })
     }
@@ -109,9 +109,9 @@ export async function GET(req: NextRequest) {
     }), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
-        'CDN-Cache-Control': 'public, s-maxage=5',
-        'Vercel-CDN-Cache-Control': 'public, s-maxage=5'
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'CDN-Cache-Control': 'no-cache',
+        'Vercel-CDN-Cache-Control': 'no-cache'
       }
     })
     

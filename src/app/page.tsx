@@ -299,37 +299,37 @@ function LiveStatsBanner() {
     try {
       // ⚡ ŞIMŞEK HIZ - Doğrudan client-side Typesense (liderlik tablosu gibi)
       if (isTypesenseEnabled()) {
-        const result = await getStatsFast()
-        setStats({
-          todayQuestions: result.todayQuestions || 0,
-          activeStudents: result.activeStudents || 0,
-          totalQuestions: result.totalQuestions || 0
-        })
-        console.log(`⚡ Stats (client-side): ${result.duration}ms, todayQuestions: ${result.todayQuestions}`)
+        try {
+          const result = await getStatsFast()
+          setStats({
+            todayQuestions: result.todayQuestions || 0,
+            activeStudents: result.activeStudents || 0,
+            totalQuestions: result.totalQuestions || 0
+          })
+          console.log(`⚡ Stats (client-side): ${result.duration}ms, today: ${result.todayQuestions}, total: ${result.totalQuestions}`)
+        } catch (typesenseError) {
+          // Typesense hatası - API'ye fallback
+          console.warn('Typesense hata, API fallback:', typesenseError)
+          throw typesenseError
+        }
       } else {
         // Typesense yoksa API route kullan (fallback)
-        const response = await fetch('/api/stats')
-        const result = await response.json()
-        setStats({
-          todayQuestions: result.todayQuestions || 0,
-          activeStudents: result.activeStudents || 0,
-          totalQuestions: result.totalQuestions || 0
-        })
-        console.log(`⚡ Stats loaded from ${result.source} in ${result.duration}ms`)
+        throw new Error('Typesense disabled')
       }
     } catch (error) {
-      console.error('Stats yüklenirken hata:', error)
       // Hata durumunda API route'a fallback
       try {
-        const response = await fetch('/api/stats')
+        const response = await fetch('/api/stats?t=' + Date.now()) // Cache bypass
         const result = await response.json()
         setStats({
           todayQuestions: result.todayQuestions || 0,
           activeStudents: result.activeStudents || 0,
           totalQuestions: result.totalQuestions || 0
         })
-      } catch {
-        setStats({ todayQuestions: 0, activeStudents: 0, totalQuestions: 0 })
+        console.log(`⚡ Stats (API fallback): ${result.duration}ms, today: ${result.todayQuestions}, total: ${result.totalQuestions}`)
+      } catch (apiError) {
+        console.error('Stats yüklenemedi:', apiError)
+        // Mevcut değerleri koru, sıfırlama
       }
     }
     setLoading(false)
