@@ -73,6 +73,9 @@ export async function POST(req: NextRequest) {
     // ============================================
     // 🛡️ KATMAN 2: Zaman Doğrulaması
     // ============================================
+    let skipXpGrant = false // XP verilmeyecek ama aktivite kaydedilecek
+    let securityWarning: string | null = null
+    
     if (questionShownAt) {
       const timeValidation = validateAnswerTime(questionShownAt, 1500) // Min 1.5 saniye
       
@@ -103,12 +106,9 @@ export async function POST(req: NextRequest) {
           }, { status: 403 })
         }
         
-        // İlk birkaç ihlalde sadece uyar, puan verme
-        return NextResponse.json({
-          warning: timeValidation.message,
-          xpGranted: false,
-          elapsedMs: timeValidation.elapsedMs
-        }, { status: 200 })
+        // İlk birkaç ihlalde XP verme ama aktiviteyi kaydet
+        skipXpGrant = true
+        securityWarning = timeValidation.message || 'Çok hızlı cevapladınız'
       }
     }
 
@@ -138,23 +138,18 @@ export async function POST(req: NextRequest) {
         }, { status: 403 })
       }
       
-      // Orta risk - sıkı rate limit uygula
+      // Orta risk - XP verme ama aktiviteyi kaydet
       if (anomalyCheck.score >= 50) {
-        const strictLimit = checkRateLimit(`strict:${userId}`, RATE_LIMITS.STRICT)
-        if (!strictLimit.allowed) {
-          return NextResponse.json({
-            error: 'Güvenlik kontrolü - lütfen daha yavaş devam edin',
-            retryAfter: Math.ceil(strictLimit.resetIn / 1000)
-          }, { status: 429 })
-        }
+        skipXpGrant = true
+        securityWarning = 'Güvenlik kontrolü - aktivite kaydedildi ama XP verilmedi'
       }
     }
 
     // ============================================
-    // ✅ Normal İşlem - XP Ekle
+    // ✅ Normal İşlem - XP Ekle (güvenlik kontrolü geçerse)
     // ============================================
     
-    // 1. student_points tablosunu güncelle
+    // 1. student_points tablosunu güncelle (sadece XP verilecekse)
     const { data: currentPoints, error: fetchError } = await supabase
       .from('student_points')
       .select('*')
@@ -169,50 +164,56 @@ export async function POST(req: NextRequest) {
     let newStreak = currentPoints?.current_streak || 0
     let maxStreak = currentPoints?.max_streak || 0
     
-    if (isCorrect) {
-      newStreak += 1
-      if (newStreak > maxStreak) {
-        maxStreak = newStreak
+    // XP verilecekse streak güncelle
+    if (!skipXpGrant) {
+      if (isCorrect) {
+        newStreak += 1
+        if (newStreak > maxStreak) {
+          maxStreak = newStreak
+        }
+      } else {
+        newStreak = 0
       }
-    } else {
-      newStreak = 0
     }
 
-    // Upsert student_points
+    // Upsert student_points (sadece XP verilecekse)
     const updatedPoints = {
       student_id: userId,
-      total_points: (currentPoints?.total_points || 0) + xp,
-      total_questions: (currentPoints?.total_questions || 0) + 1,
-      total_correct: (currentPoints?.total_correct || 0) + (isCorrect ? 1 : 0),
-      total_wrong: (currentPoints?.total_wrong || 0) + (isCorrect ? 0 : 1),
+      total_points: (currentPoints?.total_points || 0) + (skipXpGrant ? 0 : xp),
+      total_questions: (currentPoints?.total_questions || 0) + (skipXpGrant ? 0 : 1),
+      total_correct: (currentPoints?.total_correct || 0) + (skipXpGrant ? 0 : (isCorrect ? 1 : 0)),
+      total_wrong: (currentPoints?.total_wrong || 0) + (skipXpGrant ? 0 : (isCorrect ? 0 : 1)),
       current_streak: newStreak,
       max_streak: maxStreak,
       updated_at: new Date().toISOString()
     }
 
-    const { error: upsertError } = await supabase
-      .from('student_points')
-      .upsert(updatedPoints, { onConflict: 'student_id' })
+    // Sadece XP verilecekse DB'yi güncelle
+    if (!skipXpGrant) {
+      const { error: upsertError } = await supabase
+        .from('student_points')
+        .upsert(updatedPoints, { onConflict: 'student_id' })
 
-    if (upsertError) {
-      console.error('Error upserting student_points:', upsertError)
+      if (upsertError) {
+        console.error('Error upserting student_points:', upsertError)
+      }
+
+      // 2. point_history tablosuna kaydet (güvenlik logları ile)
+      await supabase.from('point_history').insert({
+        student_id: userId,
+        points: xp,
+        source,
+        description: isCorrect ? 'Doğru cevap' : 'Katılım puanı',
+        metadata: {
+          questionId,
+          ip: clientIP,
+          userAgent: req.headers.get('user-agent')?.substring(0, 200),
+          answerTimeMs: questionShownAt ? Date.now() - questionShownAt : null
+        }
+      })
     }
 
-    // 2. point_history tablosuna kaydet (güvenlik logları ile)
-    await supabase.from('point_history').insert({
-      student_id: userId,
-      points: xp,
-      source,
-      description: isCorrect ? 'Doğru cevap' : 'Katılım puanı',
-      metadata: {
-        questionId,
-        ip: clientIP,
-        userAgent: req.headers.get('user-agent')?.substring(0, 200),
-        answerTimeMs: questionShownAt ? Date.now() - questionShownAt : null
-      }
-    })
-
-    // 3. Typesense leaderboard güncelle
+    // 3. Typesense leaderboard güncelle - HER ZAMAN (aktivite sayısı için)
     if (isTypesenseAvailable()) {
       try {
         // Önce profil bilgilerini al
@@ -232,6 +233,10 @@ export async function POST(req: NextRequest) {
 
           // Mevcut leaderboard kaydını kontrol et
           let todayQuestions = 1
+          let existingTotalPoints = currentPoints?.total_points || 0
+          let existingTotalQuestions = currentPoints?.total_questions || 0
+          let existingTotalCorrect = currentPoints?.total_correct || 0
+          
           try {
             const searchResult = await typesenseClient
               .collections(COLLECTIONS.LEADERBOARD)
@@ -249,12 +254,18 @@ export async function POST(req: NextRequest) {
               if (existingDoc.today_date === todayTR) {
                 todayQuestions = (existingDoc.today_questions || 0) + 1
               }
+              // Mevcut değerleri al (XP verilmediyse bunları kullan)
+              if (skipXpGrant) {
+                existingTotalPoints = existingDoc.total_points || 0
+                existingTotalQuestions = existingDoc.total_questions || 0
+                existingTotalCorrect = existingDoc.total_correct || 0
+              }
             }
           } catch (e) {
             // Kayıt bulunamadı, yeni oluşturulacak
           }
 
-          // Leaderboard'a upsert
+          // Leaderboard'a upsert - today_questions HER ZAMAN artar
           await typesenseClient
             .collections(COLLECTIONS.LEADERBOARD)
             .documents()
@@ -264,18 +275,20 @@ export async function POST(req: NextRequest) {
               full_name: profile?.full_name || 'Öğrenci',
               avatar_url: profile?.avatar_url || null,
               grade: profileData.grade || 8,
-              total_points: updatedPoints.total_points,
-              total_questions: updatedPoints.total_questions,
-              total_correct: updatedPoints.total_correct,
-              success_rate: updatedPoints.total_questions > 0
-                ? Math.round((updatedPoints.total_correct / updatedPoints.total_questions) * 100)
+              total_points: skipXpGrant ? existingTotalPoints : updatedPoints.total_points,
+              total_questions: skipXpGrant ? existingTotalQuestions : updatedPoints.total_questions,
+              total_correct: skipXpGrant ? existingTotalCorrect : updatedPoints.total_correct,
+              success_rate: (skipXpGrant ? existingTotalQuestions : updatedPoints.total_questions) > 0
+                ? Math.round(((skipXpGrant ? existingTotalCorrect : updatedPoints.total_correct) / (skipXpGrant ? existingTotalQuestions : updatedPoints.total_questions)) * 100)
                 : 0,
               current_streak: newStreak,
               max_streak: maxStreak,
-              today_questions: todayQuestions,
+              today_questions: todayQuestions, // ← HER ZAMAN artar!
               today_date: todayTR,
               updated_at: Date.now()
             })
+            
+          console.log(`✅ Typesense leaderboard güncellendi: userId=${userId}, today_questions=${todayQuestions}, xpGranted=${!skipXpGrant}`)
         }
       } catch (typesenseError) {
         console.error('Typesense leaderboard update error:', typesenseError)
@@ -283,8 +296,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Sonuç döndür
+    if (skipXpGrant) {
+      return NextResponse.json({
+        success: true,
+        xpGranted: false,
+        warning: securityWarning,
+        message: 'Aktivite kaydedildi ama XP verilmedi'
+      })
+    }
+
     return NextResponse.json({
       success: true,
+      xpGranted: true,
       totalPoints: updatedPoints.total_points,
       totalQuestions: updatedPoints.total_questions,
       streak: newStreak,
