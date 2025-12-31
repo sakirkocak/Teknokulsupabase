@@ -125,14 +125,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Typesense'den istatistikler
+// Typesense'den istatistikler (TAMAMEN Typesense - hızlı!)
 async function getStatsFromTypesense(): Promise<StatsResponse> {
-  // Bugün için tarih (Türkiye saati) - "2025-12-27" formatında
+  // Bugünün tarihi (Türkiye saati) - "2025-12-31" formatında
   const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
-  // ⚡ TUM SORGULARI PARALEL YAP - 3x hiz artisi!
+  // ⚡ TUM SORGULARI PARALEL YAP - Tamamen Typesense!
   const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
-    // 1. Questions collection facet sorgusu
+    // 1. Questions collection facet sorgusu (Typesense)
     typesenseClient
       .collections(COLLECTIONS.QUESTIONS)
       .documents()
@@ -144,7 +144,7 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         max_facet_values: 50
       }),
     
-    // 2. Leaderboard collection ogrenci sayisi
+    // 2. Leaderboard collection ogrenci sayisi (Typesense)
     typesenseClient
       .collections(COLLECTIONS.LEADERBOARD)
       .documents()
@@ -154,16 +154,32 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         per_page: 0
       }),
     
-    // 3. Bugün çözülen sorular (Typesense'den - today_questions toplamı)
+    // 3. ✅ Bugün çözülen sorular - Typesense question_activity'den (hızlı + doğru!)
+    // Eğer koleksiyon yoksa veya boşsa fallback yapılacak
     typesenseClient
-      .collections(COLLECTIONS.LEADERBOARD)
+      .collections(COLLECTIONS.QUESTION_ACTIVITY)
       .documents()
       .search({
         q: '*',
-        query_by: 'full_name',
-        filter_by: `today_date:=${todayTR}`,
-        per_page: 250, // Max öğrenci sayısı
-        include_fields: 'today_questions'
+        query_by: 'activity_id',
+        filter_by: `date:=${todayTR}`,
+        per_page: 0  // Sadece count istiyoruz
+      })
+      .catch(async () => {
+        // Koleksiyon yoksa veya hata olursa Supabase'e fallback
+        console.log('⚠️ question_activity koleksiyonu yok veya boş, Supabase fallback...')
+        const now = new Date()
+        const todayStart = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+        todayStart.setHours(0, 0, 0, 0)
+        const todayStartUTC = new Date(todayStart.getTime() - (3 * 60 * 60 * 1000))
+        
+        const result = await supabase
+          .from('point_history')
+          .select('id', { count: 'exact', head: true })
+          .gte('created_at', todayStartUTC.toISOString())
+          .eq('source', 'question')
+        
+        return { found: result.count || 0, _source: 'supabase' }
       })
   ])
 
@@ -175,13 +191,11 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   // Aktif ogrenci sayisi
   const activeStudents = leaderboardResult.found || 0
   
-  // Bugün çözülen toplam soru sayısı (tüm öğrencilerin today_questions toplamı)
-  let todayQuestions = 0
-  if (todayQuestionsResult.hits && todayQuestionsResult.hits.length > 0) {
-    todayQuestions = todayQuestionsResult.hits.reduce((sum: number, hit: any) => {
-      return sum + (hit.document?.today_questions || 0)
-    }, 0)
-  }
+  // ✅ Bugün çözülen toplam soru sayısı
+  const todayQuestions = todayQuestionsResult.found || 0
+  const source = (todayQuestionsResult as any)._source === 'supabase' ? 'supabase' : 'typesense'
+  
+  console.log(`📊 todayQuestions from ${source}: ${todayQuestions}`)
   
   // Ders bazli dagilim
   const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')

@@ -211,9 +211,48 @@ export async function POST(req: NextRequest) {
           answerTimeMs: questionShownAt ? Date.now() - questionShownAt : null
         }
       })
+
+      // 3. ✅ Typesense question_activity'ye kaydet (append-only, race condition yok!)
+      if (isTypesenseAvailable()) {
+        try {
+          const now = new Date()
+          const todayTR = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+          
+          // Hafta hesapla (ISO week)
+          const startOfYear = new Date(now.getFullYear(), 0, 1)
+          const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000))
+          const weekNum = Math.ceil((days + startOfYear.getDay() + 1) / 7)
+          const weekTR = `${now.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`
+          
+          // Ay hesapla
+          const monthTR = todayTR.substring(0, 7) // "2025-12"
+
+          await typesenseClient
+            .collections(COLLECTIONS.QUESTION_ACTIVITY)
+            .documents()
+            .create({
+              id: `${userId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+              activity_id: `${userId}_${Date.now()}`,
+              student_id: userId,
+              question_id: questionId || '',
+              is_correct: isCorrect,
+              points: xp,
+              source: source,
+              date: todayTR,
+              week: weekTR,
+              month: monthTR,
+              created_at: Date.now()
+            })
+          
+          console.log(`📊 Typesense question_activity kaydedildi: ${userId}, date=${todayTR}`)
+        } catch (activityError) {
+          // Hata olursa logla ama devam et (kritik değil)
+          console.error('Typesense question_activity error:', activityError)
+        }
+      }
     }
 
-    // 3. Typesense leaderboard güncelle - HER ZAMAN (aktivite sayısı için)
+    // 4. Typesense leaderboard güncelle - HER ZAMAN (aktivite sayısı için)
     if (isTypesenseAvailable()) {
       try {
         // Önce profil ve öğrenci bilgilerini al (tüm zorunlu alanlar için)

@@ -32,7 +32,8 @@ export const COLLECTIONS = {
   LOCATIONS: 'locations',
   SCHOOLS: 'schools',
   STUDENT_STATS: 'student_stats',
-  STUDENT_TOPIC_PROGRESS: 'student_topic_progress'
+  STUDENT_TOPIC_PROGRESS: 'student_topic_progress',
+  QUESTION_ACTIVITY: 'question_activity'  // Soru çözüm aktiviteleri (günlük/haftalık stats)
 } as const
 
 /**

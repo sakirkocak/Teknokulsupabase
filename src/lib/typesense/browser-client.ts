@@ -41,7 +41,8 @@ export const COLLECTIONS = {
   LEADERBOARD: 'leaderboard',
   QUESTIONS: 'questions',
   LOCATIONS: 'locations',
-  SCHOOLS: 'schools'
+  SCHOOLS: 'schools',
+  QUESTION_ACTIVITY: 'question_activity'  // Soru çözüm aktiviteleri
 } as const
 
 // Typesense aktif mi? (client-side)
@@ -184,18 +185,23 @@ export interface StatsResult {
 }
 
 /**
- * ⚡ İstatistikler - Doğrudan Typesense'den (~30ms)
+ * ⚡ İstatistikler - Doğrudan Typesense'den (~30ms) - ŞIMŞEK HIZ!
+ * 
+ * ✅ todayQuestions: question_activity koleksiyonundan (append-only, race condition yok!)
+ * ✅ Diğer veriler: questions ve leaderboard koleksiyonlarından
+ * ✅ Tamamen client-side, API round-trip yok
  */
 export async function getStatsFast(): Promise<StatsResult> {
   const startTime = performance.now()
   const client = getTypesenseBrowserClient()
   
-  // Bugünün tarihi (Türkiye saati) - "2025-12-27" formatında
+  // Bugünün tarihi (Türkiye saati) - "2025-12-31" formatında
   const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
   try {
-    // Paralel sorgular
+    // ⚡ Paralel Typesense sorguları
     const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
+      // 1. Soru bankası istatistikleri
       client
         .collections(COLLECTIONS.QUESTIONS)
         .documents()
@@ -206,6 +212,8 @@ export async function getStatsFast(): Promise<StatsResult> {
           facet_by: 'subject_code,subject_name,grade',
           max_facet_values: 50
         }),
+      
+      // 2. Aktif öğrenci sayısı
       client
         .collections(COLLECTIONS.LEADERBOARD)
         .documents()
@@ -214,16 +222,21 @@ export async function getStatsFast(): Promise<StatsResult> {
           query_by: 'full_name',
           per_page: 0
         }),
-      // Bugün çözülen sorular (today_questions toplamı)
+      
+      // 3. ✅ Bugün çözülen sorular - question_activity'den (hızlı + doğru!)
       client
-        .collections(COLLECTIONS.LEADERBOARD)
+        .collections(COLLECTIONS.QUESTION_ACTIVITY)
         .documents()
         .search({
           q: '*',
-          query_by: 'full_name',
-          filter_by: `today_date:=${todayTR}`,
-          per_page: 250,
-          include_fields: 'today_questions'
+          query_by: 'activity_id',
+          filter_by: `date:=${todayTR}`,
+          per_page: 0  // Sadece count
+        })
+        .catch(() => {
+          // Koleksiyon yoksa veya boşsa 0 döndür (fallback API'ye)
+          console.warn('⚠️ question_activity koleksiyonu henüz hazır değil')
+          return { found: 0 }
         })
     ])
 
@@ -245,10 +258,8 @@ export async function getStatsFast(): Promise<StatsResult> {
       }))
       .sort((a: any, b: any) => a.grade - b.grade)
 
-    // Bugün çözülen toplam soru sayısı
-    const todayQuestions = (todayQuestionsResult.hits || []).reduce((sum: number, hit: any) => {
-      return sum + (hit.document?.today_questions || 0)
-    }, 0)
+    // Bugün çözülen soru sayısı
+    const todayQuestions = todayQuestionsResult.found || 0
 
     const duration = Math.round(performance.now() - startTime)
     console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions}`)
@@ -263,7 +274,19 @@ export async function getStatsFast(): Promise<StatsResult> {
     }
   } catch (error) {
     console.error('Typesense browser stats error:', error)
-    throw error
+    // Hata durumunda API'ye fallback
+    console.log('⚠️ Typesense hatası, API fallback...')
+    const response = await fetch('/api/stats?t=' + Date.now())
+    const result = await response.json()
+    const duration = Math.round(performance.now() - startTime)
+    return {
+      totalQuestions: result.totalQuestions || 0,
+      activeStudents: result.activeStudents || 0,
+      todayQuestions: result.todayQuestions || 0,
+      bySubject: [],
+      byGrade: [],
+      duration
+    }
   }
 }
 
@@ -727,7 +750,6 @@ export async function getSubjectLeaderboardFast(
   }
 }
 
-
 // =====================================================
 // 📚 ADMIN SORU YÖNETİMİ
 // =====================================================
@@ -875,8 +897,8 @@ export async function searchQuestionsForAdmin(
       total: result.found || 0,
       stats: {
         total: result.found || 0,
-        easy: diffStats.easy, medium: diffStats.medium, hard: diffStats.hard, legendary: diffStats.legendary,
-        withImage: 0,
+        ...diffStats,
+        withImage: 0, // Facet'te yok, ayrı sorgu lazım
         byGrade
       },
       duration
@@ -904,6 +926,7 @@ export async function getQuestionStatsFast(): Promise<{
   const client = getTypesenseBrowserClient()
 
   try {
+    // İki paralel sorgu: Tüm sorular + Görüntülü sorular
     const [allResult, imageResult] = await Promise.all([
       client
         .collections(COLLECTIONS.QUESTIONS)
@@ -947,7 +970,7 @@ export async function getQuestionStatsFast(): Promise<{
 
     return {
       total: allResult.found || 0,
-      easy: diffStats.easy, medium: diffStats.medium, hard: diffStats.hard, legendary: diffStats.legendary,
+      ...diffStats,
       withImage: imageResult.found || 0,
       byGrade,
       duration

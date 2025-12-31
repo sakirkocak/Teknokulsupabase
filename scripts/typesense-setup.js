@@ -197,6 +197,32 @@ const studentTopicProgressSchema = {
   default_sorting_field: 'last_practiced_at'
 }
 
+// Question Activity Collection Schema (Soru Çözüm Aktiviteleri)
+// Her soru çözümü için bir kayıt - append-only, race condition yok!
+const questionActivitySchema = {
+  name: 'question_activity',
+  fields: [
+    { name: 'activity_id', type: 'string' },
+    { name: 'student_id', type: 'string', facet: true },
+    { name: 'question_id', type: 'string', facet: true, optional: true },
+    
+    { name: 'is_correct', type: 'bool', facet: true },
+    { name: 'points', type: 'int32' },
+    { name: 'source', type: 'string', facet: true },  // 'question', 'duel', 'challenge'
+    
+    // Tarih filtreleme
+    { name: 'date', type: 'string', facet: true },   // "2025-12-31"
+    { name: 'week', type: 'string', facet: true, optional: true },   // "2025-W01"
+    { name: 'month', type: 'string', facet: true, optional: true },  // "2025-12"
+    
+    { name: 'subject_code', type: 'string', facet: true, optional: true },
+    { name: 'grade', type: 'int32', facet: true, optional: true },
+    
+    { name: 'created_at', type: 'int64', sort: true }
+  ],
+  default_sorting_field: 'created_at'
+}
+
 // Tüm şemalar
 const ALL_SCHEMAS = [
   leaderboardSchema,
@@ -204,7 +230,8 @@ const ALL_SCHEMAS = [
   locationsSchema,
   schoolsSchema,
   studentStatsSchema,
-  studentTopicProgressSchema
+  studentTopicProgressSchema,
+  questionActivitySchema
 ]
 
 async function createCollection(schema, forceRecreate = false) {
@@ -272,7 +299,7 @@ async function main() {
   console.log('📦 Collection\'lar oluşturuluyor...\n')
   
   // Yeni collection isimleri
-  const newCollections = ['locations', 'schools', 'student_stats', 'student_topic_progress']
+  const newCollections = ['locations', 'schools', 'student_stats', 'student_topic_progress', 'question_activity']
   
   let created = 0
   let skipped = 0

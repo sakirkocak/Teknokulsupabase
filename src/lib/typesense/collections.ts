@@ -194,6 +194,40 @@ export const studentTopicProgressSchema: CollectionCreateSchema = {
 }
 
 // ============================================
+// 📊 QUESTION ACTIVITY - Soru Çözüm Aktiviteleri
+// ============================================
+// Her soru çözümü için bir kayıt (append-only, race condition yok!)
+// Günlük/haftalık/aylık istatistikler için kullanılır
+
+export const questionActivitySchema: CollectionCreateSchema = {
+  name: 'question_activity',
+  fields: [
+    // Aktivite bilgileri
+    { name: 'activity_id', type: 'string' },
+    { name: 'student_id', type: 'string', facet: true },
+    { name: 'question_id', type: 'string', facet: true, optional: true },
+    
+    // Sonuç
+    { name: 'is_correct', type: 'bool', facet: true },
+    { name: 'points', type: 'int32' },
+    { name: 'source', type: 'string', facet: true },  // 'question', 'duel', 'challenge'
+    
+    // Tarih filtreleme (facet: true - hızlı filtreleme için)
+    { name: 'date', type: 'string', facet: true },  // "2025-12-31" formatında
+    { name: 'week', type: 'string', facet: true, optional: true },  // "2025-W01" formatında
+    { name: 'month', type: 'string', facet: true, optional: true },  // "2025-12" formatında
+    
+    // Ders bilgisi (opsiyonel, analiz için)
+    { name: 'subject_code', type: 'string', facet: true, optional: true },
+    { name: 'grade', type: 'int32', facet: true, optional: true },
+    
+    // Zaman damgası
+    { name: 'created_at', type: 'int64', sort: true }
+  ],
+  default_sorting_field: 'created_at'
+}
+
+// ============================================
 // DOCUMENT TYPE DEFINITIONS
 // ============================================
 
@@ -323,4 +357,21 @@ export interface StudentTopicProgressDocument {
   consecutive_correct: number
   last_practiced_at: number
   next_review_at?: number
+}
+
+// Question Activity document tipi (soru çözüm aktiviteleri)
+export interface QuestionActivityDocument {
+  id: string
+  activity_id: string
+  student_id: string
+  question_id?: string
+  is_correct: boolean
+  points: number
+  source: 'question' | 'duel' | 'challenge'
+  date: string      // "2025-12-31"
+  week?: string     // "2025-W01"
+  month?: string    // "2025-12"
+  subject_code?: string
+  grade?: number
+  created_at: number
 }
