@@ -375,13 +375,9 @@ export async function POST(request: NextRequest) {
         if (uploadError) {
           console.error('⚠️ Storage upload failed:', uploadError)
         } else {
-          // Public URL al
-          const { data: urlData } = serviceClient.storage
-            .from('question-bank-pdfs')
-            .getPublicUrl(fileName)
-          
-          pdfUrl = urlData.publicUrl
-          console.log(`✅ PDF uploaded: ${pdfUrl}`)
+          // Proxy URL oluştur (teknokul.com.tr/pdf/slug.pdf formatında)
+          pdfUrl = `https://teknokul.com.tr/pdf/${slug}.pdf`
+          console.log(`✅ PDF uploaded, URL: ${pdfUrl}`)
           
           // question_banks tablosunu güncelle
           await serviceClient
