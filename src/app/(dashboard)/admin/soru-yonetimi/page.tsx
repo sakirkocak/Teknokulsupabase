@@ -249,7 +249,7 @@ export default function AdminSoruYonetimiPage() {
         const questionIds = result.questions.map(q => q.question_id)
         
         if (questionIds.length > 0) {
-          const { data: detailedQuestions } = await supabase
+          const { data: detailedQuestions, error: detailError } = await supabase
             .from('questions')
             .select(`
               id,
@@ -268,19 +268,23 @@ export default function AdminSoruYonetimiPage() {
               times_answered,
               times_correct,
               created_at,
-              topic:topics!inner(
+              topic:topics(
                 id,
                 subject_id,
                 grade,
                 main_topic,
                 sub_topic,
                 learning_outcome,
-                subject:subjects!inner(id, name, code, icon)
+                subject:subjects(id, name, code, icon)
               )
             `)
             .in('id', questionIds)
           
-          if (detailedQuestions) {
+          if (detailError) {
+            console.error('Supabase detail fetch error:', detailError)
+          }
+          
+          if (detailedQuestions && detailedQuestions.length > 0) {
             // Typesense sıralamasını koru
             const questionMap = new Map(detailedQuestions.map(q => [q.id, q]))
             const mappedQuestions: Question[] = questionIds
@@ -288,7 +292,7 @@ export default function AdminSoruYonetimiPage() {
               .filter(Boolean)
               .map((q: any) => ({
                 id: q.id,
-                topic_id: q.topic_id,
+                topic_id: q.topic_id || '',
                 difficulty: q.difficulty,
                 question_text: q.question_text,
                 question_image_url: q.question_image_url,
@@ -305,21 +309,27 @@ export default function AdminSoruYonetimiPage() {
                 times_answered: q.times_answered || 0,
                 times_correct: q.times_correct || 0,
                 created_at: q.created_at,
-                topic: q.topic
+                topic: q.topic || {
+                  id: '',
+                  subject_id: '',
+                  grade: 0,
+                  main_topic: 'Bilinmiyor',
+                  sub_topic: null,
+                  learning_outcome: null,
+                  subject: { id: '', name: 'Bilinmiyor', code: '', icon: null }
+                }
               }))
             
             setQuestions(mappedQuestions)
             setTotalCount(result.total)
-            console.log(`⚡ Questions: Typesense search + Supabase details in ${result.duration}ms`)
+            console.log(`⚡ Questions: Typesense search + Supabase details in ${result.duration}ms, found ${mappedQuestions.length}`)
             setLoading(false)
             return
           }
         }
         
-        setQuestions([])
-        setTotalCount(result.total)
-        setLoading(false)
-        return
+        // Typesense sonuç verdi ama Supabase detay bulamadı - fallback'e geç
+        console.warn('Typesense found questions but Supabase details failed, falling back...')
       } catch (error) {
         console.error('Typesense questions error, falling back to Supabase:', error)
       }
