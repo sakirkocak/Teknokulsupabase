@@ -143,7 +143,10 @@ export default function AdminPDFSoruBankalariPage() {
       }
       
       setMessage({ type: 'success', text: 'Soru bankası silindi!' })
-      loadBanks()
+      // State'i güncelle ve yeniden yükle
+      setSearchQuery('')
+      setFilterSubject('')
+      await loadBanks()
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message || 'Silme işlemi başarısız!' })
     }
