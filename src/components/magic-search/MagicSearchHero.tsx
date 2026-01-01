@@ -7,7 +7,7 @@ import {
   TrendingUp, ArrowRight, Loader2, X,
   Calculator, Microscope, Globe, Languages,
   ChevronRight, ChevronDown, GraduationCap,
-  Clock, Lightbulb
+  Clock, Lightbulb, Brain
 } from 'lucide-react'
 import { searchQuestionsFast, isTypesenseEnabled, getTopicSuggestionsFast } from '@/lib/typesense/browser-client'
 import QuestionSolveDrawer from './QuestionSolveDrawer'
@@ -91,6 +91,7 @@ export default function MagicSearchHero() {
   const [searchHistory, setSearchHistory] = useState<string[]>([])
   const [topicSuggestions, setTopicSuggestions] = useState<TopicSuggestion[]>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [semanticMode, setSemanticMode] = useState(false)  // 🧠 Semantic Search modu
   
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -124,16 +125,10 @@ export default function MagicSearchHero() {
     setLoadingSuggestions(false)
   }, [selectedGrade])
 
-  // Typesense ile arama
-  const performSearch = useCallback(async (searchQuery: string, grade: number | null) => {
+  // Typesense ile arama (normal veya semantic)
+  const performSearch = useCallback(async (searchQuery: string, grade: number | null, useSemantic: boolean) => {
     if (!searchQuery || searchQuery.length < 2) {
       setResults([])
-      setLoading(false)
-      return
-    }
-
-    if (!isTypesenseEnabled()) {
-      console.warn('Typesense not enabled')
       setLoading(false)
       return
     }
@@ -141,13 +136,57 @@ export default function MagicSearchHero() {
     setLoading(true)
 
     try {
-      const { results: searchResults, duration } = await searchQuestionsFast(searchQuery, {
-        limit: 8,
-        grade: grade || undefined // Sınıf filtresi ekle
-      })
-      
-      console.log(`⚡ Magic Search: ${duration}ms, ${searchResults.length} results, grade: ${grade || 'all'}`)
-      setResults(searchResults)
+      // 🧠 Semantic Search modu
+      if (useSemantic) {
+        const response = await fetch('/api/search/semantic', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: searchQuery,
+            grade: grade || undefined,
+            limit: 8
+          })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          const searchResults = (data.results || []).map((r: any) => ({
+            question_id: r.question_id,
+            question_text: r.question_text,
+            highlight: r.question_text,
+            subject_name: r.subject_name,
+            subject_code: r.subject_code,
+            grade: r.grade,
+            main_topic: r.main_topic,
+            difficulty: r.difficulty
+          }))
+          console.log(`🧠 Semantic Search: ${data.timing?.total}ms, ${searchResults.length} results`)
+          setResults(searchResults)
+        } else {
+          // Semantic başarısız olursa normal aramaya düş
+          console.warn('Semantic search failed, falling back to text search')
+          const { results: fallbackResults } = await searchQuestionsFast(searchQuery, {
+            limit: 8,
+            grade: grade || undefined
+          })
+          setResults(fallbackResults)
+        }
+      } else {
+        // Normal text arama
+        if (!isTypesenseEnabled()) {
+          console.warn('Typesense not enabled')
+          setLoading(false)
+          return
+        }
+
+        const { results: searchResults, duration } = await searchQuestionsFast(searchQuery, {
+          limit: 8,
+          grade: grade || undefined
+        })
+        
+        console.log(`⚡ Magic Search: ${duration}ms, ${searchResults.length} results, grade: ${grade || 'all'}`)
+        setResults(searchResults)
+      }
     } catch (error) {
       console.error('Search error:', error)
       setResults([])
@@ -167,9 +206,11 @@ export default function MagicSearchHero() {
 
     if (query.length >= 2) {
       setLoading(true)
+      // Semantic modda biraz daha bekle (API çağrısı)
+      const debounceTime = semanticMode ? 400 : 200
       timeoutRef.current = setTimeout(() => {
-        performSearch(query, selectedGrade)
-      }, 200) // 200ms debounce - çok hızlı!
+        performSearch(query, selectedGrade, semanticMode)
+      }, debounceTime)
     } else {
       setResults([])
       setLoading(false)
@@ -188,7 +229,7 @@ export default function MagicSearchHero() {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current)
     }
-  }, [query, selectedGrade, performSearch, loadSuggestions])
+  }, [query, selectedGrade, semanticMode, performSearch, loadSuggestions])
   
   // Grade dropdown dışına tıklanınca kapat
   useEffect(() => {
@@ -277,8 +318,40 @@ export default function MagicSearchHero() {
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Konu yaz, anında bul, hemen çöz! 
               <span className="text-indigo-600 font-medium"> 10.000+ soru</span> arasında 
-              <span className="text-purple-600 font-medium"> 20ms</span>'de ara.
+              <span className="text-purple-600 font-medium"> {semanticMode ? '~200ms' : '20ms'}</span>'de ara.
             </p>
+            
+            {/* 🧠 Semantic Mode Toggle */}
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <button
+                onClick={() => setSemanticMode(false)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  !semanticMode 
+                    ? 'bg-indigo-500 text-white shadow-md' 
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                Normal Arama
+              </button>
+              <button
+                onClick={() => setSemanticMode(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  semanticMode 
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-md' 
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-purple-300'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                Akıllı Arama
+                <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">Beta</span>
+              </button>
+            </div>
+            {semanticMode && (
+              <p className="text-xs text-purple-600 mt-2">
+                🧠 Anlam tabanlı arama: "ivme" yazınca "hızlanma", "F=ma" soruları da gelir
+              </p>
+            )}
           </motion.div>
 
           {/* Search Box */}

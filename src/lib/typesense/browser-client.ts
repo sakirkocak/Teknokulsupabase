@@ -537,6 +537,200 @@ export async function getTopicSuggestionsFast(params: {
 }
 
 // =====================================================
+// 🧠 SEMANTIC SEARCH - Vector Search
+// =====================================================
+
+/**
+ * ⚡ Semantic Search - Anlam tabanlı soru arama
+ * 
+ * Embedding ile sorgu yapar, benzer anlamlı soruları bulur.
+ * Normal arama ile birleşik (hybrid) çalışabilir.
+ * 
+ * Not: Bu fonksiyon server-side'da çağrılmalı çünkü 
+ * Gemini API key client'ta güvenli değil.
+ */
+export async function semanticSearchQuestions(params: {
+  embedding: number[]  // 768 boyutlu vektör (server'dan gelecek)
+  grade?: number
+  subjectCode?: string
+  difficulty?: string
+  limit?: number
+  excludeIds?: string[]
+}): Promise<{
+  results: Array<{
+    question_id: string
+    question_text: string
+    subject_name: string
+    subject_code: string
+    grade: number
+    main_topic: string
+    difficulty: string
+    score: number  // Similarity score
+  }>
+  total: number
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const {
+    embedding,
+    grade,
+    subjectCode,
+    difficulty,
+    limit = 10,
+    excludeIds = []
+  } = params
+
+  // Filter oluştur
+  const filterParts: string[] = []
+  if (grade) filterParts.push(`grade:=${grade}`)
+  if (subjectCode) filterParts.push(`subject_code:=${subjectCode}`)
+  if (difficulty) filterParts.push(`difficulty:=${difficulty}`)
+  if (excludeIds.length > 0) {
+    filterParts.push(`question_id:!=[${excludeIds.join(',')}]`)
+  }
+
+  try {
+    // Vector search with optional filters
+    const result = await client
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        vector_query: `embedding:([${embedding.join(',')}], k:${limit})`,
+        filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
+        per_page: limit,
+        include_fields: 'question_id,question_text,subject_name,subject_code,grade,main_topic,difficulty'
+      })
+
+    const results = (result.hits || []).map((hit: any) => {
+      const doc = hit.document as any
+      return {
+        question_id: doc.question_id,
+        question_text: doc.question_text,
+        subject_name: doc.subject_name,
+        subject_code: doc.subject_code,
+        grade: doc.grade,
+        main_topic: doc.main_topic,
+        difficulty: doc.difficulty,
+        score: hit.vector_distance ? 1 - hit.vector_distance : 0  // Distance to similarity
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`🧠 Semantic Search (browser): ${duration}ms, ${results.length} results`)
+
+    return { results, total: result.found || 0, duration }
+  } catch (error) {
+    console.error('Typesense semantic search error:', error)
+    return { results: [], total: 0, duration: 0 }
+  }
+}
+
+/**
+ * ⚡ Hybrid Search - Kelime + Anlam birleşik arama
+ * 
+ * Hem text match hem de vector similarity kullanır.
+ * En iyi sonuçlar için önerilen yöntem.
+ */
+export async function hybridSearchQuestions(params: {
+  query: string
+  embedding?: number[]  // Opsiyonel - varsa hybrid, yoksa sadece text
+  grade?: number
+  subjectCode?: string
+  difficulty?: string
+  limit?: number
+}): Promise<{
+  results: Array<{
+    question_id: string
+    question_text: string
+    highlight: string
+    subject_name: string
+    subject_code: string
+    grade: number
+    main_topic: string
+    difficulty: string
+    matchType: 'text' | 'semantic' | 'hybrid'
+  }>
+  total: number
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const {
+    query,
+    embedding,
+    grade,
+    subjectCode,
+    difficulty,
+    limit = 10
+  } = params
+
+  // Filter oluştur
+  const filterParts: string[] = []
+  if (grade) filterParts.push(`grade:=${grade}`)
+  if (subjectCode) filterParts.push(`subject_code:=${subjectCode}`)
+  if (difficulty) filterParts.push(`difficulty:=${difficulty}`)
+
+  try {
+    // Hybrid search yapısı
+    const searchParams: any = {
+      q: query || '*',
+      query_by: 'question_text,main_topic,sub_topic',
+      filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
+      per_page: limit,
+      highlight_full_fields: 'question_text',
+      num_typos: 2
+    }
+
+    // Eğer embedding varsa, vector search de ekle
+    if (embedding && embedding.length === 768) {
+      searchParams.vector_query = `embedding:([${embedding.join(',')}], k:${limit}, alpha:0.5)`
+      // alpha: 0.5 = yarı text, yarı vector (hybrid)
+    }
+
+    const result = await client
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search(searchParams)
+
+    const results = (result.hits || []).map((hit: any) => {
+      const doc = hit.document as any
+      const hasVectorScore = hit.vector_distance !== undefined
+      const hasTextScore = hit.text_match !== undefined
+      
+      let matchType: 'text' | 'semantic' | 'hybrid' = 'text'
+      if (hasVectorScore && hasTextScore) matchType = 'hybrid'
+      else if (hasVectorScore) matchType = 'semantic'
+      
+      return {
+        question_id: doc.question_id,
+        question_text: doc.question_text,
+        highlight: hit.highlight?.question_text?.snippet || doc.question_text,
+        subject_name: doc.subject_name,
+        subject_code: doc.subject_code,
+        grade: doc.grade,
+        main_topic: doc.main_topic,
+        difficulty: doc.difficulty,
+        matchType
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    const searchType = embedding ? '🧠 Hybrid' : '⚡ Text'
+    console.log(`${searchType} Search (browser): ${duration}ms, "${query}", ${results.length} results`)
+
+    return { results, total: result.found || 0, duration }
+  } catch (error) {
+    console.error('Typesense hybrid search error:', error)
+    return { results: [], total: 0, duration: 0 }
+  }
+}
+
+// =====================================================
 // 🗺️ LOKASYON SORGULARI - İl/İlçe/Okul
 // =====================================================
 

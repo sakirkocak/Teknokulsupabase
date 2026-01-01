@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Typesense from 'typesense'
 import { createClient } from '@supabase/supabase-js'
+import { getQuestionEmbedding } from '@/lib/gemini-embedding'
 
 // Typesense admin client
 const typesense = new Typesense.Client({
@@ -225,7 +226,29 @@ async function handleQuestionsSync(
       // Options JSONB'den şıkları çıkar
       const options = record.options || {}
       
-      const document = {
+      // 🧠 Semantic Search için embedding üret
+      let embedding: number[] | undefined
+      try {
+        embedding = await getQuestionEmbedding({
+          questionText: record.question_text || '',
+          mainTopic: topicData.main_topic,
+          subTopic: topicData.sub_topic,
+          subjectName: (topicData.subject as any)?.name,
+          options: {
+            A: options.A || options.a || '',
+            B: options.B || options.b || '',
+            C: options.C || options.c || '',
+            D: options.D || options.d || '',
+            E: options.E || options.e || ''
+          }
+        })
+        console.log(`🧠 Embedding generated for question: ${record.id}`)
+      } catch (embeddingError) {
+        console.warn(`⚠️ Embedding failed for ${record.id}:`, (embeddingError as Error).message)
+        // Embedding başarısız olsa bile soruyu kaydet
+      }
+
+      const document: Record<string, any> = {
         id: record.id,
         question_id: record.id,
         question_text: record.question_text || '',
@@ -249,16 +272,21 @@ async function handleQuestionsSync(
         image_url: record.question_image_url || '',
         times_answered: record.times_answered || 0,
         times_correct: record.times_correct || 0,
-        success_rate: record.times_answered > 0 
-          ? (record.times_correct / record.times_answered) * 100 
+        success_rate: record.times_answered > 0
+          ? (record.times_correct / record.times_answered) * 100
           : 0,
-        created_at: record.created_at 
-          ? new Date(record.created_at).getTime() 
+        created_at: record.created_at
+          ? new Date(record.created_at).getTime()
           : Date.now()
       }
-      
+
+      // Embedding varsa ekle
+      if (embedding && embedding.length === 768) {
+        document.embedding = embedding
+      }
+
       await typesense.collections('questions').documents().upsert(document)
-      console.log(`Question upserted: ${record.id}`)
+      console.log(`Question upserted: ${record.id} ${embedding ? '(with embedding)' : '(no embedding)'}`)
     }
   }
   

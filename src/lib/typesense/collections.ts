@@ -88,6 +88,9 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'correct_answer', type: 'string' },
     { name: 'image_url', type: 'string', optional: true },
     
+    // 🧠 Semantic Search - Gemini Embedding (768 boyut)
+    { name: 'embedding', type: 'float[]', num_dim: 768, optional: true },
+    
     // Dil desteği (yeni - Questly için)
     { name: 'lang', type: 'string', facet: true, optional: true },  // 'tr' veya 'en'
     { name: 'is_global', type: 'bool', facet: true, optional: true },  // Global derse mi ait?
@@ -278,6 +281,8 @@ export interface QuestionDocument {
   question_id: string
   question_text: string
   explanation?: string
+  // 🧠 Semantic Search - Gemini Embedding
+  embedding?: number[]  // 768 boyutlu vektör
   // Dil desteği (Questly için)
   lang?: string  // 'tr' veya 'en'
   is_global?: boolean  // Global derse mi ait?
