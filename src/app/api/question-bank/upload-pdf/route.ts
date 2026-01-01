@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
 // Service role client - Storage için RLS bypass
 const getServiceClient = () => {
@@ -18,6 +19,32 @@ export async function POST(request: NextRequest) {
     
     if (!pdfFile || !bankId || !slug) {
       return NextResponse.json({ error: 'PDF, bankId ve slug gerekli' }, { status: 400 })
+    }
+    
+    // Güvenlik: bankId'nin gerçekten var olduğunu ve yakın zamanda oluşturulduğunu kontrol et
+    const authSupabase = await createServerClient()
+    const { data: bank, error: bankError } = await authSupabase
+      .from('question_banks')
+      .select('id, created_at')
+      .eq('id', bankId)
+      .single()
+    
+    if (bankError || !bank) {
+      return NextResponse.json({ error: 'Geçersiz soru bankası' }, { status: 400 })
+    }
+    
+    // Sadece son 5 dakika içinde oluşturulan bankalar için upload izni ver
+    const createdAt = new Date(bank.created_at)
+    const now = new Date()
+    const diffMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60)
+    
+    if (diffMinutes > 5) {
+      return NextResponse.json({ error: 'Upload süresi doldu' }, { status: 403 })
+    }
+    
+    // Dosya boyutu kontrolü (max 10MB)
+    if (pdfFile.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Dosya çok büyük (max 10MB)' }, { status: 400 })
     }
     
     const supabase = getServiceClient()
