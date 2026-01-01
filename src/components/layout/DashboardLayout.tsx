@@ -99,6 +99,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Geri Bildirimler', href: '/admin/geri-bildirimler', icon: MessageSquare },
     { label: 'Sınav Takvimi', href: '/admin/sinav-takvimi', icon: Calendar },
     { label: 'Güvenlik', href: '/admin/guvenlik', icon: Shield },
+    { label: 'PDF Soru Bankaları', href: '/admin/pdf-soru-bankalari', icon: FileText },
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
     { label: 'Ayarlar', href: '/admin/ayarlar', icon: Settings },

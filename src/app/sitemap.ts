@@ -259,6 +259,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Sınıf sayfaları sitemap hatası:', error)
   }
 
+  // ========== PDF SORU BANKALARI ==========
+  let pdfBankPages: MetadataRoute.Sitemap = []
+  
+  try {
+    const { data: pdfBanks } = await supabase
+      .from('question_banks')
+      .select('slug, created_at, updated_at')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(5000)
+    
+    if (pdfBanks) {
+      // PDF Soru Bankası ana sayfaları
+      pdfBankPages = [
+        {
+          url: `${baseUrl}/soru-bankasi/olustur`,
+          lastModified: new Date(),
+          changeFrequency: 'daily' as const,
+          priority: 0.9,
+        },
+        {
+          url: `${baseUrl}/soru-bankasi/kesif`,
+          lastModified: new Date(),
+          changeFrequency: 'hourly' as const,
+          priority: 0.85,
+        },
+        // Her PDF soru bankası için sayfa
+        ...pdfBanks.map((bank) => ({
+          url: `${baseUrl}/soru-bankasi/${bank.slug}`,
+          lastModified: bank.updated_at ? new Date(bank.updated_at) : new Date(bank.created_at),
+          changeFrequency: 'monthly' as const,
+          priority: 0.75,
+        }))
+      ]
+    }
+  } catch (error) {
+    console.error('PDF Soru Bankası sayfaları sitemap hatası:', error)
+  }
+
   // ========== TEK SORU SAYFALARI (31.000+) ==========
   let questionPages: MetadataRoute.Sitemap = []
   
@@ -299,6 +338,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...questionBankPages,
     ...subjectPages,
     ...gradePages,
+    ...pdfBankPages,
     ...questionPages,
   ]
 }

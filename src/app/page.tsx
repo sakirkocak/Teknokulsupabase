@@ -775,9 +775,9 @@ export default function HomePage() {
                 <Trophy className="w-4 h-4" />
                 Liderlik
               </Link>
-              <Link href="/sorular" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+              <Link href="/soru-bankasi/olustur" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
                 <FileText className="w-4 h-4" />
-                Soru Bankası
+                PDF Soru Bankası
               </Link>
               <Link href="/rehberler" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
                 <BookOpen className="w-4 h-4" />
@@ -1163,6 +1163,52 @@ export default function HomePage() {
 
       {/* 🔮 SİHİRLİ SORU ARAMA - TYPESENSE */}
       <MagicSearchHero />
+
+      {/* 📚 PDF SORU BANKASI OLUŞTUR */}
+      <section className="py-12 px-4 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="bg-white rounded-2xl shadow-lg p-6 md:p-8"
+          >
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                <FileText className="w-8 h-8 text-white" />
+              </div>
+              <div className="flex-1 text-center md:text-left">
+                <div className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 rounded-full text-indigo-700 text-xs font-medium mb-2">
+                  <Sparkles className="w-3 h-3" />
+                  Yeni
+                </div>
+                <h3 className="text-xl font-bold text-surface-900 mb-1">
+                  Kendi Soru Bankamı Oluştur
+                </h3>
+                <p className="text-surface-500 text-sm">
+                  "8. sınıf matematik denklemler 50 soru" yaz, PDF olarak indir!
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                <Link
+                  href="/soru-bankasi/olustur"
+                  className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  PDF Oluştur
+                </Link>
+                <Link
+                  href="/soru-bankasi/kesif"
+                  className="px-5 py-3 bg-surface-100 hover:bg-surface-200 text-surface-700 font-medium rounded-xl transition-all flex items-center justify-center gap-2 text-sm"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Keşfet
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
 
       {/* HIZLI BAŞLA KARTLARI */}
       <section className="py-8 px-4">
@@ -2374,8 +2420,8 @@ export default function HomePage() {
               <h4 className="font-semibold text-surface-900 mb-4">Öğrenme</h4>
               <ul className="space-y-2 text-surface-600">
                 <li><Link href="/hizli-coz" className="hover:text-primary-500">Soru Çöz</Link></li>
+                <li><Link href="/soru-bankasi/olustur" className="hover:text-primary-500">PDF Soru Bankası</Link></li>
                 <li><Link href="/liderlik" className="hover:text-primary-500">Liderlik</Link></li>
-                <li><Link href="/materyaller" className="hover:text-primary-500">Materyaller</Link></li>
                 <li><Link href="/rehberler" className="hover:text-primary-500">Rehberler</Link></li>
               </ul>
             </div>

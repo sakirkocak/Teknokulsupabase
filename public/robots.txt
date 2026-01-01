@@ -1,0 +1,19 @@
+# Teknokul Robots.txt
+# https://teknokul.com.tr
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://teknokul.com.tr/sitemap.xml
+Sitemap: https://teknokul.com.tr/sitemap-soru-bankasi.xml
+
+# Admin sayfalarını engelle
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_next/
+
+# Auth sayfalarını indexleme
+Disallow: /giris
+Disallow: /kayit
+Disallow: /sifre-sifirla
