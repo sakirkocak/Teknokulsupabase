@@ -1,0 +1,23 @@
+[dotenv@17.2.3] injecting env (10) from .env.local -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+🧠 Soru Embedding - Supabase pgvector
+==================================================
+📦 Batch size: 50
+
+1️⃣ Embedding kolonu kontrol ediliyor...
+   ✅ embedding kolonu mevcut
+
+2️⃣ Embedding durumu...
+   📊 Toplam soru: 45141
+   🧠 Embedded: 10
+   ⏳ Bekleyen: 45131
+
+3️⃣ Embedding başlıyor...
+📈 50 soru embed edildi (500/dk, 6s)
+📈 100 soru embed edildi (500/dk, 12s)
+📈 150 soru embed edildi (500/dk, 18s)
+📈 200 soru embed edildi (500/dk, 24s)
+📈 250 soru embed edildi (500/dk, 30s)
+📈 300 soru embed edildi (500/dk, 36s)
+📈 350 soru embed edildi (512/dk, 41s)
+📈 400 soru embed edildi (511/dk, 47s)
+📈 450 soru embed edildi (519/dk, 52s)
