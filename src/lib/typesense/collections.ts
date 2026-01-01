@@ -71,51 +71,33 @@ export const leaderboardSchema: CollectionCreateSchema = {
   default_sorting_field: 'total_points'
 }
 
-// Questions Collection Schema
+// Questions Collection Schema - OPTİMİZE (RAM tasarrufu!)
+// Detaylar (şıklar, açıklama, görsel URL) Supabase'de tutulur
 export const questionsSchema: CollectionCreateSchema = {
   name: 'questions',
   fields: [
+    // Temel
     { name: 'question_id', type: 'string' },
+    
+    // 🔍 ARAMA için
     { name: 'question_text', type: 'string' },
-    { name: 'explanation', type: 'string', optional: true },
     
-    // Şıklar (4 şık ortaokul, 5 şık lise)
-    { name: 'option_a', type: 'string', optional: true },
-    { name: 'option_b', type: 'string', optional: true },
-    { name: 'option_c', type: 'string', optional: true },
-    { name: 'option_d', type: 'string', optional: true },
-    { name: 'option_e', type: 'string', optional: true },  // Lise için 5. şık
-    { name: 'correct_answer', type: 'string' },
-    { name: 'image_url', type: 'string', optional: true },
-    
-    // 🧠 Semantic Search - Gemini Embedding (768 boyut)
-    { name: 'embedding', type: 'float[]', num_dim: 768, optional: true },
-    
-    // Dil desteği (yeni - Questly için)
-    { name: 'lang', type: 'string', facet: true, optional: true },  // 'tr' veya 'en'
-    { name: 'is_global', type: 'bool', facet: true, optional: true },  // Global derse mi ait?
-    
-    // Filtreleme alanlari
+    // 🏷️ FİLTRELEME için
     { name: 'difficulty', type: 'string', facet: true },
-    { name: 'subject_id', type: 'string', facet: true },
     { name: 'subject_code', type: 'string', facet: true },
     { name: 'subject_name', type: 'string', facet: true },
-    { name: 'topic_id', type: 'string', facet: true },
     { name: 'main_topic', type: 'string', facet: true },
     { name: 'sub_topic', type: 'string', facet: true, optional: true },
     { name: 'grade', type: 'int32', facet: true },
     { name: 'has_image', type: 'bool', facet: true, optional: true },
+    { name: 'lang', type: 'string', facet: true, optional: true },
     
-    // Istatistikler
-    { name: 'times_answered', type: 'int32' },
-    { name: 'times_correct', type: 'int32' },
-    { name: 'success_rate', type: 'float', optional: true },
-    
-    // Zaman
+    // ⏱️ SIRALAMA için
     { name: 'created_at', type: 'int64' }
   ],
   default_sorting_field: 'created_at'
 }
+// ❌ Çıkarılanlar (Supabase'de): explanation, options, correct_answer, image_url, embedding, times_answered
 
 // Locations Collection Schema (İller ve İlçeler)
 export const locationsSchema: CollectionCreateSchema = {
@@ -275,32 +257,24 @@ export interface LeaderboardDocument {
   last_activity_at: number
 }
 
-// Questions document tipi
+// Questions document tipi - OPTİMİZE (sadece Typesense'deki alanlar)
 export interface QuestionDocument {
   id: string
   question_id: string
   question_text: string
-  explanation?: string
-  // 🧠 Semantic Search - Gemini Embedding
-  embedding?: number[]  // 768 boyutlu vektör
-  // Dil desteği (Questly için)
-  lang?: string  // 'tr' veya 'en'
-  is_global?: boolean  // Global derse mi ait?
   // Filtreleme
   difficulty: string
-  subject_id: string
   subject_code: string
   subject_name: string
-  topic_id: string
   main_topic: string
   sub_topic?: string
   grade: number
   has_image?: boolean
-  times_answered: number
-  times_correct: number
-  success_rate?: number
+  lang?: string
+  // Sıralama
   created_at: number
 }
+// Not: Detaylı alanlar (explanation, options, image_url vs.) Supabase'den çekilir
 
 // Location document tipi
 export interface LocationDocument {

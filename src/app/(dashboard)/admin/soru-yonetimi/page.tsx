@@ -245,27 +245,28 @@ export default function AdminSoruYonetimiPage() {
         })
         
         // AdminQuestionResult → Question formatına çevir
+        // Not: Optimize schema - detaylar Supabase'den çekilecek
         const mappedQuestions: Question[] = result.questions.map(q => ({
           id: q.question_id,
-          topic_id: q.topic_id,
+          topic_id: q.topic_id || '',
           difficulty: q.difficulty as any,
           question_text: q.question_text,
-          question_image_url: q.image_url,
+          question_image_url: q.image_url || null,
           options: {
-            A: q.option_a,
-            B: q.option_b,
-            C: q.option_c,
-            D: q.option_d,
-            E: q.option_e
+            A: q.option_a || '',
+            B: q.option_b || '',
+            C: q.option_c || '',
+            D: q.option_d || '',
+            E: q.option_e || undefined
           },
-          correct_answer: q.correct_answer as any,
-          explanation: q.explanation,
+          correct_answer: (q.correct_answer || 'A') as any,
+          explanation: q.explanation ?? null,  // undefined -> null
           source: null,
-          times_answered: q.times_answered,
-          times_correct: q.times_correct,
+          times_answered: q.times_answered || 0,
+          times_correct: q.times_correct || 0,
           created_at: new Date(q.created_at).toISOString(),
           topic: {
-            id: q.topic_id,
+            id: q.topic_id || '',
             subject_id: '',
             grade: q.grade,
             main_topic: q.main_topic,

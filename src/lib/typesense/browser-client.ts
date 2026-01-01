@@ -337,7 +337,7 @@ export async function searchQuestionsFast(
         q: query,
         query_by: 'question_text,main_topic,sub_topic',
         filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
-        sort_by: 'times_answered:desc',
+        sort_by: '_text_match:desc,created_at:desc',  // Optimize schema - times_answered yok
         per_page: limit,
         highlight_full_fields: 'question_text',
         num_typos: 2
@@ -1127,16 +1127,16 @@ export interface AdminQuestionResult {
   option_c: string
   option_d: string
   option_e?: string
-  correct_answer: string
-  explanation: string | null
+  correct_answer?: string  // Optimize schema'da yok - Supabase'den çekilecek
+  explanation?: string | null  // Optimize schema'da yok
   difficulty: string
   grade: number
   subject_name: string
   subject_code: string
   main_topic: string
   sub_topic: string | null
-  times_answered: number
-  times_correct: number
+  times_answered?: number  // Optimize schema'da yok
+  times_correct?: number  // Optimize schema'da yok
   created_at: number
 }
 
@@ -1213,24 +1213,24 @@ export async function searchQuestionsForAdmin(
       const doc = hit.document as any
       return {
         question_id: doc.question_id || doc.id,
-        topic_id: doc.topic_id,
+        topic_id: '',  // Optimize schema - Supabase'den çekilecek
         question_text: doc.question_text,
-        image_url: doc.image_url || null,
-        option_a: doc.option_a || '',
-        option_b: doc.option_b || '',
-        option_c: doc.option_c || '',
-        option_d: doc.option_d || '',
-        option_e: doc.option_e || undefined,
-        correct_answer: doc.correct_answer,
-        explanation: doc.explanation || null,
+        image_url: null,  // Optimize schema - has_image var ama URL yok
+        option_a: '',  // Optimize schema - Supabase'den çekilecek
+        option_b: '',
+        option_c: '',
+        option_d: '',
+        option_e: undefined,
+        correct_answer: '',  // Supabase'den çekilecek
+        explanation: null,  // Supabase'den çekilecek
         difficulty: doc.difficulty,
         grade: doc.grade,
         subject_name: doc.subject_name,
         subject_code: doc.subject_code,
         main_topic: doc.main_topic,
         sub_topic: doc.sub_topic || null,
-        times_answered: doc.times_answered || 0,
-        times_correct: doc.times_correct || 0,
+        times_answered: 0,  // Supabase'den çekilecek
+        times_correct: 0,
         created_at: doc.created_at || 0
       }
     })

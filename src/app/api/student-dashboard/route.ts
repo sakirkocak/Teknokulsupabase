@@ -198,7 +198,7 @@ async function getRecommendedQuestions(studentId: string) {
       const randomResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
         q: '*',
         query_by: 'question_text',
-        sort_by: 'times_answered:desc',
+        sort_by: 'created_at:desc',
         per_page: 100 // Daha fazla çek, sonra filtrele
       })
       
@@ -215,7 +215,7 @@ async function getRecommendedQuestions(studentId: string) {
       q: '*',
       query_by: 'question_text',
       filter_by: `topic_id:[${weakTopicIds.join(',')}]`,
-      sort_by: 'times_answered:desc',
+      sort_by: 'created_at:desc',
       per_page: 100 // Daha fazla çek
     })
 

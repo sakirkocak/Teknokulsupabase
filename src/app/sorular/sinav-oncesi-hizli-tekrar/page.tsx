@@ -62,7 +62,7 @@ async function getQuickReviewFromTypesense(): Promise<{
       .search({
         q: '*',
         query_by: 'question_text',
-        sort_by: 'times_answered:desc',  // Popüler sorular
+        sort_by: 'created_at:desc',  // Popüler sorular
         per_page: 50,
         filter_by: 'difficulty:=[easy,medium,hard] && times_answered:>0',
         facet_by: 'subject_name,difficulty',

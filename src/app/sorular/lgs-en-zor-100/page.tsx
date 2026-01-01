@@ -61,7 +61,7 @@ async function getHardQuestionsFromTypesense(): Promise<{
       .search({
         q: '*',
         query_by: 'question_text',
-        sort_by: 'times_answered:desc',
+        sort_by: 'created_at:desc',
         per_page: 100,
         filter_by: 'grade:=8 && (difficulty:=hard || difficulty:=legendary)',
         facet_by: 'subject_name,difficulty',

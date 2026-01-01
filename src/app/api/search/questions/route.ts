@@ -151,7 +151,7 @@ async function searchQuestionsFromTypesense(params: {
   const searchParams: any = {
     q: query,
     query_by: 'question_text,main_topic,sub_topic,explanation',
-    sort_by: '_text_match:desc,times_answered:desc',
+    sort_by: '_text_match:desc,created_at:desc',
     page,
     per_page: perPage,
     highlight_full_fields: 'question_text',

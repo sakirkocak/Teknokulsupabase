@@ -63,7 +63,7 @@ async function getImageQuestionsFromTypesense(): Promise<{
       .search({
         q: '*',
         query_by: 'question_text',
-        sort_by: 'times_answered:desc',
+        sort_by: 'created_at:desc',
         per_page: 100,
         filter_by: 'has_image:=true',
         facet_by: 'subject_name,difficulty',
