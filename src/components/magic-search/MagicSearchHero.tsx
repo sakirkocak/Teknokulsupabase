@@ -6,9 +6,10 @@ import {
   Search, Sparkles, Zap, BookOpen, Star, 
   TrendingUp, ArrowRight, Loader2, X,
   Calculator, Microscope, Globe, Languages,
-  ChevronRight, ChevronDown, GraduationCap
+  ChevronRight, ChevronDown, GraduationCap,
+  Clock, Lightbulb
 } from 'lucide-react'
-import { searchQuestionsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
+import { searchQuestionsFast, isTypesenseEnabled, getTopicSuggestionsFast } from '@/lib/typesense/browser-client'
 import QuestionSolveDrawer from './QuestionSolveDrawer'
 import MathRenderer from '@/components/MathRenderer'
 
@@ -32,6 +33,44 @@ const popularTopics = [
   { label: 'Simple Past', icon: Languages, color: 'from-cyan-500 to-teal-500' },
 ]
 
+// Arama geçmişi yönetimi
+const SEARCH_HISTORY_KEY = 'teknokul_search_history'
+const MAX_HISTORY_ITEMS = 5
+
+function getSearchHistory(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const history = localStorage.getItem(SEARCH_HISTORY_KEY)
+    return history ? JSON.parse(history) : []
+  } catch {
+    return []
+  }
+}
+
+function addToSearchHistory(query: string) {
+  if (typeof window === 'undefined' || !query || query.length < 2) return
+  try {
+    const history = getSearchHistory()
+    // Aynı aramayı çıkar ve başa ekle
+    const filtered = history.filter(h => h.toLowerCase() !== query.toLowerCase())
+    const newHistory = [query, ...filtered].slice(0, MAX_HISTORY_ITEMS)
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(newHistory))
+  } catch {}
+}
+
+function clearSearchHistory() {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem(SEARCH_HISTORY_KEY)
+  } catch {}
+}
+
+interface TopicSuggestion {
+  topic: string
+  subject_name: string
+  count: number
+}
+
 const difficultyConfig: Record<string, { label: string; color: string }> = {
   easy: { label: 'Kolay', color: 'bg-green-100 text-green-700' },
   medium: { label: 'Orta', color: 'bg-yellow-100 text-yellow-700' },
@@ -49,11 +88,41 @@ export default function MagicSearchHero() {
   const [showDrawer, setShowDrawer] = useState(false)
   const [selectedGrade, setSelectedGrade] = useState<number | null>(null) // null = tüm sınıflar
   const [showGradeDropdown, setShowGradeDropdown] = useState(false)
+  const [searchHistory, setSearchHistory] = useState<string[]>([])
+  const [topicSuggestions, setTopicSuggestions] = useState<TopicSuggestion[]>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const gradeDropdownRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout>()
+  const suggestionTimeoutRef = useRef<NodeJS.Timeout>()
+
+  // Sayfa yüklendiğinde arama geçmişini yükle
+  useEffect(() => {
+    setSearchHistory(getSearchHistory())
+  }, [])
+
+  // Konu önerileri al
+  const loadSuggestions = useCallback(async (searchQuery: string) => {
+    if (!searchQuery || searchQuery.length < 1 || !isTypesenseEnabled()) {
+      setTopicSuggestions([])
+      return
+    }
+
+    setLoadingSuggestions(true)
+    try {
+      const { suggestions } = await getTopicSuggestionsFast({
+        query: searchQuery,
+        grade: selectedGrade || undefined,
+        limit: 5
+      })
+      setTopicSuggestions(suggestions)
+    } catch {
+      setTopicSuggestions([])
+    }
+    setLoadingSuggestions(false)
+  }, [selectedGrade])
 
   // Typesense ile arama
   const performSearch = useCallback(async (searchQuery: string, grade: number | null) => {
@@ -92,6 +161,9 @@ export default function MagicSearchHero() {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
     }
+    if (suggestionTimeoutRef.current) {
+      clearTimeout(suggestionTimeoutRef.current)
+    }
 
     if (query.length >= 2) {
       setLoading(true)
@@ -103,12 +175,20 @@ export default function MagicSearchHero() {
       setLoading(false)
     }
 
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
+    // Konu önerileri için daha kısa debounce
+    if (query.length >= 1 && query.length < 3) {
+      suggestionTimeoutRef.current = setTimeout(() => {
+        loadSuggestions(query)
+      }, 100)
+    } else if (query.length === 0) {
+      setTopicSuggestions([])
     }
-  }, [query, selectedGrade, performSearch])
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (suggestionTimeoutRef.current) clearTimeout(suggestionTimeoutRef.current)
+    }
+  }, [query, selectedGrade, performSearch, loadSuggestions])
   
   // Grade dropdown dışına tıklanınca kapat
   useEffect(() => {
@@ -134,6 +214,11 @@ export default function MagicSearchHero() {
   }, [])
 
   const handleSelectQuestion = (question: SearchResult) => {
+    // Arama geçmişine ekle
+    if (query.length >= 2) {
+      addToSearchHistory(query)
+      setSearchHistory(getSearchHistory())
+    }
     setSelectedQuestion(question)
     setShowDrawer(true)
     setIsOpen(false)
@@ -142,7 +227,26 @@ export default function MagicSearchHero() {
   const handleTopicClick = (topic: string) => {
     setQuery(topic)
     setIsOpen(true)
+    setTopicSuggestions([])
     inputRef.current?.focus()
+  }
+
+  const handleSuggestionClick = (suggestion: TopicSuggestion) => {
+    setQuery(suggestion.topic)
+    setTopicSuggestions([])
+    setIsOpen(true)
+    inputRef.current?.focus()
+  }
+
+  const handleHistoryClick = (historyItem: string) => {
+    setQuery(historyItem)
+    setIsOpen(true)
+    inputRef.current?.focus()
+  }
+
+  const handleClearHistory = () => {
+    clearSearchHistory()
+    setSearchHistory([])
   }
 
   return (
@@ -290,7 +394,7 @@ export default function MagicSearchHero() {
 
                 {/* Results Dropdown */}
                 <AnimatePresence>
-                  {isOpen && (query.length >= 2 || results.length > 0) && (
+                  {isOpen && (
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -298,7 +402,73 @@ export default function MagicSearchHero() {
                       transition={{ duration: 0.2 }}
                       className="border-t border-gray-100"
                     >
-                      {results.length > 0 ? (
+                      {/* Arama Geçmişi - Sorgu boşken */}
+                      {query.length === 0 && searchHistory.length > 0 && (
+                        <div className="p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <Clock className="w-4 h-4" />
+                              <span>Son Aramalar</span>
+                            </div>
+                            <button
+                              onClick={handleClearHistory}
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              Temizle
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {searchHistory.map((item, index) => (
+                              <button
+                                key={index}
+                                onClick={() => handleHistoryClick(item)}
+                                className="px-3 py-1.5 bg-gray-100 hover:bg-indigo-100 text-gray-700 hover:text-indigo-700 rounded-lg text-sm transition-colors"
+                              >
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Konu Önerileri - 1-2 karakter yazıldığında */}
+                      {query.length >= 1 && query.length < 3 && topicSuggestions.length > 0 && (
+                        <div className="p-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                            <Lightbulb className="w-4 h-4 text-yellow-500" />
+                            <span>Konu Önerileri</span>
+                          </div>
+                          <div className="space-y-1">
+                            {topicSuggestions.map((suggestion, index) => (
+                              <button
+                                key={index}
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                className="w-full p-2 text-left hover:bg-indigo-50 rounded-lg transition-colors group flex items-center justify-between"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-800 group-hover:text-indigo-700">{suggestion.topic}</span>
+                                  {suggestion.subject_name && (
+                                    <span className="text-xs text-gray-400">• {suggestion.subject_name}</span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-400 group-hover:text-indigo-500">
+                                  {suggestion.count} soru
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Konu Önerileri yüklenirken */}
+                      {query.length >= 1 && query.length < 3 && loadingSuggestions && topicSuggestions.length === 0 && (
+                        <div className="p-4 text-center">
+                          <Loader2 className="w-5 h-5 text-indigo-500 animate-spin mx-auto" />
+                        </div>
+                      )}
+
+                      {/* Arama Sonuçları - 2+ karakter yazıldığında */}
+                      {query.length >= 2 && results.length > 0 ? (
                         <div className="max-h-96 overflow-y-auto">
                           <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
                             <span className="text-sm text-gray-500">
@@ -348,12 +518,12 @@ export default function MagicSearchHero() {
                             )
                           })}
                         </div>
-                      ) : loading ? (
+                      ) : query.length >= 2 && loading ? (
                         <div className="p-8 text-center">
                           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-3" />
                           <p className="text-gray-500">Aranıyor...</p>
                         </div>
-                      ) : query.length >= 2 ? (
+                      ) : query.length >= 2 && results.length === 0 && !loading ? (
                         <div className="p-8 text-center">
                           <Search className="w-8 h-8 text-gray-300 mx-auto mb-3" />
                           <p className="text-gray-500">Sonuç bulunamadı</p>

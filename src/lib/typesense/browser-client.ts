@@ -460,6 +460,82 @@ export async function getSimilarQuestionsFast(params: {
   }
 }
 
+/**
+ * ⚡ Konu önerileri - Typesense facets ile (~15ms)
+ * Yazarken "Matematik > Üçgenler (245 soru)" şeklinde öneriler
+ */
+export async function getTopicSuggestionsFast(params: {
+  query: string
+  grade?: number
+  limit?: number
+}): Promise<{
+  suggestions: Array<{
+    topic: string
+    subject_name: string
+    subject_code: string
+    count: number
+  }>
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const { query, grade, limit = 6 } = params
+
+  if (!query || query.length < 1) {
+    return { suggestions: [], duration: 0 }
+  }
+
+  const filterParts: string[] = []
+  if (grade) filterParts.push(`grade:=${grade}`)
+
+  try {
+    // main_topic alanında arama yap ve facet al
+    const result = await client
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: query,
+        query_by: 'main_topic,sub_topic',
+        filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
+        facet_by: 'main_topic,subject_name,subject_code',
+        max_facet_values: 20,
+        per_page: 0, // Sadece facet'ler lazım
+        num_typos: 1
+      })
+
+    // Facet sonuçlarını işle
+    const facets = result.facet_counts || []
+    const topicFacet = facets.find((f: any) => f.field_name === 'main_topic')
+    const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
+    const subjectCodeFacet = facets.find((f: any) => f.field_name === 'subject_code')
+
+    // Topic ve subject eşleştir
+    const topicCounts = (topicFacet?.counts || []).slice(0, limit)
+    
+    // Her topic için en alakalı subject'i bul
+    const suggestions = topicCounts.map((tc: any, index: number) => {
+      const subjectName = subjectFacet?.counts?.[0]?.value || ''
+      const subjectCode = subjectCodeFacet?.counts?.[0]?.value || ''
+      
+      return {
+        topic: tc.value,
+        subject_name: subjectName,
+        subject_code: subjectCode,
+        count: tc.count
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ Topic Suggestions (browser): ${duration}ms, "${query}", ${suggestions.length} topics`)
+
+    return { suggestions, duration }
+  } catch (error) {
+    console.error('Typesense topic suggestions error:', error)
+    return { suggestions: [], duration: 0 }
+  }
+}
+
 // =====================================================
 // 🗺️ LOKASYON SORGULARI - İl/İlçe/Okul
 // =====================================================
