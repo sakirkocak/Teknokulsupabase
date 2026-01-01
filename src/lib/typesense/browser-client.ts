@@ -877,11 +877,12 @@ export async function searchQuestionsForAdmin(
     const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
     const gradeFacet = facets.find((f: any) => f.field_name === 'grade')
 
-    const diffStats: Record<string, number> = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+    const diffStats = { easy: 0, medium: 0, hard: 0, legendary: 0 }
     ;(difficultyFacet?.counts || []).forEach((item: any) => {
-      if (item.value in diffStats) {
-        diffStats[item.value] = item.count
-      }
+      if (item.value === 'easy') diffStats.easy = item.count
+      else if (item.value === 'medium') diffStats.medium = item.count
+      else if (item.value === 'hard') diffStats.hard = item.count
+      else if (item.value === 'legendary') diffStats.legendary = item.count
     })
 
     const byGrade: Record<number, number> = {}
@@ -897,8 +898,11 @@ export async function searchQuestionsForAdmin(
       total: result.found || 0,
       stats: {
         total: result.found || 0,
-        ...diffStats,
-        withImage: 0, // Facet'te yok, ayrı sorgu lazım
+        easy: diffStats.easy,
+        medium: diffStats.medium,
+        hard: diffStats.hard,
+        legendary: diffStats.legendary,
+        withImage: 0,
         byGrade
       },
       duration
@@ -953,11 +957,12 @@ export async function getQuestionStatsFast(): Promise<{
     const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
     const gradeFacet = facets.find((f: any) => f.field_name === 'grade')
 
-    const diffStats: Record<string, number> = { easy: 0, medium: 0, hard: 0, legendary: 0 }
+    const diffStats = { easy: 0, medium: 0, hard: 0, legendary: 0 }
     ;(difficultyFacet?.counts || []).forEach((item: any) => {
-      if (item.value in diffStats) {
-        diffStats[item.value] = item.count
-      }
+      if (item.value === 'easy') diffStats.easy = item.count
+      else if (item.value === 'medium') diffStats.medium = item.count
+      else if (item.value === 'hard') diffStats.hard = item.count
+      else if (item.value === 'legendary') diffStats.legendary = item.count
     })
 
     const byGrade: Record<number, number> = {}
@@ -970,7 +975,10 @@ export async function getQuestionStatsFast(): Promise<{
 
     return {
       total: allResult.found || 0,
-      ...diffStats,
+      easy: diffStats.easy,
+      medium: diffStats.medium,
+      hard: diffStats.hard,
+      legendary: diffStats.legendary,
       withImage: imageResult.found || 0,
       byGrade,
       duration
