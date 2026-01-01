@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateCurriculumQuestions, Difficulty } from '@/lib/gemini'
+import { getQuestionEmbedding } from '@/lib/gemini-embedding'
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,18 +51,38 @@ export async function POST(request: NextRequest) {
       language  // 🌍 Questly Global için dil desteği
     )
 
+    // 🧠 Semantic Search: Her soru için embedding üret
+    const questionsWithEmbedding = await Promise.all(
+      questions.map(async (q) => {
+        try {
+          const embedding = await getQuestionEmbedding({
+            questionText: q.question_text,
+            mainTopic: topic,
+            subjectName: subject,
+            options: q.options
+          })
+          console.log(`🧠 Embedding üretildi: ${q.question_text.substring(0, 50)}...`)
+          return { ...q, embedding }
+        } catch (embError) {
+          console.warn(`⚠️ Embedding hatası: ${(embError as Error).message}`)
+          return { ...q, embedding: null }
+        }
+      })
+    )
+
     return NextResponse.json({ 
       success: true,
-      questions,
+      questions: questionsWithEmbedding,
       meta: {
         grade: gradeNum,
         subject,
         topic,
         learningOutcome,
         difficulty: difficulty || 'medium',
-        count: questions.length,
+        count: questionsWithEmbedding.length,
         optionCount: gradeNum >= 9 ? 5 : 4,
-        lang: language
+        lang: language,
+        embeddingsGenerated: questionsWithEmbedding.filter(q => q.embedding).length
       }
     })
   } catch (error: any) {

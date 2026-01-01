@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Typesense from 'typesense'
 import { createClient } from '@supabase/supabase-js'
+import { getQuestionEmbedding } from '@/lib/gemini-embedding'
 
 // Typesense admin client
 const typesense = new Typesense.Client({
@@ -26,7 +27,7 @@ const supabase = createClient(
  */
 export async function POST(req: NextRequest) {
   try {
-    const { questionId, action = 'upsert' } = await req.json()
+    const { questionId, action = 'upsert', embedding: providedEmbedding } = await req.json()
     
     if (!questionId) {
       return NextResponse.json({ error: 'questionId gerekli' }, { status: 400 })
@@ -99,8 +100,37 @@ export async function POST(req: NextRequest) {
     // Options JSONB'den şıkları çıkar
     const options = question.options || {}
     
+    // 🧠 Semantic Search: Embedding üret veya kullan
+    let embedding: number[] | null = null
+    
+    // Eğer dışarıdan embedding geldiyse onu kullan
+    if (providedEmbedding && Array.isArray(providedEmbedding) && providedEmbedding.length === 768) {
+      embedding = providedEmbedding
+      console.log(`🧠 Embedding (provided): ${questionId}`)
+    } else {
+      // Yoksa yeni üret
+      try {
+        embedding = await getQuestionEmbedding({
+          questionText: question.question_text || '',
+          mainTopic: topicData.main_topic,
+          subTopic: topicData.sub_topic,
+          subjectName: (topicData.subject as any)?.name,
+          options: {
+            A: options.A || options.a || '',
+            B: options.B || options.b || '',
+            C: options.C || options.c || '',
+            D: options.D || options.d || '',
+            E: options.E || options.e || ''
+          }
+        })
+        console.log(`🧠 Embedding (generated): ${questionId}`)
+      } catch (embError) {
+        console.warn(`⚠️ Embedding hatası: ${(embError as Error).message}`)
+      }
+    }
+
     // Typesense document oluştur
-    const document = {
+    const document: Record<string, any> = {
       id: question.id,
       question_id: question.id,
       question_text: question.question_text || '',
@@ -131,9 +161,14 @@ export async function POST(req: NextRequest) {
         : Date.now()
     }
     
+    // Embedding varsa ekle
+    if (embedding && embedding.length === 768) {
+      document.embedding = embedding
+    }
+    
     // Typesense'e upsert
     await typesense.collections('questions').documents().upsert(document)
-    console.log(`✅ Typesense: Soru senkronize edildi - ${questionId}`)
+    console.log(`✅ Typesense: Soru senkronize edildi - ${questionId} ${embedding ? '(with embedding)' : ''}`)
     
     return NextResponse.json({ 
       success: true, 
