@@ -21,11 +21,11 @@ const embeddingModel = genAI.getGenerativeModel({ model: 'text-embedding-004' })
 // Typesense setup
 const typesenseClient = new Typesense.Client({
   nodes: [{
-    host: process.env.NEXT_PUBLIC_TYPESENSE_HOST || 'kc8bx4n1ldm30q6fp-1.a1.typesense.net',
+    host: process.env.NEXT_PUBLIC_TYPESENSE_HOST || process.env.TYPESENSE_HOST || 'kc8bx4n1ldm30q6fp-1.a1.typesense.net',
     port: 443,
     protocol: 'https'
   }],
-  apiKey: process.env.TYPESENSE_ADMIN_KEY,
+  apiKey: process.env.TYPESENSE_ADMIN_KEY || process.env.TYPESENSE_API_KEY,
   connectionTimeoutSeconds: 10
 })
 
@@ -73,8 +73,8 @@ async function main() {
     process.exit(1)
   }
   
-  if (!process.env.TYPESENSE_ADMIN_KEY) {
-    console.error('❌ TYPESENSE_ADMIN_KEY not found in .env.local')
+  if (!process.env.TYPESENSE_ADMIN_KEY && !process.env.TYPESENSE_API_KEY) {
+    console.error('❌ TYPESENSE_API_KEY not found in .env.local')
     process.exit(1)
   }
 

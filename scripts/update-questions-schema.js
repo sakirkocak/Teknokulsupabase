@@ -12,11 +12,11 @@ const Typesense = require('typesense')
 
 const typesenseClient = new Typesense.Client({
   nodes: [{
-    host: process.env.NEXT_PUBLIC_TYPESENSE_HOST || 'kc8bx4n1ldm30q6fp-1.a1.typesense.net',
+    host: process.env.NEXT_PUBLIC_TYPESENSE_HOST || process.env.TYPESENSE_HOST || 'kc8bx4n1ldm30q6fp-1.a1.typesense.net',
     port: 443,
     protocol: 'https'
   }],
-  apiKey: process.env.TYPESENSE_ADMIN_KEY,
+  apiKey: process.env.TYPESENSE_ADMIN_KEY || process.env.TYPESENSE_API_KEY,
   connectionTimeoutSeconds: 10
 })
 
@@ -24,8 +24,8 @@ async function main() {
   console.log('📊 Typesense Schema Güncelleme')
   console.log('=' .repeat(50))
   
-  if (!process.env.TYPESENSE_ADMIN_KEY) {
-    console.error('❌ TYPESENSE_ADMIN_KEY not found')
+  if (!process.env.TYPESENSE_ADMIN_KEY && !process.env.TYPESENSE_API_KEY) {
+    console.error('❌ TYPESENSE_API_KEY not found')
     process.exit(1)
   }
 
