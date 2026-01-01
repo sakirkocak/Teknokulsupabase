@@ -16,6 +16,10 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false, // TypeScript hataları hala kontrol edilecek
   },
+  // Vercel serverless function config - Puppeteer için
+  experimental: {
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+  },
 }
 
 module.exports = nextConfig

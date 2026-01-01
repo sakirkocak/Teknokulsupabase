@@ -118,9 +118,19 @@ export default function SoruBankasiOlusturPage() {
         throw new Error(data.error || 'Bir hata oluştu')
       }
       
-      // PDF olarak kaydet - iframe ile print dialog göster (URL çubuğunda blob görünmez)
-      if (data.pdfHtml) {
-        // Gizli iframe oluştur
+      // PDF'i aç
+      if (data.pdfUrl) {
+        // Server-side oluşturulan PDF - direkt Storage URL'ini aç
+        window.open(data.pdfUrl, '_blank')
+        
+        // İndirme sayacını artır
+        fetch('/api/question-bank/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bankId: data.bank.id })
+        })
+      } else if (data.pdfHtml) {
+        // Fallback: iframe ile print dialog (PDF oluşturulamadıysa)
         const iframe = document.createElement('iframe')
         iframe.style.position = 'fixed'
         iframe.style.right = '0'
@@ -130,23 +140,19 @@ export default function SoruBankasiOlusturPage() {
         iframe.style.border = 'none'
         document.body.appendChild(iframe)
         
-        // HTML'i iframe'e yaz
         const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
         if (iframeDoc) {
           iframeDoc.open()
           iframeDoc.write(data.pdfHtml)
           iframeDoc.close()
           
-          // Print dialog aç
           setTimeout(() => {
             iframe.contentWindow?.print()
-            // Temizle
             setTimeout(() => document.body.removeChild(iframe), 1000)
           }, 500)
         }
         
-        // İndirme sayacını artır
-        await fetch('/api/question-bank/download', {
+        fetch('/api/question-bank/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bankId: data.bank.id })

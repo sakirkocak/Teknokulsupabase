@@ -25,68 +25,27 @@ export default function DownloadButton({ bank }: DownloadButtonProps) {
     setIsLoading(true)
     
     try {
-      // PDF URL varsa yeni sekmede aç (kullanıcı kaydedebilir + Google indexleyebilir)
+      // PDF URL varsa direkt aç
       if (bank.pdf_url) {
-        // İndirme sayacını artır
+        // İndirme sayacını artır (async)
         fetch('/api/question-bank/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bankId: bank.id })
         })
         
-        // PDF'i yeni sekmede aç
+        // PDF'i yeni sekmede aç - kullanıcı kaydedebilir
         window.open(bank.pdf_url, '_blank')
-        
         setIsLoading(false)
         return
       }
       
-      // PDF URL yoksa yeniden oluştur
-      const response = await fetch('/api/question-bank/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          input: `${bank.grade ? bank.grade + '. sınıf' : ''} ${bank.subject_name || ''} ${bank.topics?.join(' ') || ''} ${bank.question_count} soru`.trim(),
-          title: bank.title 
-        })
-      })
-      
-      const data = await response.json()
-      
-      if (data.pdfHtml) {
-        // iframe ile print dialog (blob URL görünmez)
-        const iframe = document.createElement('iframe')
-        iframe.style.position = 'fixed'
-        iframe.style.right = '0'
-        iframe.style.bottom = '0'
-        iframe.style.width = '0'
-        iframe.style.height = '0'
-        iframe.style.border = 'none'
-        document.body.appendChild(iframe)
-        
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-        if (iframeDoc) {
-          iframeDoc.open()
-          iframeDoc.write(data.pdfHtml)
-          iframeDoc.close()
-          
-          setTimeout(() => {
-            iframe.contentWindow?.print()
-            setTimeout(() => document.body.removeChild(iframe), 1000)
-          }, 500)
-        }
-        
-        // İndirme sayacını artır
-        await fetch('/api/question-bank/download', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bankId: bank.id })
-        })
-      }
+      // PDF URL yoksa - detay sayfasına yönlendir (PDF henüz oluşturulmamış olabilir)
+      alert('PDF henüz hazırlanmamış. Lütfen daha sonra tekrar deneyin veya yeni bir soru bankası oluşturun.')
+      setIsLoading(false)
     } catch (error) {
       console.error('Download error:', error)
       alert('İndirme sırasında bir hata oluştu. Lütfen tekrar deneyin.')
-    } finally {
       setIsLoading(false)
     }
   }

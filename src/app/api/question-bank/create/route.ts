@@ -2,17 +2,31 @@
  * Soru Bankası Oluşturma API
  * POST /api/question-bank/create
  * 
- * Soruları çeker, PDF oluşturur, veritabanına kaydeder
+ * Soruları çeker, PDF oluşturur, Storage'a yükler, veritabanına kaydeder
  */
+
+// Vercel serverless function config - Puppeteer için gerekli
+export const maxDuration = 60 // 60 saniye timeout
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import Typesense from 'typesense'
 import { parseQuestionBankRequest, generateTitle, generateSlug, generateMetaDescription } from '@/lib/question-bank/parser'
 import { generatePDFHtml } from '@/lib/question-bank/pdf-generator'
+import { createPDFFromHtml } from '@/lib/question-bank/pdf-creator'
 import { ParsedRequest, QuestionForPDF } from '@/lib/question-bank/types'
 import { upsertBank } from '@/lib/typesense-banks'
 import crypto from 'crypto'
+
+// Service role client for Storage operations
+function getServiceClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // IP hash oluştur
 function hashIP(ip: string): string {
@@ -294,10 +308,26 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // PDF HTML oluştur (client-side'da PDF'e çevrilecek)
+    // PDF HTML oluştur
     const pdfHtml = generatePDFHtml(questions, parsed, title, userName)
     
-    // Veritabanına kaydet
+    // Server-side PDF oluştur
+    console.log('📄 Creating PDF with Puppeteer...')
+    let pdfBuffer: Buffer | null = null
+    let pdfSizeKb = 0
+    let pdfUrl: string | null = null
+    
+    try {
+      const pdfResult = await createPDFFromHtml(pdfHtml)
+      pdfBuffer = pdfResult.buffer
+      pdfSizeKb = pdfResult.sizeKb
+      console.log(`✅ PDF created: ${pdfSizeKb}KB`)
+    } catch (pdfError: any) {
+      console.error('⚠️ PDF creation failed, continuing without PDF:', pdfError.message)
+      // PDF oluşturulamadıysa devam et, client-side fallback kullanılacak
+    }
+    
+    // Veritabanına kaydet (önce kaydet, sonra Storage'a yükle)
     const { data: bank, error: insertError } = await supabase
       .from('question_banks')
       .insert({
@@ -327,6 +357,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kayıt hatası oluştu' }, { status: 500 })
     }
     
+    // PDF'i Supabase Storage'a yükle
+    if (pdfBuffer) {
+      try {
+        const serviceClient = getServiceClient()
+        const fileName = `${slug}.pdf`
+        
+        console.log(`📤 Uploading PDF to Storage: ${fileName}`)
+        
+        const { error: uploadError } = await serviceClient.storage
+          .from('question-bank-pdfs')
+          .upload(fileName, pdfBuffer, {
+            contentType: 'application/pdf',
+            upsert: true
+          })
+        
+        if (uploadError) {
+          console.error('⚠️ Storage upload failed:', uploadError)
+        } else {
+          // Public URL al
+          const { data: urlData } = serviceClient.storage
+            .from('question-bank-pdfs')
+            .getPublicUrl(fileName)
+          
+          pdfUrl = urlData.publicUrl
+          console.log(`✅ PDF uploaded: ${pdfUrl}`)
+          
+          // question_banks tablosunu güncelle
+          await serviceClient
+            .from('question_banks')
+            .update({ 
+              pdf_url: pdfUrl,
+              pdf_size_kb: pdfSizeKb
+            })
+            .eq('id', bank.id)
+        }
+      } catch (storageError: any) {
+        console.error('⚠️ Storage error:', storageError.message)
+      }
+    }
+    
     // Rate limit artır
     await supabase.rpc('increment_question_bank_rate_limit', {
       p_ip_hash: ipHash,
@@ -354,9 +424,12 @@ export async function POST(request: NextRequest) {
         id: bank.id,
         title: bank.title,
         slug: bank.slug,
-        question_count: bank.question_count
+        question_count: bank.question_count,
+        pdf_url: pdfUrl
       },
-      pdfHtml,
+      // PDF URL varsa client'a gönder, yoksa HTML fallback için
+      pdfUrl,
+      pdfHtml: pdfUrl ? undefined : pdfHtml,
       questions: questions.map(q => ({
         id: q.id,
         question_text: q.question_text,
