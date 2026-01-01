@@ -102,7 +102,6 @@ export const SUBJECT_CODES: Record<string, { code: string; name: string }> = {
   // Türkçe
   'türkçe': { code: 'turkce', name: 'Türkçe' },
   'turkce': { code: 'turkce', name: 'Türkçe' },
-  'paragraf': { code: 'turkce', name: 'Türkçe' },
   
   // Fen Bilimleri
   'fen': { code: 'fen_bilimleri', name: 'Fen Bilimleri' },

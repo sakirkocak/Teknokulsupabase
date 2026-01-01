@@ -299,6 +299,21 @@ export default async function SoruBankasiDetailPage({
               
               {/* İndir Butonu */}
               <DownloadButton bank={bank} />
+              
+              {/* PDF Direkt Link (SEO için) */}
+              {bank.pdf_url && (
+                <div className="mt-4 text-center">
+                  <a 
+                    href={bank.pdf_url}
+                    target="_blank"
+                    rel="noopener"
+                    className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                  >
+                    <FileText className="w-4 h-4" />
+                    PDF dosyasını yeni sekmede aç
+                  </a>
+                </div>
+              )}
             </div>
           </div>
           

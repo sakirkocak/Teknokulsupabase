@@ -761,53 +761,77 @@ export default function HomePage() {
               </span>
             </Link>
             
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-5">
+            {/* Desktop Navigation - Sadeleştirilmiş */}
+            <div className="hidden md:flex items-center gap-4">
               <Link href="/hizli-coz" className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
                 <Target className="w-4 h-4" />
                 Soru Çöz
               </Link>
-              <Link href="/koclar" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
-                <Users className="w-4 h-4" />
-                Koçlar
-              </Link>
-              <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+              <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
                 <Trophy className="w-4 h-4" />
                 Liderlik
               </Link>
-              <Link href="/soru-bankasi/olustur" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
-                <FileText className="w-4 h-4" />
-                PDF Soru Bankası
+              <Link href="/koclar" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
+                <Users className="w-4 h-4" />
+                Koçlar
               </Link>
-              <Link href="/rehberler" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
+              <Link href="/rehberler" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
                 <BookOpen className="w-4 h-4" />
                 Rehberlik
               </Link>
-              <Link href="/sinav-takvimi" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                Sınav Takvimi
-              </Link>
-              {/* Puan Hesapla Dropdown */}
+              {/* Araçlar Dropdown */}
               <div className="relative group">
-                <button className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1">
-                  <Calculator className="w-4 h-4" />
-                  Puan Hesapla
+                <button className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
+                  <Sparkles className="w-4 h-4" />
+                  Araçlar
                   <ChevronDown className="w-3 h-3 group-hover:rotate-180 transition-transform" />
                 </button>
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-surface-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-surface-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-2">
+                  <Link 
+                    href="/sorular" 
+                    className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Sorular
+                  </Link>
+                  <Link 
+                    href="/soru-bankasi/olustur" 
+                    className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <div>
+                      <div className="font-medium">PDF Soru Bankası</div>
+                      <div className="text-xs text-surface-400">Ücretsiz oluştur</div>
+                    </div>
+                  </Link>
+                  <Link 
+                    href="/soru-bankasi/kesif" 
+                    className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Soru Bankaları
+                  </Link>
+                  <div className="border-t border-surface-100 my-2"></div>
+                  <Link 
+                    href="/sinav-takvimi" 
+                    className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Sınav Takvimi
+                  </Link>
                   <Link 
                     href="/lgs-puan-hesaplama" 
-                    className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 hover:text-primary-500 rounded-t-xl transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
                   >
-                    <Target className="w-4 h-4" />
-                    LGS Puan Hesaplama
+                    <Calculator className="w-4 h-4" />
+                    LGS Puan Hesapla
                   </Link>
                   <Link 
                     href="/yks-puan-hesaplama" 
-                    className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 hover:text-primary-500 rounded-b-xl transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
                   >
                     <GraduationCap className="w-4 h-4" />
-                    YKS Puan Hesaplama
+                    YKS Puan Hesapla
                   </Link>
                 </div>
               </div>
@@ -863,7 +887,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Menu - Sadeleştirilmiş */}
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -880,14 +904,6 @@ export default function HomePage() {
                 Soru Çöz
               </Link>
               <Link 
-                href="/koclar" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
-              >
-                <Users className="w-4 h-4" />
-                Koçlar
-              </Link>
-              <Link 
                 href="/liderlik" 
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
@@ -896,13 +912,14 @@ export default function HomePage() {
                 Liderlik
               </Link>
               <Link 
-                href="/sorular" 
+                href="/koclar" 
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
               >
-                <FileText className="w-4 h-4" />
-                Soru Bankası
+                <Users className="w-4 h-4" />
+                Koçlar
               </Link>
+              
               <Link 
                 href="/rehberler" 
                 onClick={() => setMobileMenuOpen(false)}
@@ -911,29 +928,53 @@ export default function HomePage() {
                 <BookOpen className="w-4 h-4" />
                 Rehberlik
               </Link>
-              <Link 
-                href="/sinav-takvimi" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-4 py-3 text-surface-600 hover:bg-surface-50 rounded-xl font-medium"
-              >
-                <Calendar className="w-4 h-4" />
-                Sınav Takvimi
-              </Link>
               
-              {/* Puan Hesaplama Linkleri */}
+              {/* Araçlar Bölümü */}
               <div className="px-4 py-2">
                 <p className="text-xs text-surface-400 font-medium mb-2 flex items-center gap-1">
-                  <Calculator className="w-3 h-3" />
-                  PUAN HESAPLAMA
+                  <Sparkles className="w-3 h-3" />
+                  ARAÇLAR
                 </p>
                 <div className="space-y-1 pl-2">
+                  <Link 
+                    href="/sorular" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Sorular
+                  </Link>
+                  <Link 
+                    href="/soru-bankasi/olustur" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
+                  >
+                    <FileText className="w-4 h-4" />
+                    PDF Soru Bankası
+                  </Link>
+                  <Link 
+                    href="/soru-bankasi/kesif" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Soru Bankaları
+                  </Link>
+                  <Link 
+                    href="/sinav-takvimi" 
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    Sınav Takvimi
+                  </Link>
                   <Link 
                     href="/lgs-puan-hesaplama" 
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
                   >
-                    <Target className="w-4 h-4" />
-                    LGS Puan Hesaplama
+                    <Calculator className="w-4 h-4" />
+                    LGS Puan Hesapla
                   </Link>
                   <Link 
                     href="/yks-puan-hesaplama" 
@@ -941,7 +982,7 @@ export default function HomePage() {
                     className="flex items-center gap-2 px-3 py-2 text-surface-600 hover:bg-surface-50 rounded-lg font-medium text-sm"
                   >
                     <GraduationCap className="w-4 h-4" />
-                    YKS Puan Hesaplama
+                    YKS Puan Hesapla
                   </Link>
                 </div>
               </div>
@@ -1020,9 +1061,9 @@ export default function HomePage() {
                 Hemen Soru Çöz
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link href="/sorular" className="btn btn-outline btn-lg border-indigo-300 text-indigo-600 hover:bg-indigo-50">
+              <Link href="/soru-bankasi/kesif" className="btn btn-outline btn-lg border-indigo-300 text-indigo-600 hover:bg-indigo-50">
                 <FileText className="w-5 h-5" />
-                Soru Bankası
+                Soru Bankaları
               </Link>
               <Link href="/liderlik" className="btn btn-outline btn-lg border-purple-300 text-purple-600 hover:bg-purple-50">
                 <Trophy className="w-5 h-5" />

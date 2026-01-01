@@ -25,23 +25,17 @@ export default function DownloadButton({ bank }: DownloadButtonProps) {
     setIsLoading(true)
     
     try {
-      // PDF URL varsa direkt indir
+      // PDF URL varsa yeni sekmede aç (kullanıcı kaydedebilir + Google indexleyebilir)
       if (bank.pdf_url) {
         // İndirme sayacını artır
-        await fetch('/api/question-bank/download', {
+        fetch('/api/question-bank/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ bankId: bank.id })
         })
         
-        // PDF'i indir
-        const a = document.createElement('a')
-        a.href = bank.pdf_url
-        a.download = `${bank.slug}.pdf`
-        a.target = '_blank'
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
+        // PDF'i yeni sekmede aç
+        window.open(bank.pdf_url, '_blank')
         
         setIsLoading(false)
         return

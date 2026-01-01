@@ -174,6 +174,9 @@ function parseQuestionCount(text: string): number {
 function parseTopic(text: string, parsed: ParsedRequest): string | undefined {
   let remaining = text
   
+  // Önce "soru bankası" kelimesini çıkar ama DİĞER kelimeleri koru
+  remaining = remaining.replace(/soru\s*bankası/gi, ' ')
+  
   // Sayıları ve bilinen kelimeleri çıkar
   const removePatterns = [
     /\d+\.\s*sınıf/gi,
@@ -186,10 +189,10 @@ function parseTopic(text: string, parsed: ParsedRequest): string | undefined {
     /\d+\s*adet/gi,
     /lgs|tyt|ayt|yks/gi,
     /kolay|orta|zor|karışık|karisik/gi,
-    /soru\s*bankası/gi,
-    /istiyorum|oluştur|hazırla/gi,
-    /dersinde|konusundan|konusu/gi,
+    /istiyorum|oluştur|hazırla|üret/gi,
+    /dersinde|konusundan|konusu|dersi/gi,
     /tüm\s*konular/gi,
+    /bana|ver|yap|çıkar/gi,
   ]
   
   for (const pattern of removePatterns) {
@@ -199,10 +202,10 @@ function parseTopic(text: string, parsed: ParsedRequest): string | undefined {
   // Ders adını çıkar
   if (parsed.subject_name) {
     const subjectLower = parsed.subject_name.toLowerCase()
-    remaining = remaining.replace(new RegExp(subjectLower, 'gi'), ' ')
+    remaining = remaining.replace(new RegExp(`\\b${subjectLower}\\b`, 'gi'), ' ')
   }
   
-  // Ders kodlarını çıkar
+  // Ders kodlarını çıkar (sadece tam kelime eşleşmesi)
   for (const key of Object.keys(SUBJECT_CODES)) {
     remaining = remaining.replace(new RegExp(`\\b${key}\\b`, 'gi'), ' ')
   }

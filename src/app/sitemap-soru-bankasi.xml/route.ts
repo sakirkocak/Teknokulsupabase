@@ -10,10 +10,10 @@ import { createClient } from '@/lib/supabase/server'
 export async function GET() {
   const supabase = await createClient()
   
-  // Public bankaları getir
+  // Public bankaları getir (PDF URL dahil)
   const { data: banks } = await supabase
     .from('question_banks')
-    .select('slug, created_at, updated_at')
+    .select('slug, created_at, updated_at, pdf_url')
     .eq('is_public', true)
     .order('created_at', { ascending: false })
     .limit(1000)  // Max 1000 URL per sitemap
@@ -27,6 +27,24 @@ export async function GET() {
     priority: number
   }
 
+  // Soru bankası detay sayfaları
+  const bankPages = (banks || []).map((bank: any) => ({
+    loc: `${baseUrl}/soru-bankasi/${bank.slug}`,
+    lastmod: bank.updated_at || bank.created_at,
+    changefreq: 'monthly',
+    priority: 0.7
+  }))
+  
+  // PDF URL'leri (Google'da indexlenmesi için)
+  const pdfUrls = (banks || [])
+    .filter((bank: any) => bank.pdf_url)
+    .map((bank: any) => ({
+      loc: bank.pdf_url,
+      lastmod: bank.updated_at || bank.created_at,
+      changefreq: 'monthly',
+      priority: 0.6
+    }))
+
   const urls: SitemapUrl[] = [
     // Ana sayfalar
     {
@@ -39,13 +57,10 @@ export async function GET() {
       changefreq: 'hourly',
       priority: 0.8
     },
-    // Tüm soru bankaları
-    ...(banks || []).map((bank: any) => ({
-      loc: `${baseUrl}/soru-bankasi/${bank.slug}`,
-      lastmod: bank.updated_at || bank.created_at,
-      changefreq: 'monthly',
-      priority: 0.7
-    }))
+    // Tüm soru bankası sayfaları
+    ...bankPages,
+    // PDF dosyaları
+    ...pdfUrls
   ]
   
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
