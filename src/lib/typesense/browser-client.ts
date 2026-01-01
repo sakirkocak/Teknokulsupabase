@@ -367,6 +367,99 @@ export async function searchQuestionsFast(
   }
 }
 
+/**
+ * ⚡ Benzer sorular - Aynı konu + zorluk seviyesinden (~25ms)
+ * Soru çözüldükten sonra "5 soru daha çöz" için kullanılır
+ */
+export async function getSimilarQuestionsFast(params: {
+  excludeQuestionId: string
+  mainTopic?: string
+  subjectCode?: string
+  grade?: number
+  difficulty?: string
+  limit?: number
+}): Promise<{
+  questions: Array<{
+    question_id: string
+    question_text: string
+    subject_name: string
+    subject_code: string
+    grade: number
+    main_topic: string
+    difficulty: string
+  }>
+  total: number
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const {
+    excludeQuestionId,
+    mainTopic,
+    subjectCode,
+    grade,
+    difficulty,
+    limit = 5
+  } = params
+
+  // Filter oluştur
+  const filterParts: string[] = []
+  
+  // Mevcut soruyu hariç tut
+  filterParts.push(`question_id:!=${excludeQuestionId}`)
+  
+  // Öncelik sırası: aynı konu > aynı ders > aynı sınıf
+  if (mainTopic) {
+    filterParts.push(`main_topic:=${mainTopic}`)
+  }
+  if (subjectCode) {
+    filterParts.push(`subject_code:=${subjectCode}`)
+  }
+  if (grade) {
+    filterParts.push(`grade:=${grade}`)
+  }
+  // Zorluk seviyesini biraz esnek tut (aynı veya bir üst/alt)
+  // Şimdilik sadece aynı zorluğu getir
+  if (difficulty) {
+    filterParts.push(`difficulty:=${difficulty}`)
+  }
+
+  try {
+    const result = await client
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        filter_by: filterParts.join(' && '),
+        sort_by: '_rand:asc', // Rastgele sırala - her seferinde farklı sorular
+        per_page: limit
+      })
+
+    const questions = (result.hits || []).map(hit => {
+      const doc = hit.document as any
+      return {
+        question_id: doc.question_id,
+        question_text: doc.question_text,
+        subject_name: doc.subject_name,
+        subject_code: doc.subject_code,
+        grade: doc.grade,
+        main_topic: doc.main_topic,
+        difficulty: doc.difficulty
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ Similar Questions (browser): ${duration}ms, topic="${mainTopic}", ${questions.length} results`)
+
+    return { questions, total: result.found || 0, duration }
+  } catch (error) {
+    console.error('Typesense similar questions error:', error)
+    return { questions: [], total: 0, duration: 0 }
+  }
+}
+
 // =====================================================
 // 🗺️ LOKASYON SORGULARI - İl/İlçe/Okul
 // =====================================================

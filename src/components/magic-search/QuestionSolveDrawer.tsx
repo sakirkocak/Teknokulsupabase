@@ -5,11 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, CheckCircle, XCircle, ArrowRight, 
   Sparkles, Trophy, Flame, Star, Zap,
-  BookOpen, Lightbulb, RefreshCw, Crown
+  BookOpen, Lightbulb, RefreshCw, Crown,
+  ChevronRight, Loader2
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import MathRenderer from '@/components/MathRenderer'
 import MembershipPrompt from './MembershipPrompt'
+import { getSimilarQuestionsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
 import {
   recordAnswer,
   shouldShowSoftPrompt,
@@ -67,6 +69,14 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
   const [user, setUser] = useState<any>(null)
   const [earnedXP, setEarnedXP] = useState(0)
   const [questionShownAt, setQuestionShownAt] = useState<number>(Date.now()) // Anti-bot timestamp
+  const [similarQuestions, setSimilarQuestions] = useState<Array<{
+    question_id: string
+    question_text: string
+    subject_name: string
+    difficulty: string
+  }>>([])
+  const [loadingSimilar, setLoadingSimilar] = useState(false)
+  const [showSimilar, setShowSimilar] = useState(false)
   
   const supabase = createClient()
   
@@ -79,11 +89,35 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
     checkUser()
   }, [])
 
+  // Benzer soruları yükle
+  const loadSimilarQuestions = useCallback(async (q: Question) => {
+    if (!isTypesenseEnabled()) return
+    
+    setLoadingSimilar(true)
+    try {
+      const { questions } = await getSimilarQuestionsFast({
+        excludeQuestionId: q.id,
+        mainTopic: q.topic?.main_topic,
+        subjectCode: q.topic?.subject?.code,
+        grade: q.topic?.grade,
+        difficulty: q.difficulty,
+        limit: 5
+      })
+      setSimilarQuestions(questions)
+    } catch (error) {
+      console.error('Failed to load similar questions:', error)
+      setSimilarQuestions([])
+    }
+    setLoadingSimilar(false)
+  }, [])
+
   // Soru yükle (Supabase'den - sadece bu endpoint)
   const loadQuestion = useCallback(async (id: string) => {
     setLoading(true)
     setSelectedAnswer(null)
     setShowResult(false)
+    setShowSimilar(false)
+    setSimilarQuestions([])
     setQuestionShownAt(Date.now()) // Anti-bot: soru gösterilme zamanı
 
     try {
@@ -156,6 +190,11 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
         spread: 70,
         origin: { y: 0.6 }
       })
+    }
+
+    // Cevap verildikten sonra benzer soruları yükle
+    if (question) {
+      loadSimilarQuestions(question)
     }
 
     // Login olan kullanıcı için gerçek puan kaydet
@@ -454,6 +493,94 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
                         </>
                       )}
                     </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Benzer Sorular */}
+              <AnimatePresence>
+                {showResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mt-4"
+                  >
+                    {/* Toggle Button */}
+                    <button
+                      onClick={() => setShowSimilar(!showSimilar)}
+                      className="w-full p-4 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 rounded-xl border border-indigo-200 transition-all group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-indigo-500 rounded-lg">
+                            <Sparkles className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="text-left">
+                            <p className="font-semibold text-indigo-800">Bu Konuda Devam Et</p>
+                            <p className="text-sm text-indigo-600">
+                              {loadingSimilar ? 'Yükleniyor...' : `${similarQuestions.length} benzer soru`}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className={`w-5 h-5 text-indigo-500 transition-transform ${showSimilar ? 'rotate-90' : ''}`} />
+                      </div>
+                    </button>
+
+                    {/* Similar Questions List */}
+                    <AnimatePresence>
+                      {showSimilar && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-3 space-y-2">
+                            {loadingSimilar ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="w-6 h-6 text-indigo-500 animate-spin" />
+                              </div>
+                            ) : similarQuestions.length > 0 ? (
+                              similarQuestions.map((sq, index) => {
+                                const sqDiffInfo = difficultyConfig[sq.difficulty] || difficultyConfig.medium
+                                return (
+                                  <motion.button
+                                    key={sq.question_id}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    onClick={() => loadQuestion(sq.question_id)}
+                                    className="w-full p-3 bg-white hover:bg-indigo-50 rounded-lg border border-gray-200 hover:border-indigo-300 text-left transition-all group"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-indigo-100 text-indigo-600 rounded-full text-xs font-bold">
+                                        {index + 1}
+                                      </span>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm text-gray-700 line-clamp-2 group-hover:text-indigo-700">
+                                          <MathRenderer text={sq.question_text.substring(0, 150) + (sq.question_text.length > 150 ? '...' : '')} />
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className={`px-2 py-0.5 rounded text-xs ${sqDiffInfo.color} bg-opacity-20`}>
+                                            {sqDiffInfo.label}
+                                          </span>
+                                        </div>
+                                      </div>
+                                      <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all" />
+                                    </div>
+                                  </motion.button>
+                                )
+                              })
+                            ) : (
+                              <div className="text-center py-4 text-gray-500 text-sm">
+                                Bu konuda başka soru bulunamadı
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 )}
               </AnimatePresence>
