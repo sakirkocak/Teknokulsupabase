@@ -36,7 +36,8 @@ import {
   Flag,
   Bot,
   ImageIcon,
-  Shield
+  Shield,
+  Activity
 } from 'lucide-react'
 
 type NavItem = {
@@ -89,6 +90,7 @@ const navItems: Record<string, NavItem[]> = {
   admin: [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { label: 'Kullanıcılar', href: '/admin/kullanicilar', icon: Users },
+    { label: 'Kullanıcı Aktiviteleri', href: '/admin/kullanici-aktiviteleri', icon: Activity },
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },

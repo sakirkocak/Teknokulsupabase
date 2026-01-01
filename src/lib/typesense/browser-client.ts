@@ -980,3 +980,158 @@ export async function getQuestionStatsFast(): Promise<{
     throw error
   }
 }
+
+// =====================================================
+// 👤 ADMIN - KULLANICI AKTİVİTE FONKSİYONLARI
+// =====================================================
+
+export interface UserActivityEntry {
+  student_id: string
+  full_name: string
+  avatar_url: string | null
+  grade: number
+  total_questions: number
+  total_correct: number
+  total_wrong: number
+  total_points: number
+  success_rate: number
+  max_streak: number
+}
+
+/**
+ * ⚡ Admin: Kullanıcı aktivite listesi - Typesense'den
+ */
+export async function getUserActivitiesFast(filters: {
+  search?: string
+  sortBy?: string
+  order?: 'asc' | 'desc'
+  page?: number
+  limit?: number
+} = {}): Promise<{
+  users: UserActivityEntry[]
+  total: number
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const {
+    search = '',
+    sortBy = 'total_questions',
+    order = 'desc',
+    page = 1,
+    limit = 50
+  } = filters
+
+  try {
+    const result = await client
+      .collections(COLLECTIONS.LEADERBOARD)
+      .documents()
+      .search({
+        q: search || '*',
+        query_by: 'full_name',
+        sort_by: `${sortBy}:${order}`,
+        page,
+        per_page: limit,
+        include_fields: 'student_id,full_name,avatar_url,grade,total_questions,total_correct,total_wrong,total_points,max_streak'
+      })
+
+    const users: UserActivityEntry[] = (result.hits || []).map((hit: any) => {
+      const doc = hit.document
+      return {
+        student_id: doc.student_id,
+        full_name: doc.full_name || 'Anonim',
+        avatar_url: doc.avatar_url || null,
+        grade: doc.grade || 0,
+        total_questions: doc.total_questions || 0,
+        total_correct: doc.total_correct || 0,
+        total_wrong: doc.total_wrong || 0,
+        total_points: doc.total_points || 0,
+        success_rate: doc.total_questions > 0 
+          ? Math.round((doc.total_correct / doc.total_questions) * 100) 
+          : 0,
+        max_streak: doc.max_streak || 0
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ User Activities (browser): ${duration}ms, ${users.length} users`)
+
+    return { users, total: result.found || 0, duration }
+  } catch (error) {
+    console.error('Typesense user activities error:', error)
+    throw error
+  }
+}
+
+/**
+ * ⚡ Admin: Kullanıcı aktivite detayı - Typesense'den
+ */
+export async function getUserActivityDetailFast(
+  userId: string,
+  filters: {
+    date?: string
+    subject?: string
+    isCorrect?: boolean | null
+    page?: number
+    limit?: number
+  } = {}
+): Promise<{
+  activities: Array<{
+    activity_id: string
+    question_id: string | null
+    is_correct: boolean
+    points: number
+    date: string
+    created_at: number
+  }>
+  total: number
+  duration: number
+}> {
+  const startTime = performance.now()
+  const client = getTypesenseBrowserClient()
+
+  const { date, subject, isCorrect, page = 1, limit = 50 } = filters
+
+  // Filter oluştur
+  const filterParts: string[] = [`student_id:=${userId}`]
+  if (date) filterParts.push(`date:=${date}`)
+  if (subject) filterParts.push(`subject_code:=${subject}`)
+  if (isCorrect !== null && isCorrect !== undefined) {
+    filterParts.push(`is_correct:=${isCorrect}`)
+  }
+
+  try {
+    const result = await client
+      .collections(COLLECTIONS.QUESTION_ACTIVITY)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'activity_id',
+        filter_by: filterParts.join(' && '),
+        sort_by: 'created_at:desc',
+        page,
+        per_page: limit
+      })
+
+    const activities = (result.hits || []).map((hit: any) => {
+      const doc = hit.document
+      return {
+        activity_id: doc.activity_id,
+        question_id: doc.question_id || null,
+        is_correct: doc.is_correct,
+        points: doc.points || 0,
+        date: doc.date,
+        created_at: doc.created_at
+      }
+    })
+
+    const duration = Math.round(performance.now() - startTime)
+    console.log(`⚡ User Activity Detail (browser): ${duration}ms, ${activities.length} activities`)
+
+    return { activities, total: result.found || 0, duration }
+  } catch (error) {
+    console.error('Typesense user activity detail error:', error)
+    throw error
+  }
+}

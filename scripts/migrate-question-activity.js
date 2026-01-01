@@ -1,11 +1,14 @@
 /**
- * Mevcut point_history verilerini Typesense question_activity koleksiyonuna migrate et
+ * TÜM point_history verilerini Typesense question_activity koleksiyonuna migrate et
  * 
- * Kullanım: node scripts/migrate-question-activity.js
+ * Kullanım: 
+ *   node scripts/migrate-question-activity.js          # Tüm verileri migrate et
+ *   node scripts/migrate-question-activity.js --today  # Sadece bugünü migrate et
  * 
  * Bu script:
- * 1. Supabase point_history tablosundan bugünkü kayıtları alır
- * 2. Typesense question_activity koleksiyonuna ekler
+ * 1. Supabase point_history tablosundan TÜM kayıtları alır
+ * 2. Her kayıt için doğru tarih/hafta/ay hesaplar
+ * 3. Typesense question_activity koleksiyonuna batch import yapar
  */
 
 const { createClient } = require('@supabase/supabase-js')
@@ -26,99 +29,171 @@ const typesense = new Typesense.Client({
     protocol: 'https'
   }],
   apiKey: process.env.TYPESENSE_API_KEY,
-  connectionTimeoutSeconds: 10
+  connectionTimeoutSeconds: 30
 })
 
+// Tarih bilgilerini hesapla
+function getDateInfo(dateObj) {
+  // Türkiye saatine çevir
+  const trDate = new Date(dateObj.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+  
+  // Tarih string (YYYY-MM-DD)
+  const date = trDate.toISOString().split('T')[0]
+  
+  // Ay (YYYY-MM)
+  const month = date.substring(0, 7)
+  
+  // Hafta hesapla (ISO week)
+  const startOfYear = new Date(trDate.getFullYear(), 0, 1)
+  const days = Math.floor((trDate.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000))
+  const weekNum = Math.ceil((days + startOfYear.getDay() + 1) / 7)
+  const week = `${trDate.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`
+  
+  return { date, week, month }
+}
+
 async function migrate() {
-  console.log('\n🚀 Question Activity Migration Başlatılıyor...\n')
+  const onlyToday = process.argv.includes('--today')
   
-  // Bugünün tarihi (Türkiye saati)
-  const now = new Date()
-  const todayTR = now.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
-  
-  // Bugünün başlangıcı (UTC)
-  const todayStart = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
-  todayStart.setHours(0, 0, 0, 0)
-  const todayStartUTC = new Date(todayStart.getTime() - (3 * 60 * 60 * 1000))
-  
-  console.log(`📅 Bugün: ${todayTR}`)
-  console.log(`📅 UTC başlangıç: ${todayStartUTC.toISOString()}\n`)
+  console.log('\n🚀 Question Activity Migration Başlatılıyor...')
+  console.log(`📋 Mod: ${onlyToday ? 'Sadece bugün' : 'TÜM VERİLER'}\n`)
   
   try {
-    // Supabase'den bugünkü point_history kayıtlarını al
-    console.log('📥 Supabase\'den bugünkü kayıtlar alınıyor...')
+    // Önce toplam kayıt sayısını al
+    console.log('📊 Toplam kayıt sayısı kontrol ediliyor...')
     
-    const { data: records, error } = await supabase
+    let query = supabase
       .from('point_history')
-      .select('*')
-      .gte('created_at', todayStartUTC.toISOString())
+      .select('*', { count: 'exact', head: true })
       .eq('source', 'question')
-      .order('created_at', { ascending: true })
     
-    if (error) {
-      console.error('❌ Supabase hatası:', error)
+    if (onlyToday) {
+      const now = new Date()
+      const todayStart = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+      todayStart.setHours(0, 0, 0, 0)
+      const todayStartUTC = new Date(todayStart.getTime() - (3 * 60 * 60 * 1000))
+      query = query.gte('created_at', todayStartUTC.toISOString())
+    }
+    
+    const { count: totalCount, error: countError } = await query
+    
+    if (countError) {
+      console.error('❌ Count hatası:', countError)
       process.exit(1)
     }
     
-    console.log(`✅ ${records.length} kayıt bulundu\n`)
+    console.log(`✅ Toplam ${totalCount} kayıt bulundu\n`)
     
-    if (records.length === 0) {
-      console.log('ℹ️  Bugün henüz soru çözülmemiş, migration yapılacak bir şey yok.')
+    if (totalCount === 0) {
+      console.log('ℹ️  Migrate edilecek kayıt yok.')
       process.exit(0)
     }
     
-    // Hafta hesapla
-    const startOfYear = new Date(now.getFullYear(), 0, 1)
-    const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000))
-    const weekNum = Math.ceil((days + startOfYear.getDay() + 1) / 7)
-    const weekTR = `${now.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`
-    const monthTR = todayTR.substring(0, 7)
+    // Pagination ile tüm kayıtları al ve migrate et
+    const pageSize = 1000
+    let offset = 0
+    let totalImported = 0
+    let totalFailed = 0
     
-    // Typesense dökümanları hazırla
-    const documents = records.map((record, index) => {
-      const createdAt = new Date(record.created_at)
-      return {
-        id: `${record.student_id}_${createdAt.getTime()}_${index}`,
-        activity_id: `${record.student_id}_${createdAt.getTime()}`,
-        student_id: record.student_id,
-        question_id: record.metadata?.questionId || '',
-        is_correct: record.description === 'Doğru cevap',
-        points: record.points,
-        source: record.source,
-        date: todayTR,
-        week: weekTR,
-        month: monthTR,
-        created_at: createdAt.getTime()
-      }
-    })
-    
-    // Batch import (250'şer kayıt)
-    console.log('📤 Typesense\'e aktarılıyor...')
-    
-    const batchSize = 250
-    let imported = 0
-    
-    for (let i = 0; i < documents.length; i += batchSize) {
-      const batch = documents.slice(i, i + batchSize)
+    while (offset < totalCount) {
+      console.log(`📥 Kayıtlar alınıyor... (${offset + 1}-${Math.min(offset + pageSize, totalCount)}/${totalCount})`)
       
-      try {
-        await typesense
-          .collections('question_activity')
-          .documents()
-          .import(batch, { action: 'upsert' })
-        
-        imported += batch.length
-        console.log(`  ✅ ${imported}/${documents.length} kayıt aktarıldı`)
-      } catch (importError) {
-        console.error(`  ❌ Batch import hatası:`, importError)
+      let dataQuery = supabase
+        .from('point_history')
+        .select('*')
+        .eq('source', 'question')
+        .order('created_at', { ascending: true })
+        .range(offset, offset + pageSize - 1)
+      
+      if (onlyToday) {
+        const now = new Date()
+        const todayStart = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
+        todayStart.setHours(0, 0, 0, 0)
+        const todayStartUTC = new Date(todayStart.getTime() - (3 * 60 * 60 * 1000))
+        dataQuery = dataQuery.gte('created_at', todayStartUTC.toISOString())
       }
+      
+      const { data: records, error: fetchError } = await dataQuery
+      
+      if (fetchError) {
+        console.error('❌ Fetch hatası:', fetchError)
+        offset += pageSize
+        continue
+      }
+      
+      if (!records || records.length === 0) {
+        break
+      }
+      
+      // Typesense dökümanlarını hazırla
+      const documents = records.map((record, index) => {
+        const createdAt = new Date(record.created_at)
+        const dateInfo = getDateInfo(createdAt)
+        
+        return {
+          id: `${record.student_id}_${createdAt.getTime()}_${index + offset}`,
+          activity_id: `${record.student_id}_${createdAt.getTime()}`,
+          student_id: record.student_id,
+          question_id: record.metadata?.questionId || '',
+          is_correct: record.description === 'Doğru cevap',
+          points: record.points || 0,
+          source: record.source || 'question',
+          date: dateInfo.date,
+          week: dateInfo.week,
+          month: dateInfo.month,
+          subject_code: record.metadata?.subjectCode || '',
+          grade: record.metadata?.grade || 0,
+          created_at: createdAt.getTime()
+        }
+      })
+      
+      // Batch import (250'şer kayıt)
+      const batchSize = 250
+      let batchImported = 0
+      
+      for (let i = 0; i < documents.length; i += batchSize) {
+        const batch = documents.slice(i, i + batchSize)
+        
+        try {
+          const result = await typesense
+            .collections('question_activity')
+            .documents()
+            .import(batch, { action: 'upsert' })
+          
+          // Hata kontrolü
+          const failed = result.filter(r => !r.success).length
+          batchImported += batch.length - failed
+          totalFailed += failed
+          
+          if (failed > 0) {
+            console.log(`  ⚠️  ${failed} kayıt başarısız`)
+          }
+        } catch (importError) {
+          console.error(`  ❌ Batch import hatası:`, importError.message)
+          totalFailed += batch.length
+        }
+      }
+      
+      totalImported += batchImported
+      console.log(`  ✅ ${batchImported} kayıt aktarıldı (Toplam: ${totalImported})`)
+      
+      offset += pageSize
     }
     
-    console.log('\n' + '='.repeat(50))
-    console.log(`✅ Migration tamamlandı! ${imported} kayıt aktarıldı.`)
-    console.log(`\n📊 Kontrol için:`)
-    console.log(`   curl "https://${process.env.TYPESENSE_HOST}/collections/question_activity" \\`)
-    console.log(`     -H "X-TYPESENSE-API-KEY: ${process.env.TYPESENSE_API_KEY?.substring(0, 8)}..."`)
+    console.log('\n' + '='.repeat(60))
+    console.log(`✅ Migration tamamlandı!`)
+    console.log(`   📊 Başarılı: ${totalImported}`)
+    console.log(`   ❌ Başarısız: ${totalFailed}`)
+    console.log(`   📁 Toplam: ${totalCount}`)
+    
+    // Collection bilgisini göster
+    try {
+      const collectionInfo = await typesense.collections('question_activity').retrieve()
+      console.log(`\n📊 Collection durumu:`)
+      console.log(`   Döküman sayısı: ${collectionInfo.num_documents}`)
+    } catch (e) {
+      // Ignore
+    }
     
   } catch (error) {
     console.error('\n❌ Migration hatası:', error)
