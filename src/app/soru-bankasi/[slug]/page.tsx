@@ -90,29 +90,6 @@ export default async function SoruBankasiDetailPage({
   // View count artır
   await supabase.rpc('increment_bank_view_count', { bank_id: bank.id })
   
-  // Soruları getir (SEO için)
-  let questions: any[] = []
-  if (bank.question_ids && bank.question_ids.length > 0) {
-    const { data: questionsData } = await supabase
-      .from('questions')
-      .select(`
-        id,
-        question_text,
-        options,
-        correct_answer,
-        difficulty
-      `)
-      .in('id', bank.question_ids)
-    
-    if (questionsData) {
-      // Sıralamayı koru
-      const questionMap = new Map(questionsData.map(q => [q.id, q]))
-      questions = bank.question_ids
-        .map((id: string) => questionMap.get(id))
-        .filter(Boolean)
-    }
-  }
-  
   // Benzer bankalar
   const { data: similarBanks } = await supabase
     .from('question_banks')
@@ -148,16 +125,7 @@ export default async function SoruBankasiDetailPage({
     audience: {
       '@type': 'EducationalAudience',
       educationalRole: 'student'
-    },
-    hasPart: questions.slice(0, 5).map((q: any, i: number) => ({
-      '@type': 'Question',
-      position: i + 1,
-      text: q.question_text,
-      suggestedAnswer: {
-        '@type': 'Answer',
-        text: q.options?.[q.correct_answer] || ''
-      }
-    }))
+    }
   }
   
   return (
@@ -317,75 +285,29 @@ export default async function SoruBankasiDetailPage({
             </div>
           </div>
           
-          {/* SORULAR - SEO için önemli */}
-          {questions.length > 0 && (
-            <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-indigo-600" />
-                Sorular ({questions.length})
-              </h2>
-              
-              <div className="space-y-6">
-                {questions.map((q: any, index: number) => {
-                  const options = q.options || {}
-                  return (
-                    <article 
-                      key={q.id} 
-                      className="p-5 bg-gray-50 dark:bg-gray-700 rounded-xl border-l-4 border-indigo-500"
-                      itemScope
-                      itemType="https://schema.org/Question"
-                    >
-                      <div className="flex items-start gap-3 mb-4">
-                        <span className="flex-shrink-0 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
-                          {index + 1}
-                        </span>
-                        <p 
-                          className="text-gray-800 dark:text-gray-200 leading-relaxed"
-                          itemProp="text"
-                        >
-                          {q.question_text}
-                        </p>
-                      </div>
-                      
-                      <div className="ml-11 space-y-2">
-                        {['A', 'B', 'C', 'D', 'E'].map(letter => {
-                          if (!options[letter]) return null
-                          const isCorrect = q.correct_answer === letter
-                          return (
-                            <div 
-                              key={letter}
-                              className={`p-3 rounded-lg border ${
-                                isCorrect 
-                                  ? 'bg-green-50 dark:bg-green-900/30 border-green-300 dark:border-green-700' 
-                                  : 'bg-white dark:bg-gray-600 border-gray-200 dark:border-gray-500'
-                              }`}
-                              itemProp={isCorrect ? "suggestedAnswer" : undefined}
-                              itemScope={isCorrect}
-                              itemType={isCorrect ? "https://schema.org/Answer" : undefined}
-                            >
-                              <span className={`font-semibold mr-2 ${isCorrect ? 'text-green-600 dark:text-green-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                                {letter})
-                              </span>
-                              <span 
-                                className={isCorrect ? 'text-green-800 dark:text-green-200' : 'text-gray-700 dark:text-gray-300'}
-                                itemProp={isCorrect ? "text" : undefined}
-                              >
-                                {options[letter]}
-                              </span>
-                              {isCorrect && (
-                                <span className="ml-2 text-green-600 dark:text-green-400 text-sm">✓ Doğru</span>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </article>
-                  )
-                })}
+          {/* Soru Bankası Bilgisi - Duplicate content önlemek için soru detayları gösterilmiyor */}
+          <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FileText className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
               </div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                {bank.question_count} Soru İçeriyor
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Bu soru bankasını PDF olarak indirip çalışmaya başlayabilirsin.
+                {bank.topics && bank.topics.length > 0 && (
+                  <span className="block mt-2 text-sm">
+                    Konular: {bank.topics.join(', ')}
+                  </span>
+                )}
+              </p>
+              
+              {/* İkinci İndir Butonu */}
+              <DownloadButton bank={bank} />
               
               {/* SEO Alt Bilgi */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600 text-center">
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
                 <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                   "Bu soru bankası Şakir Koçak'ın tüm insanlara armağanıdır."
                 </p>
@@ -394,7 +316,7 @@ export default async function SoruBankasiDetailPage({
                 </p>
               </div>
             </div>
-          )}
+          </div>
           
           {/* Benzer Bankalar */}
           {similarBanks && similarBanks.length > 0 && (
