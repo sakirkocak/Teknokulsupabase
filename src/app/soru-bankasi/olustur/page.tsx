@@ -18,12 +18,6 @@ import {
 import { ParsedRequest } from '@/lib/question-bank/types'
 import Link from 'next/link'
 
-// html2pdf dinamik import
-const loadHtml2Pdf = async () => {
-  const html2pdf = (await import('html2pdf.js')).default
-  return html2pdf
-}
-
 // Örnek promptlar
 const EXAMPLE_PROMPTS = [
   '8. sınıf matematik denklemler 50 soru',
@@ -124,85 +118,38 @@ export default function SoruBankasiOlusturPage() {
         throw new Error(data.error || 'Bir hata oluştu')
       }
       
-      // PDF oluştur, Storage'a yükle ve indir
+      // PDF olarak kaydet - HTML'i yeni sekmede aç ve print dialog göster
       if (data.pdfHtml) {
-        try {
-          // html2pdf ile PDF oluştur
-          const html2pdf = await loadHtml2Pdf()
-          
-          // HTML'i container'a ekle
-          const container = document.createElement('div')
-          container.innerHTML = data.pdfHtml
-          container.style.position = 'absolute'
-          container.style.left = '-9999px'
-          container.style.width = '210mm'
-          document.body.appendChild(container)
-          
-          // KaTeX render için bekle
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          // PDF blob oluştur
-          const pdfBlob = await html2pdf()
-            .set({
-              margin: [10, 10, 10, 10],
-              filename: `${data.bank.slug}.pdf`,
-              image: { type: 'jpeg', quality: 0.95 },
-              html2canvas: { scale: 2, useCORS: true, logging: false },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            })
-            .from(container)
-            .outputPdf('blob')
-          
-          // Temizle
-          document.body.removeChild(container)
-          
-          // Supabase Storage'a yükle
-          const formData = new FormData()
-          formData.append('pdf', pdfBlob, `${data.bank.slug}.pdf`)
-          formData.append('bankId', data.bank.id)
-          formData.append('slug', data.bank.slug)
-          
-          const uploadResponse = await fetch('/api/question-bank/upload-pdf', {
-            method: 'POST',
-            body: formData
-          })
-          
-          const uploadResult = await uploadResponse.json()
-          
-          if (uploadResult.pdfUrl) {
-            // PDF'i indir
-            const a = document.createElement('a')
-            a.href = uploadResult.pdfUrl
-            a.download = `${data.bank.slug}.pdf`
-            a.target = '_blank'
-            a.click()
-          } else {
-            // Upload başarısız - lokal olarak indir
-            const localUrl = URL.createObjectURL(pdfBlob)
-            const a = document.createElement('a')
-            a.href = localUrl
-            a.download = `${data.bank.slug}.pdf`
-            a.click()
-            setTimeout(() => URL.revokeObjectURL(localUrl), 1000)
+        // HTML'i yeni sekmede aç
+        const htmlBlob = new Blob([data.pdfHtml], { type: 'text/html' })
+        const htmlUrl = URL.createObjectURL(htmlBlob)
+        const printWindow = window.open(htmlUrl, '_blank')
+        
+        if (printWindow) {
+          printWindow.onload = () => {
+            // Kısa gecikme sonra print dialog aç
+            setTimeout(() => {
+              printWindow.print()
+            }, 500)
           }
-          
-          // İndirme sayacını artır
-          await fetch('/api/question-bank/download', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bankId: data.bank.id })
-          })
-          
-        } catch (pdfError) {
-          console.error('PDF oluşturma hatası:', pdfError)
-          // Fallback: HTML olarak aç
-          const htmlBlob = new Blob([data.pdfHtml], { type: 'text/html' })
-          const htmlUrl = URL.createObjectURL(htmlBlob)
-          const printWindow = window.open(htmlUrl, '_blank')
-          if (printWindow) {
-            printWindow.onload = () => setTimeout(() => printWindow.print(), 300)
-          }
+        } else {
+          // Popup engellendi - HTML indir
+          const a = document.createElement('a')
+          a.href = htmlUrl
+          a.download = `${data.bank.slug}.html`
+          a.click()
+          alert('PDF indirmek için: İndirilen HTML dosyasını açın ve tarayıcıdan "PDF olarak yazdır" seçeneğini kullanın.')
         }
+        
+        // URL'i temizle
+        setTimeout(() => URL.revokeObjectURL(htmlUrl), 60000)
+        
+        // İndirme sayacını artır
+        await fetch('/api/question-bank/download', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bankId: data.bank.id })
+        })
       }
       
       setSuccess({

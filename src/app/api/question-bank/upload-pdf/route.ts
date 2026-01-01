@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+
+// Service role client - Storage için RLS bypass
+const getServiceClient = () => {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PDF, bankId ve slug gerekli' }, { status: 400 })
     }
     
-    const supabase = await createClient()
+    const supabase = getServiceClient()
     
     // PDF'i buffer'a çevir
     const arrayBuffer = await pdfFile.arrayBuffer()
