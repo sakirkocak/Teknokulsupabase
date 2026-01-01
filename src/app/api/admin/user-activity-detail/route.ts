@@ -90,11 +90,11 @@ export async function GET(request: NextRequest) {
         })
 
       // Soru ID'lerini topla
-      const questionIds = [...new Set(
+      const questionIds = Array.from(new Set(
         (result.hits || [])
           .map((hit: any) => hit.document?.question_id)
           .filter((id: string) => id && id.length > 0)
-      )]
+      ))
 
       // Soru detaylarını al (Typesense'den)
       let questionsMap: Record<string, any> = {}
