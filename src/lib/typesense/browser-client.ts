@@ -510,21 +510,39 @@ export async function getTopicSuggestionsFast(params: {
     const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
     const subjectCodeFacet = facets.find((f: any) => f.field_name === 'subject_code')
 
-    // Topic ve subject eşleştir
+    // Topic ve subject eşleştir - her topic için doğru subject'i bul
     const topicCounts = (topicFacet?.counts || []).slice(0, limit)
     
-    // Her topic için en alakalı subject'i bul
-    const suggestions = topicCounts.map((tc: any, index: number) => {
-      const subjectName = subjectFacet?.counts?.[0]?.value || ''
-      const subjectCode = subjectCodeFacet?.counts?.[0]?.value || ''
-      
-      return {
-        topic: tc.value,
-        subject_name: subjectName,
-        subject_code: subjectCode,
-        count: tc.count
+    // Her topic için ayrı sorgu yaparak doğru subject'i bul
+    const suggestions = await Promise.all(topicCounts.map(async (tc: any) => {
+      try {
+        // Bu topic'e ait bir soru bul ve subject'ini al
+        const topicSearch = await client
+          .collections(COLLECTIONS.QUESTIONS)
+          .documents()
+          .search({
+            q: tc.value,
+            query_by: 'main_topic',
+            filter_by: `main_topic:=${tc.value}` + (filterParts.length > 0 ? ' && ' + filterParts.join(' && ') : ''),
+            per_page: 1
+          })
+        
+        const firstHit = topicSearch.hits?.[0]?.document as any
+        return {
+          topic: tc.value,
+          subject_name: firstHit?.subject_name || '',
+          subject_code: firstHit?.subject_code || '',
+          count: tc.count
+        }
+      } catch {
+        return {
+          topic: tc.value,
+          subject_name: '',
+          subject_code: '',
+          count: tc.count
+        }
       }
-    })
+    }))
 
     const duration = Math.round(performance.now() - startTime)
     console.log(`⚡ Topic Suggestions (browser): ${duration}ms, "${query}", ${suggestions.length} topics`)
