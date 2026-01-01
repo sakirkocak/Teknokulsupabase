@@ -54,18 +54,27 @@ export default function DownloadButton({ bank }: DownloadButtonProps) {
       const data = await response.json()
       
       if (data.pdfHtml) {
-        // HTML'i yeni sekmede aç ve yazdır
-        const blob = new Blob([data.pdfHtml], { type: 'text/html' })
-        const blobUrl = URL.createObjectURL(blob)
-        const printWindow = window.open(blobUrl, '_blank')
+        // iframe ile print dialog (blob URL görünmez)
+        const iframe = document.createElement('iframe')
+        iframe.style.position = 'fixed'
+        iframe.style.right = '0'
+        iframe.style.bottom = '0'
+        iframe.style.width = '0'
+        iframe.style.height = '0'
+        iframe.style.border = 'none'
+        document.body.appendChild(iframe)
         
-        if (printWindow) {
-          printWindow.onload = () => {
-            setTimeout(() => printWindow.print(), 300)
-          }
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+        if (iframeDoc) {
+          iframeDoc.open()
+          iframeDoc.write(data.pdfHtml)
+          iframeDoc.close()
+          
+          setTimeout(() => {
+            iframe.contentWindow?.print()
+            setTimeout(() => document.body.removeChild(iframe), 1000)
+          }, 500)
         }
-        
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000)
         
         // İndirme sayacını artır
         await fetch('/api/question-bank/download', {

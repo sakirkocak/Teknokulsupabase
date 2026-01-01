@@ -118,31 +118,32 @@ export default function SoruBankasiOlusturPage() {
         throw new Error(data.error || 'Bir hata oluştu')
       }
       
-      // PDF olarak kaydet - HTML'i yeni sekmede aç ve print dialog göster
+      // PDF olarak kaydet - iframe ile print dialog göster (URL çubuğunda blob görünmez)
       if (data.pdfHtml) {
-        // HTML'i yeni sekmede aç
-        const htmlBlob = new Blob([data.pdfHtml], { type: 'text/html' })
-        const htmlUrl = URL.createObjectURL(htmlBlob)
-        const printWindow = window.open(htmlUrl, '_blank')
+        // Gizli iframe oluştur
+        const iframe = document.createElement('iframe')
+        iframe.style.position = 'fixed'
+        iframe.style.right = '0'
+        iframe.style.bottom = '0'
+        iframe.style.width = '0'
+        iframe.style.height = '0'
+        iframe.style.border = 'none'
+        document.body.appendChild(iframe)
         
-        if (printWindow) {
-          printWindow.onload = () => {
-            // Kısa gecikme sonra print dialog aç
-            setTimeout(() => {
-              printWindow.print()
-            }, 500)
-          }
-        } else {
-          // Popup engellendi - HTML indir
-          const a = document.createElement('a')
-          a.href = htmlUrl
-          a.download = `${data.bank.slug}.html`
-          a.click()
-          alert('PDF indirmek için: İndirilen HTML dosyasını açın ve tarayıcıdan "PDF olarak yazdır" seçeneğini kullanın.')
+        // HTML'i iframe'e yaz
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+        if (iframeDoc) {
+          iframeDoc.open()
+          iframeDoc.write(data.pdfHtml)
+          iframeDoc.close()
+          
+          // Print dialog aç
+          setTimeout(() => {
+            iframe.contentWindow?.print()
+            // Temizle
+            setTimeout(() => document.body.removeChild(iframe), 1000)
+          }, 500)
         }
-        
-        // URL'i temizle
-        setTimeout(() => URL.revokeObjectURL(htmlUrl), 60000)
         
         // İndirme sayacını artır
         await fetch('/api/question-bank/download', {
