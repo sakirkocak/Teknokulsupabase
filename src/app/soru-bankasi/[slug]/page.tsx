@@ -268,51 +268,17 @@ export default async function SoruBankasiDetailPage({
               {/* İndir Butonu */}
               <DownloadButton bank={bank} />
               
-              {/* PDF Direkt Link (SEO için) */}
-              {bank.pdf_url && (
-                <div className="mt-4 text-center">
-                  <a 
-                    href={bank.pdf_url}
-                    target="_blank"
-                    rel="noopener"
-                    className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
-                  >
-                    <FileText className="w-4 h-4" />
-                    PDF dosyasını yeni sekmede aç
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {/* Soru Bankası Bilgisi - Duplicate content önlemek için soru detayları gösterilmiyor */}
-          <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 md:p-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                {bank.question_count} Soru İçeriyor
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                Bu soru bankasını PDF olarak indirip çalışmaya başlayabilirsin.
-                {bank.topics && bank.topics.length > 0 && (
-                  <span className="block mt-2 text-sm">
-                    Konular: {bank.topics.join(', ')}
-                  </span>
-                )}
-              </p>
-              
-              {/* İkinci İndir Butonu */}
-              <DownloadButton bank={bank} />
-              
               {/* SEO Alt Bilgi */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600 text-center">
                 <p className="text-sm text-gray-500 dark:text-gray-400 italic">
                   "Bu soru bankası Şakir Koçak'ın tüm insanlara armağanıdır."
                 </p>
                 <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-2">
-                  teknokul.com.tr • 📷 @sakirkocak
+                  <a href="https://teknokul.com.tr" className="hover:underline">teknokul.com.tr</a>
+                  {' • '}
+                  <a href="https://instagram.com/sakirkocak" target="_blank" rel="noopener noreferrer" className="hover:underline">
+                    📷 @sakirkocak
+                  </a>
                 </p>
               </div>
             </div>
