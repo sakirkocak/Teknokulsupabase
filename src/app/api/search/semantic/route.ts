@@ -1,25 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSearchEmbedding } from '@/lib/gemini-embedding'
-import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
+import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
+
+// Supabase service client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 /**
  * POST /api/search/semantic
  * 
- * Semantic search - Anlam tabanlı soru arama
+ * 🧠 Semantic Search - Supabase pgvector ile
  * 
  * Body:
  *   query: string (aranacak metin)
  *   grade?: number
  *   subjectCode?: string
- *   difficulty?: string
  *   limit?: number (default: 10)
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { query, grade, subjectCode, difficulty, limit = 10 } = body
+    const { query, grade, subjectCode, limit = 10 } = body
 
     if (!query || query.trim().length < 2) {
       return NextResponse.json({ 
@@ -43,63 +48,57 @@ export async function POST(request: NextRequest) {
 
     const embeddingTime = Date.now() - startTime
 
-    // 2. Typesense'de vector search yap
-    if (!isTypesenseAvailable()) {
-      return NextResponse.json({ 
-        error: 'Typesense not available' 
-      }, { status: 503 })
-    }
-
-    // Filter oluştur
-    const filterParts: string[] = []
-    if (grade) filterParts.push(`grade:=${grade}`)
-    if (subjectCode) filterParts.push(`subject_code:=${subjectCode}`)
-    if (difficulty) filterParts.push(`difficulty:=${difficulty}`)
-    // Sadece embedding'i olan sorularda ara
-    filterParts.push('embedding:!=null')
-
+    // 2. Supabase pgvector ile semantic search
     const searchStartTime = Date.now()
     
-    const result = await typesenseClient
-      .collections(COLLECTIONS.QUESTIONS)
-      .documents()
-      .search({
-        q: '*',
-        query_by: 'question_text',
-        vector_query: `embedding:([${embedding.join(',')}], k:${limit})`,
-        filter_by: filterParts.join(' && '),
-        per_page: limit,
-        include_fields: 'question_id,question_text,subject_name,subject_code,grade,main_topic,difficulty'
+    // Embedding'i PostgreSQL vector formatına çevir
+    const vectorString = `[${embedding.join(',')}]`
+    
+    const { data: results, error } = await supabase
+      .rpc('search_questions_semantic', {
+        query_embedding: vectorString,
+        match_threshold: 0.5,
+        match_count: limit,
+        filter_grade: grade || null,
+        filter_subject_code: subjectCode || null
       })
+
+    if (error) {
+      console.error('pgvector search error:', error)
+      // Fallback: Normal text search
+      return NextResponse.json({ 
+        error: 'Semantic search not available',
+        fallback: true,
+        message: 'pgvector henüz kurulmamış olabilir. Migration çalıştırın.'
+      }, { status: 503 })
+    }
 
     const searchTime = Date.now() - searchStartTime
     const totalTime = Date.now() - startTime
 
     // 3. Sonuçları formatla
-    const results = (result.hits || []).map((hit: any) => {
-      const doc = hit.document
-      return {
-        question_id: doc.question_id,
-        question_text: doc.question_text,
-        subject_name: doc.subject_name,
-        subject_code: doc.subject_code,
-        grade: doc.grade,
-        main_topic: doc.main_topic,
-        difficulty: doc.difficulty,
-        similarity: hit.vector_distance ? (1 - hit.vector_distance).toFixed(3) : null
-      }
-    })
+    const formattedResults = (results || []).map((r: any) => ({
+      question_id: r.id,
+      question_text: r.question_text,
+      subject_name: r.subject_name,
+      subject_code: r.subject_code,
+      grade: r.grade,
+      main_topic: r.main_topic,
+      difficulty: r.difficulty,
+      similarity: r.similarity?.toFixed(3)
+    }))
 
-    console.log(`🧠 Semantic Search: embedding=${embeddingTime}ms, search=${searchTime}ms, total=${totalTime}ms, results=${results.length}`)
+    console.log(`🧠 Semantic Search (pgvector): embedding=${embeddingTime}ms, search=${searchTime}ms, total=${totalTime}ms, results=${formattedResults.length}`)
 
     return NextResponse.json({
-      results,
-      total: result.found || 0,
+      results: formattedResults,
+      total: formattedResults.length,
       timing: {
         embedding: embeddingTime,
         search: searchTime,
         total: totalTime
-      }
+      },
+      engine: 'pgvector'
     })
 
   } catch (error: any) {
@@ -112,8 +111,6 @@ export async function POST(request: NextRequest) {
 
 /**
  * GET /api/search/semantic?q=...
- * 
- * Basit GET endpoint (query param ile)
  */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -125,14 +122,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'q parameter required' }, { status: 400 })
   }
 
-  // POST'a yönlendir
   const body = {
     query,
     grade: grade ? parseInt(grade) : undefined,
     limit: limit ? parseInt(limit) : 10
   }
 
-  // POST handler'ı çağır
   const fakeRequest = new NextRequest(request.url, {
     method: 'POST',
     body: JSON.stringify(body),
