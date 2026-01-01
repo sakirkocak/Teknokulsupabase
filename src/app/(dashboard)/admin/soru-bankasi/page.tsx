@@ -10,6 +10,7 @@ import {
   ChevronDown, Star, Zap, Crown, Sparkles, Upload,
   FileJson, Copy, Download, AlertCircle, Wand2, RefreshCw
 } from 'lucide-react'
+import MathRenderer from '@/components/MathRenderer'
 
 interface Topic {
   id: string
@@ -404,7 +405,7 @@ export default function AdminSoruBankasiPage() {
                           </div>
                           
                           <p className="text-gray-900 dark:text-white line-clamp-2 mb-2">
-                            {question.question_text}
+                            <MathRenderer text={question.question_text} />
                           </p>
                           
                           <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -906,7 +907,7 @@ export default function AdminSoruBankasiPage() {
                             <span className="text-xs text-gray-500">#{i + 1}</span>
                           </div>
                           <p className="text-sm text-gray-900 dark:text-white mb-2 line-clamp-2">
-                            {q.question_text}
+                            <MathRenderer text={q.question_text} />
                           </p>
                           <div className="text-xs text-gray-500">
                             Doğru: <span className="font-medium text-green-600">{q.correct_answer}</span>
@@ -1167,7 +1168,7 @@ export default function AdminSoruBankasiPage() {
                             <span className="text-xs text-gray-500">#{i + 1}</span>
                           </div>
                           <p className="text-sm text-gray-900 dark:text-white mb-2 line-clamp-2">
-                            {q.question_text}
+                            <MathRenderer text={q.question_text} />
                           </p>
                           <div className="text-xs text-gray-500">
                             Doğru: <span className="font-medium text-green-600">{q.correct_answer}</span>

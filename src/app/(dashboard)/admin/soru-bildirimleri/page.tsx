@@ -276,7 +276,7 @@ export default function SoruBildirimleriPage() {
                         </div>
 
                         <p className="text-gray-900 dark:text-white line-clamp-2">
-                          {report.question?.question_text}
+                          <MathRenderer text={report.question?.question_text || ''} />
                         </p>
 
                         <div className="mt-2 flex items-center gap-2 text-sm">

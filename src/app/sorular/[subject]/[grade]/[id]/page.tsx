@@ -364,7 +364,7 @@ export default async function SingleQuestionPage({ params }: Props) {
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-600 line-clamp-2 group-hover:text-gray-900 transition-colors">
-                            {q.question_text.substring(0, 100)}...
+                            <MathRenderer text={q.question_text.substring(0, 150)} />
                           </p>
                           <div className="flex items-center gap-2 mt-2">
                             <span className={`px-2 py-0.5 bg-${qDiff.color}-100 text-${qDiff.color}-700 rounded text-xs font-medium`}>

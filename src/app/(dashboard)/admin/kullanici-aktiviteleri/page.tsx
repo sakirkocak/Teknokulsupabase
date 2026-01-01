@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getInitials } from '@/lib/utils'
+import MathRenderer from '@/components/MathRenderer'
 import { 
   Activity, 
   Search,
@@ -455,7 +456,7 @@ export default function AdminUserActivitiesPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm text-surface-900 line-clamp-2">
-                                  {activity.question_text || 'Soru detayı yüklenemedi'}
+                                  <MathRenderer text={activity.question_text || 'Soru detayı yüklenemedi'} />
                                 </p>
                                 <div className="flex items-center gap-2 mt-1 text-xs text-surface-500">
                                   {activity.subject_name && (

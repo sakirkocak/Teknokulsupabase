@@ -1139,7 +1139,7 @@ export default function ImageQuestionGeneratorPage() {
                       
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-700 line-clamp-2">
-                          {q.question_text?.substring(0, 80)}...
+                          <MathRenderer text={q.question_text?.substring(0, 100) || ''} />
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
