@@ -94,20 +94,9 @@ export default function JsonLdSchema() {
     },
   }
 
-  // SoftwareApplication Schema
-  // NOT: aggregateRating kaldırıldı - sahte veri Google cezasına neden olabilir
-  const softwareSchema = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: 'Teknokul',
-    applicationCategory: 'EducationalApplication',
-    operatingSystem: 'Web',
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'TRY',
-    },
-  }
+  // SoftwareApplication Schema - KALDIRILDI
+  // Google yıldız derecelendirmesi göstermemesi için bu schema tamamen kaldırıldı
+  // Sahte değerlendirme gibi görünüyor ve Google cezasına neden olabilir
 
   // BreadcrumbList Schema (temel yapı)
   const breadcrumbSchema = {
@@ -144,12 +133,7 @@ export default function JsonLdSchema() {
           __html: JSON.stringify(courseSchema),
         }}
       />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(softwareSchema),
-        }}
-      />
+      {/* SoftwareApplication schema kaldırıldı - sahte yıldız gösterimine neden oluyordu */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
