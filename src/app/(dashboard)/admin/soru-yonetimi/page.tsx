@@ -244,46 +244,80 @@ export default function AdminSoruYonetimiPage() {
           pageSize
         })
         
-        // AdminQuestionResult → Question formatına çevir
-        // Not: Optimize schema - detaylar Supabase'den çekilecek
-        const mappedQuestions: Question[] = result.questions.map(q => ({
-          id: q.question_id,
-          topic_id: q.topic_id || '',
-          difficulty: q.difficulty as any,
-          question_text: q.question_text,
-          question_image_url: q.image_url || null,
-          options: {
-            A: q.option_a || '',
-            B: q.option_b || '',
-            C: q.option_c || '',
-            D: q.option_d || '',
-            E: q.option_e || undefined
-          },
-          correct_answer: (q.correct_answer || 'A') as any,
-          explanation: q.explanation ?? null,  // undefined -> null
-          source: null,
-          times_answered: q.times_answered || 0,
-          times_correct: q.times_correct || 0,
-          created_at: new Date(q.created_at).toISOString(),
-          topic: {
-            id: q.topic_id || '',
-            subject_id: '',
-            grade: q.grade,
-            main_topic: q.main_topic,
-            sub_topic: q.sub_topic,
-            learning_outcome: null,
-            subject: {
-              id: '',
-              name: q.subject_name,
-              code: q.subject_code,
-              icon: null
-            }
-          }
-        }))
+        // Typesense'den gelen ID'lerle Supabase'den detayları çek
+        // (Typesense optimize edildi - şıklar, doğru cevap, açıklama orada yok)
+        const questionIds = result.questions.map(q => q.question_id)
         
-        setQuestions(mappedQuestions)
+        if (questionIds.length > 0) {
+          const { data: detailedQuestions } = await supabase
+            .from('questions')
+            .select(`
+              id,
+              topic_id,
+              question_text,
+              question_image_url,
+              option_a,
+              option_b,
+              option_c,
+              option_d,
+              option_e,
+              correct_answer,
+              explanation,
+              difficulty,
+              source,
+              times_answered,
+              times_correct,
+              created_at,
+              topic:topics!inner(
+                id,
+                subject_id,
+                grade,
+                main_topic,
+                sub_topic,
+                learning_outcome,
+                subject:subjects!inner(id, name, code, icon)
+              )
+            `)
+            .in('id', questionIds)
+          
+          if (detailedQuestions) {
+            // Typesense sıralamasını koru
+            const questionMap = new Map(detailedQuestions.map(q => [q.id, q]))
+            const mappedQuestions: Question[] = questionIds
+              .map(id => questionMap.get(id))
+              .filter(Boolean)
+              .map((q: any) => ({
+                id: q.id,
+                topic_id: q.topic_id,
+                difficulty: q.difficulty,
+                question_text: q.question_text,
+                question_image_url: q.question_image_url,
+                options: {
+                  A: q.option_a || '',
+                  B: q.option_b || '',
+                  C: q.option_c || '',
+                  D: q.option_d || '',
+                  E: q.option_e || undefined
+                },
+                correct_answer: q.correct_answer,
+                explanation: q.explanation,
+                source: q.source,
+                times_answered: q.times_answered || 0,
+                times_correct: q.times_correct || 0,
+                created_at: q.created_at,
+                topic: q.topic
+              }))
+            
+            setQuestions(mappedQuestions)
+            setTotalCount(result.total)
+            console.log(`⚡ Questions: Typesense search + Supabase details in ${result.duration}ms`)
+            setLoading(false)
+            return
+          }
+        }
+        
+        setQuestions([])
         setTotalCount(result.total)
-        console.log(`⚡ Questions loaded from Typesense in ${result.duration}ms`)
         setLoading(false)
         return
       } catch (error) {
