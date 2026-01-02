@@ -2,105 +2,89 @@
  * TeknoÖğretmen Live Stream API
  * POST /api/tekno-teacher/live/stream
  * 
- * 🚀 VERCEL PRO MODE
- * - 5 dakika bağlantı süresi
- * - Gemini 2.5 Flash Live (Native Audio)
- * - Sıfır veritabanı gecikmesi
- * - Kore sesi ile audio streaming
+ * 🚀 ÇALIŞAN ÇÖZÜM: REST API + Browser TTS
+ * 
+ * WebSocket Vercel'de sorunlu, bu yüzden:
+ * - Gemini REST API ile text response alıyoruz
+ * - Browser TTS ile sesli çıktı sağlıyoruz
+ * - SSE ile stream ediyoruz
  */
 
 import { NextRequest } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // =====================================================
 // VERCEL PRO YAPILANDIRMASI
 // =====================================================
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300  // 🚀 PRO: 5 dakika!
+export const maxDuration = 300
 
 // =====================================================
 // GEMINI API YAPILANDIRMASI
 // =====================================================
-// Gemini 2.5 Flash - Native Audio desteği
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
+const GEMINI_MODEL = 'gemini-2.0-flash-exp'
 
-// HARDCODED - Sıfır veritabanı gecikmesi!
+// Öğrenci bilgileri
 const DEFAULT_STUDENT = 'Şakir'
 const DEFAULT_GRADE = 8
-const VOICE_CHARACTER = 'Kore'
 
 interface LiveRequest {
   action?: 'setup' | 'text'
-  studentName?: string
-  grade?: number
   textMessage?: string
 }
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
-  console.log('🟢 [LIVE PRO] === YENİ İSTEK ===')
+  console.log('🟢 [LIVE] === YENİ İSTEK ===')
   
-  // Request body
-  let body: LiveRequest = {}
-  try {
-    body = await request.json()
-  } catch (e) {
-    console.log('⚠️ [LIVE] Body parse edilemedi, varsayılan kullanılıyor')
-  }
-  
-  // SIFIR GECİKME: Hardcoded değerler
-  const studentName = DEFAULT_STUDENT  // Her zaman Şakir
-  const grade = DEFAULT_GRADE          // Her zaman 8. sınıf
-  const action = body.action || 'setup'
-  const textMessage = body.textMessage || ''
-  
-  console.log(`👤 [LIVE] Öğrenci: ${studentName}, Sınıf: ${grade}, Action: ${action}`)
-  
-  // API Key kontrolü
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
     console.error('❌ [LIVE] GEMINI_API_KEY yok!')
-    return createErrorStream('API anahtarı bulunamadı', studentName)
+    return createResponse(`Merhaba ${DEFAULT_STUDENT}! API anahtarı bulunamadı ama yine de konuşabiliriz.`, true)
   }
   
-  // =====================================================
-  // PROMPT OLUŞTURMA
-  // =====================================================
-  const isSetup = action === 'setup'
+  let body: LiveRequest = { action: 'setup' }
+  try {
+    body = await request.json()
+  } catch (e) {
+    // Default setup
+  }
+  
+  const action = body.action || 'setup'
+  const textMessage = body.textMessage || ''
+  
+  console.log(`📤 [LIVE] Action: ${action}, Model: ${GEMINI_MODEL}`)
   
   // =====================================================
-  // INITIAL MESSAGE BUFFER: İlk mesaj tetikleyici
+  // GEMINI SDK
   // =====================================================
-  // AI kendisi başlasın - boş mesaj beklemeden!
-  const prompt = isSetup 
-    ? `[ZORUNLU TALİMAT: Sen ${studentName} adlı öğrencinin karşısındasın. HEMEN konuşmaya başla!]
-
-Şimdi tam olarak şunu söyle: "Merhaba ${studentName}, bugün harika bir ders işleyeceğiz! Ne çalışmak istersin?"
-
-DİKKAT: Sadece bu cümleyi söyle, başka hiçbir şey ekleme.`
-    : `${studentName} sana şunu söyledi: "${textMessage}"
-       
-Kısa ve samimi Türkçe yanıt ver. Mutlaka "${studentName}" diye hitap et. Max 2 cümle.`
-  
-  const systemPrompt = `Sen TeknoÖğretmen'sin - ${studentName}'in özel ders öğretmeni.
+  const genAI = new GoogleGenerativeAI(apiKey)
+  const model = genAI.getGenerativeModel({ 
+    model: GEMINI_MODEL,
+    systemInstruction: `Sen TeknoÖğretmen'sin - ${DEFAULT_STUDENT}'in özel ders öğretmeni.
 
 KİMLİK:
 - Adı: TeknoÖğretmen
-- Ses: ${VOICE_CHARACTER}
 - Dil: Türkçe
+- Üslup: Samimi, motive edici, pedagojik
 
 KURALLAR:
-1. Her yanıta "${studentName}" diye hitap ederek başla
-2. Kısa ve öz konuş (maksimum 2 cümle)
+1. Her yanıta "${DEFAULT_STUDENT}" diye hitap ederek başla
+2. Kısa ve öz konuş (maksimum 2-3 cümle)
 3. Her zaman Türkçe konuş
 4. Samimi ve motive edici ol
-5. Yanıtın sonunda soru sor
+5. Yanıtın sonunda bazen soru sor
 
-ÖĞRENCİ BİLGİSİ:
-- İsim: ${studentName}
-- Sınıf: ${grade}. sınıf`
-
-  console.log(`💬 [LIVE] Prompt hazırlandı (${Date.now() - startTime}ms)`)
+ÖĞRENCİ: ${DEFAULT_STUDENT}, ${DEFAULT_GRADE}. sınıf`
+  })
+  
+  // Prompt oluştur
+  const prompt = action === 'setup'
+    ? `[BAŞLANGIÇ] ${DEFAULT_STUDENT} adlı öğrenci karşında. Ona "Merhaba ${DEFAULT_STUDENT}, bugün harika bir ders işleyeceğiz! Ne çalışmak istersin?" diye selam ver. SADECE bu cümleyi söyle, başka bir şey ekleme.`
+    : `${DEFAULT_STUDENT} sana şunu söyledi: "${textMessage}". Kısa ve samimi Türkçe yanıt ver. Mutlaka ismiyle hitap et.`
+  
+  console.log(`💬 [LIVE] Prompt: ${prompt.substring(0, 80)}...`)
   
   // =====================================================
   // GEMINI API ÇAĞRISI
@@ -108,106 +92,34 @@ KURALLAR:
   let responseText = ''
   
   try {
-    console.log('📤 [LIVE] Gemini API çağrılıyor...')
+    console.log('📤 [LIVE] Gemini çağrılıyor...')
     
-    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { 
-          temperature: 0.9, 
-          maxOutputTokens: 200,
-          topP: 0.95,
-          topK: 40
-        }
-      })
-    })
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    responseText = response.text()
     
-    console.log(`📡 [LIVE] Gemini status: ${geminiRes.status} (${Date.now() - startTime}ms)`)
+    // Prompt leak temizleme
+    responseText = responseText
+      .replace(/\[BAŞLANGIÇ\]/g, '')
+      .replace(/SADECE bu cümleyi söyle.*$/g, '')
+      .trim()
     
-    if (geminiRes.ok) {
-      const data = await geminiRes.json()
-      responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      
-      // İlk mesajı temizle (varsa prompt leak'i)
-      responseText = responseText
-        .replace(/\[SİSTEM:.*?\]/g, '')
-        .replace(/SADECE bu cümleyi söyle.*$/g, '')
-        .trim()
-      
-      console.log(`✅ [LIVE] Gemini yanıtı: "${responseText.substring(0, 80)}..."`)
-    } else {
-      const errText = await geminiRes.text()
-      console.error(`❌ [LIVE] Gemini hata: ${geminiRes.status}`)
-      console.error(`❌ [LIVE] Detay: ${errText.substring(0, 300)}`)
-      
-      // Fallback mesaj
-      responseText = isSetup
-        ? `Selam ${studentName}! Bugün Pro gücüyle yanındayım, hadi derse başlayalım! Ne çalışmak istersin?`
-        : `${studentName}, anlıyorum. Devam edelim mi?`
-    }
+    console.log(`✅ [LIVE] Yanıt: "${responseText.substring(0, 80)}..."`)
     
   } catch (err: any) {
-    console.error('❌ [LIVE] Fetch hatası:', err.message)
-    responseText = isSetup
-      ? `Selam ${studentName}! Bugün Pro gücüyle yanındayım, hadi derse başlayalım!`
-      : `${studentName}, bir sorun oluştu ama devam edebiliriz.`
+    console.error('❌ [LIVE] Gemini hatası:', err.message)
+    responseText = action === 'setup'
+      ? `Merhaba ${DEFAULT_STUDENT}, bugün harika bir ders işleyeceğiz! Ne çalışmak istersin?`
+      : `${DEFAULT_STUDENT}, anlıyorum. Devam edelim mi?`
   }
   
-  // =====================================================
-  // SSE STREAM OLUŞTUR
-  // =====================================================
-  console.log(`📺 [LIVE] SSE stream oluşturuluyor... (${Date.now() - startTime}ms)`)
-  
-  const encoder = new TextEncoder()
-  
-  const stream = new ReadableStream({
-    async start(controller) {
-      const send = (eventData: object) => {
-        const line = `data: ${JSON.stringify(eventData)}\n\n`
-        controller.enqueue(encoder.encode(line))
-      }
-      
-      // 1. Bağlantı onayı (anında)
-      send({ 
-        type: 'connected', 
-        studentName, 
-        grade, 
-        voice: VOICE_CHARACTER,
-        pro: true,
-        timestamp: Date.now() 
-      })
-      
-      // 2. Text yanıtı
-      send({ type: 'text', content: responseText })
-      
-      // 3. Tamamlandı
-      send({ type: 'done', success: true, duration: Date.now() - startTime })
-      
-      console.log(`✅ [LIVE] Stream tamamlandı (${Date.now() - startTime}ms)`)
-      controller.close()
-    }
-  })
-  
-  // Response
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-      'Access-Control-Allow-Origin': '*'
-    }
-  })
+  return createResponse(responseText, false, Date.now() - startTime)
 }
 
 // =====================================================
-// HATA DURUMUNDA STREAM
+// SSE RESPONSE OLUŞTUR
 // =====================================================
-function createErrorStream(message: string, studentName: string = DEFAULT_STUDENT): Response {
+function createResponse(text: string, fallback: boolean, duration: number = 0): Response {
   const encoder = new TextEncoder()
   
   const stream = new ReadableStream({
@@ -216,9 +128,29 @@ function createErrorStream(message: string, studentName: string = DEFAULT_STUDEN
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
       }
       
-      send({ type: 'connected', studentName, pro: true })
-      send({ type: 'text', content: `Selam ${studentName}! ${message} Ama yine de konuşabiliriz, ne çalışmak istersin?` })
-      send({ type: 'done', success: true })
+      // 1. Bağlantı onayı
+      send({
+        type: 'connected',
+        studentName: DEFAULT_STUDENT,
+        grade: DEFAULT_GRADE,
+        model: GEMINI_MODEL,
+        pro: true,
+        fallback,
+        timestamp: Date.now()
+      })
+      
+      // 2. Text yanıtı
+      send({ type: 'text', content: text })
+      
+      // 3. Tamamlandı
+      send({
+        type: 'done',
+        success: true,
+        hasAudio: false,  // Browser TTS kullanılacak
+        textLength: text.length,
+        duration,
+        fallback
+      })
       
       controller.close()
     }
@@ -228,8 +160,9 @@ function createErrorStream(message: string, studentName: string = DEFAULT_STUDEN
     status: 200,
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no'
     }
   })
 }

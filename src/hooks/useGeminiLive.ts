@@ -121,33 +121,62 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     return audioContextRef.current
   }, [])
   
-  // Gemini audio'yu AudioContext ile çal
+  // =====================================================
+  // GEMINI AUDIO ÇALMA - PCM/WAV/MP3 Desteği
+  // =====================================================
   const playGeminiAudio = useCallback(async (base64Audio: string, mimeType: string) => {
-    // =====================================================
-    // SES PAKETİ GELDİ - Client-Side Log
-    // =====================================================
     console.log('🔊🔊🔊 SES PAKETİ GELDİ 🔊🔊🔊')
     console.log('🔊 [AUDIO] mimeType:', mimeType, 'size:', base64Audio.length, 'bytes')
     
     try {
       const ctx = await initAudioContext()
       
-      // Base64 -> Int16Array (doğru PCM format)
-      const pcmData = base64ToInt16Array(base64Audio)
-      console.log('🔊 [AUDIO] PCM samples:', pcmData.length)
-      
-      // Mime type'dan sample rate al (varsayılan 24000)
-      const sampleRate = mimeType.includes('16000') ? 16000 : 24000
-      
-      // PCM 16-bit -> Float32
-      const floatData = new Float32Array(pcmData.length)
-      for (let i = 0; i < pcmData.length; i++) {
-        floatData[i] = pcmData[i] / 32768
+      // Base64 -> ArrayBuffer
+      const binaryString = atob(base64Audio)
+      const bytes = new Uint8Array(binaryString.length)
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i)
       }
       
-      // AudioBuffer oluştur
-      const audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
-      audioBuffer.getChannelData(0).set(floatData)
+      // Mime type'a göre sample rate belirle
+      let sampleRate = 24000  // Gemini varsayılan
+      if (mimeType.includes('16000')) sampleRate = 16000
+      if (mimeType.includes('22050')) sampleRate = 22050
+      if (mimeType.includes('44100')) sampleRate = 44100
+      
+      console.log('🔊 [AUDIO] Sample rate:', sampleRate)
+      
+      let audioBuffer: AudioBuffer
+      
+      // PCM veya encoded audio kontrolü
+      if (mimeType.includes('pcm') || mimeType.includes('raw')) {
+        // PCM 16-bit -> Float32
+        const pcmData = new Int16Array(bytes.buffer)
+        const floatData = new Float32Array(pcmData.length)
+        for (let i = 0; i < pcmData.length; i++) {
+          floatData[i] = pcmData[i] / 32768
+        }
+        
+        audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
+        audioBuffer.getChannelData(0).set(floatData)
+        console.log('🔊 [AUDIO] PCM decoded:', floatData.length, 'samples')
+      } else {
+        // MP3/WAV/OGG - decodeAudioData kullan
+        try {
+          audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0))
+          console.log('🔊 [AUDIO] Decoded:', audioBuffer.duration, 'seconds')
+        } catch (decodeErr) {
+          // Fallback: PCM olarak dene
+          console.warn('⚠️ [AUDIO] decodeAudioData başarısız, PCM deneniyor...')
+          const pcmData = new Int16Array(bytes.buffer)
+          const floatData = new Float32Array(pcmData.length)
+          for (let i = 0; i < pcmData.length; i++) {
+            floatData[i] = pcmData[i] / 32768
+          }
+          audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
+          audioBuffer.getChannelData(0).set(floatData)
+        }
+      }
       
       // Çal
       const source = ctx.createBufferSource()
@@ -179,7 +208,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       }
       
       source.start()
-      console.log(`✅ [AUDIO] Çalıyor: ${floatData.length} samples @ ${sampleRate}Hz`)
+      console.log(`✅ [AUDIO] Çalıyor: ${audioBuffer.duration.toFixed(2)}s @ ${audioBuffer.sampleRate}Hz`)
       
     } catch (err) {
       console.error('❌ [AUDIO] Hata:', err)

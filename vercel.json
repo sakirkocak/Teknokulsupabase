@@ -5,5 +5,12 @@
       "path": "/api/cron/flush-points",
       "schedule": "0 0 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/ads.txt",
+      "destination": "https://srv.adstxtmanager.com/19390/teknokul.com.tr",
+      "permanent": true
+    }
   ]
 }
