@@ -72,6 +72,9 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   const audioQueueRef = useRef<string[]>([])
   const isPlayingRef = useRef(false)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const reconnectAttempts = useRef(0)
+  const maxReconnectAttempts = 3
+  const isSessionActive = useRef(false)
   
   // Status değişikliğini bildir
   const updateStatus = useCallback((newStatus: GeminiLiveStatus) => {
@@ -157,7 +160,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     abortControllerRef.current?.abort()
     abortControllerRef.current = new AbortController()
     
-    updateStatus(isAudio ? 'processing' : 'processing')
+    console.log('🔵 [HOOK] Stream request başlıyor:', { message: message.substring(0, 50), isAudio })
+    updateStatus('processing')
     
     try {
       const response = await fetch('/api/tekno-teacher/live/stream', {
@@ -174,9 +178,12 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         signal: abortControllerRef.current.signal
       })
       
+      console.log('📡 [HOOK] API yanıtı:', response.status, response.statusText)
+      
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Stream hatası')
+        const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen hata' }))
+        console.error('❌ [HOOK] API hatası:', errorData)
+        throw new Error(errorData.error || `HTTP ${response.status}`)
       }
       
       // SSE stream'i oku
@@ -186,12 +193,17 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       const decoder = new TextDecoder()
       let buffer = ''
       let fullText = ''
+      let lastHeartbeat = Date.now()
       
       updateStatus('speaking')
       
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        
+        if (done) {
+          console.log('✅ [HOOK] Stream tamamlandı, toplam metin:', fullText.length, 'karakter')
+          break
+        }
         
         buffer += decoder.decode(value, { stream: true })
         
@@ -204,12 +216,30 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
             try {
               const data = JSON.parse(line.slice(6))
               
+              // Heartbeat - bağlantı canlı
+              if (data.type === 'heartbeat') {
+                lastHeartbeat = Date.now()
+                console.log('💓 [HOOK] Heartbeat alındı')
+                continue
+              }
+              
+              // Bağlantı onayı
+              if (data.type === 'connected') {
+                console.log('🟢 [HOOK] Bağlantı onaylandı:', data.studentName)
+                reconnectAttempts.current = 0 // Reset reconnect counter
+                continue
+              }
+              
+              // Metin chunk'ı
               if (data.type === 'text') {
                 fullText += data.content
+                console.log('📝 [HOOK] Text chunk:', data.chunk, '-', data.content.substring(0, 30))
                 onTranscript?.(data.content, false)
               }
               
+              // Audio chunk'ı
               if (data.type === 'audio') {
+                console.log('🔊 [HOOK] Audio chunk alındı')
                 onAudioReceived?.(data.data, data.mimeType)
                 
                 // Audio'yu queue'a ekle veya çal
@@ -220,21 +250,33 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
                 }
               }
               
+              // Hata
               if (data.type === 'error') {
-                throw new Error(data.message)
+                console.error('❌ [HOOK] Server error:', data.code, data.message)
+                throw new Error(`[${data.code || 'ERR'}] ${data.message}`)
               }
               
+              // Tamamlandı
               if (data.type === 'done') {
-                console.log('✅ Stream tamamlandı')
-                if (!isPlayingRef.current) {
+                console.log('✅ [HOOK] Done sinyali, chunks:', data.totalChunks)
+                if (!isPlayingRef.current && isSessionActive.current) {
                   updateStatus('listening')
                 }
               }
               
-            } catch (e) {
-              // JSON parse hatası - devam et
+            } catch (e: any) {
+              if (e.message?.includes('[')) {
+                throw e // Re-throw server errors
+              }
+              console.warn('⚠️ [HOOK] JSON parse hatası')
             }
           }
+        }
+        
+        // Heartbeat timeout kontrolü (30 saniye)
+        if (Date.now() - lastHeartbeat > 30000) {
+          console.warn('⚠️ [HOOK] Heartbeat timeout!')
+          break
         }
       }
       
@@ -242,41 +284,49 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        console.log('Stream iptal edildi')
+        console.log('🛑 [HOOK] Stream iptal edildi')
         return
       }
-      console.error('Stream error:', err)
+      
+      console.error('❌ [HOOK] Stream error:', err.message)
       setError(err)
       onError?.(err)
-      updateStatus('error')
+      
+      // Yeniden bağlanma denemesi
+      if (isSessionActive.current && reconnectAttempts.current < maxReconnectAttempts) {
+        reconnectAttempts.current++
+        console.log(`🔄 [HOOK] Yeniden bağlanma denemesi ${reconnectAttempts.current}/${maxReconnectAttempts}`)
+        updateStatus('connecting')
+        
+        // 2 saniye bekle ve tekrar dene
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        if (isSessionActive.current) {
+          return streamRequest(message, isAudio)
+        }
+      } else {
+        updateStatus('error')
+      }
+      
       throw err
     }
   }, [studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onAudioReceived, onError])
   
-  // Bağlantıyı başlat
-  const connect = useCallback(async () => {
-    updateStatus('connecting')
-    setError(null)
-    
-    try {
-      // Hoşgeldin mesajı gönder
-      await streamRequest(`Merhaba, ben ${studentName}. Benim öğretmenim ol!`, false)
-      updateStatus('listening')
-      
-      // Mikrofonu başlat
-      await startMicrophone()
-      
-    } catch (err: any) {
-      console.error('Connect error:', err)
-      setError(err)
-      onError?.(err)
-      updateStatus('error')
-    }
-  }, [studentName, streamRequest, updateStatus, onError])
-  
   // Mikrofonu başlat (STT için)
   const startMicrophone = useCallback(async () => {
+    // Zaten aktifse tekrar başlatma
+    if (mediaStreamRef.current) {
+      const tracks = mediaStreamRef.current.getTracks()
+      const activeTracks = tracks.filter(t => t.readyState === 'live')
+      if (activeTracks.length > 0) {
+        console.log('🎤 [MIC] Mikrofon zaten aktif')
+        return true
+      }
+    }
+    
     try {
+      console.log('🎤 [MIC] Mikrofon başlatılıyor...')
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           sampleRate: 16000,
@@ -287,41 +337,126 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         }
       })
       
+      // Track ended event'i dinle
+      stream.getTracks().forEach(track => {
+        track.onended = () => {
+          console.warn('⚠️ [MIC] Track sonlandı:', track.label)
+          
+          // Oturum aktifse yeniden başlat
+          if (isSessionActive.current) {
+            console.log('🔄 [MIC] Otomatik yeniden başlatma...')
+            setTimeout(() => {
+              if (isSessionActive.current) {
+                startMicrophone()
+              }
+            }, 1000)
+          }
+        }
+        
+        track.onmute = () => {
+          console.warn('🔇 [MIC] Track susturuldu')
+        }
+        
+        track.onunmute = () => {
+          console.log('🔊 [MIC] Track tekrar aktif')
+        }
+      })
+      
       mediaStreamRef.current = stream
-      console.log('🎤 Mikrofon başlatıldı')
+      console.log('✅ [MIC] Mikrofon başlatıldı')
+      return true
       
     } catch (err: any) {
-      console.error('Microphone error:', err)
-      const error = new Error('Mikrofon erişimi reddedildi')
+      console.error('❌ [MIC] Mikrofon hatası:', err.name, err.message)
+      
+      // Hata türüne göre mesaj
+      let errorMessage = 'Mikrofon erişimi reddedildi'
+      if (err.name === 'NotAllowedError') {
+        errorMessage = 'Mikrofon izni verilmedi. Lütfen tarayıcı ayarlarından izin verin.'
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = 'Mikrofon bulunamadı. Lütfen bir mikrofon bağlayın.'
+      } else if (err.name === 'NotReadableError') {
+        errorMessage = 'Mikrofon kullanılamıyor. Başka bir uygulama kullanıyor olabilir.'
+      }
+      
+      const error = new Error(errorMessage)
       setError(error)
       onError?.(error)
+      return false
     }
   }, [onError])
   
   // Mikrofonu durdur
   const stopMicrophone = useCallback(() => {
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop())
+      mediaStreamRef.current.getTracks().forEach(track => {
+        track.onended = null
+        track.onmute = null
+        track.onunmute = null
+        track.stop()
+      })
       mediaStreamRef.current = null
+      console.log('🔇 [MIC] Mikrofon durduruldu')
     }
-    console.log('🔇 Mikrofon durduruldu')
   }, [])
+  
+  // Bağlantıyı başlat
+  const connect = useCallback(async () => {
+    console.log('🚀 [HOOK] Bağlantı başlatılıyor...')
+    
+    updateStatus('connecting')
+    setError(null)
+    isSessionActive.current = true
+    reconnectAttempts.current = 0
+    
+    try {
+      // Önce mikrofonu başlat
+      const micStarted = await startMicrophone()
+      if (!micStarted) {
+        console.warn('⚠️ [HOOK] Mikrofon başlatılamadı, sadece metin ile devam ediliyor')
+      }
+      
+      // Hoşgeldin mesajı gönder
+      console.log('📤 [HOOK] Hoşgeldin mesajı gönderiliyor...')
+      await streamRequest(`Merhaba, ben ${studentName}. Benim ${grade}. sınıf öğretmenim ol!`, false)
+      
+      console.log('✅ [HOOK] Bağlantı başarılı')
+      updateStatus('listening')
+      
+    } catch (err: any) {
+      console.error('❌ [HOOK] Bağlantı hatası:', err.message)
+      isSessionActive.current = false
+      setError(err)
+      onError?.(err)
+      updateStatus('error')
+    }
+  }, [studentName, grade, streamRequest, startMicrophone, updateStatus, onError])
   
   // Bağlantıyı kes
   const disconnect = useCallback(() => {
+    console.log('🔌 [HOOK] Bağlantı kapatılıyor...')
+    
+    isSessionActive.current = false
+    reconnectAttempts.current = 0
+    
     abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    
     stopMicrophone()
     
     if (audioContextRef.current) {
-      audioContextRef.current.close()
+      audioContextRef.current.close().catch(() => {})
       audioContextRef.current = null
     }
     
     audioQueueRef.current = []
     isPlayingRef.current = false
+    
     updateStatus('idle')
     setVolume(0)
-    console.log('🔌 Bağlantı kapatıldı')
+    setError(null)
+    
+    console.log('✅ [HOOK] Bağlantı kapatıldı')
   }, [stopMicrophone, updateStatus])
   
   // Metin gönder

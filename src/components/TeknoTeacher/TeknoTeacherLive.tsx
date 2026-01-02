@@ -58,8 +58,8 @@ export default function TeknoTeacherLive({
   const [personality, setPersonality] = useState<'friendly' | 'strict' | 'motivating'>('friendly')
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0])
   const [localError, setLocalError] = useState<string | null>(null)
+  const [sessionActive, setSessionActive] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const isSessionActive = useRef(false)
   
   // Gemini Live Hook (Server-side streaming)
   const {
@@ -85,8 +85,9 @@ export default function TeknoTeacherLive({
     },
     onStatusChange: (newStatus) => {
       console.log('🔴 Live status:', newStatus)
-      if (newStatus === 'listening' && isSessionActive.current) {
-        startListening()
+      if (newStatus === 'listening' && sessionActive) {
+        console.log('🎤 [UI] Otomatik dinleme başlatılıyor...')
+        setTimeout(() => startListening(), 500) // Küçük gecikme ile başlat
       }
     },
     onError: (err) => {
@@ -107,10 +108,12 @@ export default function TeknoTeacherLive({
     language: 'tr-TR',
     continuous: true,
     onResult: async (text, isFinal) => {
-      if (isFinal && text.trim().length > 2 && isSessionActive.current && status === 'listening') {
+      if (isFinal && text.trim().length > 2 && sessionActive && status === 'listening') {
+        console.log('🗣️ [UI] Kullanıcı konuştu:', text.trim())
         // Kullanıcı konuştu - Gemini'ye gönder
         stopListening()
         resetTranscript()
+        setMessages(prev => [...prev, { text: text.trim(), isUser: true }])
         await sendText(text.trim())
       }
     }
@@ -118,14 +121,16 @@ export default function TeknoTeacherLive({
   
   // Oturumu başlat
   const connect = async () => {
+    console.log('🚀 [UI] Oturum başlatılıyor...')
     setLocalError(null)
-    isSessionActive.current = true
+    setSessionActive(true)
     await geminiConnect()
   }
   
   // Oturumu bitir
   const disconnect = () => {
-    isSessionActive.current = false
+    console.log('🛑 [UI] Oturum sonlandırılıyor...')
+    setSessionActive(false)
     stopListening()
     geminiDisconnect()
     setMessages([])
