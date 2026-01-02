@@ -96,7 +96,7 @@ export default function TeknoOgretmenLivePage() {
       
       {/* Bilgi */}
       <div className="fixed bottom-4 left-4 text-xs text-gray-500">
-        <p>🤖 OpenAI GPT-4o + TTS-HD</p>
+        <p>🤖 Gemini 3 Flash + ElevenLabs</p>
         <p>Yüksek kaliteli AI eğitim asistanı</p>
       </div>
     </div>
