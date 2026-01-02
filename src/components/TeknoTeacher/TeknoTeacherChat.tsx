@@ -53,9 +53,16 @@ export default function TeknoTeacherChat() {
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [conversationMode, setConversationMode] = useState<ConversationMode>('text')
   const [voiceSessionActive, setVoiceSessionActive] = useState(false)
+  const [shouldAutoListen, setShouldAutoListen] = useState(false) // Auto-listen flag
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pendingVoiceInput = useRef<string>('')
+  const voiceSessionRef = useRef(false) // Ref for callbacks
+  
+  // voiceSessionActive'i ref'e sync et (callback'ler için)
+  useEffect(() => {
+    voiceSessionRef.current = voiceSessionActive
+  }, [voiceSessionActive])
   
   // Speech hook (TTS)
   const { 
@@ -67,12 +74,10 @@ export default function TeknoTeacherChat() {
     onVolumeChange: (vol) => setAvatarVolume(vol),
     onEnd: () => {
       setAvatarVolume(0)
-      // Ses bitti, dinleme moduna geç
-      if (voiceSessionActive && conversationMode === 'voice') {
-        setTimeout(() => {
-          setConversationMode('listening')
-          startListening()
-        }, 500) // Kısa bir bekleme
+      // 🎙️ Ses bitti - Auto-Listen tetikle
+      if (voiceSessionRef.current) {
+        console.log('🎙️ TTS bitti, mikrofon açılıyor...')
+        setShouldAutoListen(true)
       }
     }
   })
@@ -93,17 +98,38 @@ export default function TeknoTeacherChat() {
     onResult: (text, isFinal) => {
       if (isFinal && text.trim().length > 2) {
         // Final sonuç geldi - mesaj gönder
+        console.log('🗣️ Ses algılandı:', text)
         pendingVoiceInput.current = text.trim()
         handleVoiceInput(text.trim())
       }
     },
     onEnd: () => {
-      if (voiceSessionActive && !isSpeaking) {
-        // Dinleme bitti ama sohbet devam ediyor - tekrar başlat
-        setTimeout(() => startListening(), 300)
+      // Sürekli dinleme için otomatik restart
+      if (voiceSessionRef.current && !isSpeaking) {
+        console.log('👂 Dinleme bitti, tekrar başlatılıyor...')
+        setTimeout(() => {
+          if (voiceSessionRef.current) {
+            startListening()
+          }
+        }, 200) // Daha kısa bekleme
       }
     }
   })
+  
+  // 🎙️ AUTO-LISTEN: TTS bitince mikrofonu otomatik aç
+  useEffect(() => {
+    if (shouldAutoListen && voiceSessionActive && !isSpeaking && !isLoading) {
+      console.log('🎙️ Auto-Listen aktif, mikrofon açılıyor...')
+      setShouldAutoListen(false)
+      setConversationMode('listening')
+      
+      // Kısa gecikme ile mikrofonu aç (echo önleme)
+      setTimeout(() => {
+        resetTranscript()
+        startListening()
+      }, 300)
+    }
+  }, [shouldAutoListen, voiceSessionActive, isSpeaking, isLoading, startListening, resetTranscript])
   
   // Sesli giriş işle
   const handleVoiceInput = useCallback(async (voiceText: string) => {

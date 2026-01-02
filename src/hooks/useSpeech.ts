@@ -169,7 +169,7 @@ export function useSpeech(options: UseSpeechOptions & { rate?: number } = {}): U
     }
   }, [initAudioContext, startVolumeAnalysis, stopVolumeAnalysis, onStart, onEnd, onError])
   
-  // TTS ile konuş (Web Speech API)
+  // TTS ile konuş (Web Speech API) - Optimize edilmiş
   const speak = useCallback(async (text: string) => {
     try {
       setIsLoading(true)
@@ -184,14 +184,37 @@ export function useSpeech(options: UseSpeechOptions & { rate?: number } = {}): U
       
       const utterance = new SpeechSynthesisUtterance(text)
       utterance.lang = 'tr-TR'
-      utterance.rate = 1.0
-      utterance.pitch = 1.0
+      utterance.rate = 1.1  // Biraz daha hızlı (daha doğal)
+      utterance.pitch = 1.05 // Hafif yüksek ton (daha samimi)
+      utterance.volume = 1.0
       
-      // Türkçe ses bul
-      const voices = window.speechSynthesis.getVoices()
-      const turkishVoice = voices.find(v => v.lang.includes('tr')) || voices[0]
-      if (turkishVoice) {
-        utterance.voice = turkishVoice
+      // Sesleri al (async olabilir, bekle)
+      let voices = window.speechSynthesis.getVoices()
+      
+      // Chrome'da sesler geç yüklenebilir
+      if (voices.length === 0) {
+        await new Promise<void>(resolve => {
+          window.speechSynthesis.onvoiceschanged = () => {
+            voices = window.speechSynthesis.getVoices()
+            resolve()
+          }
+          // Timeout ile devam et
+          setTimeout(resolve, 100)
+        })
+      }
+      
+      // En iyi Türkçe sesi bul (Google > Microsoft > Diğer)
+      const turkishVoices = voices.filter(v => v.lang.includes('tr'))
+      const preferredVoice = 
+        turkishVoices.find(v => v.name.includes('Google')) ||
+        turkishVoices.find(v => v.name.includes('Microsoft')) ||
+        turkishVoices.find(v => v.name.includes('female') || v.name.includes('Female')) ||
+        turkishVoices[0] ||
+        voices[0]
+      
+      if (preferredVoice) {
+        utterance.voice = preferredVoice
+        console.log('🔊 Ses seçildi:', preferredVoice.name)
       }
       
       // Lip-sync için ses analizi simülasyonu
@@ -202,31 +225,40 @@ export function useSpeech(options: UseSpeechOptions & { rate?: number } = {}): U
         setIsPlaying(true)
         onStart?.()
         
-        // Simüle edilmiş volume değişimi (gerçek Web Speech API volume vermiyor)
+        // Daha doğal volume simülasyonu (konuşma ritmine uygun)
+        let phase = 0
         volumeInterval = setInterval(() => {
-          const simulatedVolume = 0.3 + Math.random() * 0.5
+          // Sinüs dalgası + rastgele varyasyon = daha doğal ağız hareketi
+          const baseVolume = 0.4 + 0.3 * Math.sin(phase)
+          const randomVariation = Math.random() * 0.2
+          const simulatedVolume = Math.min(1, Math.max(0, baseVolume + randomVariation))
+          phase += 0.3
           setVolume(simulatedVolume)
           onVolumeChange?.(simulatedVolume)
-        }, 100)
+        }, 80) // Daha sık güncelleme
       }
       
       utterance.onend = () => {
         setIsPlaying(false)
         setVolume(0)
         onVolumeChange?.(0)
-        onEnd?.()
         if (volumeInterval) clearInterval(volumeInterval)
+        console.log('🔇 Konuşma bitti, onEnd tetikleniyor...')
+        onEnd?.() // Auto-listen için kritik!
       }
       
       utterance.onerror = (event) => {
+        console.error('TTS Error:', event)
         setIsPlaying(false)
         setIsLoading(false)
         setVolume(0)
-        onError?.(new Error('Ses sentezi hatası'))
         if (volumeInterval) clearInterval(volumeInterval)
+        onError?.(new Error('Ses sentezi hatası'))
       }
       
+      // Hemen başlat
       window.speechSynthesis.speak(utterance)
+      console.log('🔊 Konuşma başladı:', text.slice(0, 50) + '...')
       
     } catch (error: any) {
       setIsLoading(false)
