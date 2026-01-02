@@ -7,14 +7,17 @@
  * 
  * ✅ Heartbeat ile bağlantı canlı tutulur
  * ✅ Detaylı hata logging
+ * ✅ Vercel optimized
  */
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndUseCredit } from '@/lib/tekno-teacher'
 
-export const runtime = 'edge' // Edge runtime for streaming
-export const maxDuration = 120 // 2 dakika
+// Vercel Edge Config
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // Vercel Pro: 60s, Hobby: 10s
 
 // Gemini Live API endpoint - Stable model
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent'
@@ -23,7 +26,7 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 const HEARTBEAT_INTERVAL = 15000
 
 interface LiveStreamRequest {
-  action: 'setup' | 'audio' | 'text' | 'interrupt'
+  action: 'setup' | 'audio' | 'text' | 'interrupt' | 'ping'
   studentName?: string
   grade?: number
   personality?: 'friendly' | 'strict' | 'motivating'
@@ -33,7 +36,10 @@ interface LiveStreamRequest {
   sessionId?: string
 }
 
-// System instruction builder
+// Ping interval (5 saniye - keep-alive)
+const PING_INTERVAL = 5000
+
+// System instruction builder - İsim gömülü
 function buildSystemInstruction(studentName: string, grade: number, personality: string): string {
   const name = studentName || 'Öğrenci'
   
@@ -43,19 +49,25 @@ function buildSystemInstruction(studentName: string, grade: number, personality:
     motivating: 'enerjik ve motive edici'
   }
   
-  return `Sen TeknoÖğretmen'sin - ${name}'in özel ders öğretmeni.
+  return `Sen TeknoÖğretmen'sin - yapay zeka destekli özel ders öğretmeni.
 
-ÖĞRENCİ: ${name}, ${grade}. sınıf
+⚠️ KRİTİK BİLGİ: Seninle konuşan kişinin adı "${name}". O ${grade}. sınıf öğrencisi.
+HER ZAMAN ona "${name}" diye ismiyle hitap et!
+
 KİŞİLİĞİN: ${tones[personality] || tones.friendly}
 
 KONUŞMA KURALLARIN:
-1. HER cümlene "${name}" diye başla
-2. Kısa konuş (max 2-3 cümle)
-3. Her yanıtta soru sor
-4. Doğrudan cevap verme, düşündür
-5. Türkçe konuş, samimi ol
+1. ✨ HER yanıta "${name}" diye başla (Örn: "${name}, merhaba!")
+2. 📝 Kısa konuş (max 2-3 cümle)
+3. ❓ Her yanıtta soru sor
+4. 🎯 Doğrudan cevap verme, Sokratik metodla düşündür
+5. 🇹🇷 Türkçe konuş, samimi ol
 
-Örnek: "${name}, harika soru! Şimdi düşün: Bir pizza 8 dilime bölündü, 3 dilim yedin. Ne kadar pizza yemiş oldun?"`
+İLK MESAJIN: "${name}, merhaba! Ben senin özel öğretmeninim. Bugün hangi konuda çalışmak istersin?"
+
+Örnek diyalog:
+- "${name}, harika soru! Şimdi düşün: Bir pizza 8 dilime bölündü, 3 dilim yedin. Ne kadar pizza yemiş oldun?"
+- "${name}, çok yaklaştın! Bir ipucu: Payda değişmedi, sadece pay değişti."`
 }
 
 export async function POST(request: NextRequest) {
@@ -94,13 +106,13 @@ export async function POST(request: NextRequest) {
     }
     
     // Log request details
-    console.log(`🟢 [LIVE] Yeni istek: ${studentName}, ${grade}. sınıf, ses: ${voice}`)
-    console.log(`📝 [LIVE] Mesaj: ${textMessage || '(hoşgeldin)'}`)
+    console.log(`🟢 [LIVE] Yeni istek: action=${action}, ${studentName}, ${grade}. sınıf, ses: ${voice}`)
+    console.log(`📝 [LIVE] Mesaj: ${textMessage || '(setup/audio)'}`)
     
     // Streaming response oluştur
     const stream = new ReadableStream({
       async start(controller) {
-        let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+        let pingTimer: ReturnType<typeof setInterval> | null = null
         let isStreamClosed = false
         
         // Güvenli gönderme
@@ -108,29 +120,42 @@ export async function POST(request: NextRequest) {
           if (!isStreamClosed) {
             try {
               controller.enqueue(encoder.encode(data))
+              return true
             } catch (e) {
               console.error('❌ [LIVE] Gönderim hatası:', e)
+              return false
             }
           }
+          return false
         }
         
-        // Heartbeat başlat
-        heartbeatTimer = setInterval(() => {
-          safeSend(`data: ${JSON.stringify({ type: 'heartbeat', timestamp: Date.now() })}\n\n`)
-          console.log('💓 [LIVE] Heartbeat gönderildi')
-        }, HEARTBEAT_INTERVAL)
+        // Keep-alive ping başlat
+        pingTimer = setInterval(() => {
+          const sent = safeSend(`data: ${JSON.stringify({ type: 'ping', ts: Date.now() })}\n\n`)
+          if (!sent) {
+            console.log('⚠️ [LIVE] Ping gönderilemedi, timer durduruluyor')
+            if (pingTimer) clearInterval(pingTimer)
+          }
+        }, PING_INTERVAL)
         
         try {
           // İlk bağlantı onayı
-          safeSend(`data: ${JSON.stringify({ type: 'connected', studentName })}\n\n`)
+          safeSend(`data: ${JSON.stringify({ type: 'connected', studentName, action })}\n\n`)
+          
+          // Setup action - AI'dan hoşgeldin mesajı al
+          const isSetup = action === 'setup' || (!textMessage && !audioData)
           
           // Gemini API request body
+          const userMessage = isSetup 
+            ? `Öğrencine (${studentName}) kendini tanıt ve bugün ne öğrenmek istediğini sor. Kısa ve samimi ol.`
+            : (textMessage || 'Devam et')
+          
           const requestBody = {
             contents: [{
               role: 'user',
               parts: audioData 
                 ? [{ inlineData: { mimeType: 'audio/pcm;rate=16000', data: audioData } }]
-                : [{ text: textMessage || `Merhaba, ben ${studentName}. Bana yardım eder misin?` }]
+                : [{ text: userMessage }]
             }],
             systemInstruction: {
               parts: [{ text: buildSystemInstruction(studentName || 'Öğrenci', grade || 8, personality || 'friendly') }]
@@ -138,11 +163,12 @@ export async function POST(request: NextRequest) {
             generationConfig: {
               temperature: 0.9,
               topP: 0.95,
-              maxOutputTokens: 1024
+              maxOutputTokens: 512,
+              candidateCount: 1
             }
           }
           
-          console.log('📤 [LIVE] Gemini API isteği gönderiliyor...')
+          console.log('📤 [LIVE] Gemini API isteği gönderiliyor...', { isSetup, userMessage: userMessage.substring(0, 50) })
           
           // Gemini API'ye istek gönder
           const geminiResponse = await fetch(`${GEMINI_API_URL}?key=${apiKey}&alt=sse`, {
@@ -155,17 +181,32 @@ export async function POST(request: NextRequest) {
           
           if (!geminiResponse.ok) {
             const errorText = await geminiResponse.text()
-            console.error('❌ [LIVE] Gemini API hatası:', {
+            
+            // Raw hata mesajını parse etmeye çalış
+            let errorDetail = errorText
+            try {
+              const errorJson = JSON.parse(errorText)
+              errorDetail = errorJson.error?.message || errorJson.message || errorText
+            } catch (e) {
+              // JSON değilse raw text kullan
+            }
+            
+            console.error('❌ [LIVE] Gemini API HATA:', {
               status: geminiResponse.status,
               statusText: geminiResponse.statusText,
-              error: errorText.substring(0, 500) // İlk 500 karakter
+              rawError: errorText.substring(0, 1000),
+              parsedError: errorDetail.substring(0, 200)
             })
+            
             safeSend(`data: ${JSON.stringify({ 
               type: 'error', 
               code: geminiResponse.status,
-              message: `Gemini API hatası: ${geminiResponse.status} - ${errorText.substring(0, 100)}`
+              statusText: geminiResponse.statusText,
+              rawError: errorDetail.substring(0, 300),
+              message: `Gemini API: ${geminiResponse.status} - ${errorDetail.substring(0, 150)}`
             })}\n\n`)
-            if (heartbeatTimer) clearInterval(heartbeatTimer)
+            
+            if (pingTimer) clearInterval(pingTimer)
             isStreamClosed = true
             controller.close()
             return
@@ -178,7 +219,7 @@ export async function POST(request: NextRequest) {
           if (!reader) {
             console.error('❌ [LIVE] Stream reader oluşturulamadı')
             safeSend(`data: ${JSON.stringify({ type: 'error', message: 'Stream okunamadı' })}\n\n`)
-            if (heartbeatTimer) clearInterval(heartbeatTimer)
+            if (pingTimer) clearInterval(pingTimer)
             isStreamClosed = true
             controller.close()
             return
@@ -271,24 +312,33 @@ export async function POST(request: NextRequest) {
           safeSend(`data: ${JSON.stringify({ type: 'done', totalChunks: chunkCount })}\n\n`)
           
         } catch (error: any) {
-          console.error('❌ [LIVE] Stream error:', {
+          console.error('❌ [LIVE] Stream HATA:', {
             name: error.name,
             message: error.message,
-            stack: error.stack?.substring(0, 300)
+            cause: error.cause,
+            stack: error.stack?.substring(0, 500)
           })
+          
           safeSend(`data: ${JSON.stringify({ 
             type: 'error', 
             message: error.message,
-            name: error.name
+            name: error.name,
+            cause: String(error.cause || '')
           })}\n\n`)
         } finally {
-          if (heartbeatTimer) {
-            clearInterval(heartbeatTimer)
-            console.log('🛑 [LIVE] Heartbeat durduruldu')
+          if (pingTimer) {
+            clearInterval(pingTimer)
+            console.log('🛑 [LIVE] Ping timer durduruldu')
           }
           isStreamClosed = true
+          
+          // Son done sinyali
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'stream_end' })}\n\n`))
+          } catch (e) {}
+          
           controller.close()
-          console.log('🔌 [LIVE] Bağlantı kapatıldı')
+          console.log('🔌 [LIVE] Stream kapatıldı')
         }
       }
     })

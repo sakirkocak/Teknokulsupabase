@@ -400,6 +400,113 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     }
   }, [])
   
+  // Setup request - sadece bağlantı kur, AI hoşgeldin mesajı gönderir
+  const setupSession = useCallback(async () => {
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = new AbortController()
+    
+    console.log('🔵 [HOOK] Setup session başlıyor...')
+    updateStatus('connecting')
+    
+    try {
+      const response = await fetch('/api/tekno-teacher/live/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'setup', // Sadece setup, mesaj yok
+          studentName,
+          grade,
+          personality,
+          voice
+        }),
+        signal: abortControllerRef.current.signal
+      })
+      
+      console.log('📡 [HOOK] Setup yanıtı:', response.status)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen hata' }))
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+      
+      // SSE stream'i oku
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Stream okunamadı')
+      
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullText = ''
+      
+      updateStatus('speaking') // AI hoşgeldin mesajı söyleyecek
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              // Ping - ignore
+              if (data.type === 'ping') continue
+              
+              // Bağlantı onayı
+              if (data.type === 'connected') {
+                console.log('🟢 [HOOK] Setup bağlantısı onaylandı')
+                reconnectAttempts.current = 0
+                continue
+              }
+              
+              // Metin
+              if (data.type === 'text') {
+                fullText += data.content
+                console.log('📝 [HOOK] AI:', data.content.substring(0, 50))
+                onTranscript?.(data.content, false)
+              }
+              
+              // Audio
+              if (data.type === 'audio') {
+                console.log('🔊 [HOOK] Audio chunk')
+                onAudioReceived?.(data.data, data.mimeType)
+                if (!isPlayingRef.current) {
+                  playAudioChunk(data.data, data.mimeType)
+                } else {
+                  audioQueueRef.current.push(data.data)
+                }
+              }
+              
+              // Hata - RAW error göster
+              if (data.type === 'error') {
+                console.error('❌ [HOOK] Server error:', data)
+                throw new Error(`[${data.code || 'ERR'}] ${data.rawError || data.message}`)
+              }
+              
+              // Tamamlandı
+              if (data.type === 'done' || data.type === 'stream_end') {
+                console.log('✅ [HOOK] Setup tamamlandı')
+              }
+              
+            } catch (e: any) {
+              if (e.message?.startsWith('[')) throw e
+            }
+          }
+        }
+      }
+      
+      return fullText
+      
+    } catch (err: any) {
+      if (err.name === 'AbortError') return
+      console.error('❌ [HOOK] Setup hatası:', err.message)
+      throw err
+    }
+  }, [studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onAudioReceived])
+  
   // Bağlantıyı başlat
   const connect = useCallback(async () => {
     console.log('🚀 [HOOK] Bağlantı başlatılıyor...')
@@ -416,21 +523,34 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         console.warn('⚠️ [HOOK] Mikrofon başlatılamadı, sadece metin ile devam ediliyor')
       }
       
-      // Hoşgeldin mesajı gönder
-      console.log('📤 [HOOK] Hoşgeldin mesajı gönderiliyor...')
-      await streamRequest(`Merhaba, ben ${studentName}. Benim ${grade}. sınıf öğretmenim ol!`, false)
+      // Setup - AI hoşgeldin mesajı gönderecek
+      console.log('📤 [HOOK] Setup gönderiliyor...')
+      await setupSession()
       
       console.log('✅ [HOOK] Bağlantı başarılı')
       updateStatus('listening')
       
     } catch (err: any) {
       console.error('❌ [HOOK] Bağlantı hatası:', err.message)
+      
+      // Auto-reconnect (3 deneme)
+      if (isSessionActive.current && reconnectAttempts.current < maxReconnectAttempts) {
+        reconnectAttempts.current++
+        console.log(`🔄 [HOOK] Yeniden bağlanma ${reconnectAttempts.current}/${maxReconnectAttempts}...`)
+        
+        await new Promise(r => setTimeout(r, 2000))
+        
+        if (isSessionActive.current) {
+          return connect() // Recursive retry
+        }
+      }
+      
       isSessionActive.current = false
       setError(err)
       onError?.(err)
       updateStatus('error')
     }
-  }, [studentName, grade, streamRequest, startMicrophone, updateStatus, onError])
+  }, [setupSession, startMicrophone, updateStatus, onError])
   
   // Bağlantıyı kes
   const disconnect = useCallback(() => {

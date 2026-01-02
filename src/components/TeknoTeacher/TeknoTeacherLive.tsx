@@ -124,7 +124,14 @@ export default function TeknoTeacherLive({
     console.log('🚀 [UI] Oturum başlatılıyor...')
     setLocalError(null)
     setSessionActive(true)
-    await geminiConnect()
+    
+    try {
+      await geminiConnect()
+    } catch (err: any) {
+      console.error('❌ [UI] Bağlantı hatası:', err.message)
+      setLocalError(err.message)
+      setSessionActive(false)
+    }
   }
   
   // Oturumu bitir
@@ -134,6 +141,14 @@ export default function TeknoTeacherLive({
     stopListening()
     geminiDisconnect()
     setMessages([])
+    setLocalError(null)
+  }
+  
+  // Yeniden bağlan
+  const reconnect = async () => {
+    console.log('🔄 [UI] Yeniden bağlanıyor...')
+    setLocalError(null)
+    await connect()
   }
   
   // Hata durumu
@@ -252,8 +267,15 @@ export default function TeknoTeacherLive({
           </p>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
-              {error}
+            <div className="mb-4 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+              <p className="text-red-300 text-sm mb-3">{error}</p>
+              <button
+                onClick={reconnect}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg transition-all flex items-center gap-2 mx-auto"
+              >
+                <Wifi className="w-4 h-4" />
+                Yeniden Dene
+              </button>
             </div>
           )}
           
