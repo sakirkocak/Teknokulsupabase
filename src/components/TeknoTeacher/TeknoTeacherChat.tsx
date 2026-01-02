@@ -217,6 +217,71 @@ export default function TeknoTeacherChat() {
     }
   }
   
+  // =====================================================
+  // OpenAI TTS ile seslendir (tek ses kaynağı)
+  // =====================================================
+  const speakWithOpenAI = async (text: string) => {
+    if (!text.trim()) return
+    
+    try {
+      const ttsResponse = await fetch('/api/tekno-teacher/openai/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          text, 
+          voice: 'nova',  // Aynı ses her yerde
+          speed: 1.0
+        })
+      })
+      
+      if (ttsResponse.ok) {
+        const ttsData = await ttsResponse.json()
+        if (ttsData.audio) {
+          // Base64 -> Audio
+          const binaryString = atob(ttsData.audio)
+          const bytes = new Uint8Array(binaryString.length)
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i)
+          }
+          const blob = new Blob([bytes], { type: 'audio/mpeg' })
+          const audioUrl = URL.createObjectURL(blob)
+          
+          const audio = new Audio(audioUrl)
+          setExplanationAudio(audio)
+          
+          audio.onended = () => {
+            setAvatarVolume(0)
+            setExplanationAudio(null)
+            URL.revokeObjectURL(audioUrl)
+            // Auto-listen için callback
+            if (voiceSessionRef.current) {
+              setShouldAutoListen(true)
+            }
+          }
+          
+          // Volume animation
+          const volumeInterval = setInterval(() => {
+            if (!audio.paused) {
+              setAvatarVolume(0.4 + Math.random() * 0.4)
+            } else {
+              clearInterval(volumeInterval)
+              setAvatarVolume(0)
+            }
+          }, 100)
+          
+          await audio.play()
+          return true
+        }
+      }
+    } catch (err) {
+      console.warn('OpenAI TTS hatası:', err)
+    }
+    
+    // Fallback: Browser TTS
+    speak(text)
+    return false
+  }
+
   // AI'a mesaj gönder (metin veya sesli)
   const sendMessageToAI = async (message: string, isVoice: boolean = false) => {
     if (!message.trim() || isLoading) return
@@ -266,10 +331,10 @@ export default function TeknoTeacherChat() {
           setCredits(prev => prev ? { ...prev, ...data.credits } : null)
         }
         
-        // Sesli yanıt
+        // Sesli yanıt - OpenAI TTS kullan
         if ((autoSpeak || isVoice) && data.response) {
           setConversationMode('voice')
-          setTimeout(() => speak(data.response), 300)
+          await speakWithOpenAI(data.response)
         }
       } else {
         throw new Error(data.error)
@@ -292,11 +357,14 @@ export default function TeknoTeacherChat() {
   // =====================================================
   // KONU ANLAT - OpenAI + TTS ile sesli konu anlatımı
   // =====================================================
+  const [explanationStatus, setExplanationStatus] = useState<string>('') // Loading status
+  
   const explainTopic = async () => {
     if (!topicInput.trim() || isExplaining) return
     
     setIsExplaining(true)
     setShowTopicModal(false)
+    setExplanationStatus('🤔 Konu hazırlanıyor...')
     
     // Kullanıcı mesajı ekle
     const userMessage: Message = {
@@ -308,6 +376,8 @@ export default function TeknoTeacherChat() {
     setMessages(prev => [...prev, userMessage])
     
     try {
+      setExplanationStatus('📝 AI içerik oluşturuyor...')
+      
       // OpenAI'dan konu anlatımı al
       const response = await fetch('/api/tekno-teacher/openai', {
         method: 'POST',
@@ -324,6 +394,8 @@ export default function TeknoTeacherChat() {
       const data = await response.json()
       const explanation = data.text || 'Üzgünüm, şu an bu konuyu anlatamıyorum.'
       
+      setExplanationStatus('✅ İçerik hazır!')
+      
       // Asistan mesajı ekle
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -332,6 +404,8 @@ export default function TeknoTeacherChat() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, assistantMessage])
+      
+      setExplanationStatus('🎙️ Ses oluşturuluyor...')
       
       // TTS ile seslendir
       try {
@@ -376,19 +450,23 @@ export default function TeknoTeacherChat() {
               }
             }, 100)
             
+            setExplanationStatus('🔊 Anlatılıyor...')
             await audio.play()
           }
         } else {
           // TTS başarısız - browser TTS kullan
+          setExplanationStatus('🔊 Anlatılıyor...')
           speak(explanation)
         }
       } catch (ttsErr) {
         console.warn('TTS hatası, browser TTS kullanılıyor:', ttsErr)
+        setExplanationStatus('🔊 Anlatılıyor...')
         speak(explanation)
       }
       
     } catch (err: any) {
       console.error('Konu anlatım hatası:', err)
+      setExplanationStatus('')
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -399,6 +477,8 @@ export default function TeknoTeacherChat() {
     } finally {
       setIsExplaining(false)
       setTopicInput('')
+      // Status'u ses bittiğinde temizle
+      setTimeout(() => setExplanationStatus(''), 1000)
     }
   }
   
@@ -703,6 +783,20 @@ export default function TeknoTeacherChat() {
             </div>
           )}
           
+          {/* Konu Anlatım Status */}
+          {explanationStatus && (
+            <div className="flex justify-start">
+              <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-2xl rounded-bl-md flex items-center gap-2">
+                {explanationStatus.includes('Anlatılıyor') ? (
+                  <Volume2 className="w-4 h-4 text-purple-600 animate-pulse" />
+                ) : (
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                )}
+                <span className="text-sm text-purple-700 dark:text-purple-300">{explanationStatus}</span>
+              </div>
+            </div>
+          )}
+
           <div ref={messagesEndRef} />
         </div>
         
