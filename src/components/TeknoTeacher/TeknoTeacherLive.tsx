@@ -24,6 +24,7 @@ import {
   Send
 } from 'lucide-react'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
+import MathRenderer from '@/components/MathRenderer'
 import { useTeknoTeacher, TeacherStatus } from '@/hooks/useTeknoTeacher'
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
 
@@ -258,7 +259,7 @@ export default function TeknoTeacherLive({
                       : 'bg-gray-700 text-gray-100 rounded-bl-md'
                   }`}
                 >
-                  {msg.text}
+                  <MathRenderer text={msg.text} className="text-sm" />
                 </div>
               </div>
             ))}
