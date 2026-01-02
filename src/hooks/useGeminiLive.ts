@@ -382,12 +382,17 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
                 await playGeminiAudio(data.data, data.mimeType)
               }
               
-              // Tamamlandı - audio yoksa browser TTS
+              // Tamamlandı - browser TTS ile seslendir
               if (data.type === 'done') {
-                console.log('✅ [HOOK] Stream bitti, hasAudio:', data.hasAudio)
-                if (!data.hasAudio && fullText && !hasAudio) {
-                  console.log('🗣️ [HOOK] Audio yok, browser TTS kullanılıyor')
+                console.log('✅ [HOOK] Stream bitti, text:', fullText.length, 'karakter')
+                if (fullText && !hasAudio) {
+                  console.log('🗣️ [HOOK] Browser TTS ile seslendiriliyor...')
                   speakWithBrowserTTS(fullText)
+                } else if (!fullText) {
+                  // Yanıt yoksa listening'e geç
+                  if (isSessionActive.current) {
+                    updateStatus('listening')
+                  }
                 }
               }
               
@@ -438,9 +443,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     }
   }, [studentName, grade, personality, voice, updateStatus, playGeminiAudio, speakWithBrowserTTS, onTranscript])
   
-  // Bağlantıyı başlat
+  // Bağlantıyı başlat - PROFİL BAĞIMSIZ
   const connect = useCallback(async () => {
     console.log('🚀 [HOOK] Bağlantı başlatılıyor...')
+    console.log(`👤 [HOOK] Öğrenci: ${studentName || 'Şakir'}, Sınıf: ${grade || 8}`)
     
     updateStatus('connecting')
     setError(null)
@@ -448,47 +454,28 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     reconnectAttempts.current = 0
     
     try {
-      // Önce mikrofonu başlat
-      const micStarted = await startMicrophone()
-      if (!micStarted) {
-        console.warn('⚠️ [HOOK] Mikrofon başlatılamadı, metin modu aktif')
-      }
+      // Mikrofonu başlat (opsiyonel)
+      startMicrophone().catch(e => console.warn('⚠️ Mikrofon:', e.message))
       
-      // Setup mesajı gönder - AI kendini tanıtacak
+      // Setup mesajı gönder - VARSAYILAN DEĞERLERLE
       console.log('📤 [HOOK] Setup gönderiliyor...')
-      const response = await sendMessage('', true) // isSetup = true
+      const response = await sendMessage('', true)
       
       if (response) {
         console.log('✅ [HOOK] AI yanıt verdi:', response.substring(0, 50))
       }
       
-      // Bağlantı başarılı - listening modunda kal
-      if (isSessionActive.current) {
-        console.log('🎧 [HOOK] Oturum aktif, listening modunda')
-        updateStatus('listening')
-      }
-      
     } catch (err: any) {
       console.error('❌ [HOOK] Bağlantı hatası:', err.message)
       
-      // Auto-reconnect (3 deneme)
-      if (isSessionActive.current && reconnectAttempts.current < maxReconnectAttempts) {
-        reconnectAttempts.current++
-        console.log(`🔄 [HOOK] Yeniden bağlanma ${reconnectAttempts.current}/${maxReconnectAttempts}...`)
-        
-        await new Promise(r => setTimeout(r, 2000))
-        
-        if (isSessionActive.current) {
-          return connect()
-        }
+      // ASLA hata verme - fallback mesaj göster
+      if (isSessionActive.current) {
+        console.log('🔄 [HOOK] Fallback moda geçiliyor...')
+        onTranscript?.('Selam! Bir sorun oluştu ama devam edebiliriz. Ne çalışmak istersin?', false)
+        speakWithBrowserTTS('Selam! Bir sorun oluştu ama devam edebiliriz. Ne çalışmak istersin?')
       }
-      
-      isSessionActive.current = false
-      setError(err)
-      onError?.(err)
-      updateStatus('error')
     }
-  }, [sendMessage, startMicrophone, updateStatus, onError])
+  }, [studentName, grade, sendMessage, startMicrophone, updateStatus, onTranscript, speakWithBrowserTTS])
   
   // Bağlantıyı kes
   const disconnect = useCallback(() => {
