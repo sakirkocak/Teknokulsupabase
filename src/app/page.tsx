@@ -767,6 +767,21 @@ export default function HomePage() {
                 <Target className="w-4 h-4" />
                 Soru Çöz
               </Link>
+              
+              {/* 🎓 TeknoÖğretmen - Özel Büyük Buton */}
+              <Link 
+                href="/tekno-ogretmen" 
+                className="relative group flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white rounded-xl font-bold text-base hover:shadow-xl hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
+              >
+                {/* Glow Effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity -z-10" />
+                <Brain className="w-5 h-5" />
+                <span className="relative">
+                  TeknoÖğretmen
+                  <span className="absolute -top-1 -right-6 px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase tracking-wide">Yeni</span>
+                </span>
+              </Link>
+              
               <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
                 <Trophy className="w-4 h-4" />
                 Liderlik
@@ -895,6 +910,22 @@ export default function HomePage() {
             className="md:hidden bg-white border-b border-surface-100 px-4 py-4"
           >
             <div className="space-y-2">
+              {/* 🎓 TeknoÖğretmen - Mobile */}
+              <Link 
+                href="/tekno-ogretmen" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30"
+              >
+                <Brain className="w-6 h-6" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    TeknoÖğretmen
+                    <span className="px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase">Yeni</span>
+                  </div>
+                  <div className="text-xs text-white/80 font-normal">AI Özel Ders Asistanı</div>
+                </div>
+              </Link>
+              
               <Link 
                 href="/hizli-coz" 
                 onClick={() => setMobileMenuOpen(false)}
