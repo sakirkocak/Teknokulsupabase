@@ -362,8 +362,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
               
               // Bağlantı onayı
               if (data.type === 'connected') {
-                console.log('🟢 [HOOK] Bağlantı onaylandı:', data.studentName)
+                console.log('🟢 [HOOK] === BAĞLANTI ONAYLANDI ===')
+                console.log('👤 [HOOK] Öğrenci:', data.studentName, 'Sınıf:', data.grade)
                 reconnectAttempts.current = 0
+                gotResponse = true
                 continue
               }
               
@@ -371,25 +373,26 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
               if (data.type === 'text') {
                 gotResponse = true
                 fullText += data.content
-                console.log('📝 [HOOK] AI yanıtı:', data.content.substring(0, 50))
+                console.log('📝 [HOOK] TEXT ALINDI:', data.content)
                 onTranscript?.(data.content, false)
               }
               
-              // Audio yanıtı - Gemini'den gelen ses
+              // Audio yanıtı
               if (data.type === 'audio' && data.data) {
-                console.log('🔊 [HOOK] Audio alındı:', data.mimeType)
+                console.log('🔊 [AUDIO] PACKET RECEIVED:', data.mimeType, data.data.length, 'bytes')
                 hasAudio = true
                 await playGeminiAudio(data.data, data.mimeType)
               }
               
-              // Tamamlandı - browser TTS ile seslendir
+              // Tamamlandı
               if (data.type === 'done') {
-                console.log('✅ [HOOK] Stream bitti, text:', fullText.length, 'karakter')
-                if (fullText && !hasAudio) {
-                  console.log('🗣️ [HOOK] Browser TTS ile seslendiriliyor...')
+                console.log('✅ [HOOK] STREAM DONE - Text:', fullText.length, 'chars, Audio:', hasAudio)
+                
+                if (fullText) {
+                  console.log('🗣️ [HOOK] Browser TTS başlatılıyor...')
                   speakWithBrowserTTS(fullText)
-                } else if (!fullText) {
-                  // Yanıt yoksa listening'e geç
+                } else {
+                  console.log('⚠️ [HOOK] Text yok, listening moduna geçiliyor')
                   if (isSessionActive.current) {
                     updateStatus('listening')
                   }
