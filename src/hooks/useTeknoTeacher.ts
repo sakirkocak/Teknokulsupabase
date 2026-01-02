@@ -1,13 +1,13 @@
 'use client'
 
 /**
- * 🎓 useTeknoTeacher Hook - Basit ve Temiz
+ * 🎓 useTeknoTeacher Hook - Akıllı Tahta Destekli
  * 
- * Gemini 3 Flash (zeka) + ElevenLabs (ses)
- * Karmaşıklık yok, sadece çalışan sistem!
+ * Gemini 3 Flash (zeka) + ElevenLabs (ses) + Görsel İçerik
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { VisualContent } from '@/components/TeknoTeacher/SmartBoard'
 
 export type TeacherStatus = 
   | 'idle'
@@ -28,6 +28,8 @@ interface UseTeknoTeacherOptions {
   grade?: number
   onTranscript?: (text: string, isUser: boolean) => void
   onStatusChange?: (status: TeacherStatus) => void
+  onVisualContent?: (visuals: VisualContent[]) => void  // Yeni görsel callback
+  onTopicChange?: (topic: string) => void  // Konu değişikliği callback
   onError?: (error: Error) => void
 }
 
@@ -37,10 +39,13 @@ interface UseTeknoTeacherReturn {
   isSpeaking: boolean
   volume: number
   messages: Message[]
+  visuals: VisualContent[]  // Tüm görseller
+  currentTopic: string | null
   connect: () => Promise<void>
   disconnect: () => void
   sendMessage: (text: string) => Promise<void>
   stop: () => void
+  clearVisuals: () => void
   error: Error | null
 }
 
@@ -50,6 +55,8 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
     grade = 8,
     onTranscript,
     onStatusChange,
+    onVisualContent,
+    onTopicChange,
     onError
   } = options
   
@@ -58,6 +65,8 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
   const [volume, setVolume] = useState(0)
   const [error, setError] = useState<Error | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [visuals, setVisuals] = useState<VisualContent[]>([])
+  const [currentTopic, setCurrentTopic] = useState<string | null>(null)
   
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -69,6 +78,25 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
     setStatus(newStatus)
     onStatusChange?.(newStatus)
   }, [onStatusChange])
+  
+  // Görsel ekle
+  const addVisuals = useCallback((newVisuals: VisualContent[]) => {
+    if (newVisuals.length === 0) return
+    
+    const visualsWithId = newVisuals.map((v, i) => ({
+      ...v,
+      id: `${Date.now()}-${i}`,
+      timestamp: new Date()
+    }))
+    
+    setVisuals(prev => [...prev, ...visualsWithId])
+    onVisualContent?.(visualsWithId)
+  }, [onVisualContent])
+  
+  // Görselleri temizle
+  const clearVisuals = useCallback(() => {
+    setVisuals([])
+  }, [])
   
   // Audio çal
   const playAudio = useCallback(async (base64Audio: string) => {
@@ -157,13 +185,24 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
     window.speechSynthesis?.speak(utterance)
   }, [updateStatus])
   
-  // ElevenLabs TTS
+  // ElevenLabs TTS - LaTeX temizle
   const getAudio = useCallback(async (text: string): Promise<string | null> => {
     try {
+      // LaTeX ve emojileri temizle
+      const cleanText = text
+        .replace(/\$[^$]+\$/g, '')  // Inline math
+        .replace(/\\\[[\s\S]*?\\\]/g, '')  // Block math
+        .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Emojiler
+        .replace(/[✨🚀💪📚🎯✅❌🔥⭐💡🎉👋🤔💬📝🎙🔊📊📈👂]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+      
+      if (!cleanText) return null
+      
       const response = await fetch('/api/tekno-teacher/elevenlabs-tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice: 'turkish' })
+        body: JSON.stringify({ text: cleanText, voice: 'turkish' })
       })
       
       if (!response.ok) {
@@ -193,7 +232,7 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
     abortRef.current = new AbortController()
     
     try {
-      // Gemini 3 Flash çağrısı
+      // Gemini 3 Flash çağrısı - görsel içerik ile
       const response = await fetch('/api/tekno-teacher/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,7 +240,8 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
           message: text,
           conversationHistory: messages.slice(-6),
           studentName,
-          grade
+          grade,
+          withVisuals: true  // Görsel içerik iste
         }),
         signal: abortRef.current.signal
       })
@@ -215,6 +255,17 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
       const assistantMessage: Message = { role: 'assistant', content: responseText }
       setMessages(prev => [...prev, assistantMessage])
       onTranscript?.(responseText, false)
+      
+      // Görsel içerik varsa ekle
+      if (data.visuals && data.visuals.length > 0) {
+        addVisuals(data.visuals)
+      }
+      
+      // Konu değişti mi?
+      if (data.topic && data.topic !== currentTopic) {
+        setCurrentTopic(data.topic)
+        onTopicChange?.(data.topic)
+      }
       
       // ElevenLabs TTS
       updateStatus('speaking')
@@ -238,12 +289,14 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
       setError(err)
       onError?.(err)
     }
-  }, [messages, studentName, grade, updateStatus, getAudio, playAudio, speakWithBrowser, onTranscript, onError])
+  }, [messages, studentName, grade, currentTopic, updateStatus, getAudio, playAudio, speakWithBrowser, addVisuals, onTranscript, onTopicChange, onError])
   
   // Bağlan (selamlama)
   const connect = useCallback(async () => {
     setError(null)
     setMessages([])
+    setVisuals([])
+    setCurrentTopic(null)
     updateStatus('connecting')
     
     try {
@@ -289,6 +342,8 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
     isPlayingRef.current = false
     setVolume(0)
     setMessages([])
+    setVisuals([])
+    setCurrentTopic(null)
     setError(null)
     setStatus('idle')
   }, [])
@@ -326,10 +381,13 @@ export function useTeknoTeacher(options: UseTeknoTeacherOptions): UseTeknoTeache
     isSpeaking: status === 'speaking',
     volume,
     messages,
+    visuals,
+    currentTopic,
     connect,
     disconnect,
     sendMessage,
     stop,
+    clearVisuals,
     error
   }
 }
