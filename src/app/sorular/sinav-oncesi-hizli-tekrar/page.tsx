@@ -62,9 +62,9 @@ async function getQuickReviewFromTypesense(): Promise<{
       .search({
         q: '*',
         query_by: 'question_text',
-        sort_by: 'created_at:desc',  // Popüler sorular
+        sort_by: 'created_at:desc',
         per_page: 50,
-        filter_by: 'difficulty:=[easy,medium,hard] && times_answered:>0',
+        filter_by: 'difficulty:[easy,medium,hard]',  // Doğru Typesense syntax
         facet_by: 'subject_name,difficulty',
         max_facet_values: 20
       })
@@ -103,8 +103,14 @@ async function getQuickReviewFromTypesense(): Promise<{
     console.log(`⚡ Hızlı Tekrar: Typesense ${duration}ms, ${questions.length} soru`)
     
     return { questions, totalCount, subjectStats, source: 'typesense' }
-  } catch (error) {
-    console.error('Typesense error:', error)
+  } catch (error: any) {
+    // 400/404 hatalarını sessizce logla, Supabase fallback'e düş
+    const status = error?.httpStatus || error?.status
+    if (status === 400 || status === 404) {
+      console.warn(`⚠️ Hızlı Tekrar: Typesense ${status} hatası, Supabase'e geçiliyor`)
+    } else {
+      console.error('Typesense error:', error?.message || error)
+    }
     throw error
   }
 }

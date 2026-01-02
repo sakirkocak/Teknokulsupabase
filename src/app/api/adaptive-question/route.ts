@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
         const allowedDifficulties = [adaptiveDifficulty]
         if (diffIndex > 0) allowedDifficulties.push(DIFFICULTY_ORDER[diffIndex - 1])
         if (diffIndex < DIFFICULTY_ORDER.length - 1) allowedDifficulties.push(DIFFICULTY_ORDER[diffIndex + 1])
-        filters.push(`difficulty:=[${allowedDifficulties.join(',')}]`)
+        filters.push(`difficulty:[${allowedDifficulties.join(',')}]`)  // Doğru Typesense syntax
         
         // Çözülmüş soruları hariç tut (limit)
         // NOT: Typesense'de NOT IN filtresi için farklı yöntem gerekiyor
@@ -183,8 +183,14 @@ export async function POST(req: NextRequest) {
             }
           })
         }
-      } catch (error) {
-        console.error('Typesense adaptive question error:', error)
+      } catch (error: any) {
+        // 400/404 hatalarını sessizce logla, Supabase fallback'e düş
+        const status = error?.httpStatus || error?.status
+        if (status === 400 || status === 404) {
+          console.warn(`⚠️ Adaptive Question: Typesense ${status} hatası, Supabase'e geçiliyor`)
+        } else {
+          console.error('Typesense adaptive question error:', error?.message || error)
+        }
         // Fallback to Supabase
       }
     }

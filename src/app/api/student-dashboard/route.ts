@@ -236,25 +236,43 @@ async function getRecommendedQuestions(studentId: string): Promise<any[]> {
     // 3. Soruları getir
     let allQuestions: any[] = []
     try {
-      const filterBy = weakTopicIds.length > 0 
-        ? `topic_id:[${weakTopicIds.join(',')}]`
-        : undefined
-
-      const questionsResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
+      // filterBy sadece topic varsa kullan, yoksa filter olmadan sor
+      const searchParams: any = {
         q: '*',
         query_by: 'question_text',
-        filter_by: filterBy,
         sort_by: 'created_at:desc',
         per_page: 100
-      })
+      }
+      
+      // Sadece zayıf konular varsa filter ekle
+      if (weakTopicIds.length > 0) {
+        searchParams.filter_by = `topic_id:[${weakTopicIds.join(',')}]`
+      }
+
+      const questionsResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search(searchParams)
       allQuestions = questionsResult.hits?.map(h => h.document as any) || []
     } catch (error: any) {
-      if (error?.httpStatus === 404) {
+      const status = error?.httpStatus || error?.status
+      if (status === 404) {
         console.warn('⚠️ [Dashboard] questions koleksiyonu bulunamadı, varsayılan liste dönülüyor')
+      } else if (status === 400) {
+        console.warn('⚠️ [Dashboard] questions sorgu hatası (400), filter kaldırılıyor')
+        // Filter olmadan tekrar dene
+        try {
+          const questionsResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
+            q: '*',
+            query_by: 'question_text',
+            sort_by: 'created_at:desc',
+            per_page: 100
+          })
+          allQuestions = questionsResult.hits?.map(h => h.document as any) || []
+        } catch (retryError: any) {
+          console.warn('⚠️ [Dashboard] questions retry hatası:', retryError?.message)
+        }
       } else {
         console.error('❌ [Dashboard] Soru sorgusu hatası:', error?.message)
       }
-      return [] // Boş dizi dön
+      // allQuestions boş kalır, aşağıda return [] yapmıyoruz ki filtre işlemi çalışsın
     }
 
     // Çözülmüş soruları filtrele
