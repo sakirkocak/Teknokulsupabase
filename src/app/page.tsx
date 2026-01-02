@@ -739,10 +739,10 @@ export default function HomePage() {
       {/* Activity Feed */}
       <ActivityFeed />
 
-      {/* Mobile Floating Action Button */}
+      {/* Mobile Floating Action Button - TeknoÖğretmen'in üstünde */}
       <Link 
         href="/hizli-coz"
-        className="fixed bottom-6 right-6 z-50 md:hidden flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg shadow-orange-500/30 font-semibold"
+        className="fixed bottom-24 right-6 z-40 md:hidden flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg shadow-orange-500/30 font-semibold"
       >
         <Target className="w-5 h-5" />
         Soru Çöz
