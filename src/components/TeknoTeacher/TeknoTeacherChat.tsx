@@ -491,6 +491,18 @@ export default function TeknoTeacherChat() {
           </button>
         </div>
         
+        {/* 🔴 LIVE Mode Banner */}
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => window.open('/tekno-ogretmen/live', '_blank')}
+            className="w-full py-2.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-sm font-medium rounded-lg hover:shadow-lg hover:shadow-red-500/30 transition-all flex items-center justify-center gap-2 group"
+          >
+            <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+            <span>🎙️ Canlı Sesli Ders</span>
+            <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">LIVE</span>
+          </button>
+        </div>
+        
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
