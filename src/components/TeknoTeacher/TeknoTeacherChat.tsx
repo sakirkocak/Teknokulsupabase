@@ -22,6 +22,7 @@ import {
   PhoneOff
 } from 'lucide-react'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
+import MathRenderer from '@/components/MathRenderer'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
 import { PERSONAS, PersonaType } from '@/lib/personas'
@@ -790,7 +791,11 @@ export default function TeknoTeacherChat() {
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-md'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  {/* Matematik formülleri destekli mesaj */}
+                  <MathRenderer 
+                    content={msg.content} 
+                    className="text-sm whitespace-pre-wrap"
+                  />
                   
                   {/* Asistan mesajları için ses butonu */}
                   {msg.role === 'assistant' && (

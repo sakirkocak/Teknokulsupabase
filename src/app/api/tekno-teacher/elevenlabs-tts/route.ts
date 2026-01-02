@@ -52,12 +52,12 @@ export async function POST(request: NextRequest) {
       apiKey: apiKey
     })
     
-    // Text to Speech
+    // Text to Speech - FLASH v2.5 (en hızlı ~75ms!)
     const audioStream = await elevenlabs.textToSpeech.convert(
       voiceId,
       {
         text: cleanText,
-        modelId: 'eleven_multilingual_v2',
+        modelId: 'eleven_flash_v2_5',  // En hızlı model - 75ms gecikme
         outputFormat: 'mp3_44100_128'
       }
     )
@@ -107,6 +107,6 @@ export async function GET() {
       { id: 'natural', name: 'Doğal Ses', voiceId: VOICES.natural },
       { id: 'turkish', name: 'Türkçe Ses', voiceId: VOICES.turkish }
     ],
-    model: 'eleven_multilingual_v2'
+    model: 'eleven_flash_v2_5'
   })
 }
