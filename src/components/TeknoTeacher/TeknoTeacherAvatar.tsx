@@ -9,6 +9,7 @@ interface TeknoTeacherAvatarProps {
   audioUrl?: string
   size?: 'sm' | 'md' | 'lg'
   personality?: 'friendly' | 'strict' | 'motivating'
+  externalVolume?: number // Dışarıdan gelen volume (0-1)
 }
 
 export default function TeknoTeacherAvatar({
@@ -16,9 +17,17 @@ export default function TeknoTeacherAvatar({
   isSpeaking = false,
   audioUrl,
   size = 'md',
-  personality = 'friendly'
+  personality = 'friendly',
+  externalVolume
 }: TeknoTeacherAvatarProps) {
   const [mouthOpen, setMouthOpen] = useState(0) // 0-1 arası
+  
+  // Dışarıdan volume geliyorsa kullan
+  useEffect(() => {
+    if (externalVolume !== undefined) {
+      setMouthOpen(externalVolume)
+    }
+  }, [externalVolume])
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)

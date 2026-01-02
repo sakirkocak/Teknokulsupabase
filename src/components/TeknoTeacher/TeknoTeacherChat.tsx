@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { 
   MessageCircle, 
   Send, 
@@ -13,9 +13,12 @@ import {
   X,
   BookOpen,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Play,
+  Pause
 } from 'lucide-react'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
+import { useSpeech } from '@/hooks/useSpeech'
 
 interface Message {
   id: string
@@ -39,8 +42,21 @@ export default function TeknoTeacherChat() {
   const [credits, setCredits] = useState<CreditStatus | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [studentName, setStudentName] = useState('')
+  const [avatarVolume, setAvatarVolume] = useState(0)
+  const [autoSpeak, setAutoSpeak] = useState(true)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  
+  // Speech hook
+  const { 
+    isPlaying: isSpeaking, 
+    speak, 
+    stop: stopSpeaking,
+    volume: speechVolume 
+  } = useSpeech({
+    onVolumeChange: (vol) => setAvatarVolume(vol),
+    onEnd: () => setAvatarVolume(0)
+  })
   
   // Kredileri yükle
   useEffect(() => {
@@ -113,6 +129,11 @@ export default function TeknoTeacherChat() {
         if (data.credits) {
           setCredits(prev => prev ? { ...prev, ...data.credits } : null)
         }
+        
+        // Otomatik sesli okuma
+        if (autoSpeak && data.response) {
+          setTimeout(() => speak(data.response), 300)
+        }
       } else {
         throw new Error(data.error)
       }
@@ -166,11 +187,25 @@ export default function TeknoTeacherChat() {
         if (data.credits) {
           setCredits(prev => prev ? { ...prev, ...data.credits } : null)
         }
+        
+        // Otomatik sesli okuma
+        if (autoSpeak && data.response) {
+          setTimeout(() => speak(data.response), 300)
+        }
       }
     } catch (error: any) {
       console.error('Summary error:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  // Mesajı sesli oku
+  const speakMessage = (text: string) => {
+    if (isSpeaking) {
+      stopSpeaking()
+    } else {
+      speak(text)
     }
   }
   
@@ -195,26 +230,48 @@ export default function TeknoTeacherChat() {
         <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Avatar */}
+              {/* Avatar - Lip Sync ile */}
               <div className="relative">
                 <TeknoTeacherAvatar 
                   isActive={true}
-                  isSpeaking={isLoading}
+                  isSpeaking={isSpeaking || isLoading}
                   size="sm"
                   personality="friendly"
                 />
+                {/* Konuşma göstergesi */}
+                {isSpeaking && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
+                    <Volume2 className="w-2.5 h-2.5 text-white" />
+                  </div>
+                )}
               </div>
               <div>
                 <h3 className="font-bold">TeknoÖğretmen</h3>
-                <p className="text-xs text-white/80">AI Özel Ders Asistanı</p>
+                <p className="text-xs text-white/80">
+                  {isSpeaking ? '🎙️ Konuşuyor...' : 'AI Özel Ders Asistanı'}
+                </p>
               </div>
             </div>
-            <button 
-              onClick={() => setIsOpen(false)}
-              className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Ses açma/kapama */}
+              <button 
+                onClick={() => setAutoSpeak(!autoSpeak)}
+                className={`p-1.5 rounded-lg transition-colors ${autoSpeak ? 'bg-white/20' : 'bg-white/10'}`}
+                title={autoSpeak ? 'Sesli yanıt açık' : 'Sesli yanıt kapalı'}
+              >
+                {autoSpeak ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+              {/* Kapat */}
+              <button 
+                onClick={() => {
+                  stopSpeaking()
+                  setIsOpen(false)
+                }}
+                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           
           {/* Kredi Durumu */}
@@ -281,6 +338,26 @@ export default function TeknoTeacherChat() {
                   }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  
+                  {/* Asistan mesajları için ses butonu */}
+                  {msg.role === 'assistant' && (
+                    <button
+                      onClick={() => speakMessage(msg.content)}
+                      className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      {isSpeaking ? (
+                        <>
+                          <Pause className="w-3 h-3" />
+                          Durdur
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3 h-3" />
+                          Dinle
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             ))
