@@ -1,157 +1,97 @@
 /**
- * TeknoÖğretmen Chat API
- * POST /api/tekno-teacher/chat
+ * 🎓 TeknoÖğretmen - Basit Chat API
  * 
- * Öğrenciyle sohbet, soru analizi, konu anlatımı
+ * Gemini 3 Flash ile akıllı sohbet
+ * Basit ve hızlı!
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { 
-  checkAndUseCredit, 
-  buildTeacherContext, 
-  saveAIFeedback,
-  updateWeakness 
-} from '@/lib/tekno-teacher'
-import { 
-  analyzeError, 
-  generateDailySummary, 
-  explainTopic, 
-  chat,
-  generatePodcastScript,
-  TeacherPersonality,
-  QuestionContext
-} from '@/lib/tekno-teacher-ai'
+import { geminiModel } from '@/lib/gemini'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-type ChatAction = 'chat' | 'analyze_error' | 'daily_summary' | 'explain_topic' | 'generate_podcast'
-
 interface ChatRequest {
-  action: ChatAction
-  message?: string
-  personality?: TeacherPersonality
-  question?: QuestionContext
-  topic?: {
-    subject: string
-    topic: string
-  }
+  message: string
   conversationHistory?: { role: 'user' | 'assistant', content: string }[]
+  studentName?: string
+  grade?: number
 }
 
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+  
   try {
-    const supabase = await createClient()
-    
-    // Kullanıcı kontrolü
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Giriş yapmanız gerekiyor' },
-        { status: 401 }
-      )
-    }
-    
-    // Kredi kontrolü
-    const creditStatus = await checkAndUseCredit(user.id)
-    
-    if (!creditStatus.allowed) {
-      return NextResponse.json({
-        error: 'Günlük krediniz bitti',
-        remaining: 0,
-        is_premium: false,
-        upgrade_required: true
-      }, { status: 429 })
-    }
-    
-    // Request body
     const body: ChatRequest = await request.json()
-    const { action, message, personality = 'friendly', question, topic, conversationHistory = [] } = body
+    const { 
+      message, 
+      conversationHistory = [],
+      studentName = 'Öğrenci',
+      grade = 8
+    } = body
     
-    // Öğrenci bağlamını oluştur
-    const context = await buildTeacherContext(user.id)
-    
-    let response: string
-    let feedbackType: 'text' | 'audio' = 'text'
-    
-    switch (action) {
-      case 'analyze_error':
-        if (!question) {
-          return NextResponse.json(
-            { error: 'Soru bilgisi gerekli' },
-            { status: 400 }
-          )
-        }
-        
-        // Zayıf konuyu güncelle
-        await updateWeakness(user.id, question.subject, question.topic)
-        
-        response = await analyzeError(context, question, personality)
-        break
-        
-      case 'daily_summary':
-        response = await generateDailySummary(context, personality)
-        break
-        
-      case 'explain_topic':
-        if (!topic) {
-          return NextResponse.json(
-            { error: 'Konu bilgisi gerekli' },
-            { status: 400 }
-          )
-        }
-        response = await explainTopic(context, topic.subject, topic.topic, personality)
-        break
-        
-      case 'generate_podcast':
-        response = await generatePodcastScript(context, topic)
-        feedbackType = 'text' // İleride 'audio' olacak
-        break
-        
-      case 'chat':
-      default:
-        if (!message) {
-          return NextResponse.json(
-            { error: 'Mesaj gerekli' },
-            { status: 400 }
-          )
-        }
-        // Sokratik akış için konuşma geçmişini gönder
-        response = await chat(context, message, personality, conversationHistory)
-        break
+    if (!message?.trim()) {
+      return NextResponse.json({ error: 'Mesaj gerekli' }, { status: 400 })
     }
     
-    // Geri bildirimi kaydet
-    await saveAIFeedback({
-      user_id: user.id,
-      feedback_type: feedbackType,
-      text_content: response,
-      topic_context: {
-        action,
-        subject: topic?.subject || question?.subject,
-        topic: topic?.topic || question?.topic,
-        message: message?.slice(0, 200)
-      },
-      is_premium: creditStatus.is_premium,
-      credits_used: 1
-    })
+    // Sistem talimatı
+    const systemPrompt = `Sen TeknoÖğretmen'sin - ${studentName}'in özel ders öğretmeni.
+
+KİMLİK:
+- Adı: TeknoÖğretmen
+- Dil: Türkçe
+- Üslup: Samimi, motive edici, pedagojik
+
+KURALLAR:
+1. Her yanıta "${studentName}" diye hitap ederek başla
+2. Kısa ve öz konuş (maksimum 3-4 cümle)
+3. Her zaman Türkçe konuş
+4. Samimi ve motive edici ol
+5. Matematik sorularında adım adım açıkla
+6. Yanlış cevaplarda cesaretini kırma, ipucu ver
+
+ÖĞRENCİ:
+- İsim: ${studentName}
+- Sınıf: ${grade}. sınıf
+- Platform: Teknokul - AI destekli eğitim platformu`
+
+    // Konuşma geçmişini hazırla
+    const historyText = conversationHistory.slice(-4).map(msg => 
+      `${msg.role === 'user' ? studentName : 'TeknoÖğretmen'}: ${msg.content}`
+    ).join('\n')
+    
+    const fullPrompt = historyText 
+      ? `${systemPrompt}\n\nÖNCEKİ KONUŞMA:\n${historyText}\n\n${studentName}: ${message}\n\nTeknoÖğretmen:`
+      : `${systemPrompt}\n\n${studentName}: ${message}\n\nTeknoÖğretmen:`
+    
+    // Gemini 3 Flash çağrısı
+    const result = await geminiModel.generateContent(fullPrompt)
+    const response = await result.response
+    let responseText = response.text()
+    
+    // "TeknoÖğretmen:" prefix'ini kaldır
+    responseText = responseText.replace(/^TeknoÖğretmen:\s*/i, '').trim()
+    
+    // Fallback
+    if (!responseText) {
+      responseText = `${studentName}, şu an bir teknik sorun yaşıyoruz ama yine de sana yardımcı olabilirim!`
+    }
+    
+    const duration = Date.now() - startTime
     
     return NextResponse.json({
       success: true,
-      response,
-      credits: {
-        remaining: creditStatus.remaining,
-        is_premium: creditStatus.is_premium
-      },
-      student_name: context.student_name
+      text: responseText,
+      model: 'gemini-3-flash-preview',
+      duration
     })
     
   } catch (error: any) {
-    console.error('TeknoÖğretmen error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Bir hata oluştu' },
-      { status: 500 }
-    )
+    console.error('❌ [GEMINI] Hata:', error.message)
+    return NextResponse.json({ 
+      error: error.message,
+      text: 'Bir sorun oluştu ama endişelenme!'
+    }, { status: 500 })
   }
 }
