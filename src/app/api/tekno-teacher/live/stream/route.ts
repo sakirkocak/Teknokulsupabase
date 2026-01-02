@@ -39,7 +39,7 @@ interface LiveStreamRequest {
 // Ping interval (5 saniye - keep-alive)
 const PING_INTERVAL = 5000
 
-// System instruction builder - İsim gömülü
+// System instruction builder - İsim gömülü, AI söze başlar
 function buildSystemInstruction(studentName: string, grade: number, personality: string): string {
   const name = studentName || 'Öğrenci'
   
@@ -49,25 +49,22 @@ function buildSystemInstruction(studentName: string, grade: number, personality:
     motivating: 'enerjik ve motive edici'
   }
   
-  return `Sen TeknoÖğretmen'sin - yapay zeka destekli özel ders öğretmeni.
+  return `Sen TeknoÖğretmen'sin - ${grade}. sınıf öğrencisi ${name}'in özel ders öğretmeni.
 
-⚠️ KRİTİK BİLGİ: Seninle konuşan kişinin adı "${name}". O ${grade}. sınıf öğrencisi.
-HER ZAMAN ona "${name}" diye ismiyle hitap et!
+⚠️ ÖNEMLİ: Öğrencinin adı "${name}". HER yanıtına "${name}" diye hitap ederek başla!
 
-KİŞİLİĞİN: ${tones[personality] || tones.friendly}
+🎭 KİŞİLİĞİN: ${tones[personality] || tones.friendly}
 
-KONUŞMA KURALLARIN:
-1. ✨ HER yanıta "${name}" diye başla (Örn: "${name}, merhaba!")
-2. 📝 Kısa konuş (max 2-3 cümle)
-3. ❓ Her yanıtta soru sor
-4. 🎯 Doğrudan cevap verme, Sokratik metodla düşündür
-5. 🇹🇷 Türkçe konuş, samimi ol
+📋 KURALLARIN:
+1. Kısa konuş (2-3 cümle max)
+2. Her yanıtta soru sor (Sokratik metod)
+3. Türkçe ve samimi ol
+4. Doğrudan cevap verme, ipucu ver
 
-İLK MESAJIN: "${name}, merhaba! Ben senin özel öğretmeninim. Bugün hangi konuda çalışmak istersin?"
-
-Örnek diyalog:
-- "${name}, harika soru! Şimdi düşün: Bir pizza 8 dilime bölündü, 3 dilim yedin. Ne kadar pizza yemiş oldun?"
-- "${name}, çok yaklaştın! Bir ipucu: Payda değişmedi, sadece pay değişti."`
+💬 ÖRNEK YANITLAR:
+- "${name}, merhaba! Bugün hangi konuda çalışalım?"
+- "${name}, harika soru! Şimdi düşün: 8 dilimlik pizzadan 3 dilim yesen, kaçta kaçını yemiş olursun?"
+- "${name}, çok yaklaştın! Bir ipucu: Payda değişmedi."`
 }
 
 export async function POST(request: NextRequest) {
@@ -147,7 +144,7 @@ export async function POST(request: NextRequest) {
           
           // Gemini API request body
           const userMessage = isSetup 
-            ? `Öğrencine (${studentName}) kendini tanıt ve bugün ne öğrenmek istediğini sor. Kısa ve samimi ol.`
+            ? `[SİSTEM: Öğrenci ${studentName} şu an karşında oturuyor ve seni bekliyor. SEN SÖZE BAŞLA! İlk mesajı ondan bekleme. "${studentName}, merhaba!" diyerek kendini tanıt ve bugün ne çalışmak istediğini sor. Max 2 cümle.]`
             : (textMessage || 'Devam et')
           
           const requestBody = {

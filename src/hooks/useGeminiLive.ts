@@ -155,162 +155,6 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     }
   }, [initAudioContext, updateStatus])
   
-  // Server-side streaming ile Gemini'ye bağlan
-  const streamRequest = useCallback(async (message: string, isAudio: boolean = false) => {
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = new AbortController()
-    
-    console.log('🔵 [HOOK] Stream request başlıyor:', { message: message.substring(0, 50), isAudio })
-    updateStatus('processing')
-    
-    try {
-      const response = await fetch('/api/tekno-teacher/live/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: isAudio ? 'audio' : 'text',
-          studentName,
-          grade,
-          personality,
-          voice,
-          [isAudio ? 'audioData' : 'textMessage']: message
-        }),
-        signal: abortControllerRef.current.signal
-      })
-      
-      console.log('📡 [HOOK] API yanıtı:', response.status, response.statusText)
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen hata' }))
-        console.error('❌ [HOOK] API hatası:', errorData)
-        throw new Error(errorData.error || `HTTP ${response.status}`)
-      }
-      
-      // SSE stream'i oku
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('Stream okunamadı')
-      
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let fullText = ''
-      let lastHeartbeat = Date.now()
-      
-      updateStatus('speaking')
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        
-        if (done) {
-          console.log('✅ [HOOK] Stream tamamlandı, toplam metin:', fullText.length, 'karakter')
-          break
-        }
-        
-        buffer += decoder.decode(value, { stream: true })
-        
-        // SSE satırlarını parse et
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              
-              // Heartbeat - bağlantı canlı
-              if (data.type === 'heartbeat') {
-                lastHeartbeat = Date.now()
-                console.log('💓 [HOOK] Heartbeat alındı')
-                continue
-              }
-              
-              // Bağlantı onayı
-              if (data.type === 'connected') {
-                console.log('🟢 [HOOK] Bağlantı onaylandı:', data.studentName)
-                reconnectAttempts.current = 0 // Reset reconnect counter
-                continue
-              }
-              
-              // Metin chunk'ı
-              if (data.type === 'text') {
-                fullText += data.content
-                console.log('📝 [HOOK] Text chunk:', data.chunk, '-', data.content.substring(0, 30))
-                onTranscript?.(data.content, false)
-              }
-              
-              // Audio chunk'ı
-              if (data.type === 'audio') {
-                console.log('🔊 [HOOK] Audio chunk alındı')
-                onAudioReceived?.(data.data, data.mimeType)
-                
-                // Audio'yu queue'a ekle veya çal
-                if (isPlayingRef.current) {
-                  audioQueueRef.current.push(data.data)
-                } else {
-                  playAudioChunk(data.data, data.mimeType)
-                }
-              }
-              
-              // Hata
-              if (data.type === 'error') {
-                console.error('❌ [HOOK] Server error:', data.code, data.message)
-                throw new Error(`[${data.code || 'ERR'}] ${data.message}`)
-              }
-              
-              // Tamamlandı
-              if (data.type === 'done') {
-                console.log('✅ [HOOK] Done sinyali, chunks:', data.totalChunks)
-                if (!isPlayingRef.current && isSessionActive.current) {
-                  updateStatus('listening')
-                }
-              }
-              
-            } catch (e: any) {
-              if (e.message?.includes('[')) {
-                throw e // Re-throw server errors
-              }
-              console.warn('⚠️ [HOOK] JSON parse hatası')
-            }
-          }
-        }
-        
-        // Heartbeat timeout kontrolü (30 saniye)
-        if (Date.now() - lastHeartbeat > 30000) {
-          console.warn('⚠️ [HOOK] Heartbeat timeout!')
-          break
-        }
-      }
-      
-      return fullText
-      
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('🛑 [HOOK] Stream iptal edildi')
-        return
-      }
-      
-      console.error('❌ [HOOK] Stream error:', err.message)
-      setError(err)
-      onError?.(err)
-      
-      // Yeniden bağlanma denemesi
-      if (isSessionActive.current && reconnectAttempts.current < maxReconnectAttempts) {
-        reconnectAttempts.current++
-        console.log(`🔄 [HOOK] Yeniden bağlanma denemesi ${reconnectAttempts.current}/${maxReconnectAttempts}`)
-        updateStatus('connecting')
-        
-        // 2 saniye bekle ve tekrar dene
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        if (isSessionActive.current) {
-          return streamRequest(message, isAudio)
-        }
-      } else {
-        updateStatus('error')
-      }
-      
-      throw err
-    }
-  }, [studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onAudioReceived, onError])
   
   // Mikrofonu başlat (STT için)
   const startMicrophone = useCallback(async () => {
@@ -400,48 +244,58 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     }
   }, [])
   
-  // Setup request - sadece bağlantı kur, AI hoşgeldin mesajı gönderir
-  const setupSession = useCallback(async () => {
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = new AbortController()
+  // Mesaj gönder ve yanıt al (streaming)
+  const sendMessage = useCallback(async (message: string, isSetup: boolean = false) => {
+    // Önceki request'i iptal etme - sadece yeni request başlat
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     
-    console.log('🔵 [HOOK] Setup session başlıyor...')
-    updateStatus('connecting')
+    console.log(`🔵 [HOOK] ${isSetup ? 'Setup' : 'Message'} gönderiliyor:`, message.substring(0, 30))
+    
+    if (isSetup) {
+      updateStatus('connecting')
+    } else {
+      updateStatus('processing')
+    }
     
     try {
       const response = await fetch('/api/tekno-teacher/live/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'setup', // Sadece setup, mesaj yok
+          action: isSetup ? 'setup' : 'text',
           studentName,
           grade,
           personality,
-          voice
+          voice,
+          textMessage: isSetup ? null : message
         }),
-        signal: abortControllerRef.current.signal
+        signal: controller.signal
       })
       
-      console.log('📡 [HOOK] Setup yanıtı:', response.status)
+      console.log('📡 [HOOK] API yanıtı:', response.status)
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen hata' }))
         throw new Error(errorData.error || `HTTP ${response.status}`)
       }
       
-      // SSE stream'i oku
       const reader = response.body?.getReader()
       if (!reader) throw new Error('Stream okunamadı')
       
       const decoder = new TextDecoder()
       let buffer = ''
       let fullText = ''
+      let gotResponse = false
       
-      updateStatus('speaking') // AI hoşgeldin mesajı söyleyecek
+      updateStatus('speaking')
       
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          console.log('📭 [HOOK] Stream bitti, text:', fullText.length, 'karakter')
+          break
+        }
         
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
@@ -452,26 +306,31 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
             try {
               const data = JSON.parse(line.slice(6))
               
-              // Ping - ignore
-              if (data.type === 'ping') continue
+              // Ping - ignore, sadece log
+              if (data.type === 'ping') {
+                // console.log('💓 ping')
+                continue
+              }
               
               // Bağlantı onayı
               if (data.type === 'connected') {
-                console.log('🟢 [HOOK] Setup bağlantısı onaylandı')
+                console.log('🟢 [HOOK] Bağlantı onaylandı:', data.studentName)
                 reconnectAttempts.current = 0
                 continue
               }
               
-              // Metin
+              // Metin yanıtı
               if (data.type === 'text') {
+                gotResponse = true
                 fullText += data.content
-                console.log('📝 [HOOK] AI:', data.content.substring(0, 50))
+                console.log('📝 [HOOK] AI yanıtı:', data.content.substring(0, 50))
                 onTranscript?.(data.content, false)
               }
               
-              // Audio
+              // Audio yanıtı
               if (data.type === 'audio') {
-                console.log('🔊 [HOOK] Audio chunk')
+                gotResponse = true
+                console.log('🔊 [HOOK] Audio chunk alındı')
                 onAudioReceived?.(data.data, data.mimeType)
                 if (!isPlayingRef.current) {
                   playAudioChunk(data.data, data.mimeType)
@@ -480,29 +339,49 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
                 }
               }
               
-              // Hata - RAW error göster
+              // Hata - ama VAD/no-speech hatasını ignore et
               if (data.type === 'error') {
-                console.error('❌ [HOOK] Server error:', data)
-                throw new Error(`[${data.code || 'ERR'}] ${data.rawError || data.message}`)
+                const errorMsg = data.rawError || data.message || ''
+                
+                // VAD/no-speech hatalarını ignore et
+                if (errorMsg.toLowerCase().includes('no speech') || 
+                    errorMsg.toLowerCase().includes('no audio') ||
+                    errorMsg.toLowerCase().includes('vad')) {
+                  console.warn('⚠️ [HOOK] VAD hatası (ignore):', errorMsg)
+                  continue // Hata olarak sayma, devam et
+                }
+                
+                console.error('❌ [HOOK] API hatası:', data)
+                throw new Error(`[${data.code || 'ERR'}] ${errorMsg}`)
               }
               
-              // Tamamlandı
+              // Stream tamamlandı
               if (data.type === 'done' || data.type === 'stream_end') {
-                console.log('✅ [HOOK] Setup tamamlandı')
+                console.log('✅ [HOOK] Stream tamamlandı, chunks:', data.totalChunks || 0)
               }
               
             } catch (e: any) {
               if (e.message?.startsWith('[')) throw e
+              // JSON parse hatası - devam et
             }
           }
         }
       }
       
+      // Yanıt alındıysa listening'e geç
+      if (gotResponse && isSessionActive.current) {
+        console.log('🎧 [HOOK] Listening moduna geçiliyor...')
+        updateStatus('listening')
+      }
+      
       return fullText
       
     } catch (err: any) {
-      if (err.name === 'AbortError') return
-      console.error('❌ [HOOK] Setup hatası:', err.message)
+      if (err.name === 'AbortError') {
+        console.log('🛑 [HOOK] Request iptal edildi')
+        return ''
+      }
+      console.error('❌ [HOOK] Request hatası:', err.message)
       throw err
     }
   }, [studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onAudioReceived])
@@ -520,15 +399,22 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       // Önce mikrofonu başlat
       const micStarted = await startMicrophone()
       if (!micStarted) {
-        console.warn('⚠️ [HOOK] Mikrofon başlatılamadı, sadece metin ile devam ediliyor')
+        console.warn('⚠️ [HOOK] Mikrofon başlatılamadı, metin modu aktif')
       }
       
-      // Setup - AI hoşgeldin mesajı gönderecek
+      // Setup mesajı gönder - AI kendini tanıtacak
       console.log('📤 [HOOK] Setup gönderiliyor...')
-      await setupSession()
+      const response = await sendMessage('', true) // isSetup = true
       
-      console.log('✅ [HOOK] Bağlantı başarılı')
-      updateStatus('listening')
+      if (response) {
+        console.log('✅ [HOOK] AI yanıt verdi:', response.substring(0, 50))
+      }
+      
+      // Bağlantı başarılı - listening modunda kal
+      if (isSessionActive.current) {
+        console.log('🎧 [HOOK] Oturum aktif, listening modunda')
+        updateStatus('listening')
+      }
       
     } catch (err: any) {
       console.error('❌ [HOOK] Bağlantı hatası:', err.message)
@@ -541,7 +427,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         await new Promise(r => setTimeout(r, 2000))
         
         if (isSessionActive.current) {
-          return connect() // Recursive retry
+          return connect()
         }
       }
       
@@ -550,7 +436,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       onError?.(err)
       updateStatus('error')
     }
-  }, [setupSession, startMicrophone, updateStatus, onError])
+  }, [sendMessage, startMicrophone, updateStatus, onError])
   
   // Bağlantıyı kes
   const disconnect = useCallback(() => {
@@ -582,14 +468,16 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   // Metin gönder
   const sendText = useCallback(async (text: string) => {
     if (!text.trim()) return
+    console.log('💬 [HOOK] Kullanıcı mesajı:', text.substring(0, 50))
     onTranscript?.(text, true)
-    await streamRequest(text, false)
-  }, [streamRequest, onTranscript])
+    await sendMessage(text, false)
+  }, [sendMessage, onTranscript])
   
-  // Audio gönder (base64)
+  // Audio gönder (base64) - şimdilik devre dışı
   const sendAudio = useCallback(async (audioData: string) => {
-    await streamRequest(audioData, true)
-  }, [streamRequest])
+    console.log('🎤 [HOOK] Audio gönderme henüz desteklenmiyor')
+    // TODO: Audio streaming implementasyonu
+  }, [])
   
   // Konuşmayı kes
   const interrupt = useCallback(() => {
