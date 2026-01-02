@@ -181,6 +181,7 @@ export default function TeknoTeacherLive({
   const statusColors: Record<ChatStatus, string> = {
     idle: 'bg-gray-500',
     connecting: 'bg-yellow-500 animate-pulse',
+    analyzing: 'bg-indigo-500 animate-pulse',
     ready: 'bg-green-500',
     listening: 'bg-green-500 animate-pulse',
     processing: 'bg-blue-500 animate-pulse',
@@ -192,6 +193,7 @@ export default function TeknoTeacherLive({
   const statusTexts: Record<ChatStatus, string> = {
     idle: 'Beklemede',
     connecting: 'Bağlanıyor...',
+    analyzing: '📊 Veriler analiz ediliyor...',
     ready: '✓ Hazır',
     listening: '🎤 Seni dinliyorum...',
     processing: '🤔 Düşünüyor...',

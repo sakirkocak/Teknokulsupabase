@@ -24,6 +24,7 @@ import {
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
 import { useSpeech } from '@/hooks/useSpeech'
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
+import { PERSONAS, PersonaType } from '@/lib/personas'
 
 interface Message {
   id: string
@@ -60,6 +61,8 @@ export default function TeknoTeacherChat() {
   const [explanationAudio, setExplanationAudio] = useState<HTMLAudioElement | null>(null)
   const [isSummaryLoading, setIsSummaryLoading] = useState(false) // Günlük Özet yükleniyor
   const [summaryStatus, setSummaryStatus] = useState('') // Günlük Özet status
+  const [currentPersona, setCurrentPersona] = useState<PersonaType>('energetic') // Aktif persona
+  const [ragUsed, setRagUsed] = useState(false) // RAG kullanıldı mı
   
   // 🔒 Mutex: Herhangi bir özellik aktifken diğerleri engellenir
   const isAnyFeatureActive = isExplaining || isSummaryLoading || (explanationAudio !== null)

@@ -1,20 +1,20 @@
 'use client'
 
 /**
- * useOpenAIChat Hook
+ * 🎓 useOpenAIChat Hook - RAG + Persona + Kişiselleştirme
  * 
- * 🚀 OpenAI GPT-4o-mini + TTS-1-HD
- * REST API tabanlı - %100 çalışır!
+ * OpenAI GPT-4o-mini + TTS-1-HD + RAG + Öğrenci Analizi
  * 
  * Özellikler:
- * - GPT-4o-mini ile akıllı sohbet
- * - TTS-1-HD ile yüksek kaliteli ses
- * - Nova sesi (samimi kadın öğretmen)
- * - Konuşma geçmişi
- * - Browser TTS fallback
+ * - RAG: Semantic search ile benzer sorular bulur
+ * - Öğrenci analizi: Zayıf/güçlü konular (Typesense'ten)
+ * - Persona: Destekleyici veya Enerjik mod
+ * - Kişiselleştirilmiş karşılama
+ * - Cache: Supabase'e yük bindirmez
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { PersonaType, VoiceType, PERSONAS, selectPersona, VOICE_SETTINGS } from '@/lib/personas'
 
 // =====================================================
 // TYPES
@@ -22,6 +22,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 export type ChatStatus = 
   | 'idle'
   | 'connecting'
+  | 'analyzing'     // Öğrenci analizi yapılıyor
   | 'ready'
   | 'listening'
   | 'processing'
@@ -31,15 +32,39 @@ export type ChatStatus =
 interface Message {
   role: 'user' | 'assistant'
   content: string
+  persona?: PersonaType
+}
+
+interface StudentAnalysis {
+  studentId: string
+  studentName: string
+  grade: number
+  weakTopics: string[]
+  strongTopics: string[]
+  stats: {
+    totalQuestions: number
+    totalCorrect: number
+    successRate: number
+    currentStreak: number
+  }
+  recentActivity: {
+    questionsLast7Days: number
+    correctLast7Days: number
+    avgDailyQuestions: number
+  }
 }
 
 interface UseOpenAIChatOptions {
   studentName?: string
+  studentId?: string
   grade?: number
-  voice?: 'nova' | 'onyx' | 'alloy' | 'echo' | 'fable' | 'shimmer'
+  voice?: VoiceType
   speed?: number
+  enableRAG?: boolean           // RAG aktif mi?
+  enableAnalysis?: boolean      // Öğrenci analizi aktif mi?
   onTranscript?: (text: string, isUser: boolean) => void
   onStatusChange?: (status: ChatStatus) => void
+  onPersonaChange?: (persona: PersonaType) => void
   onError?: (error: Error) => void
 }
 
@@ -50,21 +75,28 @@ interface UseOpenAIChatReturn {
   isSpeaking: boolean
   volume: number
   messages: Message[]
+  currentPersona: PersonaType
+  studentAnalysis: StudentAnalysis | null
   connect: () => Promise<void>
   disconnect: () => void
   sendMessage: (text: string) => Promise<void>
   interrupt: () => void
+  switchPersona: (persona: PersonaType) => void
   error: Error | null
 }
 
 export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatReturn {
   const {
-    studentName = 'Şakir',
+    studentName = 'Öğrenci',
+    studentId,
     grade = 8,
-    voice = 'nova',
+    voice: initialVoice = 'nova',
     speed = 1.0,
+    enableRAG = true,
+    enableAnalysis = true,
     onTranscript,
     onStatusChange,
+    onPersonaChange,
     onError
   } = options
   
@@ -73,10 +105,12 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
   const [volume, setVolume] = useState(0)
   const [error, setError] = useState<Error | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
+  const [currentPersona, setCurrentPersona] = useState<PersonaType>('energetic')
+  const [studentAnalysis, setStudentAnalysis] = useState<StudentAnalysis | null>(null)
+  const [currentVoice, setCurrentVoice] = useState<VoiceType>(initialVoice)
   
   // Refs
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
   const isPlayingRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   
@@ -90,10 +124,43 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
   }, [status, onStatusChange])
   
   // =====================================================
+  // PERSONA SWITCH
+  // =====================================================
+  const switchPersona = useCallback((persona: PersonaType) => {
+    console.log(`🎭 [PERSONA] ${currentPersona} → ${persona}`)
+    setCurrentPersona(persona)
+    setCurrentVoice(PERSONAS[persona].voice)
+    onPersonaChange?.(persona)
+  }, [currentPersona, onPersonaChange])
+  
+  // =====================================================
+  // FETCH STUDENT ANALYSIS (Typesense'ten)
+  // =====================================================
+  const fetchStudentAnalysis = useCallback(async (): Promise<StudentAnalysis | null> => {
+    if (!studentId || !enableAnalysis) return null
+    
+    try {
+      const response = await fetch(`/api/tekno-teacher/student-analysis?studentId=${studentId}`)
+      
+      if (!response.ok) {
+        console.warn('⚠️ [ANALYSIS] API hatası')
+        return null
+      }
+      
+      const data = await response.json()
+      return data.data || null
+      
+    } catch (err) {
+      console.warn('⚠️ [ANALYSIS] Hata:', err)
+      return null
+    }
+  }, [studentId, enableAnalysis])
+  
+  // =====================================================
   // PLAY AUDIO (OpenAI TTS)
   // =====================================================
   const playAudio = useCallback(async (base64Audio: string) => {
-    console.log('🔊🔊🔊 SES ÇALINIYOR 🔊🔊🔊')
+    console.log('🔊 [AUDIO] Çalınıyor...')
     
     try {
       // Base64 → Blob
@@ -105,7 +172,7 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       const blob = new Blob([bytes], { type: 'audio/mpeg' })
       const audioUrl = URL.createObjectURL(blob)
       
-      // Audio element ile çal
+      // Önceki audio'yu temizle
       if (audioRef.current) {
         audioRef.current.pause()
         URL.revokeObjectURL(audioRef.current.src)
@@ -144,7 +211,6 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       }
       
       await audio.play()
-      console.log('✅ [AUDIO] Çalıyor')
       
     } catch (err: any) {
       console.error('❌ [AUDIO] Hata:', err.message)
@@ -193,18 +259,24 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
   }, [speed, updateStatus])
   
   // =====================================================
-  // GET TTS AUDIO
+  // GET TTS AUDIO (Persona'ya göre ses)
   // =====================================================
   const getAudio = useCallback(async (text: string): Promise<string | null> => {
     try {
+      const voiceSpeed = VOICE_SETTINGS[currentVoice]?.speed || speed
+      
       const response = await fetch('/api/tekno-teacher/openai/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voice, speed })
+        body: JSON.stringify({ 
+          text, 
+          voice: currentVoice, 
+          speed: voiceSpeed 
+        })
       })
       
       if (!response.ok) {
-        console.warn('⚠️ [TTS] API hatası, fallback kullanılacak')
+        console.warn('⚠️ [TTS] API hatası')
         return null
       }
       
@@ -215,10 +287,10 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       console.warn('⚠️ [TTS] Hata:', err)
       return null
     }
-  }, [voice, speed])
+  }, [currentVoice, speed])
   
   // =====================================================
-  // SEND MESSAGE
+  // SEND MESSAGE (RAG + Persona)
   // =====================================================
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim()) return
@@ -236,30 +308,67 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
     abortControllerRef.current = new AbortController()
     
     try {
-      // GPT-4o-mini çağrısı
+      // Persona seç (mesaj içeriğine göre)
+      const selectedPersona = selectPersona({
+        successRate: studentAnalysis?.stats.successRate,
+        weakTopicMentioned: studentAnalysis?.weakTopics.some(
+          topic => text.toLowerCase().includes(topic.toLowerCase())
+        ),
+        messageContent: text
+      })
+      
+      // Persona değiştiyse güncelle
+      if (selectedPersona !== currentPersona) {
+        switchPersona(selectedPersona)
+      }
+      
+      // GPT-4o-mini çağrısı (RAG + Analiz ile)
       const response = await fetch('/api/tekno-teacher/openai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
-          conversationHistory: messages,
+          conversationHistory: messages.slice(-6),  // Son 6 mesaj
           studentName,
-          grade
+          studentId,
+          grade,
+          persona: selectedPersona,
+          includeRAG: enableRAG,
+          studentAnalysis: studentAnalysis ? {
+            weakTopics: studentAnalysis.weakTopics,
+            strongTopics: studentAnalysis.strongTopics,
+            recentActivity: {
+              questionsLast7Days: studentAnalysis.recentActivity.questionsLast7Days,
+              successRate: studentAnalysis.stats.successRate
+            }
+          } : undefined
         }),
         signal: abortControllerRef.current.signal
       })
       
-      if (!response.ok) {
-        throw new Error('API hatası')
-      }
+      if (!response.ok) throw new Error('API hatası')
       
       const data = await response.json()
       const responseText = data.text || `${studentName}, bir sorun oluştu!`
       
-      console.log('✅ [CHAT] Yanıt:', responseText.substring(0, 60))
+      // Persona'yı API'den gelen değerle güncelle
+      if (data.persona && data.persona !== currentPersona) {
+        switchPersona(data.persona)
+      }
+      
+      // Sesi güncelle (API'den gelen voice)
+      if (data.voice && data.voice !== currentVoice) {
+        setCurrentVoice(data.voice)
+      }
+      
+      console.log(`✅ [CHAT] Yanıt (${data.persona || currentPersona}):`, responseText.substring(0, 60))
       
       // Assistant mesajını ekle
-      const assistantMessage: Message = { role: 'assistant', content: responseText }
+      const assistantMessage: Message = { 
+        role: 'assistant', 
+        content: responseText,
+        persona: data.persona || currentPersona
+      }
       setMessages(prev => [...prev, assistantMessage])
       onTranscript?.(responseText, false)
       
@@ -270,7 +379,6 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       if (audio) {
         await playAudio(audio)
       } else {
-        // Fallback: Browser TTS
         speakWithBrowserTTS(responseText)
       }
       
@@ -288,38 +396,66 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       setError(err)
       onError?.(err)
     }
-  }, [messages, studentName, grade, updateStatus, getAudio, playAudio, speakWithBrowserTTS, onTranscript, onError])
+  }, [
+    messages, studentName, studentId, grade, currentPersona, currentVoice,
+    studentAnalysis, enableRAG, updateStatus, switchPersona, getAudio, 
+    playAudio, speakWithBrowserTTS, onTranscript, onError
+  ])
   
   // =====================================================
-  // CONNECT (Başlangıç selamı)
+  // CONNECT (Öğrenci analizi + Kişiselleştirilmiş karşılama)
   // =====================================================
   const connect = useCallback(async () => {
-    console.log('🚀🚀🚀 [OPENAI] Oturum başlatılıyor 🚀🚀🚀')
+    console.log('🚀 [OPENAI] Oturum başlatılıyor...')
     
     setError(null)
     setMessages([])
     updateStatus('connecting')
     
     try {
-      // İlk mesaj - selamlama
-      const response = await fetch('/api/tekno-teacher/openai', {
+      // 1. Öğrenci analizini çek (Typesense'ten)
+      updateStatus('analyzing')
+      const analysis = await fetchStudentAnalysis()
+      
+      if (analysis) {
+        setStudentAnalysis(analysis)
+        console.log('📊 [ANALYSIS] Öğrenci verisi alındı:', {
+          weakTopics: analysis.weakTopics.slice(0, 3),
+          successRate: analysis.stats.successRate
+        })
+        
+        // Başlangıç persona'sını belirle
+        const initialPersona = selectPersona({
+          successRate: analysis.stats.successRate,
+          isStruggling: analysis.weakTopics.length > 3
+        })
+        switchPersona(initialPersona)
+      }
+      
+      // 2. Kişiselleştirilmiş karşılama mesajı al
+      updateStatus('connecting')
+      
+      const greetingResponse = await fetch('/api/tekno-teacher/student-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `[SİSTEM: Yeni oturum başladı. ${studentName} adlı ${grade}. sınıf öğrencisine "Merhaba ${studentName}, bugün harika bir ders işleyeceğiz! Ne çalışmak istersin?" şeklinde kısa ve samimi bir selam ver.]`,
-          conversationHistory: [],
-          studentName,
-          grade
+          studentId,
+          studentName
         })
       })
       
-      if (!response.ok) throw new Error('Bağlantı hatası')
+      let greeting: string
       
-      const data = await response.json()
-      const greeting = data.text || `Merhaba ${studentName}! Bugün harika bir ders işleyeceğiz!`
+      if (greetingResponse.ok) {
+        const greetingData = await greetingResponse.json()
+        greeting = greetingData.greeting || `Merhaba ${studentName}! Bugün harika bir ders işleyeceğiz!`
+      } else {
+        // Fallback selamlama
+        greeting = `Merhaba ${studentName}! Ben TeknoÖğretmen, senin kişisel ders asistanın. Bugün sana nasıl yardımcı olabilirim?`
+      }
       
       // Selamlamayı ekle
-      setMessages([{ role: 'assistant', content: greeting }])
+      setMessages([{ role: 'assistant', content: greeting, persona: currentPersona }])
       onTranscript?.(greeting, false)
       
       updateStatus('ready')
@@ -342,10 +478,14 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       
       // Fallback selamlama
       const fallbackGreeting = `Merhaba ${studentName}! Bağlantıda küçük bir sorun var ama konuşabiliriz.`
+      setMessages([{ role: 'assistant', content: fallbackGreeting }])
       onTranscript?.(fallbackGreeting, false)
       speakWithBrowserTTS(fallbackGreeting)
     }
-  }, [studentName, grade, updateStatus, getAudio, playAudio, speakWithBrowserTTS, onTranscript, onError])
+  }, [
+    studentName, studentId, currentPersona, updateStatus, fetchStudentAnalysis, 
+    switchPersona, getAudio, playAudio, speakWithBrowserTTS, onTranscript, onError
+  ])
   
   // =====================================================
   // DISCONNECT
@@ -366,8 +506,9 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
     setVolume(0)
     setMessages([])
     setError(null)
-    setStatus('idle')  // Direct set, no callback dependency
-  }, [])  // Empty deps - stable reference
+    setStudentAnalysis(null)
+    setStatus('idle')
+  }, [])
   
   // =====================================================
   // INTERRUPT
@@ -385,13 +526,12 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
     
     isPlayingRef.current = false
     setVolume(0)
-    setStatus('ready')  // Direct set
-  }, [])  // Empty deps - stable reference
+    setStatus('ready')
+  }, [])
   
-  // Cleanup on unmount only
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log('🧹 [OPENAI] Component unmount - cleanup')
       abortControllerRef.current?.abort()
       if (audioRef.current) {
         audioRef.current.pause()
@@ -400,7 +540,7 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
       window.speechSynthesis?.cancel()
       isPlayingRef.current = false
     }
-  }, [])  // Empty deps - only on unmount
+  }, [])
   
   return {
     status,
@@ -409,10 +549,13 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
     isSpeaking: status === 'speaking',
     volume,
     messages,
+    currentPersona,
+    studentAnalysis,
     connect,
     disconnect,
     sendMessage,
     interrupt,
+    switchPersona,
     error
   }
 }
