@@ -59,9 +59,20 @@ export default function TeknoTeacherLive({
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0])
   const [localError, setLocalError] = useState<string | null>(null)
   const [sessionActive, setSessionActive] = useState(false)
+  const [apiKey, setApiKey] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  // Gemini Live Hook (Server-side streaming)
+  // API Key al (client-side WebSocket için)
+  useEffect(() => {
+    fetch('/api/tekno-teacher/api-key')
+      .then(res => res.json())
+      .then(data => {
+        if (data.apiKey) setApiKey(data.apiKey)
+      })
+      .catch(err => console.error('API key alınamadı:', err))
+  }, [])
+  
+  // Gemini Live Hook (Client-side WebSocket)
   const {
     status,
     isConnected,
@@ -74,6 +85,7 @@ export default function TeknoTeacherLive({
     interrupt,
     error: geminiError
   } = useGeminiLive({
+    apiKey: apiKey || '',
     studentName,
     grade,
     personality,
@@ -87,7 +99,7 @@ export default function TeknoTeacherLive({
       console.log('🔴 Live status:', newStatus)
       if (newStatus === 'listening' && sessionActive) {
         console.log('🎤 [UI] Otomatik dinleme başlatılıyor...')
-        setTimeout(() => startListening(), 500) // Küçük gecikme ile başlat
+        setTimeout(() => startListening(), 500)
       }
     },
     onError: (err) => {
@@ -163,6 +175,7 @@ export default function TeknoTeacherLive({
   const statusColors: Record<GeminiLiveStatus, string> = {
     idle: 'bg-gray-500',
     connecting: 'bg-yellow-500 animate-pulse',
+    setup_sent: 'bg-orange-500 animate-pulse',
     connected: 'bg-blue-500',
     listening: 'bg-green-500 animate-pulse',
     speaking: 'bg-purple-500',
@@ -174,6 +187,7 @@ export default function TeknoTeacherLive({
   const statusTexts: Record<GeminiLiveStatus, string> = {
     idle: 'Beklemede',
     connecting: 'Bağlanıyor...',
+    setup_sent: 'Setup gönderildi...',
     connected: '✓ Bağlandı',
     listening: '🎤 Seni dinliyorum...',
     speaking: '🔊 Konuşuyorum...',
@@ -243,7 +257,7 @@ export default function TeknoTeacherLive({
       </div>
       
       {/* Bağlantı durumu - başlangıç ekranı */}
-      {(status === 'idle' || status === 'connecting' || status === 'error') && (
+      {(status === 'idle' || status === 'connecting' || status === 'setup_sent' || status === 'error') && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <div className="w-32 h-32 mb-6 relative">
             <TeknoTeacherAvatar 
@@ -252,7 +266,7 @@ export default function TeknoTeacherLive({
               size="lg"
               personality={personality}
             />
-            {status === 'connecting' && (
+            {(status === 'connecting' || status === 'setup_sent') && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="w-16 h-16 text-purple-500 animate-spin" />
               </div>
@@ -319,13 +333,13 @@ export default function TeknoTeacherLive({
           
           <button
             onClick={connect}
-            disabled={status === 'connecting'}
+            disabled={status === 'connecting' || status === 'setup_sent' || !apiKey}
             className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 flex items-center gap-3"
           >
-            {status === 'connecting' ? (
+            {(status === 'connecting' || status === 'setup_sent') ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Bağlanıyor...
+                {status === 'connecting' ? 'Bağlanıyor...' : 'Setup bekleniyor...'}
               </>
             ) : (
               <>

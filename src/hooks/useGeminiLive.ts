@@ -1,26 +1,28 @@
 'use client'
 
 /**
- * useGeminiLive Hook - VERCEL PRO MODE v2
+ * useGeminiLive Hook - CLIENT-SIDE WEBSOCKET
  * 
- * 🚀 Gemini 2.5 Flash Live API ile gerçek zamanlı sesli sohbet
- * Server-side proxy üzerinden bağlanır (CORS sorunu yok)
+ * 🚀 Gemini Multimodal Live API (WebSocket)
+ * Dokümantasyon: https://ai.google.dev/api/live?hl=tr
  * 
- * PRO Özellikler:
- * - 5 dakika kesintisiz bağlantı (maxDuration: 300)
- * - Sıfır veritabanı gecikmesi
- * - Native audio output (Kore sesi)
- * - AI ilk mesajı kendisi başlatır
- * - Mikrofon input + VAD
- * - 5 saniye connecting timeout ile otomatik yenileme
+ * ÖNEMLİ KURALLAR:
+ * 1. Endpoint: wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent
+ * 2. İlk mesaj: setup (model, generationConfig, systemInstruction)
+ * 3. setupComplete bekle, sonra mesaj gönder
+ * 4. Ses: realtimeInput.audio ile gönder
+ * 5. Hata takibi: interrupted, turnComplete dinle
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 
-// Types
+// =====================================================
+// TYPES
+// =====================================================
 export type GeminiLiveStatus = 
   | 'idle'
   | 'connecting'
+  | 'setup_sent'
   | 'connected'
   | 'listening'
   | 'speaking'
@@ -28,8 +30,9 @@ export type GeminiLiveStatus =
   | 'error'
 
 interface UseGeminiLiveOptions {
-  studentName: string
-  grade: number
+  apiKey: string
+  studentName?: string
+  grade?: number
   personality?: 'friendly' | 'strict' | 'motivating'
   voice?: string
   onTranscript?: (text: string, isUser: boolean) => void
@@ -46,37 +49,23 @@ interface UseGeminiLiveReturn {
   volume: number
   connect: () => Promise<void>
   disconnect: () => void
-  sendText: (text: string) => Promise<void>
-  sendAudio: (audioData: string) => Promise<void>
+  sendText: (text: string) => void
+  sendAudio: (audioData: ArrayBuffer) => void
   interrupt: () => void
   error: Error | null
 }
 
 // =====================================================
-// AUDIO HELPERS - Int16Array <-> Base64
+// CONSTANTS - Dokümantasyona göre
 // =====================================================
-function int16ArrayToBase64(int16Array: Int16Array): string {
-  const bytes = new Uint8Array(int16Array.buffer)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
-
-function base64ToInt16Array(base64: string): Int16Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return new Int16Array(bytes.buffer)
-}
+const GEMINI_WS_ENDPOINT = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
+const GEMINI_MODEL = 'models/gemini-2.0-flash-exp'  // Format: models/{model}
 
 export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const {
-    studentName,
-    grade,
+    apiKey,
+    studentName = 'Şakir',
+    grade = 8,
     personality = 'friendly',
     voice = 'Kore',
     onTranscript,
@@ -91,45 +80,37 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   const [error, setError] = useState<Error | null>(null)
   
   // Refs
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
-  const audioQueueRef = useRef<string[]>([])
   const isPlayingRef = useRef(false)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
-  const reconnectAttempts = useRef(0)
-  const maxReconnectAttempts = 3
-  const isSessionActive = useRef(false)
-  const connectingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const setupCompleteRef = useRef(false)
+  const messageQueueRef = useRef<object[]>([])
   
-  // Status değişikliğini bildir
+  // =====================================================
+  // STATUS UPDATE
+  // =====================================================
   const updateStatus = useCallback((newStatus: GeminiLiveStatus) => {
-    console.log(`🔄 [STATUS] ${status} → ${newStatus}`)
+    console.log(`🔄 [LIVE STATUS] ${status} → ${newStatus}`)
     setStatus(newStatus)
     onStatusChange?.(newStatus)
   }, [status, onStatusChange])
   
-  // Audio context oluştur
-  const initAudioContext = useCallback(async () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext({ sampleRate: 24000 })
-    }
-    
-    if (audioContextRef.current.state === 'suspended') {
-      await audioContextRef.current.resume()
-    }
-    
-    return audioContextRef.current
-  }, [])
-  
   // =====================================================
-  // GEMINI AUDIO ÇALMA - PCM/WAV/MP3 Desteği
+  // AUDIO PLAYBACK
   // =====================================================
-  const playGeminiAudio = useCallback(async (base64Audio: string, mimeType: string) => {
+  const playAudio = useCallback(async (base64Audio: string, mimeType: string) => {
     console.log('🔊🔊🔊 SES PAKETİ GELDİ 🔊🔊🔊')
-    console.log('🔊 [AUDIO] mimeType:', mimeType, 'size:', base64Audio.length, 'bytes')
+    console.log('🔊 [AUDIO] mimeType:', mimeType, 'size:', base64Audio.length)
+    
+    onAudioReceived?.(base64Audio, mimeType)
     
     try {
-      const ctx = await initAudioContext()
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext({ sampleRate: 24000 })
+      }
+      
+      const ctx = audioContextRef.current
+      if (ctx.state === 'suspended') await ctx.resume()
       
       // Base64 -> ArrayBuffer
       const binaryString = atob(base64Audio)
@@ -138,47 +119,22 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         bytes[i] = binaryString.charCodeAt(i)
       }
       
-      // Mime type'a göre sample rate belirle
-      let sampleRate = 24000  // Gemini varsayılan
-      if (mimeType.includes('16000')) sampleRate = 16000
-      if (mimeType.includes('22050')) sampleRate = 22050
-      if (mimeType.includes('44100')) sampleRate = 44100
+      // Sample rate from mime type
+      let sampleRate = 24000
+      const rateMatch = mimeType.match(/rate=(\d+)/)
+      if (rateMatch) sampleRate = parseInt(rateMatch[1])
       
-      console.log('🔊 [AUDIO] Sample rate:', sampleRate)
-      
-      let audioBuffer: AudioBuffer
-      
-      // PCM veya encoded audio kontrolü
-      if (mimeType.includes('pcm') || mimeType.includes('raw')) {
-        // PCM 16-bit -> Float32
-        const pcmData = new Int16Array(bytes.buffer)
-        const floatData = new Float32Array(pcmData.length)
-        for (let i = 0; i < pcmData.length; i++) {
-          floatData[i] = pcmData[i] / 32768
-        }
-        
-        audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
-        audioBuffer.getChannelData(0).set(floatData)
-        console.log('🔊 [AUDIO] PCM decoded:', floatData.length, 'samples')
-      } else {
-        // MP3/WAV/OGG - decodeAudioData kullan
-        try {
-          audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0))
-          console.log('🔊 [AUDIO] Decoded:', audioBuffer.duration, 'seconds')
-        } catch (decodeErr) {
-          // Fallback: PCM olarak dene
-          console.warn('⚠️ [AUDIO] decodeAudioData başarısız, PCM deneniyor...')
-          const pcmData = new Int16Array(bytes.buffer)
-          const floatData = new Float32Array(pcmData.length)
-          for (let i = 0; i < pcmData.length; i++) {
-            floatData[i] = pcmData[i] / 32768
-          }
-          audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
-          audioBuffer.getChannelData(0).set(floatData)
-        }
+      // PCM 16-bit -> Float32
+      const pcmData = new Int16Array(bytes.buffer)
+      const floatData = new Float32Array(pcmData.length)
+      for (let i = 0; i < pcmData.length; i++) {
+        floatData[i] = pcmData[i] / 32768
       }
       
-      // Çal
+      // Create and play buffer
+      const audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
+      audioBuffer.getChannelData(0).set(floatData)
+      
       const source = ctx.createBufferSource()
       source.buffer = audioBuffer
       source.connect(ctx.destination)
@@ -186,7 +142,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       isPlayingRef.current = true
       updateStatus('speaking')
       
-      // Volume simülasyonu (lip-sync)
+      // Volume simulation
       const volumeInterval = setInterval(() => {
         if (isPlayingRef.current) {
           setVolume(0.3 + Math.random() * 0.5)
@@ -200,30 +156,28 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         isPlayingRef.current = false
         setVolume(0)
         clearInterval(volumeInterval)
-        console.log('🔇 [AUDIO] Bitti')
-        
-        if (isSessionActive.current) {
+        console.log('🔇 [AUDIO] Oynatma bitti')
+        if (setupCompleteRef.current) {
           updateStatus('listening')
         }
       }
       
       source.start()
-      console.log(`✅ [AUDIO] Çalıyor: ${audioBuffer.duration.toFixed(2)}s @ ${audioBuffer.sampleRate}Hz`)
+      console.log(`✅ [AUDIO] Çalıyor: ${floatData.length} samples @ ${sampleRate}Hz`)
       
     } catch (err) {
       console.error('❌ [AUDIO] Hata:', err)
-      // Audio çalamazsa listening'e geç
-      if (isSessionActive.current) {
-        updateStatus('listening')
-      }
+      updateStatus('listening')
     }
-  }, [initAudioContext, updateStatus])
+  }, [onAudioReceived, updateStatus])
   
-  // Fallback: Browser TTS
-  const speakWithBrowserTTS = useCallback((text: string) => {
+  // =====================================================
+  // BROWSER TTS FALLBACK
+  // =====================================================
+  const speakWithTTS = useCallback((text: string) => {
     if (!text.trim() || typeof window === 'undefined') return
     
-    console.log('🗣️ [TTS] Browser TTS kullanılıyor:', text.substring(0, 50))
+    console.log('🗣️ [TTS] Browser TTS:', text.substring(0, 50))
     window.speechSynthesis?.cancel()
     
     const utterance = new SpeechSynthesisUtterance(text)
@@ -237,17 +191,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     utterance.onstart = () => {
       isPlayingRef.current = true
       updateStatus('speaking')
-      console.log('🗣️ [TTS] Konuşma başladı')
     }
     
     utterance.onend = () => {
       isPlayingRef.current = false
       setVolume(0)
-      console.log('🗣️ [TTS] Konuşma bitti')
-      if (isSessionActive.current) updateStatus('listening')
+      if (setupCompleteRef.current) updateStatus('listening')
     }
     
-    // Volume simülasyonu
     const interval = setInterval(() => {
       if (isPlayingRef.current) {
         setVolume(0.3 + Math.random() * 0.5)
@@ -259,325 +210,272 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     window.speechSynthesis?.speak(utterance)
   }, [updateStatus])
   
-  
-  // Mikrofonu başlat (STT için) - 16kHz PCM Mono
-  const startMicrophone = useCallback(async () => {
-    // Zaten aktifse tekrar başlatma
-    if (mediaStreamRef.current) {
-      const tracks = mediaStreamRef.current.getTracks()
-      const activeTracks = tracks.filter(t => t.readyState === 'live')
-      if (activeTracks.length > 0) {
-        console.log('🎤 [MIC] Mikrofon zaten aktif')
-        return true
-      }
+  // =====================================================
+  // SEND MESSAGE (Queue if not ready)
+  // =====================================================
+  const sendMessage = useCallback((message: object) => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('⚠️ [WS] Bağlantı açık değil, kuyruğa ekleniyor')
+      messageQueueRef.current.push(message)
+      return
     }
     
-    try {
-      console.log('🎤 [MIC] Mikrofon başlatılıyor (16kHz PCM Mono)...')
-      
-      // =====================================================
-      // AUDIO SERIALIZATION: 16-bit PCM, 16kHz, Mono
-      // =====================================================
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          sampleRate: 16000,     // Gemini Live API şartı
-          channelCount: 1,       // Mono
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      })
-      
-      // Track ended event'i dinle
-      stream.getTracks().forEach(track => {
-        track.onended = () => {
-          console.warn('⚠️ [MIC] Track sonlandı:', track.label)
-          
-          // Oturum aktifse yeniden başlat
-          if (isSessionActive.current) {
-            console.log('🔄 [MIC] Otomatik yeniden başlatma...')
-            setTimeout(() => {
-              if (isSessionActive.current) {
-                startMicrophone()
-              }
-            }, 1000)
-          }
-        }
-      })
-      
-      mediaStreamRef.current = stream
-      console.log('✅ [MIC] Mikrofon başlatıldı (16kHz PCM Mono)')
-      return true
-      
-    } catch (err: any) {
-      console.error('❌ [MIC] Mikrofon hatası:', err.name, err.message)
-      // Hata olsa da devam et
-      return false
+    // setupComplete gelmediyse bekle (setup hariç)
+    if (!setupCompleteRef.current && !('setup' in message)) {
+      console.warn('⚠️ [WS] setupComplete bekleniyor, kuyruğa ekleniyor')
+      messageQueueRef.current.push(message)
+      return
     }
-  }, [])
-  
-  // Mikrofonu durdur
-  const stopMicrophone = useCallback(() => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => {
-        track.onended = null
-        track.stop()
-      })
-      mediaStreamRef.current = null
-      console.log('🔇 [MIC] Mikrofon durduruldu')
-    }
+    
+    const msgStr = JSON.stringify(message)
+    console.log('📤 [WS] Gönderiliyor:', Object.keys(message)[0])
+    wsRef.current.send(msgStr)
   }, [])
   
   // =====================================================
-  // FORCE RE-CONNECT: 5 saniye timeout
+  // PROCESS MESSAGE QUEUE
   // =====================================================
-  const clearConnectingTimeout = useCallback(() => {
-    if (connectingTimeoutRef.current) {
-      clearTimeout(connectingTimeoutRef.current)
-      connectingTimeoutRef.current = null
+  const processQueue = useCallback(() => {
+    while (messageQueueRef.current.length > 0 && setupCompleteRef.current) {
+      const msg = messageQueueRef.current.shift()
+      if (msg) sendMessage(msg)
     }
-  }, [])
-  
-  // Mesaj gönder ve yanıt al (streaming)
-  const sendMessage = useCallback(async (message: string, isSetup: boolean = false): Promise<string> => {
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    
-    console.log(`🔵 [HOOK] ${isSetup ? 'Setup' : 'Message'} gönderiliyor...`)
-    
-    if (isSetup) {
-      updateStatus('connecting')
-    } else {
-      updateStatus('processing')
-    }
-    
-    try {
-      const response = await fetch('/api/tekno-teacher/live/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: isSetup ? 'setup' : 'text',
-          studentName: 'Şakir', // HARDCODED
-          grade: 8,
-          personality,
-          voice,
-          textMessage: isSetup ? null : message
-        }),
-        signal: controller.signal
-      })
-      
-      console.log('📡 [HOOK] API yanıtı:', response.status)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('Stream okunamadı')
-      
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let fullText = ''
-      let hasAudio = false
-      
-      // =====================================================
-      // 5 SANİYE TIMEOUT - Connecting'de kalırsa yenile
-      // =====================================================
-      clearConnectingTimeout()
-      
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          console.log('📭 [HOOK] Stream bitti')
-          break
-        }
-        
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6))
-              
-              // Bağlantı onayı
-              if (data.type === 'connected') {
-                console.log('🟢🟢🟢 [HOOK] === BAĞLANTI ONAYLANDI === 🟢🟢🟢')
-                console.log('👤 Öğrenci:', data.studentName, 'Pro:', data.pro)
-                reconnectAttempts.current = 0
-                clearConnectingTimeout()
-                updateStatus('connected')
-                continue
-              }
-              
-              // Metin yanıtı
-              if (data.type === 'text' && data.content) {
-                fullText += data.content
-                console.log('📝 [HOOK] TEXT:', data.content.substring(0, 60))
-                onTranscript?.(data.content, false)
-              }
-              
-              // =====================================================
-              // SES PAKETİ - Client-Side Log
-              // =====================================================
-              if (data.type === 'audio' && data.data) {
-                console.log('🔊🔊🔊 SES PAKETİ GELDİ 🔊🔊🔊')
-                hasAudio = true
-                onAudioReceived?.(data.data, data.mimeType)
-                await playGeminiAudio(data.data, data.mimeType)
-              }
-              
-              // Tamamlandı
-              if (data.type === 'done') {
-                console.log('✅ [HOOK] DONE - Text:', fullText.length, 'chars, Audio:', hasAudio)
-                
-                if (fullText && !hasAudio) {
-                  // Audio yoksa Browser TTS kullan
-                  console.log('🗣️ [HOOK] Audio yok, Browser TTS kullanılıyor...')
-                  speakWithBrowserTTS(fullText)
-                } else if (!fullText && !hasAudio) {
-                  console.log('⚠️ [HOOK] Yanıt yok!')
-                  if (isSessionActive.current) {
-                    updateStatus('listening')
-                  }
-                }
-              }
-              
-              // Hata (VAD hariç)
-              if (data.type === 'error') {
-                const errorMsg = data.rawError || data.message || ''
-                if (!errorMsg.toLowerCase().includes('no speech') && 
-                    !errorMsg.toLowerCase().includes('vad')) {
-                  console.error('❌ [HOOK] API hatası:', errorMsg)
-                }
-              }
-              
-            } catch (e) {
-              // JSON parse hatası - devam et
-            }
-          }
-        }
-      }
-      
-      // Session aktifse listening'e geç
-      if (isSessionActive.current && !isPlayingRef.current) {
-        updateStatus('listening')
-      }
-      
-      return fullText
-      
-    } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log('🛑 [HOOK] Request iptal edildi')
-        return ''
-      }
-      console.error('❌ [HOOK] Request hatası:', err.message)
-      
-      // Fallback - hata verme, sessizce devam et
-      if (isSetup && isSessionActive.current) {
-        const fallbackMsg = 'Selam Şakir! Bugün Pro gücüyle yanındayım, hadi derse başlayalım!'
-        onTranscript?.(fallbackMsg, false)
-        speakWithBrowserTTS(fallbackMsg)
-      }
-      
-      return ''
-    }
-  }, [personality, voice, updateStatus, playGeminiAudio, speakWithBrowserTTS, onTranscript, onAudioReceived, clearConnectingTimeout])
+  }, [sendMessage])
   
   // =====================================================
-  // CONNECT - VERCEL PRO MODE + 5 Saniye Timeout
+  // CONNECT - Dokümantasyona göre
   // =====================================================
   const connect = useCallback(async () => {
-    console.log('🚀🚀🚀 [HOOK PRO] Bağlantı başlatılıyor... 🚀🚀🚀')
-    console.log('👤 Öğrenci: Şakir (hardcoded)')
-    console.log('⏱️ Max Duration: 5 dakika')
-    console.log('⏱️ Connecting Timeout: 5 saniye')
+    if (!apiKey) {
+      const err = new Error('API Key gerekli')
+      setError(err)
+      onError?.(err)
+      return
+    }
+    
+    console.log('🚀🚀🚀 [LIVE] WebSocket bağlantısı başlatılıyor... 🚀🚀🚀')
+    console.log(`📍 [LIVE] Endpoint: ${GEMINI_WS_ENDPOINT}`)
+    console.log(`📦 [LIVE] Model: ${GEMINI_MODEL}`)
     
     updateStatus('connecting')
     setError(null)
-    isSessionActive.current = true
-    reconnectAttempts.current = 0
-    
-    // =====================================================
-    // FORCE RE-CONNECT: 5 saniye timeout
-    // =====================================================
-    clearConnectingTimeout()
-    connectingTimeoutRef.current = setTimeout(() => {
-      if (status === 'connecting' && isSessionActive.current) {
-        console.warn('⚠️ [HOOK] 5 saniye geçti, connecting hala aktif!')
-        console.log('🔄 [HOOK] Otomatik yeniden bağlanma...')
-        
-        // Mevcut request'i iptal et
-        abortControllerRef.current?.abort()
-        
-        // Yeniden dene
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          reconnectAttempts.current++
-          console.log(`🔄 [HOOK] Deneme ${reconnectAttempts.current}/${maxReconnectAttempts}`)
-          
-          // 1 saniye bekle ve tekrar dene
-          setTimeout(async () => {
-            if (isSessionActive.current) {
-              try {
-                await sendMessage('', true)
-              } catch (e) {
-                console.error('❌ [HOOK] Yeniden bağlantı başarısız')
-              }
-            }
-          }, 1000)
-        } else {
-          console.error('❌ [HOOK] Maksimum deneme aşıldı')
-          // Fallback
-          const fallbackMsg = 'Selam Şakir! Bağlantı kurulamadı ama seninle konuşabilirim. Ne öğrenmek istersin?'
-          onTranscript?.(fallbackMsg, false)
-          speakWithBrowserTTS(fallbackMsg)
-        }
-      }
-    }, 5000)
+    setupCompleteRef.current = false
+    messageQueueRef.current = []
     
     try {
-      // Mikrofonu başlat (hata olsa da devam)
-      await startMicrophone().catch(e => console.warn('⚠️ Mikrofon:', e.message))
+      // WebSocket URL with API Key
+      const wsUrl = `${GEMINI_WS_ENDPOINT}?key=${apiKey}`
+      const ws = new WebSocket(wsUrl)
+      wsRef.current = ws
       
-      // =====================================================
-      // INITIAL MESSAGE BUFFER: Setup tetikleyici
-      // =====================================================
-      console.log('📤 [HOOK PRO] Setup tetikleyici gönderiliyor...')
-      console.log('📤 [HOOK PRO] AI ilk mesajı kendisi başlatacak: "Merhaba Şakir, bugün harika bir ders işleyeceğiz"')
+      ws.onopen = () => {
+        console.log('✅ [WS] Bağlantı açıldı')
+        updateStatus('setup_sent')
+        
+        // =====================================================
+        // SETUP MESSAGE - Dokümantasyona göre
+        // =====================================================
+        const setupMessage = {
+          setup: {
+            model: GEMINI_MODEL,
+            generationConfig: {
+              temperature: 0.9,
+              maxOutputTokens: 200,
+              responseModalities: ["AUDIO", "TEXT"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: voice
+                  }
+                }
+              }
+            },
+            systemInstruction: {
+              parts: [{
+                text: `Sen TeknoÖğretmen'sin - ${studentName}'in özel ders öğretmeni.
+
+KİMLİK:
+- Adı: TeknoÖğretmen  
+- Ses: ${voice}
+- Dil: Türkçe
+- Kişilik: ${personality === 'friendly' ? 'Samimi ve arkadaşça' : personality === 'strict' ? 'Disiplinli ve ciddi' : 'Motive edici ve enerjik'}
+
+KURALLAR:
+1. Her yanıta "${studentName}" diye hitap ederek başla
+2. Kısa ve öz konuş (maksimum 2 cümle)
+3. Her zaman Türkçe konuş
+4. Samimi ve motive edici ol
+5. Yanıtın sonunda bazen soru sor
+
+ÖĞRENCİ: ${studentName}, ${grade}. sınıf
+
+[BAŞLANGIÇ TALİMATI: Bağlantı kurulduğunda hemen "Merhaba ${studentName}, bugün harika bir ders işleyeceğiz! Ne çalışmak istersin?" diye selam ver.]`
+              }]
+            }
+          }
+        }
+        
+        console.log('📤 [WS] Setup gönderiliyor...')
+        ws.send(JSON.stringify(setupMessage))
+      }
       
-      const response = await sendMessage('', true)
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          const msgType = Object.keys(data).filter(k => k !== 'usageMetadata')[0]
+          console.log('📥 [WS] Mesaj alındı:', msgType)
+          
+          // =====================================================
+          // SETUP COMPLETE - Dokümantasyona göre
+          // =====================================================
+          if (data.setupComplete) {
+            console.log('✅✅✅ [WS] SETUP COMPLETE! ✅✅✅')
+            setupCompleteRef.current = true
+            updateStatus('connected')
+            
+            // Kuyruktaki mesajları gönder
+            processQueue()
+            
+            // İlk mesajı tetikle
+            const firstMessage = {
+              clientContent: {
+                turns: [{
+                  role: 'user',
+                  parts: [{ 
+                    text: `[BAŞLA] Merhaba de ve ${studentName}'e selam ver.` 
+                  }]
+                }],
+                turnComplete: true
+              }
+            }
+            sendMessage(firstMessage)
+          }
+          
+          // =====================================================
+          // SERVER CONTENT - Model yanıtı
+          // =====================================================
+          if (data.serverContent) {
+            const content = data.serverContent
+            
+            // Model Turn
+            if (content.modelTurn?.parts) {
+              for (const part of content.modelTurn.parts) {
+                // Text
+                if (part.text) {
+                  console.log('📝 [WS] Text:', part.text.substring(0, 80))
+                  onTranscript?.(part.text, false)
+                  
+                  // Audio yoksa TTS kullan
+                  if (!content.modelTurn.parts.some((p: any) => p.inlineData)) {
+                    speakWithTTS(part.text)
+                  }
+                }
+                
+                // Audio
+                if (part.inlineData) {
+                  console.log('🔊 [WS] Audio alındı:', part.inlineData.mimeType)
+                  playAudio(part.inlineData.data, part.inlineData.mimeType)
+                }
+              }
+            }
+            
+            // =====================================================
+            // HATA TAKİBİ - interrupted, turnComplete
+            // =====================================================
+            if (content.interrupted) {
+              console.warn('⚠️ [WS] INTERRUPTED - Model kesintiye uğradı')
+            }
+            
+            if (content.turnComplete) {
+              console.log('✅ [WS] TURN COMPLETE - Model sırasını tamamladı')
+              if (!isPlayingRef.current) {
+                updateStatus('listening')
+              }
+            }
+            
+            if (content.generationComplete) {
+              console.log('✅ [WS] GENERATION COMPLETE')
+            }
+          }
+          
+          // Input/Output Transcription
+          if (data.inputTranscription) {
+            console.log('📝 [WS] Input transcript:', data.inputTranscription.text)
+            onTranscript?.(data.inputTranscription.text, true)
+          }
+          
+          if (data.outputTranscription) {
+            console.log('📝 [WS] Output transcript:', data.outputTranscription.text)
+          }
+          
+          // Tool calls
+          if (data.toolCall) {
+            console.log('🔧 [WS] Tool call:', data.toolCall)
+          }
+          
+          // GoAway - Sunucu bağlantıyı kapatacak
+          if (data.goAway) {
+            console.warn('⚠️ [WS] GO AWAY - Sunucu bağlantıyı kapatacak:', data.goAway.timeLeft)
+          }
+          
+          // Usage
+          if (data.usageMetadata) {
+            console.log('📊 [WS] Usage:', data.usageMetadata.totalTokenCount, 'tokens')
+          }
+          
+        } catch (parseErr) {
+          console.error('❌ [WS] Parse hatası:', parseErr)
+        }
+      }
       
-      if (response) {
-        console.log('✅ [HOOK PRO] AI yanıt verdi:', response.substring(0, 60))
-        clearConnectingTimeout()
+      ws.onerror = (event) => {
+        console.error('❌ [WS] WebSocket hatası:', event)
+        const err = new Error('WebSocket bağlantı hatası')
+        setError(err)
+        onError?.(err)
+        updateStatus('error')
+        
+        // Fallback
+        speakWithTTS(`Merhaba ${studentName}! Bağlantıda sorun var ama konuşabiliriz.`)
+      }
+      
+      ws.onclose = (event) => {
+        console.log(`🔌 [WS] Bağlantı kapandı: ${event.code} - ${event.reason}`)
+        setupCompleteRef.current = false
+        
+        if (event.code !== 1000) {  // Normal kapatma değilse
+          console.warn(`⚠️ [WS] Anormal kapanış kodu: ${event.code}`)
+        }
+        
+        updateStatus('idle')
       }
       
     } catch (err: any) {
-      console.error('❌ [HOOK PRO] Bağlantı hatası:', err.message)
-      clearConnectingTimeout()
+      console.error('❌ [LIVE] Bağlantı hatası:', err.message)
+      const error = new Error(err.message)
+      setError(error)
+      onError?.(error)
+      updateStatus('error')
       
-      // ASLA hata verme - fallback mesaj göster
-      if (isSessionActive.current) {
-        const fallbackMsg = 'Selam Şakir! Bugün Pro gücüyle yanındayım, hadi derse başlayalım!'
-        onTranscript?.(fallbackMsg, false)
-        speakWithBrowserTTS(fallbackMsg)
-      }
+      // Fallback
+      speakWithTTS(`Merhaba ${studentName}! Bugün harika bir ders işleyeceğiz!`)
     }
-  }, [sendMessage, startMicrophone, updateStatus, onTranscript, speakWithBrowserTTS, clearConnectingTimeout, status])
+  }, [apiKey, studentName, grade, personality, voice, updateStatus, onError, onTranscript, playAudio, speakWithTTS, processQueue, sendMessage])
   
-  // Bağlantıyı kes
+  // =====================================================
+  // DISCONNECT
+  // =====================================================
   const disconnect = useCallback(() => {
-    console.log('🔌 [HOOK] Bağlantı kapatılıyor...')
+    console.log('🔌 [LIVE] Bağlantı kapatılıyor...')
     
-    isSessionActive.current = false
-    reconnectAttempts.current = 0
-    clearConnectingTimeout()
+    setupCompleteRef.current = false
+    messageQueueRef.current = []
     
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = null
+    if (wsRef.current) {
+      wsRef.current.close(1000, 'User disconnect')
+      wsRef.current = null
+    }
     
-    stopMicrophone()
     window.speechSynthesis?.cancel()
     
     if (audioContextRef.current) {
@@ -585,52 +483,83 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       audioContextRef.current = null
     }
     
-    audioQueueRef.current = []
     isPlayingRef.current = false
-    
-    updateStatus('idle')
     setVolume(0)
     setError(null)
+    updateStatus('idle')
     
-    console.log('✅ [HOOK] Bağlantı kapatıldı')
-  }, [stopMicrophone, updateStatus, clearConnectingTimeout])
+    console.log('✅ [LIVE] Bağlantı kapatıldı')
+  }, [updateStatus])
   
-  // Metin gönder
-  const sendText = useCallback(async (text: string) => {
+  // =====================================================
+  // SEND TEXT - clientContent ile
+  // =====================================================
+  const sendText = useCallback((text: string) => {
     if (!text.trim()) return
-    console.log('💬 [HOOK] Kullanıcı mesajı:', text.substring(0, 50))
+    
+    console.log('💬 [LIVE] Kullanıcı mesajı:', text.substring(0, 50))
     onTranscript?.(text, true)
-    await sendMessage(text, false)
-  }, [sendMessage, onTranscript])
+    
+    const message = {
+      clientContent: {
+        turns: [{
+          role: 'user',
+          parts: [{ text }]
+        }],
+        turnComplete: true
+      }
+    }
+    
+    sendMessage(message)
+    updateStatus('processing')
+  }, [sendMessage, onTranscript, updateStatus])
   
   // =====================================================
-  // AUDIO GÖNDER - Int16Array -> Base64
+  // SEND AUDIO - realtimeInput.audio ile
   // =====================================================
-  const sendAudio = useCallback(async (audioData: string) => {
-    console.log('🎤 [HOOK] Audio gönderiliyor (base64):', audioData.length, 'bytes')
-    // TODO: WebSocket üzerinden ses gönderimi
-  }, [])
+  const sendAudio = useCallback((audioData: ArrayBuffer) => {
+    // ArrayBuffer -> Base64
+    const bytes = new Uint8Array(audioData)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    const base64 = btoa(binary)
+    
+    console.log('🎤 [LIVE] Audio gönderiliyor:', base64.length, 'bytes')
+    
+    // =====================================================
+    // REALTIME INPUT - Dokümantasyona göre
+    // =====================================================
+    const message = {
+      realtimeInput: {
+        audio: {
+          mimeType: 'audio/pcm;rate=16000',
+          data: base64
+        }
+      }
+    }
+    
+    sendMessage(message)
+  }, [sendMessage])
   
-  // Konuşmayı kes
+  // =====================================================
+  // INTERRUPT
+  // =====================================================
   const interrupt = useCallback(() => {
-    console.log('🛑 [HOOK] Konuşma kesiliyor...')
-    abortControllerRef.current?.abort()
+    console.log('🛑 [LIVE] Konuşma kesiliyor...')
     window.speechSynthesis?.cancel()
     isPlayingRef.current = false
-    audioQueueRef.current = []
     setVolume(0)
-    if (isSessionActive.current) {
-      updateStatus('listening')
-    }
+    updateStatus('listening')
   }, [updateStatus])
   
   // Cleanup
   useEffect(() => {
     return () => {
-      clearConnectingTimeout()
       disconnect()
     }
-  }, [disconnect, clearConnectingTimeout])
+  }, [disconnect])
   
   return {
     status,
