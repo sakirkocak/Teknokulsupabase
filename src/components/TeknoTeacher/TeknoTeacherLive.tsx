@@ -2,13 +2,13 @@
 
 /**
  * TeknoÖğretmen Live Mode
- * Gemini Live API ile gerçek zamanlı sesli sohbet
+ * Gemini 2.5 Flash Live API ile gerçek zamanlı sesli sohbet
  * 
  * Özellikler:
- * - Streaming audio
+ * - Native audio streaming (düşük gecikme)
  * - VAD (konuşma algılama)
  * - Interruption (kesme)
- * - Düşük gecikme
+ * - Bidirectional audio
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -24,10 +24,12 @@ import {
   Sparkles,
   Zap,
   Crown,
-  Radio
+  Radio,
+  Wifi,
+  WifiOff
 } from 'lucide-react'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
-import { useLiveChat, LiveStatus } from '@/hooks/useLiveChat'
+import { useGeminiLive, GeminiLiveStatus } from '@/hooks/useGeminiLive'
 
 interface TeknoTeacherLiveProps {
   studentName: string
@@ -45,20 +47,48 @@ export default function TeknoTeacherLive({
   const [messages, setMessages] = useState<{ text: string, isUser: boolean }[]>([])
   const [personality, setPersonality] = useState<'friendly' | 'strict' | 'motivating'>('friendly')
   const [voice, setVoice] = useState('Kore')
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [tokenLoading, setTokenLoading] = useState(false)
+  const [tokenError, setTokenError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  // Live chat hook
+  // API key al
+  const fetchApiKey = async () => {
+    setTokenLoading(true)
+    setTokenError(null)
+    
+    try {
+      const res = await fetch('/api/tekno-teacher/live/token')
+      const data = await res.json()
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Token alınamadı')
+      }
+      
+      setApiKey(data.apiKey)
+      onCreditsUpdate?.(data.credits)
+      return data.apiKey
+    } catch (err: any) {
+      setTokenError(err.message)
+      return null
+    } finally {
+      setTokenLoading(false)
+    }
+  }
+  
+  // Gemini Live hook
   const {
     status,
     isConnected,
     isListening,
     isSpeaking,
     volume,
-    connect,
+    connect: geminiConnect,
     disconnect,
     interrupt,
     error
-  } = useLiveChat({
+  } = useGeminiLive({
+    apiKey: apiKey || '',
     studentName,
     grade,
     personality,
@@ -67,12 +97,23 @@ export default function TeknoTeacherLive({
       setMessages(prev => [...prev, { text, isUser }])
     },
     onStatusChange: (newStatus) => {
-      console.log('Live status:', newStatus)
+      console.log('🔴 Gemini Live status:', newStatus)
     },
     onError: (err) => {
-      console.error('Live error:', err)
+      console.error('❌ Gemini Live error:', err)
     }
   })
+  
+  // Bağlan (önce token al)
+  const connect = async () => {
+    let key = apiKey
+    if (!key) {
+      key = await fetchApiKey()
+    }
+    if (key) {
+      geminiConnect()
+    }
+  }
   
   // Otomatik scroll
   useEffect(() => {
@@ -80,25 +121,25 @@ export default function TeknoTeacherLive({
   }, [messages])
   
   // Status renkleri
-  const statusColors: Record<LiveStatus, string> = {
+  const statusColors: Record<GeminiLiveStatus, string> = {
     idle: 'bg-gray-500',
     connecting: 'bg-yellow-500 animate-pulse',
+    connected: 'bg-blue-500',
     listening: 'bg-green-500 animate-pulse',
-    processing: 'bg-blue-500 animate-pulse',
     speaking: 'bg-purple-500',
-    interrupted: 'bg-orange-500',
-    error: 'bg-red-500'
+    error: 'bg-red-500',
+    disconnected: 'bg-gray-500'
   }
   
   // Status metinleri
-  const statusTexts: Record<LiveStatus, string> = {
+  const statusTexts: Record<GeminiLiveStatus, string> = {
     idle: 'Beklemede',
     connecting: 'Bağlanıyor...',
+    connected: '✓ Bağlandı',
     listening: '🎤 Seni dinliyorum...',
-    processing: '🤔 Düşünüyorum...',
     speaking: '🔊 Konuşuyorum...',
-    interrupted: '✋ Kesildi',
-    error: '❌ Hata'
+    error: '❌ Hata',
+    disconnected: 'Bağlantı kesildi'
   }
   
   return (
@@ -186,9 +227,9 @@ export default function TeknoTeacherLive({
             Gerçek zamanlı, düşük gecikmeli AI öğretmeninle konuş
           </p>
           
-          {error && (
+          {(error || tokenError) && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
-              {error.message}
+              {error?.message || tokenError}
             </div>
           )}
           
@@ -211,13 +252,13 @@ export default function TeknoTeacherLive({
           
           <button
             onClick={connect}
-            disabled={status === 'connecting'}
+            disabled={status === 'connecting' || tokenLoading}
             className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 flex items-center gap-3"
           >
-            {status === 'connecting' ? (
+            {(status === 'connecting' || tokenLoading) ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Bağlanıyor...
+                {tokenLoading ? 'Token alınıyor...' : 'Bağlanıyor...'}
               </>
             ) : (
               <>
@@ -226,6 +267,17 @@ export default function TeknoTeacherLive({
               </>
             )}
           </button>
+          
+          {/* Bağlantı bilgisi */}
+          <div className="mt-6 p-3 bg-gray-800/50 rounded-lg text-xs text-gray-400 text-left">
+            <p className="flex items-center gap-2 mb-1">
+              <Wifi className="w-3 h-3" />
+              <span>Gemini 2.5 Flash Live API</span>
+            </p>
+            <p>• Native audio streaming</p>
+            <p>• Düşük gecikme (&lt;500ms)</p>
+            <p>• Ses karakteri: {voice}</p>
+          </div>
           
           <p className="mt-4 text-xs text-gray-500">
             🎤 Mikrofon erişimi gerektirir
