@@ -58,6 +58,24 @@ export default function TeknoTeacherChat() {
   const [topicInput, setTopicInput] = useState('') // Konu input
   const [isExplaining, setIsExplaining] = useState(false) // Konu anlatılıyor mu
   const [explanationAudio, setExplanationAudio] = useState<HTMLAudioElement | null>(null)
+  const [isSummaryLoading, setIsSummaryLoading] = useState(false) // Günlük Özet yükleniyor
+  const [summaryStatus, setSummaryStatus] = useState('') // Günlük Özet status
+  
+  // 🔒 Mutex: Herhangi bir özellik aktifken diğerleri engellenir
+  const isAnyFeatureActive = isExplaining || isSummaryLoading || (explanationAudio !== null)
+  
+  // 🧹 Emoji temizleme (TTS için)
+  const cleanTextForTTS = (text: string): string => {
+    // Tüm emojileri ve özel karakterleri temizle
+    return text
+      .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')  // Surrogate pairs (emojiler)
+      .replace(/[\u2600-\u27BF]/g, '')  // Misc symbols & dingbats
+      .replace(/[\uFE00-\uFE0F]/g, '')  // Variation selectors
+      .replace(/[\u200D]/g, '')  // Zero width joiner
+      .replace(/[✨🚀💪📚🎯✅❌🔥⭐💡🎉👋🤔💬📝🎙🔊📊📈👂]/g, '') // Common emojis
+      .replace(/\s+/g, ' ')  // Fazla boşlukları temizle
+      .trim()
+  }
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pendingVoiceInput = useRef<string>('')
@@ -223,13 +241,17 @@ export default function TeknoTeacherChat() {
   const speakWithOpenAI = async (text: string) => {
     if (!text.trim()) return
     
+    // Emojileri temizle
+    const cleanText = cleanTextForTTS(text)
+    if (!cleanText) return
+    
     try {
       const ttsResponse = await fetch('/api/tekno-teacher/openai/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          text, 
-          voice: 'nova',  // Aynı ses her yerde
+          text: cleanText,  // Temizlenmiş metin
+          voice: 'nova',
           speed: 1.0
         })
       })
@@ -409,11 +431,14 @@ export default function TeknoTeacherChat() {
       
       // TTS ile seslendir
       try {
+        // Emojileri temizle
+        const cleanExplanation = cleanTextForTTS(explanation)
+        
         const ttsResponse = await fetch('/api/tekno-teacher/openai/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            text: explanation, 
+          body: JSON.stringify({
+            text: cleanExplanation,  // Temizlenmiş metin
             voice: 'nova',
             speed: 0.95  // Biraz yavaş, anlaşılır olsun
           })
@@ -510,12 +535,18 @@ export default function TeknoTeacherChat() {
     await sendMessageToAI(messageText, false)
   }
   
+  // =====================================================
+  // GÜNLÜK ÖZET - OpenAI + TTS ile sesli özet
+  // =====================================================
   const getDailySummary = async () => {
-    if (isLoading) return
-    
-    setIsLoading(true)
-    
+    if (isLoading || isAnyFeatureActive) return
+
+    setIsSummaryLoading(true)
+    setSummaryStatus('🤔 Özet hazırlanıyor...')
+
     try {
+      setSummaryStatus('📊 Veriler analiz ediliyor...')
+      
       const res = await fetch('/api/tekno-teacher/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -524,39 +555,46 @@ export default function TeknoTeacherChat() {
           personality: 'motivating'
         })
       })
-      
+
       const data = await res.json()
-      
+
       if (data.upgrade_required) {
         setShowUpgradeModal(true)
-        setIsLoading(false)
+        setIsSummaryLoading(false)
+        setSummaryStatus('')
         return
       }
-      
+
       if (data.success) {
+        setSummaryStatus('✅ Özet hazır!')
+        
         const summaryMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
           content: data.response,
           timestamp: new Date()
         }
-        
+
         setMessages(prev => [...prev, summaryMessage])
         setStudentName(data.student_name)
-        
+
         if (data.credits) {
           setCredits(prev => prev ? { ...prev, ...data.credits } : null)
         }
-        
-        // Otomatik sesli okuma
+
+        // OpenAI TTS ile sesli okuma
         if (autoSpeak && data.response) {
-          setTimeout(() => speak(data.response), 300)
+          setSummaryStatus('🎙️ Ses oluşturuluyor...')
+          await speakWithOpenAI(data.response)
+          setSummaryStatus('🔊 Okunuyor...')
         }
       }
     } catch (error: any) {
       console.error('Summary error:', error)
+      setSummaryStatus('')
     } finally {
-      setIsLoading(false)
+      setIsSummaryLoading(false)
+      setTimeout(() => setSummaryStatus(''), 1000)
     }
   }
   
@@ -695,15 +733,15 @@ export default function TeknoTeacherChat() {
         <div className="p-3 border-b border-gray-100 dark:border-gray-700 flex gap-2">
           <button
             onClick={getDailySummary}
-            disabled={isLoading}
-            className="flex-1 py-2 px-3 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors flex items-center justify-center gap-1"
+            disabled={isLoading || isAnyFeatureActive}
+            className="flex-1 py-2 px-3 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
             <TrendingUp className="w-3 h-3" />
-            Günlük Özet
+            {isSummaryLoading ? 'Yükleniyor...' : 'Günlük Özet'}
           </button>
           <button
             onClick={() => setShowTopicModal(true)}
-            disabled={isLoading || isExplaining}
+            disabled={isLoading || isAnyFeatureActive}
             className="flex-1 py-2 px-3 text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
             <BookOpen className="w-3 h-3" />
@@ -793,6 +831,20 @@ export default function TeknoTeacherChat() {
                   <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
                 )}
                 <span className="text-sm text-purple-700 dark:text-purple-300">{explanationStatus}</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Günlük Özet Status */}
+          {summaryStatus && (
+            <div className="flex justify-start">
+              <div className="bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-2xl rounded-bl-md flex items-center gap-2">
+                {summaryStatus.includes('Okunuyor') ? (
+                  <Volume2 className="w-4 h-4 text-indigo-600 animate-pulse" />
+                ) : (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                )}
+                <span className="text-sm text-indigo-700 dark:text-indigo-300">{summaryStatus}</span>
               </div>
             </div>
           )}
