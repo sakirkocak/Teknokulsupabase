@@ -2,357 +2,233 @@
  * TeknoÖğretmen Live Stream API
  * POST /api/tekno-teacher/live/stream
  * 
- * Server-side Gemini Live API bağlantısı
- * WebSocket proxy - CORS sorununu çözer
- * 
- * ✅ Heartbeat ile bağlantı canlı tutulur
- * ✅ Detaylı hata logging
- * ✅ Vercel optimized
+ * HİBRİT MOD:
+ * - Node.js runtime (stabil)
+ * - SSE streaming
+ * - Gemini Native Audio (server-side TTS)
+ * - İsim gömülü prompt
  */
 
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAndUseCredit } from '@/lib/tekno-teacher'
 
-// Vercel Edge Config
-export const runtime = 'edge'
+// Node.js runtime
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Vercel Pro: 60s, Hobby: 10s
+export const maxDuration = 60
 
-// Gemini Live API endpoint - Stable model
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent'
-
-// Heartbeat interval (15 saniye)
-const HEARTBEAT_INTERVAL = 15000
+// Gemini API - Audio destekli model
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
 
 interface LiveStreamRequest {
-  action: 'setup' | 'audio' | 'text' | 'interrupt' | 'ping'
+  action: 'setup' | 'text'
   studentName?: string
   grade?: number
   personality?: 'friendly' | 'strict' | 'motivating'
   voice?: string
-  audioData?: string // Base64 PCM audio
   textMessage?: string
-  sessionId?: string
 }
 
-// Ping interval (5 saniye - keep-alive)
-const PING_INTERVAL = 5000
+// Ses karakterleri
+const VOICES: Record<string, string> = {
+  'Kore': 'Kore',
+  'Charon': 'Charon', 
+  'Aoede': 'Aoede',
+  'Puck': 'Puck',
+  'Fenrir': 'Fenrir'
+}
 
-// System instruction builder - İsim gömülü, AI söze başlar
-function buildSystemInstruction(studentName: string, grade: number, personality: string): string {
-  const name = studentName || 'Öğrenci'
-  
-  const tones: Record<string, string> = {
-    friendly: 'samimi, sıcak ve arkadaş canlısı',
-    strict: 'disiplinli ama adil',
-    motivating: 'enerjik ve motive edici'
-  }
-  
-  return `Sen TeknoÖğretmen'sin - ${grade}. sınıf öğrencisi ${name}'in özel ders öğretmeni.
+// System instruction - İSİM GÖMÜLÜ
+function buildSystemInstruction(studentName: string, grade: number): string {
+  return `Sen TeknoÖğretmen'sin.
 
-⚠️ ÖNEMLİ: Öğrencinin adı "${name}". HER yanıtına "${name}" diye hitap ederek başla!
-
-🎭 KİŞİLİĞİN: ${tones[personality] || tones.friendly}
+🎯 ÖĞRENCİN: ${studentName} (${grade}. sınıf)
 
 📋 KURALLARIN:
-1. Kısa konuş (2-3 cümle max)
-2. Her yanıtta soru sor (Sokratik metod)
-3. Türkçe ve samimi ol
-4. Doğrudan cevap verme, ipucu ver
+1. HER yanıta "${studentName}" diye başla
+2. Kısa konuş (max 2 cümle)
+3. Soru sor
+4. Türkçe konuş
 
-💬 ÖRNEK YANITLAR:
-- "${name}, merhaba! Bugün hangi konuda çalışalım?"
-- "${name}, harika soru! Şimdi düşün: 8 dilimlik pizzadan 3 dilim yesen, kaçta kaçını yemiş olursun?"
-- "${name}, çok yaklaştın! Bir ipucu: Payda değişmedi."`
+💬 İLK MESAJIN: "Selam ${studentName}! Ben senin özel öğretmeninim. Bugün ne çalışalım?"`
 }
 
 export async function POST(request: NextRequest) {
-  const encoder = new TextEncoder()
+  console.log('🟢 [LIVE] Yeni istek')
   
   try {
-    // Auth kontrolü
+    // Auth
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Giriş yapmanız gerekiyor' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      )
+      return NextResponse.json({ error: 'Giriş yapmanız gerekiyor' }, { status: 401 })
     }
     
-    // Kredi kontrolü
+    // Kredi
     const creditStatus = await checkAndUseCredit(user.id)
     if (!creditStatus.allowed) {
-      return new Response(
-        JSON.stringify({ error: 'Günlük krediniz bitti', upgrade_required: true }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } }
-      )
+      return NextResponse.json({ error: 'Günlük krediniz bitti' }, { status: 429 })
     }
     
     const body: LiveStreamRequest = await request.json()
-    const { action, studentName, grade, personality, voice, audioData, textMessage } = body
+    const { action, studentName = 'Öğrenci', grade = 8, personality, voice = 'Kore', textMessage } = body
     
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'API key yapılandırılmamış' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      )
+      return NextResponse.json({ error: 'API key yok' }, { status: 500 })
     }
     
-    // Log request details
-    console.log(`🟢 [LIVE] Yeni istek: action=${action}, ${studentName}, ${grade}. sınıf, ses: ${voice}`)
-    console.log(`📝 [LIVE] Mesaj: ${textMessage || '(setup/audio)'}`)
+    console.log(`📝 [LIVE] ${action} - ${studentName} - ses: ${voice}`)
     
-    // Streaming response oluştur
-    const stream = new ReadableStream({
-      async start(controller) {
-        let pingTimer: ReturnType<typeof setInterval> | null = null
-        let isStreamClosed = false
-        
-        // Güvenli gönderme
-        const safeSend = (data: string) => {
-          if (!isStreamClosed) {
-            try {
-              controller.enqueue(encoder.encode(data))
-              return true
-            } catch (e) {
-              console.error('❌ [LIVE] Gönderim hatası:', e)
-              return false
-            }
-          }
-          return false
-        }
-        
-        // Keep-alive ping başlat
-        pingTimer = setInterval(() => {
-          const sent = safeSend(`data: ${JSON.stringify({ type: 'ping', ts: Date.now() })}\n\n`)
-          if (!sent) {
-            console.log('⚠️ [LIVE] Ping gönderilemedi, timer durduruluyor')
-            if (pingTimer) clearInterval(pingTimer)
-          }
-        }, PING_INTERVAL)
-        
-        try {
-          // İlk bağlantı onayı
-          safeSend(`data: ${JSON.stringify({ type: 'connected', studentName, action })}\n\n`)
-          
-          // Setup action - AI'dan hoşgeldin mesajı al
-          const isSetup = action === 'setup' || (!textMessage && !audioData)
-          
-          // Gemini API request body
-          const userMessage = isSetup 
-            ? `[SİSTEM: Öğrenci ${studentName} şu an karşında oturuyor ve seni bekliyor. SEN SÖZE BAŞLA! İlk mesajı ondan bekleme. "${studentName}, merhaba!" diyerek kendini tanıt ve bugün ne çalışmak istediğini sor. Max 2 cümle.]`
-            : (textMessage || 'Devam et')
-          
-          const requestBody = {
-            contents: [{
-              role: 'user',
-              parts: audioData 
-                ? [{ inlineData: { mimeType: 'audio/pcm;rate=16000', data: audioData } }]
-                : [{ text: userMessage }]
-            }],
-            systemInstruction: {
-              parts: [{ text: buildSystemInstruction(studentName || 'Öğrenci', grade || 8, personality || 'friendly') }]
-            },
-            generationConfig: {
-              temperature: 0.9,
-              topP: 0.95,
-              maxOutputTokens: 512,
-              candidateCount: 1
-            }
-          }
-          
-          console.log('📤 [LIVE] Gemini API isteği gönderiliyor...', { isSetup, userMessage: userMessage.substring(0, 50) })
-          
-          // Gemini API'ye istek gönder
-          const geminiResponse = await fetch(`${GEMINI_API_URL}?key=${apiKey}&alt=sse`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody)
-          })
-          
-          if (!geminiResponse.ok) {
-            const errorText = await geminiResponse.text()
-            
-            // Raw hata mesajını parse etmeye çalış
-            let errorDetail = errorText
-            try {
-              const errorJson = JSON.parse(errorText)
-              errorDetail = errorJson.error?.message || errorJson.message || errorText
-            } catch (e) {
-              // JSON değilse raw text kullan
-            }
-            
-            console.error('❌ [LIVE] Gemini API HATA:', {
-              status: geminiResponse.status,
-              statusText: geminiResponse.statusText,
-              rawError: errorText.substring(0, 1000),
-              parsedError: errorDetail.substring(0, 200)
-            })
-            
-            safeSend(`data: ${JSON.stringify({ 
-              type: 'error', 
-              code: geminiResponse.status,
-              statusText: geminiResponse.statusText,
-              rawError: errorDetail.substring(0, 300),
-              message: `Gemini API: ${geminiResponse.status} - ${errorDetail.substring(0, 150)}`
-            })}\n\n`)
-            
-            if (pingTimer) clearInterval(pingTimer)
-            isStreamClosed = true
-            controller.close()
-            return
-          }
-          
-          console.log('✅ [LIVE] Gemini bağlantısı başarılı, streaming başlıyor...')
-          
-          // Streaming response'u işle
-          const reader = geminiResponse.body?.getReader()
-          if (!reader) {
-            console.error('❌ [LIVE] Stream reader oluşturulamadı')
-            safeSend(`data: ${JSON.stringify({ type: 'error', message: 'Stream okunamadı' })}\n\n`)
-            if (pingTimer) clearInterval(pingTimer)
-            isStreamClosed = true
-            controller.close()
-            return
-          }
-          
-          const decoder = new TextDecoder()
-          let buffer = ''
-          let chunkCount = 0
-          
-          while (true) {
-            const { done, value } = await reader.read()
-            
-            if (done) {
-              console.log(`✅ [LIVE] Stream tamamlandı. Toplam ${chunkCount} chunk alındı.`)
-              break
-            }
-            
-            buffer += decoder.decode(value, { stream: true })
-            
-            // SSE formatını parse et
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-            
-            for (const line of lines) {
-              // SSE data satırını al
-              if (line.startsWith('data: ')) {
-                const jsonStr = line.slice(6).trim()
-                if (jsonStr && jsonStr !== '[DONE]') {
-                  try {
-                    const data = JSON.parse(jsonStr)
-                    chunkCount++
-                    
-                    // Candidates'tan içeriği çıkar
-                    if (data.candidates?.[0]?.content?.parts) {
-                      for (const part of data.candidates[0].content.parts) {
-                        if (part.text) {
-                          console.log(`📝 [LIVE] Chunk ${chunkCount}: "${part.text.substring(0, 50)}..."`)
-                          safeSend(`data: ${JSON.stringify({ 
-                            type: 'text', 
-                            content: part.text,
-                            chunk: chunkCount
-                          })}\n\n`)
-                        }
-                        
-                        if (part.inlineData?.mimeType?.startsWith('audio/')) {
-                          console.log(`🔊 [LIVE] Audio chunk ${chunkCount}`)
-                          safeSend(`data: ${JSON.stringify({ 
-                            type: 'audio', 
-                            mimeType: part.inlineData.mimeType,
-                            data: part.inlineData.data 
-                          })}\n\n`)
-                        }
-                      }
-                    }
-                    
-                    // Hata kontrolü
-                    if (data.error) {
-                      console.error('❌ [LIVE] Gemini error in response:', data.error)
-                      safeSend(`data: ${JSON.stringify({ 
-                        type: 'error', 
-                        code: data.error.code,
-                        message: data.error.message
-                      })}\n\n`)
-                    }
-                    
-                  } catch (e) {
-                    // JSON parse hatası - devam et
-                    console.warn('⚠️ [LIVE] JSON parse hatası:', jsonStr.substring(0, 100))
-                  }
-                }
-              } else if (line.trim()) {
-                // SSE olmayan satır
-                try {
-                  const data = JSON.parse(line.trim())
-                  if (data.candidates?.[0]?.content?.parts) {
-                    for (const part of data.candidates[0].content.parts) {
-                      if (part.text) {
-                        safeSend(`data: ${JSON.stringify({ type: 'text', content: part.text })}\n\n`)
-                      }
-                    }
-                  }
-                } catch (e) {
-                  // Ignore
-                }
+    // Setup: AI hemen selam verecek
+    const isSetup = action === 'setup'
+    const prompt = isSetup 
+      ? `[SİSTEM KOMUTU: Öğrencin ${studentName} şu an karşında. HEMEN "Selam ${studentName}!" diyerek başla ve kendini tanıt. Türkçe konuş. Max 2 cümle.]`
+      : textMessage || 'Devam et'
+    
+    console.log(`💬 [LIVE] Prompt: ${prompt.substring(0, 80)}...`)
+    
+    // Gemini API - Audio response
+    const geminiResponse = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ 
+          role: 'user', 
+          parts: [{ text: prompt }] 
+        }],
+        systemInstruction: { 
+          parts: [{ text: buildSystemInstruction(studentName, grade) }] 
+        },
+        generationConfig: {
+          temperature: 0.9,
+          maxOutputTokens: 300,
+          responseModalities: ['AUDIO', 'TEXT'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: VOICES[voice] || 'Kore'
               }
             }
           }
-          
-          // Stream tamamlandı
-          safeSend(`data: ${JSON.stringify({ type: 'done', totalChunks: chunkCount })}\n\n`)
-          
-        } catch (error: any) {
-          console.error('❌ [LIVE] Stream HATA:', {
-            name: error.name,
-            message: error.message,
-            cause: error.cause,
-            stack: error.stack?.substring(0, 500)
-          })
-          
-          safeSend(`data: ${JSON.stringify({ 
-            type: 'error', 
-            message: error.message,
-            name: error.name,
-            cause: String(error.cause || '')
-          })}\n\n`)
-        } finally {
-          if (pingTimer) {
-            clearInterval(pingTimer)
-            console.log('🛑 [LIVE] Ping timer durduruldu')
-          }
-          isStreamClosed = true
-          
-          // Son done sinyali
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'stream_end' })}\n\n`))
-          } catch (e) {}
-          
-          controller.close()
-          console.log('🔌 [LIVE] Stream kapatıldı')
         }
+      })
+    })
+    
+    if (!geminiResponse.ok) {
+      const errorText = await geminiResponse.text()
+      console.error('❌ [LIVE] Gemini hatası:', geminiResponse.status, errorText.substring(0, 300))
+      
+      // Audio desteklenmiyorsa sadece text dene
+      console.log('🔄 [LIVE] Text-only moduna geçiliyor...')
+      
+      const textResponse = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: buildSystemInstruction(studentName, grade) }] },
+          generationConfig: { temperature: 0.9, maxOutputTokens: 300 }
+        })
+      })
+      
+      if (!textResponse.ok) {
+        return NextResponse.json({ error: 'Gemini API hatası' }, { status: 502 })
+      }
+      
+      const textData = await textResponse.json()
+      const text = textData.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      
+      console.log(`📝 [LIVE] Text yanıt: ${text.substring(0, 50)}...`)
+      
+      // Text-only SSE response
+      const encoder = new TextEncoder()
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', studentName })}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`))
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'done', hasAudio: false })}\n\n`))
+          controller.close()
+        }
+      })
+      
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        }
+      })
+    }
+    
+    // Audio + Text response
+    const data = await geminiResponse.json()
+    console.log('✅ [LIVE] Gemini yanıtı alındı')
+    
+    // Parse response
+    let textContent = ''
+    let audioData = ''
+    let audioMimeType = ''
+    
+    const parts = data.candidates?.[0]?.content?.parts || []
+    for (const part of parts) {
+      if (part.text) {
+        textContent += part.text
+      }
+      if (part.inlineData?.mimeType?.startsWith('audio/')) {
+        audioData = part.inlineData.data
+        audioMimeType = part.inlineData.mimeType
+      }
+    }
+    
+    console.log(`📝 [LIVE] Text: ${textContent.substring(0, 50)}...`)
+    console.log(`🔊 [LIVE] Audio: ${audioData ? `${audioData.length} bytes, ${audioMimeType}` : 'yok'}`)
+    
+    // SSE Stream
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      start(controller) {
+        // Bağlantı onayı
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', studentName })}\n\n`))
+        
+        // Text
+        if (textContent) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'text', content: textContent })}\n\n`))
+        }
+        
+        // Audio
+        if (audioData) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+            type: 'audio', 
+            mimeType: audioMimeType,
+            data: audioData 
+          })}\n\n`))
+        }
+        
+        // Done
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+          type: 'done', 
+          hasAudio: !!audioData,
+          textLength: textContent.length 
+        })}\n\n`))
+        
+        controller.close()
       }
     })
     
     return new Response(stream, {
       headers: {
         'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
-      },
+        'X-Accel-Buffering': 'no'
+      }
     })
     
   } catch (error: any) {
-    console.error('Live stream error:', error)
-    return new Response(
-      JSON.stringify({ error: error.message || 'Stream hatası' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
+    console.error('❌ [LIVE] Hata:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

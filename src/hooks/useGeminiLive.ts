@@ -95,8 +95,10 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     return audioContextRef.current
   }, [])
   
-  // Audio chunk'ı çal
-  const playAudioChunk = useCallback(async (base64Audio: string, mimeType: string) => {
+  // Gemini audio'yu AudioContext ile çal
+  const playGeminiAudio = useCallback(async (base64Audio: string, mimeType: string) => {
+    console.log('🔊 [AUDIO] Çalınıyor...', mimeType)
+    
     try {
       const ctx = await initAudioContext()
       
@@ -107,8 +109,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         bytes[i] = binaryString.charCodeAt(i)
       }
       
-      // Sample rate'i mime type'dan al
-      const sampleRate = mimeType.includes('24000') ? 24000 : 16000
+      // Mime type'dan sample rate al (varsayılan 24000)
+      const sampleRate = mimeType.includes('16000') ? 16000 : 24000
       
       // PCM 16-bit -> Float32
       const pcmData = new Int16Array(bytes.buffer)
@@ -126,34 +128,79 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       source.buffer = audioBuffer
       source.connect(ctx.destination)
       
-      source.onended = () => {
-        isPlayingRef.current = false
-        setVolume(0)
-        // Queue'da başka ses varsa çal
-        if (audioQueueRef.current.length > 0) {
-          const next = audioQueueRef.current.shift()
-          if (next) playAudioChunk(next, mimeType)
-        } else {
-          updateStatus('listening')
-        }
-      }
-      
       isPlayingRef.current = true
-      source.start()
+      updateStatus('speaking')
       
-      // Volume simülasyonu
+      // Volume simülasyonu (lip-sync)
       const volumeInterval = setInterval(() => {
         if (isPlayingRef.current) {
           setVolume(0.3 + Math.random() * 0.5)
         } else {
           clearInterval(volumeInterval)
+          setVolume(0)
         }
       }, 100)
       
+      source.onended = () => {
+        isPlayingRef.current = false
+        setVolume(0)
+        clearInterval(volumeInterval)
+        console.log('🔇 [AUDIO] Bitti')
+        
+        if (isSessionActive.current) {
+          updateStatus('listening')
+        }
+      }
+      
+      source.start()
+      console.log(`✅ [AUDIO] Çalıyor: ${floatData.length} samples @ ${sampleRate}Hz`)
+      
     } catch (err) {
-      console.error('Audio playback error:', err)
+      console.error('❌ [AUDIO] Hata:', err)
+      // Audio çalamazsa listening'e geç
+      if (isSessionActive.current) {
+        updateStatus('listening')
+      }
     }
   }, [initAudioContext, updateStatus])
+  
+  // Fallback: Browser TTS
+  const speakWithBrowserTTS = useCallback((text: string) => {
+    if (!text.trim() || typeof window === 'undefined') return
+    
+    console.log('🗣️ [TTS] Browser TTS kullanılıyor...')
+    window.speechSynthesis?.cancel()
+    
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'tr-TR'
+    utterance.rate = 1.0
+    
+    const voices = window.speechSynthesis?.getVoices() || []
+    const turkishVoice = voices.find(v => v.lang.startsWith('tr'))
+    if (turkishVoice) utterance.voice = turkishVoice
+    
+    utterance.onstart = () => {
+      isPlayingRef.current = true
+      updateStatus('speaking')
+    }
+    
+    utterance.onend = () => {
+      isPlayingRef.current = false
+      setVolume(0)
+      if (isSessionActive.current) updateStatus('listening')
+    }
+    
+    // Volume simülasyonu
+    const interval = setInterval(() => {
+      if (isPlayingRef.current) {
+        setVolume(0.3 + Math.random() * 0.5)
+      } else {
+        clearInterval(interval)
+      }
+    }, 100)
+    
+    window.speechSynthesis?.speak(utterance)
+  }, [updateStatus])
   
   
   // Mikrofonu başlat (STT için)
@@ -287,8 +334,9 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       let buffer = ''
       let fullText = ''
       let gotResponse = false
+      let hasAudio = false
       
-      updateStatus('speaking')
+      updateStatus('processing')
       
       while (true) {
         const { done, value } = await reader.read()
@@ -327,15 +375,19 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
                 onTranscript?.(data.content, false)
               }
               
-              // Audio yanıtı
-              if (data.type === 'audio') {
-                gotResponse = true
-                console.log('🔊 [HOOK] Audio chunk alındı')
-                onAudioReceived?.(data.data, data.mimeType)
-                if (!isPlayingRef.current) {
-                  playAudioChunk(data.data, data.mimeType)
-                } else {
-                  audioQueueRef.current.push(data.data)
+              // Audio yanıtı - Gemini'den gelen ses
+              if (data.type === 'audio' && data.data) {
+                console.log('🔊 [HOOK] Audio alındı:', data.mimeType)
+                hasAudio = true
+                await playGeminiAudio(data.data, data.mimeType)
+              }
+              
+              // Tamamlandı - audio yoksa browser TTS
+              if (data.type === 'done') {
+                console.log('✅ [HOOK] Stream bitti, hasAudio:', data.hasAudio)
+                if (!data.hasAudio && fullText && !hasAudio) {
+                  console.log('🗣️ [HOOK] Audio yok, browser TTS kullanılıyor')
+                  speakWithBrowserTTS(fullText)
                 }
               }
               
@@ -384,7 +436,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       console.error('❌ [HOOK] Request hatası:', err.message)
       throw err
     }
-  }, [studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onAudioReceived])
+  }, [studentName, grade, personality, voice, updateStatus, playGeminiAudio, speakWithBrowserTTS, onTranscript])
   
   // Bağlantıyı başlat
   const connect = useCallback(async () => {
