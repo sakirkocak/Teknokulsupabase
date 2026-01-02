@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { typesenseClient, COLLECTIONS } from '@/lib/typesense/client'
+import { typesenseClient, COLLECTIONS, isTypesenseAvailable } from '@/lib/typesense/client'
+
+/**
+ * Student Dashboard API
+ * 
+ * ✅ 404 Collection not found hatası graceful handle edilir
+ * ✅ Typesense yoksa boş veri döner
+ * ✅ Her sorgu ayrı try-catch içinde
+ */
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,51 +33,64 @@ export async function GET(req: NextRequest) {
     const studentId = studentProfile.id
     const grade = studentProfile.grade || 8
 
-    // Paralel olarak tüm Typesense sorgularını çalıştır
+    // Typesense kullanılabilir mi kontrol et
+    const typesenseReady = isTypesenseAvailable()
+    console.log(`📊 [Dashboard] Typesense: ${typesenseReady ? 'aktif' : 'pasif'}`)
+
+    // Paralel olarak tüm sorguları çalıştır - HER BİRİ AYRI TRY-CATCH
     const [
       topicProgressResult,
       leaderboardResult,
       recommendedQuestionsResult,
       studentStatsResult
     ] = await Promise.allSettled([
-      // 1. Konu İlerlemeleri (Topic Mastery)
-      typesenseClient.collections(COLLECTIONS.STUDENT_TOPIC_PROGRESS).documents().search({
-        q: '*',
-        query_by: 'subject_name',
-        filter_by: `student_id:=${studentId}`,
-        sort_by: 'last_practiced_at:desc',
-        per_page: 100,
-        facet_by: 'subject_code,mastery_level'
-      }),
+      // 1. Konu İlerlemeleri
+      safeTypesenseQuery(() => 
+        typesenseClient.collections(COLLECTIONS.STUDENT_TOPIC_PROGRESS).documents().search({
+          q: '*',
+          query_by: 'subject_name',
+          filter_by: `student_id:=${studentId}`,
+          sort_by: 'last_practiced_at:desc',
+          per_page: 100,
+          facet_by: 'subject_code,mastery_level'
+        }),
+        'STUDENT_TOPIC_PROGRESS'
+      ),
 
       // 2. Liderlik Tablosu
-      typesenseClient.collections(COLLECTIONS.LEADERBOARD).documents().search({
-        q: '*',
-        query_by: 'full_name',
-        filter_by: `grade:=${grade}`,
-        sort_by: 'total_points:desc',
-        per_page: 100
-      }),
+      safeTypesenseQuery(() =>
+        typesenseClient.collections(COLLECTIONS.LEADERBOARD).documents().search({
+          q: '*',
+          query_by: 'full_name',
+          filter_by: `grade:=${grade}`,
+          sort_by: 'total_points:desc',
+          per_page: 100
+        }),
+        'LEADERBOARD'
+      ),
 
-      // 3. Önerilen Sorular (zayıf konulardan)
+      // 3. Önerilen Sorular
       getRecommendedQuestions(studentId),
 
       // 4. Öğrenci İstatistikleri
-      typesenseClient.collections(COLLECTIONS.STUDENT_STATS).documents().search({
-        q: '*',
-        query_by: 'student_name',
-        filter_by: `student_id:=${studentId}`,
-        per_page: 1
-      })
+      safeTypesenseQuery(() =>
+        typesenseClient.collections(COLLECTIONS.STUDENT_STATS).documents().search({
+          q: '*',
+          query_by: 'student_name',
+          filter_by: `student_id:=${studentId}`,
+          per_page: 1
+        }),
+        'STUDENT_STATS'
+      )
     ])
 
-    // Sonuçları işle
+    // Sonuçları işle - hata varsa boş dizi kullan
     const topicProgress = topicProgressResult.status === 'fulfilled' 
-      ? topicProgressResult.value.hits?.map(h => h.document) || []
+      ? topicProgressResult.value?.hits?.map(h => h.document) || []
       : []
 
     const leaderboardData = leaderboardResult.status === 'fulfilled'
-      ? leaderboardResult.value.hits?.map(h => h.document as any) || []
+      ? leaderboardResult.value?.hits?.map(h => h.document as any) || []
       : []
 
     const recommendedQuestions = recommendedQuestionsResult.status === 'fulfilled'
@@ -77,12 +98,12 @@ export async function GET(req: NextRequest) {
       : []
 
     const studentStats = studentStatsResult.status === 'fulfilled'
-      ? studentStatsResult.value.hits?.[0]?.document as any || null
+      ? studentStatsResult.value?.hits?.[0]?.document as any || null
       : null
 
-    // Facet verilerini işle (konu mastery özeti)
+    // Facet verilerini işle
     const facetCounts = topicProgressResult.status === 'fulfilled'
-      ? topicProgressResult.value.facet_counts || []
+      ? topicProgressResult.value?.facet_counts || []
       : []
 
     // Öğrencinin sıralamasını bul
@@ -95,19 +116,19 @@ export async function GET(req: NextRequest) {
       ? leaderboardData.slice(Math.max(0, myRankIndex - 2), myRankIndex + 3)
       : []
 
-    // Zayıf konuları bul (success_rate < 50)
+    // Zayıf konuları bul
     const weakTopics = topicProgress
       .filter((tp: any) => tp.success_rate < 50)
       .sort((a: any, b: any) => a.success_rate - b.success_rate)
       .slice(0, 5)
 
-    // Güçlü konuları bul (success_rate >= 70)
+    // Güçlü konuları bul
     const strongTopics = topicProgress
       .filter((tp: any) => tp.success_rate >= 70)
       .sort((a: any, b: any) => b.success_rate - a.success_rate)
       .slice(0, 5)
 
-    // Tekrar zamanı gelmiş konuları bul
+    // Tekrar zamanı gelmiş konular
     const now = Date.now()
     const reviewDueTopics = topicProgress
       .filter((tp: any) => tp.next_review_at && tp.next_review_at < now)
@@ -120,7 +141,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        // Konu İlerlemeleri
         topicProgress: {
           all: topicProgress.slice(0, 20),
           weak: weakTopics,
@@ -128,19 +148,13 @@ export async function GET(req: NextRequest) {
           reviewDue: reviewDueTopics,
           subjectMastery
         },
-        
-        // Liderlik
         leaderboard: {
           myRank,
           totalStudents,
           nearbyRivals,
           myPoints: leaderboardData[myRankIndex]?.total_points || 0
         },
-        
-        // Önerilen Sorular
         recommendedQuestions,
-        
-        // Genel İstatistikler
         stats: studentStats ? {
           totalQuestions: studentStats.total_questions || 0,
           totalCorrect: studentStats.total_correct || 0,
@@ -153,7 +167,7 @@ export async function GET(req: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Student dashboard API error:', error)
+    console.error('❌ [Dashboard] Genel hata:', error)
     return NextResponse.json(
       { error: 'Failed to fetch dashboard data', details: (error as Error).message },
       { status: 500 }
@@ -161,78 +175,101 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Zayıf konulardan soru önerileri getir (çözülmüş soruları hariç tut)
-async function getRecommendedQuestions(studentId: string) {
+/**
+ * Güvenli Typesense sorgusu - 404 ve diğer hataları yakalar
+ */
+async function safeTypesenseQuery<T>(
+  queryFn: () => Promise<T>,
+  collectionName: string
+): Promise<T | null> {
+  try {
+    return await queryFn()
+  } catch (error: any) {
+    // 404 - Collection not found
+    if (error?.httpStatus === 404 || error?.message?.includes('not found')) {
+      console.warn(`⚠️ [Dashboard] Koleksiyon bulunamadı: ${collectionName}, varsayılan liste dönülüyor`)
+      return null
+    }
+    
+    // Diğer hatalar
+    console.error(`❌ [Dashboard] Typesense sorgu hatası (${collectionName}):`, error?.message || error)
+    return null
+  }
+}
+
+/**
+ * Önerilen soruları getir - 404 hatası graceful handle edilir
+ */
+async function getRecommendedQuestions(studentId: string): Promise<any[]> {
   try {
     const supabase = await createClient()
     
-    // 1. Kullanıcının daha önce çözdüğü soruları al
+    // 1. Çözülmüş soruları al
     const { data: answeredQuestions } = await supabase
       .from('user_answers')
       .select('question_id')
       .eq('user_id', studentId)
-      .limit(500) // Son 500 cevabı kontrol et
+      .limit(500)
     
     const answeredIds = answeredQuestions?.map(a => a.question_id) || []
-    
-    // 2. Öğrencinin zayıf konularını bul
-    const progressResult = await typesenseClient.collections(COLLECTIONS.STUDENT_TOPIC_PROGRESS).documents().search({
-      q: '*',
-      query_by: 'subject_name',
-      filter_by: `student_id:=${studentId} && success_rate:<50`,
-      sort_by: 'success_rate:asc',
-      per_page: 5
-    })
+    const answeredIdSet = new Set(answeredIds)
 
-    const weakTopicIds = progressResult.hits?.map(h => (h.document as any).topic_id) || []
-
-    // 3. Filter oluştur - çözülmüş soruları hariç tut
-    let filterBy = ''
-    if (answeredIds.length > 0) {
-      // Typesense'de NOT IN yerine tüm soruları alıp JS'te filtreliyoruz
-      // Çünkü Typesense id:[...]:! syntax'ını tam desteklemiyor
+    // 2. Zayıf konuları bul
+    let weakTopicIds: string[] = []
+    try {
+      const progressResult = await typesenseClient.collections(COLLECTIONS.STUDENT_TOPIC_PROGRESS).documents().search({
+        q: '*',
+        query_by: 'subject_name',
+        filter_by: `student_id:=${studentId} && success_rate:<50`,
+        sort_by: 'success_rate:asc',
+        per_page: 5
+      })
+      weakTopicIds = progressResult.hits?.map(h => (h.document as any).topic_id) || []
+    } catch (error: any) {
+      if (error?.httpStatus === 404) {
+        console.warn('⚠️ [Dashboard] student_topic_progress koleksiyonu bulunamadı')
+      } else {
+        console.error('❌ [Dashboard] Zayıf konu sorgusu hatası:', error?.message)
+      }
     }
 
-    if (weakTopicIds.length === 0) {
-      // Zayıf konu yoksa popüler sorular getir
-      const randomResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
+    // 3. Soruları getir
+    let allQuestions: any[] = []
+    try {
+      const filterBy = weakTopicIds.length > 0 
+        ? `topic_id:[${weakTopicIds.join(',')}]`
+        : undefined
+
+      const questionsResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
         q: '*',
         query_by: 'question_text',
+        filter_by: filterBy,
         sort_by: 'created_at:desc',
-        per_page: 100 // Daha fazla çek, sonra filtrele
+        per_page: 100
       })
-      
-      // Çözülmüş soruları JS'te filtrele
-      const allQuestions = randomResult.hits?.map(h => h.document as any) || []
-      const answeredIdSet = new Set(answeredIds)
-      const filteredQuestions = allQuestions.filter(q => !answeredIdSet.has(q.question_id))
-      
-      return filteredQuestions.slice(0, 20)
+      allQuestions = questionsResult.hits?.map(h => h.document as any) || []
+    } catch (error: any) {
+      if (error?.httpStatus === 404) {
+        console.warn('⚠️ [Dashboard] questions koleksiyonu bulunamadı, varsayılan liste dönülüyor')
+      } else {
+        console.error('❌ [Dashboard] Soru sorgusu hatası:', error?.message)
+      }
+      return [] // Boş dizi dön
     }
 
-    // Zayıf konulardan sorular getir (daha fazla çek, sonra filtrele)
-    const questionsResult = await typesenseClient.collections(COLLECTIONS.QUESTIONS).documents().search({
-      q: '*',
-      query_by: 'question_text',
-      filter_by: `topic_id:[${weakTopicIds.join(',')}]`,
-      sort_by: 'created_at:desc',
-      per_page: 100 // Daha fazla çek
-    })
-
-    // Çözülmüş soruları JS'te filtrele
-    const allQuestions = questionsResult.hits?.map(h => h.document as any) || []
-    const answeredIdSet = new Set(answeredIds)
+    // Çözülmüş soruları filtrele
     const filteredQuestions = allQuestions.filter(q => !answeredIdSet.has(q.question_id))
-
     return filteredQuestions.slice(0, 20)
 
   } catch (error) {
-    console.error('Error fetching recommended questions:', error)
-    return []
+    console.error('❌ [Dashboard] getRecommendedQuestions hatası:', error)
+    return [] // Hata durumunda boş dizi
   }
 }
 
-// Ders bazlı mastery hesapla
+/**
+ * Ders bazlı mastery hesapla
+ */
 function calculateSubjectMastery(topicProgress: any[], facetCounts: any[]) {
   const subjectMap: { [key: string]: { total: number, mastered: number, name: string } } = {}
 
@@ -258,4 +295,3 @@ function calculateSubjectMastery(topicProgress: any[], facetCounts: any[]) {
     percentage: data.total > 0 ? Math.round((data.mastered / data.total) * 100) : 0
   })).sort((a, b) => b.percentage - a.percentage)
 }
-
