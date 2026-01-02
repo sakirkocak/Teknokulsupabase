@@ -127,9 +127,26 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
+      <head>
+        {/* Ezoic CMP (Consent Management Platform) - GDPR/KVKK uyumluluğu */}
+        <script data-cfasync="false" src="https://cmp.gatekeeperconsent.com/min.js" />
+        <script data-cfasync="false" src="https://the.gatekeeperconsent.com/cmp.min.js" />
+      </head>
       <body className="font-sans">
         {/* JSON-LD Structured Data */}
         <JsonLdSchema />
+        
+        {/* Ezoic Reklam Ağı */}
+        <Script
+          src="//www.ezojs.com/ezoic/sa.min.js"
+          strategy="afterInteractive"
+        />
+        <Script id="ezoic-init" strategy="afterInteractive">
+          {`
+            window.ezstandalone = window.ezstandalone || {};
+            ezstandalone.cmd = ezstandalone.cmd || [];
+          `}
+        </Script>
         
         {/* Google Analytics + Ads Tag (gtag.js) */}
         <Script
