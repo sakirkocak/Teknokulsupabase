@@ -30,6 +30,16 @@ import {
 } from 'lucide-react'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
 import { useGeminiLive, GeminiLiveStatus } from '@/hooks/useGeminiLive'
+import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
+
+// Gemini ses karakterleri
+const VOICE_OPTIONS = [
+  { id: 'Kore', name: '👩‍🏫 Kore', description: 'Samimi ve sıcak kadın sesi' },
+  { id: 'Charon', name: '👨‍🏫 Charon', description: 'Derin ve güven veren erkek sesi' },
+  { id: 'Aoede', name: '👩‍🎓 Aoede', description: 'Yumuşak ve öğretici kadın sesi' },
+  { id: 'Puck', name: '🎭 Puck', description: 'Enerjik ve neşeli ses' },
+  { id: 'Fenrir', name: '🧘 Fenrir', description: 'Sakin ve rahatlatıcı ses' }
+]
 
 interface TeknoTeacherLiveProps {
   studentName: string
@@ -46,37 +56,12 @@ export default function TeknoTeacherLive({
 }: TeknoTeacherLiveProps) {
   const [messages, setMessages] = useState<{ text: string, isUser: boolean }[]>([])
   const [personality, setPersonality] = useState<'friendly' | 'strict' | 'motivating'>('friendly')
-  const [voice, setVoice] = useState('Kore')
-  const [apiKey, setApiKey] = useState<string | null>(null)
-  const [tokenLoading, setTokenLoading] = useState(false)
-  const [tokenError, setTokenError] = useState<string | null>(null)
+  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0])
+  const [localError, setLocalError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const isSessionActive = useRef(false)
   
-  // API key al
-  const fetchApiKey = async () => {
-    setTokenLoading(true)
-    setTokenError(null)
-    
-    try {
-      const res = await fetch('/api/tekno-teacher/live/token')
-      const data = await res.json()
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Token alınamadı')
-      }
-      
-      setApiKey(data.apiKey)
-      onCreditsUpdate?.(data.credits)
-      return data.apiKey
-    } catch (err: any) {
-      setTokenError(err.message)
-      return null
-    } finally {
-      setTokenLoading(false)
-    }
-  }
-  
-  // Gemini Live hook
+  // Gemini Live Hook (Server-side streaming)
   const {
     status,
     isConnected,
@@ -84,36 +69,70 @@ export default function TeknoTeacherLive({
     isSpeaking,
     volume,
     connect: geminiConnect,
-    disconnect,
+    disconnect: geminiDisconnect,
+    sendText,
     interrupt,
-    error
+    error: geminiError
   } = useGeminiLive({
-    apiKey: apiKey || '',
     studentName,
     grade,
     personality,
-    voice,
+    voice: selectedVoice.id,
     onTranscript: (text, isUser) => {
-      setMessages(prev => [...prev, { text, isUser }])
+      if (text.trim()) {
+        setMessages(prev => [...prev, { text: text.trim(), isUser }])
+      }
     },
     onStatusChange: (newStatus) => {
-      console.log('🔴 Gemini Live status:', newStatus)
+      console.log('🔴 Live status:', newStatus)
+      if (newStatus === 'listening' && isSessionActive.current) {
+        startListening()
+      }
     },
     onError: (err) => {
-      console.error('❌ Gemini Live error:', err)
+      console.error('❌ Gemini error:', err)
+      setLocalError(err.message)
     }
   })
   
-  // Bağlan (önce token al)
+  // STT Hook (mikrofon dinleme)
+  const {
+    isListening: micListening,
+    transcript,
+    interimTranscript,
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useVoiceRecognition({
+    language: 'tr-TR',
+    continuous: true,
+    onResult: async (text, isFinal) => {
+      if (isFinal && text.trim().length > 2 && isSessionActive.current && status === 'listening') {
+        // Kullanıcı konuştu - Gemini'ye gönder
+        stopListening()
+        resetTranscript()
+        await sendText(text.trim())
+      }
+    }
+  })
+  
+  // Oturumu başlat
   const connect = async () => {
-    let key = apiKey
-    if (!key) {
-      key = await fetchApiKey()
-    }
-    if (key) {
-      geminiConnect()
-    }
+    setLocalError(null)
+    isSessionActive.current = true
+    await geminiConnect()
   }
+  
+  // Oturumu bitir
+  const disconnect = () => {
+    isSessionActive.current = false
+    stopListening()
+    geminiDisconnect()
+    setMessages([])
+  }
+  
+  // Hata durumu
+  const error = localError || geminiError?.message
   
   // Otomatik scroll
   useEffect(() => {
@@ -127,8 +146,8 @@ export default function TeknoTeacherLive({
     connected: 'bg-blue-500',
     listening: 'bg-green-500 animate-pulse',
     speaking: 'bg-purple-500',
-    error: 'bg-red-500',
-    disconnected: 'bg-gray-500'
+    processing: 'bg-blue-500 animate-pulse',
+    error: 'bg-red-500'
   }
   
   // Status metinleri
@@ -138,8 +157,8 @@ export default function TeknoTeacherLive({
     connected: '✓ Bağlandı',
     listening: '🎤 Seni dinliyorum...',
     speaking: '🔊 Konuşuyorum...',
-    error: '❌ Hata',
-    disconnected: 'Bağlantı kesildi'
+    processing: '🤔 Düşünüyor...',
+    error: '❌ Hata'
   }
   
   return (
@@ -203,8 +222,8 @@ export default function TeknoTeacherLive({
         )}
       </div>
       
-      {/* Bağlantı durumu */}
-      {!isConnected && (
+      {/* Bağlantı durumu - başlangıç ekranı */}
+      {(status === 'idle' || status === 'connecting' || status === 'error') && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <div className="w-32 h-32 mb-6 relative">
             <TeknoTeacherAvatar 
@@ -227,9 +246,9 @@ export default function TeknoTeacherLive({
             Gerçek zamanlı, düşük gecikmeli AI öğretmeninle konuş
           </p>
           
-          {(error || tokenError) && (
+          {error && (
             <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300 text-sm">
-              {error?.message || tokenError}
+              {error}
             </div>
           )}
           
@@ -250,15 +269,36 @@ export default function TeknoTeacherLive({
             ))}
           </div>
           
+          {/* Ses karakteri seçimi */}
+          <div className="mb-6 w-full">
+            <p className="text-sm text-gray-400 mb-2">Öğretmen Sesi:</p>
+            <div className="grid grid-cols-3 gap-2">
+              {VOICE_OPTIONS.map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => setSelectedVoice(v)}
+                  className={`p-2 rounded-lg text-xs transition-all ${
+                    selectedVoice.id === v.id 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  {v.name.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{selectedVoice.description}</p>
+          </div>
+          
           <button
             onClick={connect}
-            disabled={status === 'connecting' || tokenLoading}
+            disabled={status === 'connecting'}
             className="px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl hover:shadow-lg hover:shadow-purple-500/50 transition-all disabled:opacity-50 flex items-center gap-3"
           >
-            {(status === 'connecting' || tokenLoading) ? (
+            {status === 'connecting' ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                {tokenLoading ? 'Token alınıyor...' : 'Bağlanıyor...'}
+                Bağlanıyor...
               </>
             ) : (
               <>
@@ -268,15 +308,15 @@ export default function TeknoTeacherLive({
             )}
           </button>
           
-          {/* Bağlantı bilgisi */}
+          {/* Bilgi */}
           <div className="mt-6 p-3 bg-gray-800/50 rounded-lg text-xs text-gray-400 text-left">
             <p className="flex items-center gap-2 mb-1">
-              <Wifi className="w-3 h-3" />
-              <span>Gemini 2.5 Flash Live API</span>
+              <Wifi className="w-3 h-3 text-green-500" />
+              <span>Sesli Ders Sistemi</span>
             </p>
-            <p>• Native audio streaming</p>
-            <p>• Düşük gecikme (&lt;500ms)</p>
-            <p>• Ses karakteri: {voice}</p>
+            <p>• Gerçek zamanlı sohbet</p>
+            <p>• Otomatik dinleme modu</p>
+            <p>• {selectedVoice.name}</p>
           </div>
           
           <p className="mt-4 text-xs text-gray-500">

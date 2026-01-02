@@ -3,12 +3,13 @@
 /**
  * useGeminiLive Hook
  * Gemini 2.5 Flash Live API ile gerçek zamanlı sesli sohbet
+ * Server-side proxy üzerinden bağlanır (CORS sorunu yok)
  * 
  * Özellikler:
- * - Native audio streaming (düşük gecikme)
- * - Bidirectional audio (mikrofon + speaker)
+ * - Server-side streaming (SSE)
+ * - Native audio output
+ * - Mikrofon input
  * - VAD (Voice Activity Detection)
- * - Interruption desteği
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
@@ -20,16 +21,16 @@ export type GeminiLiveStatus =
   | 'connected'
   | 'listening'
   | 'speaking'
+  | 'processing'
   | 'error'
-  | 'disconnected'
 
 interface UseGeminiLiveOptions {
-  apiKey: string
   studentName: string
   grade: number
   personality?: 'friendly' | 'strict' | 'motivating'
   voice?: string
   onTranscript?: (text: string, isUser: boolean) => void
+  onAudioReceived?: (audioData: string, mimeType: string) => void
   onStatusChange?: (status: GeminiLiveStatus) => void
   onError?: (error: Error) => void
 }
@@ -42,49 +43,20 @@ interface UseGeminiLiveReturn {
   volume: number
   connect: () => Promise<void>
   disconnect: () => void
-  sendAudio: (audioData: ArrayBuffer) => void
+  sendText: (text: string) => Promise<void>
+  sendAudio: (audioData: string) => Promise<void>
   interrupt: () => void
   error: Error | null
 }
 
-// Gemini Live API WebSocket URL
-const GEMINI_LIVE_WS_URL = 'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
-
-/**
- * System instruction builder
- */
-function buildSystemInstruction(studentName: string, grade: number, personality: string): string {
-  const name = studentName || 'Öğrenci'
-  
-  const tones: Record<string, string> = {
-    friendly: 'samimi, sıcak ve arkadaş canlısı',
-    strict: 'disiplinli ama adil',
-    motivating: 'enerjik ve motive edici'
-  }
-  
-  return `Sen TeknoÖğretmen'sin - ${name}'in özel ders öğretmeni.
-
-ÖĞRENCİ: ${name}, ${grade}. sınıf
-KİŞİLİĞİN: ${tones[personality] || tones.friendly}
-
-KONUŞMA KURALLARIN:
-1. HER cümlene "${name}" diye başla
-2. Kısa konuş (max 2-3 cümle)
-3. Her yanıtta soru sor
-4. Doğrudan cevap verme, düşündür
-5. Türkçe konuş, samimi ol
-
-Örnek: "${name}, harika soru! Şimdi düşün: Bir pizza 8 dilime bölündü, 3 dilim yedin. Ne kadar pizza yemiş oldun?"`
-}
-
 export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const {
-    apiKey,
     studentName,
     grade,
     personality = 'friendly',
     voice = 'Kore',
     onTranscript,
+    onAudioReceived,
     onStatusChange,
     onError
   } = options
@@ -95,12 +67,11 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   const [error, setError] = useState<Error | null>(null)
   
   // Refs
-  const wsRef = useRef<WebSocket | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
-  const mediaStreamRef = useRef<MediaStream | null>(null)
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
-  const audioQueueRef = useRef<ArrayBuffer[]>([])
+  const audioQueueRef = useRef<string[]>([])
   const isPlayingRef = useRef(false)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
   
   // Status değişikliğini bildir
   const updateStatus = useCallback((newStatus: GeminiLiveStatus) => {
@@ -114,7 +85,6 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       audioContextRef.current = new AudioContext({ sampleRate: 24000 })
     }
     
-    // Resume if suspended
     if (audioContextRef.current.state === 'suspended') {
       await audioContextRef.current.resume()
     }
@@ -122,8 +92,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     return audioContextRef.current
   }, [])
   
-  // Gelen audio'yu çal (streaming)
-  const playAudioChunk = useCallback(async (base64Audio: string) => {
+  // Audio chunk'ı çal
+  const playAudioChunk = useCallback(async (base64Audio: string, mimeType: string) => {
     try {
       const ctx = await initAudioContext()
       
@@ -134,6 +104,9 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         bytes[i] = binaryString.charCodeAt(i)
       }
       
+      // Sample rate'i mime type'dan al
+      const sampleRate = mimeType.includes('24000') ? 24000 : 16000
+      
       // PCM 16-bit -> Float32
       const pcmData = new Int16Array(bytes.buffer)
       const floatData = new Float32Array(pcmData.length)
@@ -142,7 +115,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       }
       
       // AudioBuffer oluştur
-      const audioBuffer = ctx.createBuffer(1, floatData.length, 24000)
+      const audioBuffer = ctx.createBuffer(1, floatData.length, sampleRate)
       audioBuffer.getChannelData(0).set(floatData)
       
       // Çal
@@ -150,139 +123,148 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       source.buffer = audioBuffer
       source.connect(ctx.destination)
       
-      // Volume analizi
-      const analyser = ctx.createAnalyser()
-      source.connect(analyser)
-      analyser.fftSize = 256
-      
       source.onended = () => {
+        isPlayingRef.current = false
         setVolume(0)
-      }
-      
-      source.start()
-      
-      // Volume güncelle
-      const dataArray = new Uint8Array(analyser.frequencyBinCount)
-      const updateVolume = () => {
-        if (status === 'speaking') {
-          analyser.getByteFrequencyData(dataArray)
-          const avg = dataArray.reduce((a, b) => a + b) / dataArray.length
-          setVolume(avg / 255)
-          requestAnimationFrame(updateVolume)
+        // Queue'da başka ses varsa çal
+        if (audioQueueRef.current.length > 0) {
+          const next = audioQueueRef.current.shift()
+          if (next) playAudioChunk(next, mimeType)
+        } else {
+          updateStatus('listening')
         }
       }
-      updateVolume()
+      
+      isPlayingRef.current = true
+      source.start()
+      
+      // Volume simülasyonu
+      const volumeInterval = setInterval(() => {
+        if (isPlayingRef.current) {
+          setVolume(0.3 + Math.random() * 0.5)
+        } else {
+          clearInterval(volumeInterval)
+        }
+      }, 100)
       
     } catch (err) {
       console.error('Audio playback error:', err)
     }
-  }, [initAudioContext, status])
+  }, [initAudioContext, updateStatus])
   
-  // WebSocket'e bağlan
-  const connect = useCallback(async () => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('Already connected')
-      return
-    }
+  // Server-side streaming ile Gemini'ye bağlan
+  const streamRequest = useCallback(async (message: string, isAudio: boolean = false) => {
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = new AbortController()
     
+    updateStatus(isAudio ? 'processing' : 'processing')
+    
+    try {
+      const response = await fetch('/api/tekno-teacher/live/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isAudio ? 'audio' : 'text',
+          studentName,
+          grade,
+          personality,
+          voice,
+          [isAudio ? 'audioData' : 'textMessage']: message
+        }),
+        signal: abortControllerRef.current.signal
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Stream hatası')
+      }
+      
+      // SSE stream'i oku
+      const reader = response.body?.getReader()
+      if (!reader) throw new Error('Stream okunamadı')
+      
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullText = ''
+      
+      updateStatus('speaking')
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        
+        // SSE satırlarını parse et
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.type === 'text') {
+                fullText += data.content
+                onTranscript?.(data.content, false)
+              }
+              
+              if (data.type === 'audio') {
+                onAudioReceived?.(data.data, data.mimeType)
+                
+                // Audio'yu queue'a ekle veya çal
+                if (isPlayingRef.current) {
+                  audioQueueRef.current.push(data.data)
+                } else {
+                  playAudioChunk(data.data, data.mimeType)
+                }
+              }
+              
+              if (data.type === 'error') {
+                throw new Error(data.message)
+              }
+              
+              if (data.type === 'done') {
+                console.log('✅ Stream tamamlandı')
+                if (!isPlayingRef.current) {
+                  updateStatus('listening')
+                }
+              }
+              
+            } catch (e) {
+              // JSON parse hatası - devam et
+            }
+          }
+        }
+      }
+      
+      return fullText
+      
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('Stream iptal edildi')
+        return
+      }
+      console.error('Stream error:', err)
+      setError(err)
+      onError?.(err)
+      updateStatus('error')
+      throw err
+    }
+  }, [studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onAudioReceived, onError])
+  
+  // Bağlantıyı başlat
+  const connect = useCallback(async () => {
     updateStatus('connecting')
     setError(null)
     
     try {
-      // WebSocket URL with API key
-      const wsUrl = `${GEMINI_LIVE_WS_URL}?key=${apiKey}`
-      const ws = new WebSocket(wsUrl)
+      // Hoşgeldin mesajı gönder
+      await streamRequest(`Merhaba, ben ${studentName}. Benim öğretmenim ol!`, false)
+      updateStatus('listening')
       
-      ws.onopen = () => {
-        console.log('🔗 Gemini Live WebSocket connected')
-        
-        // Setup message gönder
-        const setupMessage = {
-          setup: {
-            model: 'models/gemini-2.5-flash-native-audio-preview-12-2025',
-            generationConfig: {
-              responseModalities: ['AUDIO'],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: voice
-                  }
-                }
-              }
-            },
-            systemInstruction: {
-              parts: [{
-                text: buildSystemInstruction(studentName, grade, personality)
-              }]
-            }
-          }
-        }
-        
-        ws.send(JSON.stringify(setupMessage))
-        updateStatus('connected')
-        
-        // Mikrofonu başlat
-        startMicrophone()
-      }
-      
-      ws.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          
-          // Setup response
-          if (data.setupComplete) {
-            console.log('✅ Gemini Live setup complete')
-            updateStatus('listening')
-            return
-          }
-          
-          // Server content (AI yanıtı)
-          if (data.serverContent?.modelTurn?.parts) {
-            updateStatus('speaking')
-            
-            for (const part of data.serverContent.modelTurn.parts) {
-              // Audio data
-              if (part.inlineData?.mimeType?.startsWith('audio/')) {
-                await playAudioChunk(part.inlineData.data)
-              }
-              
-              // Text transcript
-              if (part.text) {
-                onTranscript?.(part.text, false)
-              }
-            }
-            
-            // Turn complete
-            if (data.serverContent.turnComplete) {
-              updateStatus('listening')
-            }
-          }
-          
-          // User transcript
-          if (data.serverContent?.inputTranscript) {
-            onTranscript?.(data.serverContent.inputTranscript, true)
-          }
-          
-        } catch (err) {
-          console.error('Message parse error:', err)
-        }
-      }
-      
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event)
-        const err = new Error('WebSocket bağlantı hatası')
-        setError(err)
-        onError?.(err)
-        updateStatus('error')
-      }
-      
-      ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code, event.reason)
-        updateStatus('disconnected')
-        stopMicrophone()
-      }
-      
-      wsRef.current = ws
+      // Mikrofonu başlat
+      await startMicrophone()
       
     } catch (err: any) {
       console.error('Connect error:', err)
@@ -290,9 +272,9 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       onError?.(err)
       updateStatus('error')
     }
-  }, [apiKey, studentName, grade, personality, voice, updateStatus, playAudioChunk, onTranscript, onError])
+  }, [studentName, streamRequest, updateStatus, onError])
   
-  // Mikrofonu başlat
+  // Mikrofonu başlat (STT için)
   const startMicrophone = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -306,61 +288,6 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       })
       
       mediaStreamRef.current = stream
-      const ctx = await initAudioContext()
-      
-      // MediaStreamSource
-      const source = ctx.createMediaStreamSource(stream)
-      
-      // ScriptProcessor (AudioWorklet'e geçilecek)
-      const processor = ctx.createScriptProcessor(4096, 1, 1)
-      
-      processor.onaudioprocess = (e) => {
-        if (status !== 'listening' || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-          return
-        }
-        
-        const inputData = e.inputBuffer.getChannelData(0)
-        
-        // Resample 24kHz -> 16kHz
-        const resampledLength = Math.floor(inputData.length * 16000 / ctx.sampleRate)
-        const resampledData = new Float32Array(resampledLength)
-        
-        for (let i = 0; i < resampledLength; i++) {
-          const srcIndex = Math.floor(i * ctx.sampleRate / 16000)
-          resampledData[i] = inputData[srcIndex] || 0
-        }
-        
-        // Float32 -> PCM 16-bit
-        const pcmData = new Int16Array(resampledData.length)
-        for (let i = 0; i < resampledData.length; i++) {
-          const s = Math.max(-1, Math.min(1, resampledData[i]))
-          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
-        }
-        
-        // Base64'e çevir
-        const bytes = new Uint8Array(pcmData.buffer)
-        let binary = ''
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i])
-        }
-        const base64Audio = btoa(binary)
-        
-        // Gemini'ye gönder
-        const message = {
-          realtimeInput: {
-            mediaChunks: [{
-              mimeType: 'audio/pcm;rate=16000',
-              data: base64Audio
-            }]
-          }
-        }
-        
-        wsRef.current.send(JSON.stringify(message))
-      }
-      
-      source.connect(processor)
-      processor.connect(ctx.destination)
-      
       console.log('🎤 Mikrofon başlatıldı')
       
     } catch (err: any) {
@@ -369,7 +296,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       setError(error)
       onError?.(error)
     }
-  }, [initAudioContext, status, onError])
+  }, [onError])
   
   // Mikrofonu durdur
   const stopMicrophone = useCallback(() => {
@@ -382,62 +309,40 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   
   // Bağlantıyı kes
   const disconnect = useCallback(() => {
+    abortControllerRef.current?.abort()
     stopMicrophone()
-    
-    if (wsRef.current) {
-      wsRef.current.close()
-      wsRef.current = null
-    }
     
     if (audioContextRef.current) {
       audioContextRef.current.close()
       audioContextRef.current = null
     }
     
+    audioQueueRef.current = []
+    isPlayingRef.current = false
     updateStatus('idle')
     setVolume(0)
     console.log('🔌 Bağlantı kapatıldı')
   }, [stopMicrophone, updateStatus])
   
-  // Manuel audio gönder
-  const sendAudio = useCallback((audioData: ArrayBuffer) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected')
-      return
-    }
-    
-    const bytes = new Uint8Array(audioData)
-    let binary = ''
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i])
-    }
-    const base64Audio = btoa(binary)
-    
-    wsRef.current.send(JSON.stringify({
-      realtimeInput: {
-        mediaChunks: [{
-          mimeType: 'audio/pcm;rate=16000',
-          data: base64Audio
-        }]
-      }
-    }))
-  }, [])
+  // Metin gönder
+  const sendText = useCallback(async (text: string) => {
+    if (!text.trim()) return
+    onTranscript?.(text, true)
+    await streamRequest(text, false)
+  }, [streamRequest, onTranscript])
   
-  // Konuşmayı kes (Interruption)
+  // Audio gönder (base64)
+  const sendAudio = useCallback(async (audioData: string) => {
+    await streamRequest(audioData, true)
+  }, [streamRequest])
+  
+  // Konuşmayı kes
   const interrupt = useCallback(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      // Boş audio göndererek kesme
-      wsRef.current.send(JSON.stringify({
-        realtimeInput: {
-          mediaChunks: [{
-            mimeType: 'audio/pcm;rate=16000',
-            data: ''
-          }]
-        }
-      }))
-      updateStatus('listening')
-      setVolume(0)
-    }
+    abortControllerRef.current?.abort()
+    isPlayingRef.current = false
+    audioQueueRef.current = []
+    setVolume(0)
+    updateStatus('listening')
   }, [updateStatus])
   
   // Cleanup
@@ -449,12 +354,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   
   return {
     status,
-    isConnected: status === 'connected' || status === 'listening' || status === 'speaking',
+    isConnected: ['connected', 'listening', 'speaking', 'processing'].includes(status),
     isListening: status === 'listening',
     isSpeaking: status === 'speaking',
     volume,
     connect,
     disconnect,
+    sendText,
     sendAudio,
     interrupt,
     error
