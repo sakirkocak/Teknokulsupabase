@@ -15,6 +15,7 @@ import {
   TrendingUp,
   AlertCircle
 } from 'lucide-react'
+import TeknoTeacherAvatar from './TeknoTeacherAvatar'
 
 interface Message {
   id: string
@@ -194,8 +195,14 @@ export default function TeknoTeacherChat() {
         <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
+              {/* Avatar */}
+              <div className="relative">
+                <TeknoTeacherAvatar 
+                  isActive={true}
+                  isSpeaking={isLoading}
+                  size="sm"
+                  personality="friendly"
+                />
               </div>
               <div>
                 <h3 className="font-bold">TeknoÖğretmen</h3>
