@@ -14,7 +14,7 @@ import { Loader2 } from 'lucide-react'
 export default function TeknoOgretmenLivePage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
-  const [studentName, setStudentName] = useState('')
+  const [studentName, setStudentName] = useState('Şakir')  // Hardcoded for testing
   const [grade, setGrade] = useState(8)
   const [error, setError] = useState<string | null>(null)
   
@@ -96,8 +96,8 @@ export default function TeknoOgretmenLivePage() {
       
       {/* Bilgi */}
       <div className="fixed bottom-4 left-4 text-xs text-gray-500">
-        <p>🎙️ Gemini Live API</p>
-        <p>Düşük gecikmeli, gerçek zamanlı AI eğitim</p>
+        <p>🤖 OpenAI GPT-4o + TTS-HD</p>
+        <p>Yüksek kaliteli AI eğitim asistanı</p>
       </div>
     </div>
   )

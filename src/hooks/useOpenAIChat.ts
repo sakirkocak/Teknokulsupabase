@@ -366,8 +366,8 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
     setVolume(0)
     setMessages([])
     setError(null)
-    updateStatus('idle')
-  }, [updateStatus])
+    setStatus('idle')  // Direct set, no callback dependency
+  }, [])  // Empty deps - stable reference
   
   // =====================================================
   // INTERRUPT
@@ -385,15 +385,22 @@ export function useOpenAIChat(options: UseOpenAIChatOptions): UseOpenAIChatRetur
     
     isPlayingRef.current = false
     setVolume(0)
-    updateStatus('ready')
-  }, [updateStatus])
+    setStatus('ready')  // Direct set
+  }, [])  // Empty deps - stable reference
   
-  // Cleanup
+  // Cleanup on unmount only
   useEffect(() => {
     return () => {
-      disconnect()
+      console.log('🧹 [OPENAI] Component unmount - cleanup')
+      abortControllerRef.current?.abort()
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      window.speechSynthesis?.cancel()
+      isPlayingRef.current = false
     }
-  }, [disconnect])
+  }, [])  // Empty deps - only on unmount
   
   return {
     status,
