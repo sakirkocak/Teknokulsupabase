@@ -23,6 +23,7 @@ import {
   LogIn
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
 import MathRenderer from '@/components/MathRenderer'
 import { useSpeech } from '@/hooks/useSpeech'
@@ -46,6 +47,7 @@ interface CreditStatus {
 type ConversationMode = 'text' | 'voice' | 'listening'
 
 export default function TeknoTeacherChat() {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -348,11 +350,9 @@ export default function TeknoTeacherChat() {
       
       const data = await res.json()
 
-      // 🔒 Auth kontrolü
+      // 🔒 Auth kontrolü - Kayıt sayfasına yönlendir
       if (res.status === 401 || data.requireAuth) {
-        setShowLoginModal(true)
-        setIsAuthenticated(false)
-        setIsLoading(false)
+        router.push('/kayit')
         return
       }
 
@@ -388,6 +388,12 @@ export default function TeknoTeacherChat() {
         throw new Error(data.error)
       }
     } catch (error: any) {
+      // Auth hatası kontrolü - kayıt sayfasına yönlendir
+      if (error.message?.includes('Giriş') || error.message?.includes('401')) {
+        router.push('/kayit')
+        return
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -436,10 +442,17 @@ export default function TeknoTeacherChat() {
           grade: 8
         })
       })
-      
-      if (!response.ok) throw new Error('API hatası')
-      
+
       const data = await response.json()
+      
+      // 🔒 Auth kontrolü - Kayıt sayfasına yönlendir
+      if (response.status === 401 || data.requireAuth) {
+        router.push('/kayit')
+        return
+      }
+
+      if (!response.ok) throw new Error('API hatası')
+
       const explanation = data.text || 'Üzgünüm, şu an bu konuyu anlatamıyorum.'
       
       setExplanationStatus('✅ İçerik hazır!')
@@ -519,6 +532,13 @@ export default function TeknoTeacherChat() {
     } catch (err: any) {
       console.error('Konu anlatım hatası:', err)
       setExplanationStatus('')
+      
+      // Auth hatası kontrolü - kayıt sayfasına yönlendir
+      if (err.message?.includes('Giriş') || err.message?.includes('401')) {
+        router.push('/kayit')
+        return
+      }
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -585,6 +605,12 @@ export default function TeknoTeacherChat() {
 
       const data = await res.json()
 
+      // 🔒 Auth kontrolü - Kayıt sayfasına yönlendir
+      if (res.status === 401 || data.requireAuth) {
+        router.push('/kayit')
+        return
+      }
+
       if (data.success && data.text) {
         setSummaryStatus('✅ Özet hazır!')
         
@@ -608,6 +634,13 @@ export default function TeknoTeacherChat() {
     } catch (error: any) {
       console.error('Summary error:', error)
       setSummaryStatus('')
+      
+      // Auth hatası kontrolü - kayıt sayfasına yönlendir
+      if (error.message?.includes('Giriş') || error.message?.includes('401')) {
+        router.push('/kayit')
+        return
+      }
+      
       const errorMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
