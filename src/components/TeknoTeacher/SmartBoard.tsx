@@ -11,7 +11,7 @@
  * - Başarı göstergesi
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { 
   BookOpen, 
   TrendingUp, 
@@ -59,13 +59,22 @@ export default function SmartBoard({
   onClear
 }: SmartBoardProps) {
   const [animatingId, setAnimatingId] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Yeni görsel geldiğinde animasyon
+  // Yeni görsel geldiğinde animasyon + auto-scroll
   useEffect(() => {
     if (visuals.length > 0) {
       const latestId = visuals[visuals.length - 1].id
       setAnimatingId(latestId)
       setTimeout(() => setAnimatingId(null), 500)
+      
+      // Otomatik scroll - yeni içerik görünsün
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: 'smooth'
+        })
+      }, 100)
     }
   }, [visuals.length])
 
@@ -159,7 +168,7 @@ export default function SmartBoard({
       )}
 
       {/* Görsel İçerikler */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {visuals.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
             <Sparkles className="w-12 h-12 mb-3 opacity-30" />
