@@ -54,6 +54,10 @@ export default function TeknoTeacherChat() {
   const [conversationMode, setConversationMode] = useState<ConversationMode>('text')
   const [voiceSessionActive, setVoiceSessionActive] = useState(false)
   const [shouldAutoListen, setShouldAutoListen] = useState(false) // Auto-listen flag
+  const [showTopicModal, setShowTopicModal] = useState(false) // Konu Anlat modal
+  const [topicInput, setTopicInput] = useState('') // Konu input
+  const [isExplaining, setIsExplaining] = useState(false) // Konu anlatılıyor mu
+  const [explanationAudio, setExplanationAudio] = useState<HTMLAudioElement | null>(null)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pendingVoiceInput = useRef<string>('')
@@ -285,6 +289,129 @@ export default function TeknoTeacherChat() {
     }
   }
   
+  // =====================================================
+  // KONU ANLAT - OpenAI + TTS ile sesli konu anlatımı
+  // =====================================================
+  const explainTopic = async () => {
+    if (!topicInput.trim() || isExplaining) return
+    
+    setIsExplaining(true)
+    setShowTopicModal(false)
+    
+    // Kullanıcı mesajı ekle
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: `📚 Konu: ${topicInput}`,
+      timestamp: new Date()
+    }
+    setMessages(prev => [...prev, userMessage])
+    
+    try {
+      // OpenAI'dan konu anlatımı al
+      const response = await fetch('/api/tekno-teacher/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `[KONU ANLATIMI MODU] Öğrenci "${topicInput}" konusunu öğrenmek istiyor. Bu konuyu detaylı, anlaşılır ve örneklerle anlat. Öğrencinin adı ${studentName || 'Öğrenci'}. Samimi ve öğretici bir dille, adım adım açıkla. Maksimum 4-5 paragraf.`,
+          studentName: studentName || 'Öğrenci',
+          grade: 8
+        })
+      })
+      
+      if (!response.ok) throw new Error('API hatası')
+      
+      const data = await response.json()
+      const explanation = data.text || 'Üzgünüm, şu an bu konuyu anlatamıyorum.'
+      
+      // Asistan mesajı ekle
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: explanation,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, assistantMessage])
+      
+      // TTS ile seslendir
+      try {
+        const ttsResponse = await fetch('/api/tekno-teacher/openai/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            text: explanation, 
+            voice: 'nova',
+            speed: 0.95  // Biraz yavaş, anlaşılır olsun
+          })
+        })
+        
+        if (ttsResponse.ok) {
+          const ttsData = await ttsResponse.json()
+          if (ttsData.audio) {
+            // Base64 -> Audio
+            const binaryString = atob(ttsData.audio)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            const blob = new Blob([bytes], { type: 'audio/mpeg' })
+            const audioUrl = URL.createObjectURL(blob)
+            
+            const audio = new Audio(audioUrl)
+            setExplanationAudio(audio)
+            
+            audio.onended = () => {
+              setAvatarVolume(0)
+              setExplanationAudio(null)
+              URL.revokeObjectURL(audioUrl)
+            }
+            
+            // Volume animation
+            const volumeInterval = setInterval(() => {
+              if (!audio.paused) {
+                setAvatarVolume(0.4 + Math.random() * 0.4)
+              } else {
+                clearInterval(volumeInterval)
+                setAvatarVolume(0)
+              }
+            }, 100)
+            
+            await audio.play()
+          }
+        } else {
+          // TTS başarısız - browser TTS kullan
+          speak(explanation)
+        }
+      } catch (ttsErr) {
+        console.warn('TTS hatası, browser TTS kullanılıyor:', ttsErr)
+        speak(explanation)
+      }
+      
+    } catch (err: any) {
+      console.error('Konu anlatım hatası:', err)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `${studentName || 'Öğrenci'}, üzgünüm şu an bir teknik sorun var. Birazdan tekrar dene!`,
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
+      setIsExplaining(false)
+      setTopicInput('')
+    }
+  }
+  
+  // Konu anlatımını durdur
+  const stopExplanation = () => {
+    if (explanationAudio) {
+      explanationAudio.pause()
+      setExplanationAudio(null)
+    }
+    stopSpeaking()
+    setAvatarVolume(0)
+  }
+  
   // Metin mesajı gönder
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -408,7 +535,9 @@ export default function TeknoTeacherChat() {
               <div>
                 <h3 className="font-bold">TeknoÖğretmen</h3>
                 <p className="text-xs text-white/80">
-                  {isListening ? '👂 Seni dinliyorum...' :
+                  {isExplaining ? '📚 Konu anlatılıyor...' :
+                   explanationAudio ? '🔊 Sesli anlatım...' :
+                   isListening ? '👂 Seni dinliyorum...' :
                    isSpeaking ? '🎙️ Konuşuyor...' :
                    isLoading ? '🤔 Düşünüyor...' :
                    voiceSessionActive ? '📞 Sesli Ders Aktif' :
@@ -417,6 +546,16 @@ export default function TeknoTeacherChat() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Konu anlatımı durdur */}
+              {explanationAudio && (
+                <button 
+                  onClick={stopExplanation}
+                  className="p-1.5 bg-red-500 hover:bg-red-600 rounded-lg transition-all animate-pulse"
+                  title="Anlatımı durdur"
+                >
+                  <Pause className="w-4 h-4" />
+                </button>
+              )}
               {/* Sesli sohbet butonu */}
               {voiceSupported && (
                 <button 
@@ -483,11 +622,12 @@ export default function TeknoTeacherChat() {
             Günlük Özet
           </button>
           <button
-            disabled={isLoading}
-            className="flex-1 py-2 px-3 text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center gap-1"
+            onClick={() => setShowTopicModal(true)}
+            disabled={isLoading || isExplaining}
+            className="flex-1 py-2 px-3 text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
             <BookOpen className="w-3 h-3" />
-            Konu Anlat
+            {isExplaining ? 'Anlatıyor...' : 'Konu Anlat'}
           </button>
         </div>
         
@@ -636,6 +776,85 @@ export default function TeknoTeacherChat() {
         </div>
       </div>
       
+      {/* Konu Anlat Modal */}
+      {showTopicModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-purple-600" />
+                Konu Anlat
+              </h3>
+              <button 
+                onClick={() => setShowTopicModal(false)}
+                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Hangi konuyu öğrenmek istiyorsun? AI öğretmenin sesli olarak anlatacak.
+            </p>
+            
+            <input
+              type="text"
+              value={topicInput}
+              onChange={(e) => setTopicInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && explainTopic()}
+              placeholder="Örn: Pisagor teoremi, Fotosentez..."
+              className="w-full px-4 py-3 border border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4"
+              autoFocus
+            />
+            
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <button
+                onClick={() => setTopicInput('Denklem çözümü')}
+                className="px-3 py-2 text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100"
+              >
+                📐 Denklem
+              </button>
+              <button
+                onClick={() => setTopicInput('Fotosentez')}
+                className="px-3 py-2 text-xs bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100"
+              >
+                🌱 Fotosentez
+              </button>
+              <button
+                onClick={() => setTopicInput('Osmanlı kuruluşu')}
+                className="px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-100"
+              >
+                🏰 Osmanlı
+              </button>
+              <button
+                onClick={() => setTopicInput('Paragraf analizi')}
+                className="px-3 py-2 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100"
+              >
+                📖 Paragraf
+              </button>
+            </div>
+            
+            <button
+              onClick={explainTopic}
+              disabled={!topicInput.trim() || isExplaining}
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isExplaining ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Hazırlanıyor...
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-4 h-4" />
+                  Sesli Anlat
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Upgrade Modal */}
       {showUpgradeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
