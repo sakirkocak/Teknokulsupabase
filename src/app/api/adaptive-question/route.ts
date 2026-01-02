@@ -101,8 +101,11 @@ export async function POST(req: NextRequest) {
       topicSuccessRate
     })
     
-    // Soru getir
-    if (isTypesenseAvailable()) {
+    // Soru getir - Şimdilik sadece Supabase kullan (Typesense filter optimizasyonu bekliyor)
+    // NOT: Typesense 404 uyarılarını önlemek için geçici olarak devre dışı
+    const USE_TYPESENSE_FOR_ADAPTIVE = false
+    
+    if (USE_TYPESENSE_FOR_ADAPTIVE && isTypesenseAvailable()) {
       try {
         // Typesense filtresi oluştur
         const filters: string[] = []
@@ -122,7 +125,7 @@ export async function POST(req: NextRequest) {
         const allowedDifficulties = [adaptiveDifficulty]
         if (diffIndex > 0) allowedDifficulties.push(DIFFICULTY_ORDER[diffIndex - 1])
         if (diffIndex < DIFFICULTY_ORDER.length - 1) allowedDifficulties.push(DIFFICULTY_ORDER[diffIndex + 1])
-        filters.push(`difficulty:[${allowedDifficulties.join(',')}]`)  // Doğru Typesense syntax
+        filters.push(`difficulty:[${allowedDifficulties.join(',')}]`)
         
         // Çözülmüş soruları hariç tut (limit)
         // NOT: Typesense'de NOT IN filtresi için farklı yöntem gerekiyor
@@ -184,13 +187,7 @@ export async function POST(req: NextRequest) {
           })
         }
       } catch (error: any) {
-        // 400/404 hatalarını sessizce logla, Supabase fallback'e düş
-        const status = error?.httpStatus || error?.status
-        if (status === 400 || status === 404) {
-          console.warn(`⚠️ Adaptive Question: Typesense ${status} hatası, Supabase'e geçiliyor`)
-        } else {
-          console.error('Typesense adaptive question error:', error?.message || error)
-        }
+        // Typesense hatası - sessizce Supabase'e geç
         // Fallback to Supabase
       }
     }
