@@ -19,8 +19,10 @@ import {
   Mic,
   MicOff,
   Phone,
-  PhoneOff
+  PhoneOff,
+  LogIn
 } from 'lucide-react'
+import Link from 'next/link'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
 import MathRenderer from '@/components/MathRenderer'
 import { useSpeech } from '@/hooks/useSpeech'
@@ -50,6 +52,8 @@ export default function TeknoTeacherChat() {
   const [isLoading, setIsLoading] = useState(false)
   const [credits, setCredits] = useState<CreditStatus | null>(null)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false) // 🔒 Giriş gerekli modalı
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null) // null = kontrol ediliyor
   const [studentName, setStudentName] = useState('')
   const [avatarVolume, setAvatarVolume] = useState(0)
   const [autoSpeak, setAutoSpeak] = useState(true)
@@ -231,11 +235,21 @@ export default function TeknoTeacherChat() {
     try {
       const res = await fetch('/api/tekno-teacher/credits')
       const data = await res.json()
+      
+      if (res.status === 401) {
+        // Giriş yapılmamış
+        setIsAuthenticated(false)
+        setCredits(null)
+        return
+      }
+      
       if (data.success) {
+        setIsAuthenticated(true)
         setCredits(data.credits)
       }
     } catch (error) {
       console.error('Credits load error:', error)
+      setIsAuthenticated(false)
     }
   }
   
@@ -333,7 +347,15 @@ export default function TeknoTeacherChat() {
       })
       
       const data = await res.json()
-      
+
+      // 🔒 Auth kontrolü
+      if (res.status === 401 || data.requireAuth) {
+        setShowLoginModal(true)
+        setIsAuthenticated(false)
+        setIsLoading(false)
+        return
+      }
+
       if (data.upgrade_required) {
         setShowUpgradeModal(true)
         setVoiceSessionActive(false)
@@ -1002,6 +1024,43 @@ export default function TeknoTeacherChat() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🔒 Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm mx-4 text-center">
+            <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <LogIn className="w-8 h-8 text-indigo-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Giriş Yapman Gerekiyor
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              TeknoÖğretmen'i kullanmak için önce giriş yap veya ücretsiz kayıt ol.
+            </p>
+            <div className="space-y-3">
+              <Link 
+                href="/giris"
+                className="block w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold rounded-xl hover:shadow-lg transition-all text-center"
+              >
+                Giriş Yap
+              </Link>
+              <Link 
+                href="/kayit"
+                className="block w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-all text-center"
+              >
+                Ücretsiz Kayıt Ol
+              </Link>
+              <button 
+                onClick={() => setShowLoginModal(false)}
+                className="w-full py-3 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+              >
+                Kapat
+              </button>
+            </div>
           </div>
         </div>
       )}

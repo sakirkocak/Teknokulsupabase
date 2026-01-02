@@ -2,11 +2,14 @@
  * 🎓 TeknoÖğretmen - Akıllı Chat API
  * 
  * Gemini 3 Flash ile akıllı sohbet + Görsel İçerik
- * Structured JSON yanıt desteği
+ * ✅ Auth kontrolü
+ * ✅ Kredi/Limit sistemi
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { geminiModel } from '@/lib/gemini'
+import { checkAndUseCredit, getCreditStatus } from '@/lib/tekno-teacher'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,7 +20,7 @@ interface ChatRequest {
   conversationHistory?: { role: 'user' | 'assistant', content: string }[]
   studentName?: string
   grade?: number
-  withVisuals?: boolean  // Görsel içerik isteniyor mu?
+  withVisuals?: boolean
 }
 
 // Görsel içerik tipi
@@ -28,28 +31,64 @@ interface VisualContent {
   data?: any
 }
 
-interface StructuredResponse {
-  text: string
-  visuals?: VisualContent[]
-  topic?: string
-}
-
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
   try {
+    // =====================================================
+    // 🔒 AUTH KONTROLÜ
+    // =====================================================
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ 
+        error: 'Giriş yapmanız gerekiyor',
+        requireAuth: true
+      }, { status: 401 })
+    }
+    
+    // =====================================================
+    // 💳 KREDİ KONTROLÜ
+    // =====================================================
+    const creditStatus = await checkAndUseCredit(user.id)
+    
+    if (!creditStatus.allowed) {
+      return NextResponse.json({ 
+        error: 'Günlük krediniz bitti',
+        upgrade_required: true,
+        credits: {
+          remaining: creditStatus.remaining,
+          is_premium: creditStatus.is_premium
+        }
+      }, { status: 403 })
+    }
+    
+    // =====================================================
+    // 📝 İSTEK İŞLEME
+    // =====================================================
     const body: ChatRequest = await request.json()
     const { 
       message, 
       conversationHistory = [],
-      studentName = 'Öğrenci',
-      grade = 8,
-      withVisuals = true  // Varsayılan olarak görsel içerik üret
+      studentName: providedName,
+      grade: providedGrade,
+      withVisuals = true
     } = body
     
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Mesaj gerekli' }, { status: 400 })
     }
+    
+    // Kullanıcı profilini al
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, grade')
+      .eq('id', user.id)
+      .single()
+    
+    const studentName = providedName || profile?.full_name || 'Öğrenci'
+    const grade = providedGrade || profile?.grade || 8
     
     // Görsel içerik talimatı
     const visualInstructions = withVisuals ? `
@@ -119,7 +158,6 @@ KURALLAR:
     let cleanText = responseText
     
     if (withVisuals) {
-      // <visual> taglarını bul ve parse et
       const visualRegex = /<visual\s+type="([^"]+)"(?:\s+title="([^"]*)")?>([\s\S]*?)<\/visual>/g
       let match
       
@@ -130,15 +168,13 @@ KURALLAR:
           title: title || undefined,
           content: content.trim()
         })
-        // Tag'ı metinden kaldır
         cleanText = cleanText.replace(fullMatch, '')
       }
       
-      // Temizle
       cleanText = cleanText.trim()
     }
     
-    // Konu tespiti (basit)
+    // Konu tespiti
     let topic = undefined
     const topicKeywords = {
       'üslü': 'Üslü Sayılar',
@@ -170,11 +206,19 @@ KURALLAR:
     
     const duration = Date.now() - startTime
     
+    // Güncel kredi durumunu al
+    const updatedCredits = await getCreditStatus(user.id)
+    
     return NextResponse.json({
       success: true,
       text: cleanText,
       visuals: visuals.length > 0 ? visuals : undefined,
       topic,
+      student_name: studentName,
+      credits: {
+        remaining: updatedCredits.remaining,
+        is_premium: updatedCredits.is_premium
+      },
       model: 'gemini-3-flash-preview',
       duration
     })

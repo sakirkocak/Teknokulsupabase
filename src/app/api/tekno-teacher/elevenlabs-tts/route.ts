@@ -2,10 +2,11 @@
  * 🔊 TeknoÖğretmen - ElevenLabs TTS API
  * 
  * Yüksek kaliteli Türkçe ses üretimi
- * ElevenLabs SDK kullanır
+ * ✅ Auth kontrolü - sadece giriş yapmış kullanıcılar
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js'
 
 export const runtime = 'nodejs'
@@ -28,6 +29,19 @@ interface TTSRequest {
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   
+  // =====================================================
+  // 🔒 AUTH KONTROLÜ
+  // =====================================================
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+    return NextResponse.json({ 
+      error: 'Giriş yapmanız gerekiyor',
+      requireAuth: true
+    }, { status: 401 })
+  }
+  
   const apiKey = process.env.ELEVENLABS_API_KEY
   if (!apiKey) {
     console.error('❌ ElevenLabs API key yok!')
@@ -45,7 +59,7 @@ export async function POST(request: NextRequest) {
     const cleanText = text.trim().slice(0, 5000)
     const voiceId = VOICES[voice] || VOICES.turkish
     
-    console.log(`🔊 [ELEVENLABS] Ses üretiliyor: ${cleanText.slice(0, 50)}...`)
+    console.log(`🔊 [ELEVENLABS] User: ${user.id.slice(0, 8)}... Ses üretiliyor: ${cleanText.slice(0, 50)}...`)
     
     // ElevenLabs Client
     const elevenlabs = new ElevenLabsClient({
@@ -57,7 +71,7 @@ export async function POST(request: NextRequest) {
       voiceId,
       {
         text: cleanText,
-        modelId: 'eleven_flash_v2_5',  // En hızlı model - 75ms gecikme
+        modelId: 'eleven_flash_v2_5',
         outputFormat: 'mp3_44100_128'
       }
     )
