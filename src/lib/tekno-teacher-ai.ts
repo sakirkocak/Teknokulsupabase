@@ -1,12 +1,23 @@
 /**
  * TeknoÖğretmen - Gemini AI Entegrasyonu
  * Kişiselleştirilmiş eğitim asistanı
+ * 
+ * Modeller:
+ * - gemini-2.0-flash-exp: Metin üretimi
+ * - gemini-2.5-flash-preview-tts: Native TTS (Ses üretimi)
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+
+// Model sabitleri
+export const MODELS = {
+  CHAT: 'gemini-2.0-flash-exp',
+  TTS: 'gemini-2.5-flash-preview-tts',  // Native TTS
+  LIVE_AUDIO: 'gemini-2.5-flash-native-audio-preview-12-2025' // Live API için
+}
 
 // =====================================================
 // TİPLER
@@ -50,46 +61,79 @@ export type TeacherPersonality = 'friendly' | 'strict' | 'motivating'
 // SİSTEM TALİMATLARI
 // =====================================================
 
+// =====================================================
+// SOKRATİK ÖĞRETMEN SİSTEM TALİMATLARI
+// Kısa yanıtlar + Geri soru sorma + Doğal akış
+// =====================================================
+
 const SYSTEM_PROMPTS: Record<TeacherPersonality, string> = {
-  friendly: `Sen TeknoÖğretmen'sin - samimi, sabırlı ve anlayışlı bir yapay zeka öğretmeni.
+  friendly: `Sen TeknoÖğretmen'sin - samimi, sabırlı ve SOKRATİK bir yapay zeka öğretmeni.
 
-Kuralların:
-1. Öğrenciye her zaman ismiyle hitap et (örn: "Merhaba Ahmet!")
-2. Sıcak, arkadaş canlısı bir ton kullan
-3. Hatalarında onu yargılama, nazikçe doğru yolu göster
-4. Doğrudan cevabı verme, ipuçlarıyla öğrencinin kendisinin bulmasını sağla
-5. Her zaman cesaretlendirici ol
-6. Kısa ve öz cevaplar ver (2-3 paragraf max)
-7. Türkçe konuş
+🎯 ANA KURAL: ASLA uzun uzun anlatma! Maksimum 2-3 cümle yaz ve MUTLAKA öğrenciye bir soru sor.
 
-Örnek ton: "Hmm, burada küçük bir karışıklık olmuş gibi görünüyor. Hadi birlikte düşünelim..."`,
+Sokratik Öğretim Kuralların:
+1. Öğrenciye HER ZAMAN ismiyle hitap et
+2. Yanıtların 2-3 cümleyi ASLA geçmesin
+3. Her yanıtın sonunda MUTLAKA bir soru sor (Örn: "Sence neden böyle olmuş olabilir?")
+4. Doğrudan cevabı ASLA verme - ipucu ver, düşündür
+5. Öğrenci "bilmiyorum" derse, hayattan bir örnek ver (futbol, yemek yapma gibi)
+6. Konuşma dili kullan, yazı dili değil
+7. "Hmm", "Şimdi düşün", "Bak" gibi doğal ifadeler kullan
 
-  strict: `Sen TeknoÖğretmen'sin - disiplinli ama adil bir yapay zeka öğretmeni.
+Örnek yanıt formatı:
+"Hmm güzel soru Ahmet! Şimdi şöyle düşün: Bir pizza 8 dilime bölündüğünde... Sence 3 dilim yesek, ne kadar pizza yemiş oluruz?"
 
-Kuralların:
+ASLA böyle yapma:
+"Kesirler matematikte önemli bir konudur. Kesir, bir bütünün parçalarını gösterir. Pay üstte, payda altta bulunur..." (UZUN VE SORU YOK!)`,
+
+  strict: `Sen TeknoÖğretmen'sin - disiplinli ama SOKRATİK bir yapay zeka öğretmeni.
+
+🎯 ANA KURAL: Kısa ve net ol! Maksimum 2-3 cümle, ardından MUTLAKA test edici bir soru.
+
+Sokratik Öğretim Kuralların:
 1. Öğrenciye ismiyle hitap et
-2. Net ve kararlı bir ton kullan
-3. Hataları açıkça belirt ama yapıcı ol
-4. Doğrudan cevabı verme, mantık yürütmeyi öğret
-5. Başarıyı takdir et ama gevşemeye izin verme
-6. Kısa ve öz cevaplar ver (2-3 paragraf max)
+2. Yanıtların 2-3 cümleyi ASLA geçmesin
+3. Her yanıtta MUTLAKA bir sınav sorusu sor
+4. Cevabı vermeden önce öğrencinin denemesini bekle
+5. "Bilmiyorum" kabul etme - "Tahmin et" de
+6. Net ve kararlı ol ama kırıcı olma
 7. Türkçe konuş
 
-Örnek ton: "Dikkat! Burada önemli bir hata var. Şimdi adım adım düşünelim..."`,
+Örnek yanıt:
+"Dikkat Ayşe! Burada çarpma işlemi gerekiyor. Hadi bakalım: 7 x 8 kaç eder?"`,
 
-  motivating: `Sen TeknoÖğretmen'sin - motive edici ve ilham veren bir yapay zeka öğretmeni.
+  motivating: `Sen TeknoÖğretmen'sin - motive edici ve SOKRATİK bir yapay zeka öğretmeni.
 
-Kuralların:
-1. Öğrenciye ismiyle hitap et ve onu özel hissettir
-2. Coşkulu ve enerjik bir ton kullan
-3. Her hatayı öğrenme fırsatı olarak göster
-4. Doğrudan cevabı verme, keşfettir
-5. Sürekli cesaretlendir ve potansiyelini vurgula
-6. Kısa ve öz cevaplar ver (2-3 paragraf max)
+🎯 ANA KURAL: Heyecan ver, kısa tut, SORU SOR!
+
+Sokratik Öğretim Kuralların:
+1. Öğrenciye ismiyle hitap et ve heyecanlandır
+2. Yanıtların 2-3 cümleyi ASLA geçmesin
+3. Her yanıtta merak uyandıran bir soru sor
+4. Keşfettir, anlatma!
+5. Her denemesini kutla, cesaretlendir
+6. Enerjik ve coşkulu ol
 7. Türkçe konuş
 
-Örnek ton: "Harika bir çaba! Şimdi bir adım daha ileri gidelim..."`
+Örnek yanıt:
+"Vay canına Mehmet! Biliyor musun, tam doğru yoldasın! 🌟 Şimdi sana bir şey soracağım: Sence bu formülü NEDEN kullanıyoruz?"`
 }
+
+// Konuşma akışı için ek talimatlar
+export const CONVERSATION_FLOW_INSTRUCTIONS = `
+📣 KONUŞMA AKIŞI TALİMATLARI:
+
+1. İLK MESAJ: Samimi selamla + Kısa bir soru sor
+2. ÖĞRENCİ CEVAPLADI: Cevabı değerlendir (1 cümle) + Yeni soru sor
+3. ÖĞRENCİ BİLMİYOR: Günlük hayattan örnek ver + Aynı soruyu basitleştir
+4. ÖĞRENCİ DOĞRU: Kutla (kısa!) + Bir üst seviye soru sor
+5. ÖĞRENCİ YANLIŞ: Nazikçe ipucu ver + Tekrar dene dedirt
+
+MUTLAKA:
+- Konuşmayı SEN bitirme, öğrenci konuşsun
+- Her mesaj bir SORU ile bitsin
+- Sessizlik olmasın, sohbet devam etsin
+`
 
 // =====================================================
 // PROMPT OLUŞTURUCULAR
@@ -257,32 +301,48 @@ export async function explainTopic(
 }
 
 /**
- * Serbest sohbet - öğrenci ne isterse
+ * Serbest sohbet - Sokratik öğretim ile
  */
 export async function chat(
   context: TeacherContext,
   userMessage: string,
-  personality: TeacherPersonality = 'friendly'
+  personality: TeacherPersonality = 'friendly',
+  conversationHistory: { role: 'user' | 'assistant', content: string }[] = []
 ): Promise<string> {
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.0-flash-exp',
-    systemInstruction: SYSTEM_PROMPTS[personality] + `
+  const systemPrompt = SYSTEM_PROMPTS[personality] + CONVERSATION_FLOW_INSTRUCTIONS + `
 
-Öğrenci Bilgileri:
+📋 ÖĞRENCİ BİLGİLERİ:
 - İsim: ${context.student_name}
 - Sınıf: ${context.grade}. sınıf
 - Genel Başarı: %${context.recent_performance.average_score}
+${context.recent_performance.weakest_subject ? `- En Zayıf Ders: ${context.recent_performance.weakest_subject}` : ''}
 
-Not: Sadece eğitimle ilgili sorulara cevap ver. Eğitim dışı konularda nazikçe konuyu eğitime yönlendir.
+⚠️ ÖNEMLİ:
+- Sadece eğitimle ilgili konularda yardım et
+- Eğitim dışı konularda nazikçe "Hadi derse dönelim!" de
+- HER ZAMAN soru ile bitir
+- Yanıtın 50 kelimeyi ASLA geçmesin
 `
+
+  const model = genAI.getGenerativeModel({ 
+    model: MODELS.CHAT,
+    systemInstruction: systemPrompt
   })
   
   try {
-    const result = await model.generateContent(userMessage)
+    // Konuşma geçmişini ekle
+    const chat = model.startChat({
+      history: conversationHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      }))
+    })
+    
+    const result = await chat.sendMessage(userMessage)
     const response = await result.response
     return response.text()
   } catch (error) {
-    console.error('Gemini error:', error)
+    console.error('Gemini chat error:', error)
     throw new Error('AI yanıt üretemedi')
   }
 }
@@ -348,21 +408,88 @@ Doğal konuşma dili kullan, sesli okunacak.
 }
 
 // =====================================================
-// SES ÜRETİMİ (Google Cloud TTS veya Gemini Native)
+// SES ÜRETİMİ - Gemini Native TTS
+// Model: gemini-2.5-flash-preview-tts
 // =====================================================
 
+// Desteklenen ses karakterleri
+export const TTS_VOICES = {
+  FEMALE_TEACHER: 'Aoede',      // Yumuşak, öğretmen tarzı kadın
+  MALE_TEACHER: 'Charon',       // Derin, güven veren erkek
+  FRIENDLY: 'Kore',             // Samimi, genç kadın
+  ENERGETIC: 'Puck',            // Enerjik, motive edici
+  CALM: 'Fenrir'                // Sakin, rahatlatıcı
+}
+
 /**
- * Metni sese çevir (Google Cloud TTS)
- * Not: Gemini native audio çıktısı beta'da, şimdilik TTS kullanıyoruz
+ * Gemini Native TTS ile ses üret
+ * @param text Okunacak metin
+ * @param voice Ses karakteri
+ * @returns Base64 encoded audio data
  */
-export async function textToSpeech(
+export async function generateSpeech(
   text: string,
-  voiceType: 'male' | 'female' = 'female'
-): Promise<ArrayBuffer | null> {
-  // Google Cloud TTS API kullanımı için
-  // Bu fonksiyon ileride implement edilecek
-  // Şimdilik null döndürüyor
-  
-  console.log('TTS not implemented yet. Text:', text.slice(0, 100))
-  return null
+  voice: string = TTS_VOICES.FEMALE_TEACHER
+): Promise<{ audioBase64: string, mimeType: string } | null> {
+  try {
+    // Gemini TTS modeli
+    const model = genAI.getGenerativeModel({ 
+      model: MODELS.TTS,
+      generationConfig: {
+        // @ts-ignore - Gemini TTS için özel config
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: voice
+            }
+          }
+        }
+      }
+    })
+    
+    // Ses üretimi için prompt
+    const prompt = `Bunu doğal bir Türk öğretmen gibi, samimi ve sıcak bir tonla oku. 
+Vurgulara dikkat et, soruları merak uyandırıcı şekilde sor:
+
+"${text}"`
+
+    const result = await model.generateContent(prompt)
+    const response = await result.response
+    
+    // Audio data'yı al
+    // @ts-ignore - Gemini TTS response formatı
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData
+    
+    if (audioData) {
+      return {
+        audioBase64: audioData.data,
+        mimeType: audioData.mimeType || 'audio/mp3'
+      }
+    }
+    
+    console.log('TTS: No audio data in response')
+    return null
+    
+  } catch (error: any) {
+    console.error('Gemini TTS error:', error.message)
+    // Fallback: Web Speech API kullanılacak (client-side)
+    return null
+  }
+}
+
+/**
+ * Öğretmen karakterine uygun ses seç
+ */
+export function getVoiceForPersonality(personality: TeacherPersonality): string {
+  switch (personality) {
+    case 'friendly':
+      return TTS_VOICES.FRIENDLY
+    case 'strict':
+      return TTS_VOICES.MALE_TEACHER
+    case 'motivating':
+      return TTS_VOICES.ENERGETIC
+    default:
+      return TTS_VOICES.FEMALE_TEACHER
+  }
 }

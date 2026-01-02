@@ -15,10 +15,15 @@ import {
   TrendingUp,
   AlertCircle,
   Play,
-  Pause
+  Pause,
+  Mic,
+  MicOff,
+  Phone,
+  PhoneOff
 } from 'lucide-react'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
 import { useSpeech } from '@/hooks/useSpeech'
+import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
 
 interface Message {
   id: string
@@ -34,6 +39,8 @@ interface CreditStatus {
   used_today: number
 }
 
+type ConversationMode = 'text' | 'voice' | 'listening'
+
 export default function TeknoTeacherChat() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
@@ -44,10 +51,13 @@ export default function TeknoTeacherChat() {
   const [studentName, setStudentName] = useState('')
   const [avatarVolume, setAvatarVolume] = useState(0)
   const [autoSpeak, setAutoSpeak] = useState(true)
+  const [conversationMode, setConversationMode] = useState<ConversationMode>('text')
+  const [voiceSessionActive, setVoiceSessionActive] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const pendingVoiceInput = useRef<string>('')
   
-  // Speech hook
+  // Speech hook (TTS)
   const { 
     isPlaying: isSpeaking, 
     speak, 
@@ -55,8 +65,103 @@ export default function TeknoTeacherChat() {
     volume: speechVolume 
   } = useSpeech({
     onVolumeChange: (vol) => setAvatarVolume(vol),
-    onEnd: () => setAvatarVolume(0)
+    onEnd: () => {
+      setAvatarVolume(0)
+      // Ses bitti, dinleme moduna geç
+      if (voiceSessionActive && conversationMode === 'voice') {
+        setTimeout(() => {
+          setConversationMode('listening')
+          startListening()
+        }, 500) // Kısa bir bekleme
+      }
+    }
   })
+  
+  // Voice recognition hook (STT)
+  const {
+    isListening,
+    isSupported: voiceSupported,
+    transcript,
+    interimTranscript,
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useVoiceRecognition({
+    language: 'tr-TR',
+    continuous: true,
+    interimResults: true,
+    onResult: (text, isFinal) => {
+      if (isFinal && text.trim().length > 2) {
+        // Final sonuç geldi - mesaj gönder
+        pendingVoiceInput.current = text.trim()
+        handleVoiceInput(text.trim())
+      }
+    },
+    onEnd: () => {
+      if (voiceSessionActive && !isSpeaking) {
+        // Dinleme bitti ama sohbet devam ediyor - tekrar başlat
+        setTimeout(() => startListening(), 300)
+      }
+    }
+  })
+  
+  // Sesli giriş işle
+  const handleVoiceInput = useCallback(async (voiceText: string) => {
+    if (!voiceText.trim() || isLoading) return
+    
+    stopListening()
+    setConversationMode('voice')
+    
+    // Kullanıcı mesajını ekle
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: voiceText,
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+    resetTranscript()
+    
+    // AI yanıtı al
+    await sendMessageToAI(voiceText, true)
+  }, [isLoading, stopListening, resetTranscript])
+  
+  // Sesli sohbet oturumunu başlat/durdur
+  const toggleVoiceSession = useCallback(() => {
+    if (voiceSessionActive) {
+      // Oturumu kapat
+      setVoiceSessionActive(false)
+      setConversationMode('text')
+      stopListening()
+      stopSpeaking()
+    } else {
+      // Oturumu başlat
+      setVoiceSessionActive(true)
+      setConversationMode('listening')
+      startListening()
+      
+      // Karşılama mesajı
+      if (messages.length === 0) {
+        const welcomeMsg = studentName 
+          ? `Merhaba ${studentName}! 🎙️ Sesli sohbet moduna geçtik. Sana nasıl yardımcı olabilirim?`
+          : `Merhaba! 🎙️ Sesli sohbet moduna geçtik. Ne öğrenmek istersin?`
+        
+        const welcomeMessage: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: welcomeMsg,
+          timestamp: new Date()
+        }
+        setMessages([welcomeMessage])
+        
+        if (autoSpeak) {
+          setConversationMode('voice')
+          speak(welcomeMsg)
+        }
+      }
+    }
+  }, [voiceSessionActive, startListening, stopListening, stopSpeaking, messages.length, studentName, autoSpeak, speak])
   
   // Kredileri yükle
   useEffect(() => {
@@ -82,28 +187,27 @@ export default function TeknoTeacherChat() {
     }
   }
   
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return
+  // AI'a mesaj gönder (metin veya sesli)
+  const sendMessageToAI = async (message: string, isVoice: boolean = false) => {
+    if (!message.trim() || isLoading) return
     
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: new Date()
-    }
-    
-    setMessages(prev => [...prev, userMessage])
-    setInput('')
     setIsLoading(true)
     
     try {
+      // Konuşma geçmişini oluştur (son 10 mesaj)
+      const conversationHistory = messages.slice(-10).map(m => ({
+        role: m.role,
+        content: m.content
+      }))
+      
       const res = await fetch('/api/tekno-teacher/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'chat',
-          message: input,
-          personality: 'friendly'
+          message: message,
+          personality: 'friendly',
+          conversationHistory // Sokratik akış için geçmiş
         })
       })
       
@@ -111,6 +215,8 @@ export default function TeknoTeacherChat() {
       
       if (data.upgrade_required) {
         setShowUpgradeModal(true)
+        setVoiceSessionActive(false)
+        setConversationMode('text')
         setIsLoading(false)
         return
       }
@@ -130,8 +236,9 @@ export default function TeknoTeacherChat() {
           setCredits(prev => prev ? { ...prev, ...data.credits } : null)
         }
         
-        // Otomatik sesli okuma
-        if (autoSpeak && data.response) {
+        // Sesli yanıt
+        if ((autoSpeak || isVoice) && data.response) {
+          setConversationMode('voice')
           setTimeout(() => speak(data.response), 300)
         }
       } else {
@@ -145,9 +252,29 @@ export default function TeknoTeacherChat() {
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
+      setVoiceSessionActive(false)
+      setConversationMode('text')
     } finally {
       setIsLoading(false)
     }
+  }
+  
+  // Metin mesajı gönder
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return
+    
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: input,
+      timestamp: new Date()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+    const messageText = input
+    setInput('')
+    
+    await sendMessageToAI(messageText, false)
   }
   
   const getDailySummary = async () => {
@@ -227,7 +354,9 @@ export default function TeknoTeacherChat() {
       {/* Chat Window */}
       <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-gray-200 dark:border-gray-700">
         {/* Header */}
-        <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+        <div className={`p-4 text-white ${voiceSessionActive 
+          ? 'bg-gradient-to-r from-green-600 to-emerald-600' 
+          : 'bg-gradient-to-r from-indigo-600 to-purple-600'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* Avatar - Lip Sync ile */}
@@ -237,22 +366,45 @@ export default function TeknoTeacherChat() {
                   isSpeaking={isSpeaking || isLoading}
                   size="sm"
                   personality="friendly"
+                  externalVolume={avatarVolume}
                 />
-                {/* Konuşma göstergesi */}
-                {isSpeaking && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
-                    <Volume2 className="w-2.5 h-2.5 text-white" />
-                  </div>
-                )}
+                {/* Durum göstergesi */}
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center ${
+                  isListening ? 'bg-red-500 animate-pulse' :
+                  isSpeaking ? 'bg-green-500 animate-pulse' :
+                  'bg-gray-400'
+                }`}>
+                  {isListening ? <Mic className="w-2.5 h-2.5 text-white" /> :
+                   isSpeaking ? <Volume2 className="w-2.5 h-2.5 text-white" /> :
+                   null}
+                </div>
               </div>
               <div>
                 <h3 className="font-bold">TeknoÖğretmen</h3>
                 <p className="text-xs text-white/80">
-                  {isSpeaking ? '🎙️ Konuşuyor...' : 'AI Özel Ders Asistanı'}
+                  {isListening ? '👂 Seni dinliyorum...' :
+                   isSpeaking ? '🎙️ Konuşuyor...' :
+                   isLoading ? '🤔 Düşünüyor...' :
+                   voiceSessionActive ? '📞 Sesli Ders Aktif' :
+                   'AI Özel Ders Asistanı'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Sesli sohbet butonu */}
+              {voiceSupported && (
+                <button 
+                  onClick={toggleVoiceSession}
+                  className={`p-1.5 rounded-lg transition-all ${
+                    voiceSessionActive 
+                      ? 'bg-red-500 hover:bg-red-600' 
+                      : 'bg-white/20 hover:bg-white/30'
+                  }`}
+                  title={voiceSessionActive ? 'Sesli dersi bitir' : 'Sesli ders başlat'}
+                >
+                  {voiceSessionActive ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
+                </button>
+              )}
               {/* Ses açma/kapama */}
               <button 
                 onClick={() => setAutoSpeak(!autoSpeak)}
@@ -265,6 +417,8 @@ export default function TeknoTeacherChat() {
               <button 
                 onClick={() => {
                   stopSpeaking()
+                  stopListening()
+                  setVoiceSessionActive(false)
                   setIsOpen(false)
                 }}
                 className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
@@ -376,24 +530,71 @@ export default function TeknoTeacherChat() {
         
         {/* Input */}
         <div className="p-3 border-t border-gray-100 dark:border-gray-700">
+          {/* Sesli dinleme göstergesi */}
+          {isListening && (
+            <div className="mb-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="font-medium">Dinleniyor...</span>
+              </div>
+              {(interimTranscript || transcript) && (
+                <p className="mt-1 text-gray-600 dark:text-gray-400 italic">
+                  "{interimTranscript || transcript}"
+                </p>
+              )}
+            </div>
+          )}
+          
           <div className="flex gap-2">
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendMessage()}
-              placeholder="Bir soru sor..."
+              placeholder={voiceSessionActive ? "Konuşabilir veya yazabilirsin..." : "Bir soru sor..."}
               className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              disabled={isLoading}
+              disabled={isLoading || isListening}
             />
+            
+            {/* Mikrofon butonu */}
+            {voiceSupported && !voiceSessionActive && (
+              <button
+                onClick={() => {
+                  if (isListening) {
+                    stopListening()
+                  } else {
+                    resetTranscript()
+                    startListening()
+                  }
+                }}
+                disabled={isLoading || isSpeaking}
+                className={`p-2 rounded-xl transition-colors ${
+                  isListening 
+                    ? 'bg-red-500 text-white hover:bg-red-600' 
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                } disabled:opacity-50`}
+                title={isListening ? 'Dinlemeyi durdur' : 'Sesle konuş'}
+              >
+                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              </button>
+            )}
+            
+            {/* Gönder butonu */}
             <button
               onClick={sendMessage}
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || !input.trim() || isListening}
               className="p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="w-5 h-5" />
             </button>
           </div>
+          
+          {/* Sesli ders aktifken bilgi */}
+          {voiceSessionActive && (
+            <p className="mt-2 text-xs text-center text-gray-500 dark:text-gray-400">
+              🎙️ Sesli ders aktif - Konuş, seni dinliyorum!
+            </p>
+          )}
         </div>
       </div>
       

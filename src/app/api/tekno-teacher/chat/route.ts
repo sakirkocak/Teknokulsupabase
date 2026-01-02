@@ -36,6 +36,7 @@ interface ChatRequest {
     subject: string
     topic: string
   }
+  conversationHistory?: { role: 'user' | 'assistant', content: string }[]
 }
 
 export async function POST(request: NextRequest) {
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     
     // Request body
     const body: ChatRequest = await request.json()
-    const { action, message, personality = 'friendly', question, topic } = body
+    const { action, message, personality = 'friendly', question, topic, conversationHistory = [] } = body
     
     // Öğrenci bağlamını oluştur
     const context = await buildTeacherContext(user.id)
@@ -116,7 +117,8 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           )
         }
-        response = await chat(context, message, personality)
+        // Sokratik akış için konuşma geçmişini gönder
+        response = await chat(context, message, personality, conversationHistory)
         break
     }
     
