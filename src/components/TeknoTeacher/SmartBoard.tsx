@@ -184,11 +184,15 @@ export default function SmartBoard({
                 </div>
               )}
               
-              {/* İçerik */}
-              <div className="text-white">
-                {visual.type === 'formula' || visual.type === 'steps' ? (
-                  <div className="text-lg font-mono">
+              {/* İçerik - Tüm içeriklerde KaTeX/LaTeX desteği */}
+              <div className="text-white math-content">
+                {visual.type === 'formula' ? (
+                  <div className="text-lg">
                     <MathRenderer text={visual.content} className="text-xl leading-relaxed" />
+                  </div>
+                ) : visual.type === 'steps' ? (
+                  <div className="space-y-1">
+                    <MathRenderer text={visual.content} className="text-lg leading-relaxed" />
                   </div>
                 ) : visual.type === 'question' ? (
                   <div className="space-y-2">
@@ -207,7 +211,7 @@ export default function SmartBoard({
                 ) : visual.type === 'tip' ? (
                   <div className="flex gap-2">
                     <Lightbulb className="w-4 h-4 flex-shrink-0 mt-0.5 text-yellow-400" />
-                    <p className="text-sm">{visual.content}</p>
+                    <MathRenderer text={visual.content} className="text-sm" />
                   </div>
                 ) : (
                   <MathRenderer text={visual.content} className="text-sm" />
