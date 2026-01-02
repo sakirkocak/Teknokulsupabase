@@ -240,24 +240,22 @@ export default function TeknoTeacherChat() {
   }
   
   // =====================================================
-  // OpenAI TTS ile seslendir (tek ses kaynağı)
+  // ElevenLabs TTS ile seslendir
   // =====================================================
-  const speakWithOpenAI = async (text: string) => {
-    if (!text.trim()) return
+  const speakWithElevenLabs = async (text: string) => {
+    if (!text.trim()) return false
     
-    // Emojileri temizle
+    // Emojileri ve LaTeX'i temizle
     const cleanText = cleanTextForTTS(text)
-    if (!cleanText) return
+      .replace(/\$[^$]+\$/g, '') // Inline math kaldır
+      .replace(/\\\[[\s\S]*?\\\]/g, '') // Block math kaldır
+    if (!cleanText) return false
     
     try {
-      const ttsResponse = await fetch('/api/tekno-teacher/openai/tts', {
+      const ttsResponse = await fetch('/api/tekno-teacher/elevenlabs-tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          text: cleanText,  // Temizlenmiş metin
-          voice: 'nova',
-          speed: 1.0
-        })
+        body: JSON.stringify({ text: cleanText })
       })
       
       if (ttsResponse.ok) {
@@ -278,6 +276,7 @@ export default function TeknoTeacherChat() {
           audio.onended = () => {
             setAvatarVolume(0)
             setExplanationAudio(null)
+            setSummaryStatus('')
             URL.revokeObjectURL(audioUrl)
             // Auto-listen için callback
             if (voiceSessionRef.current) {
@@ -295,12 +294,13 @@ export default function TeknoTeacherChat() {
             }
           }, 100)
           
+          setSummaryStatus('🔊 Okunuyor...')
           await audio.play()
           return true
         }
       }
     } catch (err) {
-      console.warn('OpenAI TTS hatası:', err)
+      console.warn('ElevenLabs TTS hatası:', err)
     }
     
     // Fallback: Browser TTS
@@ -357,10 +357,10 @@ export default function TeknoTeacherChat() {
           setCredits(prev => prev ? { ...prev, ...data.credits } : null)
         }
         
-        // Sesli yanıt - OpenAI TTS kullan
+        // Sesli yanıt - ElevenLabs TTS kullan
         if ((autoSpeak || isVoice) && data.response) {
           setConversationMode('voice')
-          await speakWithOpenAI(data.response)
+          await speakWithElevenLabs(data.response)
         }
       } else {
         throw new Error(data.error)
@@ -381,7 +381,7 @@ export default function TeknoTeacherChat() {
   }
   
   // =====================================================
-  // KONU ANLAT - OpenAI + TTS ile sesli konu anlatımı
+  // KONU ANLAT - Gemini + ElevenLabs TTS ile sesli konu anlatımı
   // =====================================================
   const [explanationStatus, setExplanationStatus] = useState<string>('') // Loading status
   
@@ -404,12 +404,12 @@ export default function TeknoTeacherChat() {
     try {
       setExplanationStatus('📝 AI içerik oluşturuyor...')
       
-      // OpenAI'dan konu anlatımı al
-      const response = await fetch('/api/tekno-teacher/openai', {
+      // Gemini'den konu anlatımı al
+      const response = await fetch('/api/tekno-teacher/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `[KONU ANLATIMI MODU] Öğrenci "${topicInput}" konusunu öğrenmek istiyor. Bu konuyu detaylı, anlaşılır ve örneklerle anlat. Öğrencinin adı ${studentName || 'Öğrenci'}. Samimi ve öğretici bir dille, adım adım açıkla. Maksimum 4-5 paragraf.`,
+          message: `[KONU ANLATIMI MODU] "${topicInput}" konusunu detaylı, anlaşılır ve örneklerle anlat. Samimi ve öğretici bir dille, adım adım açıkla. Matematiksel formülleri LaTeX formatında yaz. 4-5 paragraf olsun.`,
           studentName: studentName || 'Öğrenci',
           grade: 8
         })
@@ -433,18 +433,18 @@ export default function TeknoTeacherChat() {
       
       setExplanationStatus('🎙️ Ses oluşturuluyor...')
       
-      // TTS ile seslendir
+      // ElevenLabs TTS ile seslendir
       try {
-        // Emojileri temizle
+        // Emojileri ve LaTeX'i temizle
         const cleanExplanation = cleanTextForTTS(explanation)
+          .replace(/\$[^$]+\$/g, '') // Inline math kaldır
+          .replace(/\\\[[\s\S]*?\\\]/g, '') // Block math kaldır
         
-        const ttsResponse = await fetch('/api/tekno-teacher/openai/tts', {
+        const ttsResponse = await fetch('/api/tekno-teacher/elevenlabs-tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: cleanExplanation,  // Temizlenmiş metin
-            voice: 'nova',
-            speed: 0.95  // Biraz yavaş, anlaşılır olsun
+            text: cleanExplanation
           })
         })
         
@@ -466,6 +466,7 @@ export default function TeknoTeacherChat() {
             audio.onended = () => {
               setAvatarVolume(0)
               setExplanationAudio(null)
+              setExplanationStatus('')
               URL.revokeObjectURL(audioUrl)
             }
             
@@ -506,8 +507,6 @@ export default function TeknoTeacherChat() {
     } finally {
       setIsExplaining(false)
       setTopicInput('')
-      // Status'u ses bittiğinde temizle
-      setTimeout(() => setExplanationStatus(''), 1000)
     }
   }
   
@@ -540,7 +539,7 @@ export default function TeknoTeacherChat() {
   }
   
   // =====================================================
-  // GÜNLÜK ÖZET - OpenAI + TTS ile sesli özet
+  // GÜNLÜK ÖZET - Gemini + ElevenLabs TTS ile sesli özet
   // =====================================================
   const getDailySummary = async () => {
     if (isLoading || isAnyFeatureActive) return
@@ -551,51 +550,49 @@ export default function TeknoTeacherChat() {
     try {
       setSummaryStatus('📊 Veriler analiz ediliyor...')
       
+      // Gemini'den günlük özet al
       const res = await fetch('/api/tekno-teacher/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'daily_summary',
-          personality: 'motivating'
+          message: `[GÜNLÜK ÖZET MODU] Bana bugün için motivasyon veren, kısa bir günlük özet ve çalışma tavsiyesi ver. Enerjik ve motive edici ol. Maksimum 3-4 cümle.`,
+          studentName: studentName || 'Öğrenci',
+          grade: 8
         })
       })
 
       const data = await res.json()
 
-      if (data.upgrade_required) {
-        setShowUpgradeModal(true)
-        setIsSummaryLoading(false)
-        setSummaryStatus('')
-        return
-      }
-
-      if (data.success) {
+      if (data.success && data.text) {
         setSummaryStatus('✅ Özet hazır!')
         
         const summaryMessage: Message = {
           id: Date.now().toString(),
           role: 'assistant',
-          content: data.response,
+          content: data.text,
           timestamp: new Date()
         }
 
         setMessages(prev => [...prev, summaryMessage])
-        setStudentName(data.student_name)
 
-        if (data.credits) {
-          setCredits(prev => prev ? { ...prev, ...data.credits } : null)
-        }
-
-        // OpenAI TTS ile sesli okuma
-        if (autoSpeak && data.response) {
+        // ElevenLabs TTS ile sesli okuma
+        if (autoSpeak && data.text) {
           setSummaryStatus('🎙️ Ses oluşturuluyor...')
-          await speakWithOpenAI(data.response)
-          setSummaryStatus('🔊 Okunuyor...')
+          await speakWithElevenLabs(data.text)
         }
+      } else {
+        throw new Error(data.error || 'Özet alınamadı')
       }
     } catch (error: any) {
       console.error('Summary error:', error)
       setSummaryStatus('')
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: 'Günlük özet hazırlanırken bir sorun oluştu. Tekrar dene!',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsSummaryLoading(false)
       setTimeout(() => setSummaryStatus(''), 1000)
