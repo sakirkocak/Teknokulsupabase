@@ -128,6 +128,12 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <head>
+        {/* Google AdSense */}
+        <script 
+          async 
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6104136038653545"
+          crossOrigin="anonymous"
+        />
         {/* Ezoic CMP (Consent Management Platform) - GDPR/KVKK uyumluluğu */}
         <script data-cfasync="false" src="https://cmp.gatekeeperconsent.com/min.js" />
         <script data-cfasync="false" src="https://the.gatekeeperconsent.com/cmp.min.js" />
