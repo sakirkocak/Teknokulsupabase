@@ -4,6 +4,7 @@ import { Suspense } from 'react'
 import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import JsonLdSchema from '@/components/JsonLdSchema'
 import FeedbackWidget from '@/components/FeedbackWidget'
+import { TeknoTeacherChat } from '@/components/TeknoTeacher'
 import './globals.css'
 
 const baseUrl = 'https://www.teknokul.com.tr'
@@ -162,6 +163,9 @@ export default function RootLayout({
         
         {/* Geri Bildirim Widget */}
         <FeedbackWidget />
+        
+        {/* TeknoÖğretmen AI Asistan */}
+        <TeknoTeacherChat />
       </body>
     </html>
   )
