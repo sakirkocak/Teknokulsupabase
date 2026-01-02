@@ -68,16 +68,19 @@ export async function POST(request: NextRequest) {
   // =====================================================
   const isSetup = action === 'setup'
   
-  // İlk mesaj: AI kendisi başlasın!
+  // =====================================================
+  // INITIAL MESSAGE BUFFER: İlk mesaj tetikleyici
+  // =====================================================
+  // AI kendisi başlasın - boş mesaj beklemeden!
   const prompt = isSetup 
-    ? `[SİSTEM: Öğrenci ${studentName} karşında oturuyor. SEN HEMEN SÖZE BAŞLA! İlk mesajı ondan bekleme!]
-       
-       Şimdi Türkçe olarak söyle: "Selam ${studentName}! Bugün Pro gücüyle yanındayım, hadi derse başlayalım! Ne çalışmak istersin?"
-       
-       SADECE bu cümleyi söyle, başka açıklama yapma.`
+    ? `[ZORUNLU TALİMAT: Sen ${studentName} adlı öğrencinin karşısındasın. HEMEN konuşmaya başla!]
+
+Şimdi tam olarak şunu söyle: "Merhaba ${studentName}, bugün harika bir ders işleyeceğiz! Ne çalışmak istersin?"
+
+DİKKAT: Sadece bu cümleyi söyle, başka hiçbir şey ekleme.`
     : `${studentName} sana şunu söyledi: "${textMessage}"
        
-       Kısa ve öz Türkçe yanıt ver. ${studentName}'e ismiyle hitap et. Maksimum 2 cümle.`
+Kısa ve samimi Türkçe yanıt ver. Mutlaka "${studentName}" diye hitap et. Max 2 cümle.`
   
   const systemPrompt = `Sen TeknoÖğretmen'sin - ${studentName}'in özel ders öğretmeni.
 

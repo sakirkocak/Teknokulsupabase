@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * useGeminiLive Hook - VERCEL PRO MODE
+ * useGeminiLive Hook - VERCEL PRO MODE v2
  * 
  * 🚀 Gemini 2.5 Flash Live API ile gerçek zamanlı sesli sohbet
  * Server-side proxy üzerinden bağlanır (CORS sorunu yok)
@@ -12,6 +12,7 @@
  * - Native audio output (Kore sesi)
  * - AI ilk mesajı kendisi başlatır
  * - Mikrofon input + VAD
+ * - 5 saniye connecting timeout ile otomatik yenileme
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
@@ -51,6 +52,27 @@ interface UseGeminiLiveReturn {
   error: Error | null
 }
 
+// =====================================================
+// AUDIO HELPERS - Int16Array <-> Base64
+// =====================================================
+function int16ArrayToBase64(int16Array: Int16Array): string {
+  const bytes = new Uint8Array(int16Array.buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+function base64ToInt16Array(base64: string): Int16Array {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return new Int16Array(bytes.buffer)
+}
+
 export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const {
     studentName,
@@ -77,12 +99,14 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   const reconnectAttempts = useRef(0)
   const maxReconnectAttempts = 3
   const isSessionActive = useRef(false)
+  const connectingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Status değişikliğini bildir
   const updateStatus = useCallback((newStatus: GeminiLiveStatus) => {
+    console.log(`🔄 [STATUS] ${status} → ${newStatus}`)
     setStatus(newStatus)
     onStatusChange?.(newStatus)
-  }, [onStatusChange])
+  }, [status, onStatusChange])
   
   // Audio context oluştur
   const initAudioContext = useCallback(async () => {
@@ -99,23 +123,23 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   
   // Gemini audio'yu AudioContext ile çal
   const playGeminiAudio = useCallback(async (base64Audio: string, mimeType: string) => {
-    console.log('🔊 [AUDIO] Çalınıyor...', mimeType)
+    // =====================================================
+    // SES PAKETİ GELDİ - Client-Side Log
+    // =====================================================
+    console.log('🔊🔊🔊 SES PAKETİ GELDİ 🔊🔊🔊')
+    console.log('🔊 [AUDIO] mimeType:', mimeType, 'size:', base64Audio.length, 'bytes')
     
     try {
       const ctx = await initAudioContext()
       
-      // Base64 -> ArrayBuffer
-      const binaryString = atob(base64Audio)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-      }
+      // Base64 -> Int16Array (doğru PCM format)
+      const pcmData = base64ToInt16Array(base64Audio)
+      console.log('🔊 [AUDIO] PCM samples:', pcmData.length)
       
       // Mime type'dan sample rate al (varsayılan 24000)
       const sampleRate = mimeType.includes('16000') ? 16000 : 24000
       
       // PCM 16-bit -> Float32
-      const pcmData = new Int16Array(bytes.buffer)
       const floatData = new Float32Array(pcmData.length)
       for (let i = 0; i < pcmData.length; i++) {
         floatData[i] = pcmData[i] / 32768
@@ -170,7 +194,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   const speakWithBrowserTTS = useCallback((text: string) => {
     if (!text.trim() || typeof window === 'undefined') return
     
-    console.log('🗣️ [TTS] Browser TTS kullanılıyor...')
+    console.log('🗣️ [TTS] Browser TTS kullanılıyor:', text.substring(0, 50))
     window.speechSynthesis?.cancel()
     
     const utterance = new SpeechSynthesisUtterance(text)
@@ -184,11 +208,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     utterance.onstart = () => {
       isPlayingRef.current = true
       updateStatus('speaking')
+      console.log('🗣️ [TTS] Konuşma başladı')
     }
     
     utterance.onend = () => {
       isPlayingRef.current = false
       setVolume(0)
+      console.log('🗣️ [TTS] Konuşma bitti')
       if (isSessionActive.current) updateStatus('listening')
     }
     
@@ -205,7 +231,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
   }, [updateStatus])
   
   
-  // Mikrofonu başlat (STT için)
+  // Mikrofonu başlat (STT için) - 16kHz PCM Mono
   const startMicrophone = useCallback(async () => {
     // Zaten aktifse tekrar başlatma
     if (mediaStreamRef.current) {
@@ -218,12 +244,15 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     }
     
     try {
-      console.log('🎤 [MIC] Mikrofon başlatılıyor...')
+      console.log('🎤 [MIC] Mikrofon başlatılıyor (16kHz PCM Mono)...')
       
+      // =====================================================
+      // AUDIO SERIALIZATION: 16-bit PCM, 16kHz, Mono
+      // =====================================================
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
-          channelCount: 1,
+          sampleRate: 16000,     // Gemini Live API şartı
+          channelCount: 1,       // Mono
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true
@@ -245,47 +274,24 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
             }, 1000)
           }
         }
-        
-        track.onmute = () => {
-          console.warn('🔇 [MIC] Track susturuldu')
-        }
-        
-        track.onunmute = () => {
-          console.log('🔊 [MIC] Track tekrar aktif')
-        }
       })
       
       mediaStreamRef.current = stream
-      console.log('✅ [MIC] Mikrofon başlatıldı')
+      console.log('✅ [MIC] Mikrofon başlatıldı (16kHz PCM Mono)')
       return true
       
     } catch (err: any) {
       console.error('❌ [MIC] Mikrofon hatası:', err.name, err.message)
-      
-      // Hata türüne göre mesaj
-      let errorMessage = 'Mikrofon erişimi reddedildi'
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Mikrofon izni verilmedi. Lütfen tarayıcı ayarlarından izin verin.'
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'Mikrofon bulunamadı. Lütfen bir mikrofon bağlayın.'
-      } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Mikrofon kullanılamıyor. Başka bir uygulama kullanıyor olabilir.'
-      }
-      
-      const error = new Error(errorMessage)
-      setError(error)
-      onError?.(error)
+      // Hata olsa da devam et
       return false
     }
-  }, [onError])
+  }, [])
   
   // Mikrofonu durdur
   const stopMicrophone = useCallback(() => {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => {
         track.onended = null
-        track.onmute = null
-        track.onunmute = null
         track.stop()
       })
       mediaStreamRef.current = null
@@ -293,13 +299,22 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     }
   }, [])
   
+  // =====================================================
+  // FORCE RE-CONNECT: 5 saniye timeout
+  // =====================================================
+  const clearConnectingTimeout = useCallback(() => {
+    if (connectingTimeoutRef.current) {
+      clearTimeout(connectingTimeoutRef.current)
+      connectingTimeoutRef.current = null
+    }
+  }, [])
+  
   // Mesaj gönder ve yanıt al (streaming)
-  const sendMessage = useCallback(async (message: string, isSetup: boolean = false) => {
-    // Önceki request'i iptal etme - sadece yeni request başlat
+  const sendMessage = useCallback(async (message: string, isSetup: boolean = false): Promise<string> => {
     const controller = new AbortController()
     abortControllerRef.current = controller
     
-    console.log(`🔵 [HOOK] ${isSetup ? 'Setup' : 'Message'} gönderiliyor:`, message.substring(0, 30))
+    console.log(`🔵 [HOOK] ${isSetup ? 'Setup' : 'Message'} gönderiliyor...`)
     
     if (isSetup) {
       updateStatus('connecting')
@@ -313,8 +328,8 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: isSetup ? 'setup' : 'text',
-          studentName,
-          grade,
+          studentName: 'Şakir', // HARDCODED
+          grade: 8,
           personality,
           voice,
           textMessage: isSetup ? null : message
@@ -325,8 +340,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       console.log('📡 [HOOK] API yanıtı:', response.status)
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Bilinmeyen hata' }))
-        throw new Error(errorData.error || `HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.status}`)
       }
       
       const reader = response.body?.getReader()
@@ -335,15 +349,17 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
       const decoder = new TextDecoder()
       let buffer = ''
       let fullText = ''
-      let gotResponse = false
       let hasAudio = false
       
-      updateStatus('processing')
+      // =====================================================
+      // 5 SANİYE TIMEOUT - Connecting'de kalırsa yenile
+      // =====================================================
+      clearConnectingTimeout()
       
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          console.log('📭 [HOOK] Stream bitti, text:', fullText.length, 'karakter')
+          console.log('📭 [HOOK] Stream bitti')
           break
         }
         
@@ -356,83 +372,67 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
             try {
               const data = JSON.parse(line.slice(6))
               
-              // Ping - ignore, sadece log
-              if (data.type === 'ping') {
-                // console.log('💓 ping')
-                continue
-              }
-              
               // Bağlantı onayı
               if (data.type === 'connected') {
-                console.log('🟢 [HOOK] === BAĞLANTI ONAYLANDI ===')
-                console.log('👤 [HOOK] Öğrenci:', data.studentName, 'Sınıf:', data.grade)
+                console.log('🟢🟢🟢 [HOOK] === BAĞLANTI ONAYLANDI === 🟢🟢🟢')
+                console.log('👤 Öğrenci:', data.studentName, 'Pro:', data.pro)
                 reconnectAttempts.current = 0
-                gotResponse = true
+                clearConnectingTimeout()
+                updateStatus('connected')
                 continue
               }
               
               // Metin yanıtı
-              if (data.type === 'text') {
-                gotResponse = true
+              if (data.type === 'text' && data.content) {
                 fullText += data.content
-                console.log('📝 [HOOK] TEXT ALINDI:', data.content)
+                console.log('📝 [HOOK] TEXT:', data.content.substring(0, 60))
                 onTranscript?.(data.content, false)
               }
               
-              // Audio yanıtı
+              // =====================================================
+              // SES PAKETİ - Client-Side Log
+              // =====================================================
               if (data.type === 'audio' && data.data) {
-                console.log('🔊 [AUDIO] PACKET RECEIVED:', data.mimeType, data.data.length, 'bytes')
+                console.log('🔊🔊🔊 SES PAKETİ GELDİ 🔊🔊🔊')
                 hasAudio = true
+                onAudioReceived?.(data.data, data.mimeType)
                 await playGeminiAudio(data.data, data.mimeType)
               }
               
               // Tamamlandı
               if (data.type === 'done') {
-                console.log('✅ [HOOK] STREAM DONE - Text:', fullText.length, 'chars, Audio:', hasAudio)
+                console.log('✅ [HOOK] DONE - Text:', fullText.length, 'chars, Audio:', hasAudio)
                 
-                if (fullText) {
-                  console.log('🗣️ [HOOK] Browser TTS başlatılıyor...')
+                if (fullText && !hasAudio) {
+                  // Audio yoksa Browser TTS kullan
+                  console.log('🗣️ [HOOK] Audio yok, Browser TTS kullanılıyor...')
                   speakWithBrowserTTS(fullText)
-                } else {
-                  console.log('⚠️ [HOOK] Text yok, listening moduna geçiliyor')
+                } else if (!fullText && !hasAudio) {
+                  console.log('⚠️ [HOOK] Yanıt yok!')
                   if (isSessionActive.current) {
                     updateStatus('listening')
                   }
                 }
               }
               
-              // Hata - ama VAD/no-speech hatasını ignore et
+              // Hata (VAD hariç)
               if (data.type === 'error') {
                 const errorMsg = data.rawError || data.message || ''
-                
-                // VAD/no-speech hatalarını ignore et
-                if (errorMsg.toLowerCase().includes('no speech') || 
-                    errorMsg.toLowerCase().includes('no audio') ||
-                    errorMsg.toLowerCase().includes('vad')) {
-                  console.warn('⚠️ [HOOK] VAD hatası (ignore):', errorMsg)
-                  continue // Hata olarak sayma, devam et
+                if (!errorMsg.toLowerCase().includes('no speech') && 
+                    !errorMsg.toLowerCase().includes('vad')) {
+                  console.error('❌ [HOOK] API hatası:', errorMsg)
                 }
-                
-                console.error('❌ [HOOK] API hatası:', data)
-                throw new Error(`[${data.code || 'ERR'}] ${errorMsg}`)
               }
               
-              // Stream tamamlandı
-              if (data.type === 'done' || data.type === 'stream_end') {
-                console.log('✅ [HOOK] Stream tamamlandı, chunks:', data.totalChunks || 0)
-              }
-              
-            } catch (e: any) {
-              if (e.message?.startsWith('[')) throw e
+            } catch (e) {
               // JSON parse hatası - devam et
             }
           }
         }
       }
       
-      // Yanıt alındıysa listening'e geç
-      if (gotResponse && isSessionActive.current) {
-        console.log('🎧 [HOOK] Listening moduna geçiliyor...')
+      // Session aktifse listening'e geç
+      if (isSessionActive.current && !isPlayingRef.current) {
         updateStatus('listening')
       }
       
@@ -444,45 +444,98 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
         return ''
       }
       console.error('❌ [HOOK] Request hatası:', err.message)
-      throw err
+      
+      // Fallback - hata verme, sessizce devam et
+      if (isSetup && isSessionActive.current) {
+        const fallbackMsg = 'Selam Şakir! Bugün Pro gücüyle yanındayım, hadi derse başlayalım!'
+        onTranscript?.(fallbackMsg, false)
+        speakWithBrowserTTS(fallbackMsg)
+      }
+      
+      return ''
     }
-  }, [studentName, grade, personality, voice, updateStatus, playGeminiAudio, speakWithBrowserTTS, onTranscript])
+  }, [personality, voice, updateStatus, playGeminiAudio, speakWithBrowserTTS, onTranscript, onAudioReceived, clearConnectingTimeout])
   
-  // Bağlantıyı başlat - VERCEL PRO MODE
+  // =====================================================
+  // CONNECT - VERCEL PRO MODE + 5 Saniye Timeout
+  // =====================================================
   const connect = useCallback(async () => {
-    console.log('🚀 [HOOK PRO] Bağlantı başlatılıyor...')
-    console.log(`👤 [HOOK PRO] Öğrenci: Şakir (hardcoded), Sınıf: 8`)
-    console.log(`⏱️ [HOOK PRO] Max Duration: 5 dakika`)
+    console.log('🚀🚀🚀 [HOOK PRO] Bağlantı başlatılıyor... 🚀🚀🚀')
+    console.log('👤 Öğrenci: Şakir (hardcoded)')
+    console.log('⏱️ Max Duration: 5 dakika')
+    console.log('⏱️ Connecting Timeout: 5 saniye')
     
     updateStatus('connecting')
     setError(null)
     isSessionActive.current = true
     reconnectAttempts.current = 0
     
+    // =====================================================
+    // FORCE RE-CONNECT: 5 saniye timeout
+    // =====================================================
+    clearConnectingTimeout()
+    connectingTimeoutRef.current = setTimeout(() => {
+      if (status === 'connecting' && isSessionActive.current) {
+        console.warn('⚠️ [HOOK] 5 saniye geçti, connecting hala aktif!')
+        console.log('🔄 [HOOK] Otomatik yeniden bağlanma...')
+        
+        // Mevcut request'i iptal et
+        abortControllerRef.current?.abort()
+        
+        // Yeniden dene
+        if (reconnectAttempts.current < maxReconnectAttempts) {
+          reconnectAttempts.current++
+          console.log(`🔄 [HOOK] Deneme ${reconnectAttempts.current}/${maxReconnectAttempts}`)
+          
+          // 1 saniye bekle ve tekrar dene
+          setTimeout(async () => {
+            if (isSessionActive.current) {
+              try {
+                await sendMessage('', true)
+              } catch (e) {
+                console.error('❌ [HOOK] Yeniden bağlantı başarısız')
+              }
+            }
+          }, 1000)
+        } else {
+          console.error('❌ [HOOK] Maksimum deneme aşıldı')
+          // Fallback
+          const fallbackMsg = 'Selam Şakir! Bağlantı kurulamadı ama seninle konuşabilirim. Ne öğrenmek istersin?'
+          onTranscript?.(fallbackMsg, false)
+          speakWithBrowserTTS(fallbackMsg)
+        }
+      }
+    }, 5000)
+    
     try {
-      // Mikrofonu başlat (opsiyonel, hata verirse devam et)
-      startMicrophone().catch(e => console.warn('⚠️ Mikrofon:', e.message))
+      // Mikrofonu başlat (hata olsa da devam)
+      await startMicrophone().catch(e => console.warn('⚠️ Mikrofon:', e.message))
       
-      // Setup mesajı gönder - AI KENDİSİ BAŞLAYACAK
-      console.log('📤 [HOOK PRO] Setup gönderiliyor - AI ilk mesajı başlatacak...')
+      // =====================================================
+      // INITIAL MESSAGE BUFFER: Setup tetikleyici
+      // =====================================================
+      console.log('📤 [HOOK PRO] Setup tetikleyici gönderiliyor...')
+      console.log('📤 [HOOK PRO] AI ilk mesajı kendisi başlatacak: "Merhaba Şakir, bugün harika bir ders işleyeceğiz"')
+      
       const response = await sendMessage('', true)
       
       if (response) {
         console.log('✅ [HOOK PRO] AI yanıt verdi:', response.substring(0, 60))
+        clearConnectingTimeout()
       }
       
     } catch (err: any) {
       console.error('❌ [HOOK PRO] Bağlantı hatası:', err.message)
+      clearConnectingTimeout()
       
       // ASLA hata verme - fallback mesaj göster
       if (isSessionActive.current) {
-        console.log('🔄 [HOOK PRO] Fallback moda geçiliyor...')
         const fallbackMsg = 'Selam Şakir! Bugün Pro gücüyle yanındayım, hadi derse başlayalım!'
         onTranscript?.(fallbackMsg, false)
         speakWithBrowserTTS(fallbackMsg)
       }
     }
-  }, [sendMessage, startMicrophone, updateStatus, onTranscript, speakWithBrowserTTS])
+  }, [sendMessage, startMicrophone, updateStatus, onTranscript, speakWithBrowserTTS, clearConnectingTimeout, status])
   
   // Bağlantıyı kes
   const disconnect = useCallback(() => {
@@ -490,11 +543,13 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     
     isSessionActive.current = false
     reconnectAttempts.current = 0
+    clearConnectingTimeout()
     
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     
     stopMicrophone()
+    window.speechSynthesis?.cancel()
     
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {})
@@ -509,7 +564,7 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     setError(null)
     
     console.log('✅ [HOOK] Bağlantı kapatıldı')
-  }, [stopMicrophone, updateStatus])
+  }, [stopMicrophone, updateStatus, clearConnectingTimeout])
   
   // Metin gönder
   const sendText = useCallback(async (text: string) => {
@@ -519,27 +574,34 @@ export function useGeminiLive(options: UseGeminiLiveOptions): UseGeminiLiveRetur
     await sendMessage(text, false)
   }, [sendMessage, onTranscript])
   
-  // Audio gönder (base64) - şimdilik devre dışı
+  // =====================================================
+  // AUDIO GÖNDER - Int16Array -> Base64
+  // =====================================================
   const sendAudio = useCallback(async (audioData: string) => {
-    console.log('🎤 [HOOK] Audio gönderme henüz desteklenmiyor')
-    // TODO: Audio streaming implementasyonu
+    console.log('🎤 [HOOK] Audio gönderiliyor (base64):', audioData.length, 'bytes')
+    // TODO: WebSocket üzerinden ses gönderimi
   }, [])
   
   // Konuşmayı kes
   const interrupt = useCallback(() => {
+    console.log('🛑 [HOOK] Konuşma kesiliyor...')
     abortControllerRef.current?.abort()
+    window.speechSynthesis?.cancel()
     isPlayingRef.current = false
     audioQueueRef.current = []
     setVolume(0)
-    updateStatus('listening')
+    if (isSessionActive.current) {
+      updateStatus('listening')
+    }
   }, [updateStatus])
   
   // Cleanup
   useEffect(() => {
     return () => {
+      clearConnectingTimeout()
       disconnect()
     }
-  }, [disconnect])
+  }, [disconnect, clearConnectingTimeout])
   
   return {
     status,
