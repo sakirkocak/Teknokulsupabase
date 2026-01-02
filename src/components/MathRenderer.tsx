@@ -58,17 +58,21 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     result = result.replace(/\\n/g, '<br/>')
     result = result.replace(/\n/g, '<br/>')
     
+    // KaTeX ortak ayarları - 'ignore' tüm uyarıları susturur
+    const katexOptions = {
+      throwOnError: false,
+      strict: 'ignore' as const,  // "No character metrics" uyarılarını sustur
+      trust: true,
+      output: 'html' as const
+    }
+    
     // Display math: $$...$$ 
     result = result.replace(/\$\$([^$]+)\$\$/g, (_, math) => {
       try {
-        return katex.renderToString(math.trim(), {
-          displayMode: true,
-          throwOnError: false,
-          strict: false,
-          trust: true
-        })
+        const trimmed = math.trim()
+        if (!trimmed) return ''
+        return katex.renderToString(trimmed, { ...katexOptions, displayMode: true })
       } catch (e) {
-        console.error('KaTeX display error:', e, math)
         return `<span class="text-red-500 bg-red-50 px-1 rounded">${math}</span>`
       }
     })
@@ -76,14 +80,10 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     // Inline math: $...$ (tek $)
     result = result.replace(/\$([^$]+)\$/g, (_, math) => {
       try {
-        return katex.renderToString(math.trim(), {
-          displayMode: false,
-          throwOnError: false,
-          strict: false,
-          trust: true
-        })
+        const trimmed = math.trim()
+        if (!trimmed) return ''
+        return katex.renderToString(trimmed, { ...katexOptions, displayMode: false })
       } catch (e) {
-        console.error('KaTeX inline error:', e, math)
         return `<span class="text-red-500 bg-red-50 px-1 rounded">${math}</span>`
       }
     })
@@ -91,12 +91,9 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     // \(...\) inline math (alternatif)
     result = result.replace(/\\\((.+?)\\\)/g, (_, math) => {
       try {
-        return katex.renderToString(math.trim(), {
-          displayMode: false,
-          throwOnError: false,
-          strict: false,
-          trust: true
-        })
+        const trimmed = math.trim()
+        if (!trimmed) return ''
+        return katex.renderToString(trimmed, { ...katexOptions, displayMode: false })
       } catch (e) {
         return `<span class="text-red-500">${math}</span>`
       }
@@ -105,12 +102,9 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     // \[...\] display math (alternatif)
     result = result.replace(/\\\[(.+?)\\\]/g, (_, math) => {
       try {
-        return katex.renderToString(math.trim(), {
-          displayMode: true,
-          throwOnError: false,
-          strict: false,
-          trust: true
-        })
+        const trimmed = math.trim()
+        if (!trimmed) return ''
+        return katex.renderToString(trimmed, { ...katexOptions, displayMode: true })
       } catch (e) {
         return `<span class="text-red-500">${math}</span>`
       }
