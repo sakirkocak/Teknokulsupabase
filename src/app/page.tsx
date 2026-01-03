@@ -444,6 +444,9 @@ export default function HomePage() {
     setAuthLoading(false)
   }
 
+  // 🎯 Soru Çöz yönlendirmesi - giriş yapmışsa dashboard, yapmamışsa hızlı çöz
+  const soruCozHref = user ? '/ogrenci/soru-bankasi' : '/hizli-coz'
+
   useEffect(() => {
     loadFeaturedCoaches()
     loadTopLeaders()
@@ -743,7 +746,7 @@ export default function HomePage() {
       {/* Mobile Floating Action Button - TeknoÖğretmen'in üstünde */}
       {/* Mobil Soru Çöz butonu - TeknoÖğretmen widget'ın üstünde */}
       <Link
-        href="/hizli-coz"
+        href={soruCozHref}
         className="fixed bottom-28 right-6 z-40 md:hidden flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg shadow-orange-500/30 font-semibold"
       >
         <Target className="w-5 h-5" />
@@ -767,7 +770,7 @@ export default function HomePage() {
               
               {/* Sol Menü Öğeleri */}
               <div className="hidden lg:flex items-center gap-3 ml-4">
-                <Link href="/hizli-coz" className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
+                <Link href={soruCozHref} className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
                   <Target className="w-4 h-4" />
                   Soru Çöz
                 </Link>
@@ -932,8 +935,8 @@ export default function HomePage() {
                 </div>
               </Link>
               
-              <Link 
-                href="/hizli-coz" 
+              <Link
+                href={soruCozHref}
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-2 px-4 py-3 bg-orange-50 text-orange-600 rounded-xl font-medium"
               >
@@ -1103,7 +1106,7 @@ export default function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
-              <Link href="/hizli-coz" className="group relative btn btn-lg px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/30 transition-all hover:shadow-xl hover:shadow-orange-500/40 hover:scale-105">
+              <Link href={soruCozHref} className="group relative btn btn-lg px-8 py-4 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/30 transition-all hover:shadow-xl hover:shadow-orange-500/40 hover:scale-105">
                 <Target className="w-5 h-5" />
                 Hemen Soru Çöz
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -1344,7 +1347,7 @@ export default function HomePage() {
                       whileHover={{ scale: 1.05, y: -5 }}
                       className="relative group cursor-pointer"
                     >
-                      <Link href={`/hizli-coz?dersId=${subject.id}&sinif=${selectedGrade}`}>
+                      <Link href={user ? `/ogrenci/soru-bankasi` : `/hizli-coz?dersId=${subject.id}&sinif=${selectedGrade}`}>
                         <div className={`${style.bgLight} rounded-2xl p-4 text-center transition-all duration-300 group-hover:shadow-lg border border-transparent group-hover:border-surface-200`}>
                           <div className={`w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br ${style.color} flex items-center justify-center shadow-lg`}>
                             <SubjectIcon className="w-6 h-6 text-white" />
@@ -1368,7 +1371,7 @@ export default function HomePage() {
 
             {/* Alt Butonlar */}
             <div className="flex flex-wrap justify-center gap-3">
-              <Link href={`/hizli-coz?sinif=${selectedGrade}`} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-all">
+              <Link href={user ? '/ogrenci/soru-bankasi' : `/hizli-coz?sinif=${selectedGrade}`} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-violet-500 text-white rounded-xl text-sm font-medium hover:shadow-lg transition-all">
                 <Zap className="w-4 h-4" />
                 Rastgele Soru
               </Link>
@@ -2510,7 +2513,7 @@ export default function HomePage() {
             <div>
               <h4 className="font-semibold text-surface-900 mb-4">Öğrenme</h4>
               <ul className="space-y-2 text-surface-600">
-                <li><Link href="/hizli-coz" className="hover:text-primary-500">Soru Çöz</Link></li>
+                <li><Link href={soruCozHref} className="hover:text-primary-500">Soru Çöz</Link></li>
                 <li><Link href="/soru-bankasi/olustur" className="hover:text-primary-500">PDF Soru Bankası</Link></li>
                 <li><Link href="/liderlik" className="hover:text-primary-500">Liderlik</Link></li>
                 <li><Link href="/rehberler" className="hover:text-primary-500">Rehberler</Link></li>
