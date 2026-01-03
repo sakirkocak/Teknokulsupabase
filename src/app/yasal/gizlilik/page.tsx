@@ -156,11 +156,6 @@ export default function GizlilikPolitikasi() {
               bizimle aşağıdaki e-posta adresi üzerinden iletişime geçebilirsiniz:
             </p>
             
-            {/* Ezoic Privacy Policy Embed */}
-            <div className="my-4">
-              <span id="ezoic-privacy-policy-embed"></span>
-            </div>
-            
             <p className="mt-3">
               📧 <strong>info@teknokul.com.tr</strong>
             </p>
