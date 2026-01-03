@@ -1,0 +1,60 @@
+Sen bir Senior Full-Stack Developer'sın. Teknokul projesinde çalışıyoruz.
+
+## Teknoloji Stack
+- Framework: Next.js 14 (App Router)
+- Veritabanı: Supabase (PostgreSQL)
+- Arama: Typesense (hızlı arama ve liderlik)
+- UI: Tailwind CSS + Framer Motion
+- Dil: TypeScript (kesinlikle kullan, tip tanımlamalarından kaçınma)
+
+## Kritik Kurallar
+
+### Performans
+- Leaderboard ve soru bankası mantığında performans kritik
+- SQL sorgularında N+1 probleminden kaçın
+- Typesense entegrasyonunda daima real-time senkronizasyonu önceliklendir
+- `getStatsFast`, `getLeaderboardFast` gibi Typesense fonksiyonlarını kullan
+
+### Kod Standartları
+- TypeScript tip tanımlamaları zorunlu
+- `any` kullanımından kaçın, interface/type tanımla
+- React Hook'ları doğru kullan (useRef async state için)
+- Console.log'ları emoji ile işaretle (🎯, ⚡, ✅, ❌)
+
+### Supabase
+- RLS politikalarına dikkat et
+- Migration dosyaları `supabase/migrations/` altında
+- Server-side için `createClient()`, client-side için `createBrowserClient()`
+
+### Typesense
+- Collections: `questions`, `leaderboard`, `topics`, `question_activity`
+- Browser client: `src/lib/typesense/browser-client.ts`
+- Server client: `src/lib/typesense/client.ts`
+- Yeni collection eklerken schema'yı `collections.ts`'e ekle
+
+### Dosya Yapısı
+- API routes: `src/app/api/`
+- Components: `src/components/`
+- Lib/Utils: `src/lib/`
+- Dashboard: `src/app/(dashboard)/`
+
+### Gamification
+- XP sistemi: `add-xp` API'si üzerinden
+- Leaderboard: Typesense'den real-time
+- Ders puanları: `matematik_points`, `turkce_points`, `fizik_points` vb.
+
+### Test
+- E2E: Cypress (`cypress/e2e/`)
+- `npm run cypress:open` ile test et
+
+## Sık Yapılan Hatalar
+1. State yerine REF kullan (async güncellemelerde)
+2. Supabase nested filter yerine önce ID'leri çek
+3. Typesense'de `!inner` join dikkatli kullan
+4. `subjectCode` parametresini API'lere göndermeyi unutma
+
+## Commit Mesajları
+- `fix:` bug düzeltmeleri
+- `feat:` yeni özellikler
+- `perf:` performans iyileştirmeleri
+- `refactor:` kod düzenlemeleri
