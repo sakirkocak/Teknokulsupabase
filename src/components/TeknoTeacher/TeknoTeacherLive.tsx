@@ -105,12 +105,19 @@ export default function TeknoTeacherLive({
     resetTranscript
   } = useVoiceRecognition({
     language: 'tr-TR',
-    continuous: false,
+    continuous: true,  // 🎤 Sürekli dinleme modu
     interimResults: true,
     onResult: (text, isFinal) => {
       if (isFinal && text.trim().length > 2) {
         console.log('🗣️ Ses algılandı:', text)
         handleVoiceInput(text.trim())
+      }
+    },
+    onEnd: () => {
+      // 🔄 Oturum aktifse ve öğretmen konuşmuyorsa mikrofonu yeniden başlat
+      if (sessionActive && !isSpeaking && status === 'ready') {
+        console.log('🎤 Mikrofon otomatik restart')
+        setTimeout(() => startListening(), 500)
       }
     }
   })
@@ -119,6 +126,25 @@ export default function TeknoTeacherLive({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [displayMessages])
+
+  // 🎤 Öğretmen konuşması bitince mikrofonu otomatik aç
+  useEffect(() => {
+    if (sessionActive && !isSpeaking && status === 'ready' && !isListening) {
+      console.log('🎤 Öğretmen konuşması bitti, mikrofon açılıyor...')
+      const timer = setTimeout(() => {
+        startListening()
+      }, 800) // 800ms bekle, ses sistemleri stabilize olsun
+      return () => clearTimeout(timer)
+    }
+  }, [isSpeaking, sessionActive, status, isListening, startListening])
+
+  // 🔇 Öğretmen konuşurken mikrofonu kapat
+  useEffect(() => {
+    if (isSpeaking && isListening) {
+      console.log('🔇 Öğretmen konuşuyor, mikrofon kapatılıyor...')
+      stopListening()
+    }
+  }, [isSpeaking, isListening, stopListening])
 
   // Ses ile mesaj gönder
   const handleVoiceInput = useCallback(async (text: string) => {
