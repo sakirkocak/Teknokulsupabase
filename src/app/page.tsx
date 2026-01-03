@@ -16,6 +16,7 @@ import { testimonials, activityMessages, universities, demoCoaches } from '@/lib
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
 import { getStatsFast, isTypesenseEnabled, getQuestionCountsByGradeFast } from '@/lib/typesense/browser-client'
 import { MagicSearchHero } from '@/components/magic-search'
+import AdBanner from '@/components/AdBanner'
 import { 
   GraduationCap, 
   Users, 
@@ -1383,6 +1384,9 @@ export default function HomePage() {
           </motion.div>
         </div>
       </section>
+
+      {/* 📢 REKLAM ALANI */}
+      <AdBanner className="bg-gray-50" />
 
       {/* ✨ PREMIUM KOÇLUK BÖLÜMÜ - YENİ KONUM */}
       <section className="py-20 px-4 bg-gradient-to-br from-emerald-900 via-green-900 to-teal-900 relative overflow-hidden">
