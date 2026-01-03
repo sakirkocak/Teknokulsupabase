@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Typesense from 'typesense'
 import { createClient } from '@supabase/supabase-js'
-import { getQuestionEmbedding } from '@/lib/gemini-embedding'
+// NOT: Embedding'ler Supabase pgvector'da tutulur, Typesense'e gönderilmez
 
 // Typesense admin client
 const typesense = new Typesense.Client({
@@ -274,64 +274,33 @@ async function handleQuestionsSync(
       return
     }
     
-    // Options JSONB'den şıkları çıkar
-    const options = record.options || {}
-    
-    // 🧠 Semantic Search için embedding üret (opsiyonel)
-    let embedding: number[] | undefined
-    try {
-      embedding = await getQuestionEmbedding({
-        questionText: safeString(record.question_text),
-        mainTopic: safeString(topicData.main_topic),
-        subTopic: safeString(topicData.sub_topic),
-        subjectName: safeString((topicData.subject as any)?.name),
-        options: {
-          A: safeString(options.A || options.a),
-          B: safeString(options.B || options.b),
-          C: safeString(options.C || options.c),
-          D: safeString(options.D || options.d),
-          E: safeString(options.E || options.e)
-        }
-      })
-    } catch (embeddingError) {
-      // Embedding hatası soruyu kaydetmeyi engellemez
-    }
-
+    // 📊 İstatistikler
     const timesAnswered = safeNumber(record.times_answered)
     const timesCorrect = safeNumber(record.times_correct)
 
+    // 🚀 OPTİMİZE: Sadece arama/filtreleme için gereken alanlar
+    // Detaylar (options, explanation, correct_answer, image_url) Supabase'den çekilir
+    // Embedding'ler Supabase pgvector'da tutulur
     const document: Record<string, any> = {
       id: questionId,
       question_id: questionId,
       question_text: safeString(record.question_text),
-      explanation: safeString(record.explanation),
-      option_a: safeString(options.A || options.a),
-      option_b: safeString(options.B || options.b),
-      option_c: safeString(options.C || options.c),
-      option_d: safeString(options.D || options.d),
-      option_e: safeString(options.E || options.e),
-      correct_answer: safeString(record.correct_answer),
+      // Filtreleme alanları
       difficulty: safeString(record.difficulty, 'medium'),
-      subject_id: safeString((topicData.subject as any)?.id, 'unknown'),
       subject_code: safeString((topicData.subject as any)?.code, 'unknown'),
       subject_name: safeString((topicData.subject as any)?.name, 'Bilinmeyen'),
-      topic_id: safeString(topicData.id),
       main_topic: safeString(topicData.main_topic),
       sub_topic: safeString(topicData.sub_topic),
       grade: safeNumber(topicData.grade),
       has_image: !!record.question_image_url,
-      image_url: safeString(record.question_image_url),
+      // İstatistikler
       times_answered: timesAnswered,
       times_correct: timesCorrect,
       success_rate: timesAnswered > 0
         ? Math.round((timesCorrect / timesAnswered) * 100 * 100) / 100
         : 0,
+      // Sıralama
       created_at: safeTimestamp(record.created_at)
-    }
-
-    // Embedding varsa ekle
-    if (embedding && embedding.length === 768) {
-      document.embedding = embedding
     }
 
     try {

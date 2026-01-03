@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { createClient } from '@/lib/supabase/server'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
 import QuestionPreviewList from '@/components/QuestionPreviewList'
@@ -157,7 +158,58 @@ export async function generateStaticParams() {
   return params
 }
 
-async function getQuestionsData(subjectCode: string, grade: number) {
+// ⚡ TYPESENSE - Şimşek hızında veri çekme!
+async function getQuestionsDataFromTypesense(subjectCode: string, grade: number, subjectName: string) {
+  try {
+    // Tek sorgu ile zorluk dağılımı + konular
+    const result = await typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        filter_by: `subject_code:=${subjectCode} && grade:=${grade}`,
+        facet_by: 'difficulty,main_topic',
+        per_page: 0,
+        max_facet_values: 200
+      })
+    
+    const facets = result.facet_counts || []
+    const difficultyFacet = facets.find((f: any) => f.field_name === 'difficulty')
+    const topicFacet = facets.find((f: any) => f.field_name === 'main_topic')
+    
+    // Zorluk istatistikleri
+    const diffCounts = difficultyFacet?.counts || []
+    const difficultyStats = {
+      easy: diffCounts.find((d: any) => d.value === 'easy')?.count || 0,
+      medium: diffCounts.find((d: any) => d.value === 'medium')?.count || 0,
+      hard: diffCounts.find((d: any) => d.value === 'hard')?.count || 0,
+      legendary: diffCounts.find((d: any) => d.value === 'legendary')?.count || 0,
+    }
+    
+    // Konu listesi (main_topic facet'lerinden)
+    const topicCounts = topicFacet?.counts || []
+    const topics = topicCounts.map((t: any) => ({
+      name: t.value,
+      subTopics: [], // Typesense facet'te sub_topic gruplu gelmiyor, boş bırakıyoruz
+      questionCount: t.count
+    }))
+    
+    return {
+      subject: { name: subjectName },
+      topics,
+      totalCount: result.found || 0,
+      difficultyStats,
+      source: 'typesense'
+    }
+  } catch (error) {
+    console.error('⚠️ Typesense grade data error:', error)
+    return null
+  }
+}
+
+// Supabase fallback
+async function getQuestionsDataFromSupabase(subjectCode: string, grade: number) {
   const supabase = await createClient()
   
   // Subject bilgisini al
@@ -169,29 +221,16 @@ async function getQuestionsData(subjectCode: string, grade: number) {
   
   if (!subject) return null
   
-  // 3 RPC sorgusunu paralel olarak çalıştır (eskiden 10+ sorgu vardı)
-  const [difficultyResult, topicGroupsResult, questionsResult] = await Promise.all([
-    // 1. Zorluk dağılımı (RPC ile tek sorgu)
+  // 2 RPC sorgusunu paralel olarak çalıştır
+  const [difficultyResult, topicGroupsResult] = await Promise.all([
     supabase.rpc('get_grade_difficulty_stats', { 
       p_subject_code: subjectCode, 
       p_grade: grade 
     }),
-    // 2. Topic grupları ve soru sayıları (RPC ile tek sorgu)
     supabase.rpc('get_grade_topic_groups', { 
       p_subject_code: subjectCode, 
       p_grade: grade 
-    }),
-    // 3. İlk 20 soru (Schema için)
-    supabase
-      .from('questions')
-      .select(`
-        id, question_text, options, correct_answer, difficulty, topic_id,
-        topics!inner(subject_id, grade)
-      `)
-      .eq('topics.subject_id', subject.id)
-      .eq('topics.grade', grade)
-      .order('created_at', { ascending: false })
-      .limit(20)
+    })
   ])
   
   // Zorluk istatistikleri
@@ -220,9 +259,75 @@ async function getQuestionsData(subjectCode: string, grade: number) {
   return {
     subject,
     topics,
-    questions: questionsResult.data || [],
     totalCount: Number(diffStats.total_questions) || 0,
     difficultyStats,
+    source: 'supabase'
+  }
+}
+
+// Örnek soruları ayrı çek (Supabase - detay lazım)
+async function getSampleQuestions(subjectCode: string, grade: number) {
+  const supabase = await createClient()
+  
+  const { data: subject } = await supabase
+    .from('subjects')
+    .select('id')
+    .eq('code', subjectCode)
+    .single()
+  
+  if (!subject) return []
+  
+  const { data } = await supabase
+    .from('questions')
+    .select(`
+      id, question_text, options, correct_answer, difficulty, topic_id,
+      topics!inner(subject_id, grade)
+    `)
+    .eq('topics.subject_id', subject.id)
+    .eq('topics.grade', grade)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  
+  return data || []
+}
+
+// Ana data fetcher - Typesense öncelikli
+async function getQuestionsData(subjectCode: string, grade: number) {
+  const supabase = await createClient()
+  
+  // Subject bilgisini al (Supabase'den - hızlı, küçük sorgu)
+  const { data: subject } = await supabase
+    .from('subjects')
+    .select('id, name')
+    .eq('code', subjectCode)
+    .single()
+  
+  if (!subject) return null
+  
+  // Typesense'den istatistikleri çek
+  let statsData = null
+  if (isTypesenseAvailable()) {
+    try {
+      statsData = await getQuestionsDataFromTypesense(subjectCode, grade, subject.name)
+    } catch (error) {
+      console.warn('⚠️ Typesense failed, falling back to Supabase')
+    }
+  }
+  
+  // Typesense başarısızsa Supabase fallback
+  if (!statsData) {
+    statsData = await getQuestionsDataFromSupabase(subjectCode, grade)
+  }
+  
+  if (!statsData) return null
+  
+  // Örnek soruları Supabase'den çek (detay lazım - options, correct_answer)
+  const questions = await getSampleQuestions(subjectCode, grade)
+  
+  return {
+    ...statsData,
+    subject,
+    questions
   }
 }
 

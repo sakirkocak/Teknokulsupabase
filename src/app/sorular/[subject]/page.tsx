@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { createClient } from '@/lib/supabase/server'
 import { BreadcrumbSchema, QuestionListSchema } from '@/components/JsonLdSchema'
 import { 
@@ -8,7 +9,7 @@ import {
   Atom, FlaskConical, Leaf, History, BookText,
   ChevronRight, GraduationCap, Users, Target,
   ArrowLeft, Code, Palette, Music, Dumbbell, HeartPulse,
-  Hammer, Monitor
+  Hammer, Monitor, Zap
 } from 'lucide-react'
 
 // ISR - 1 saat cache
@@ -197,10 +198,59 @@ export async function generateStaticParams() {
   return popularSubjects.map((subject) => ({ subject }))
 }
 
-async function getGradesWithCounts(subjectCode: string) {
+// ⚡ TYPESENSE - Şimşek hızında veri çekme!
+async function getGradesWithCountsFromTypesense(subjectCode: string) {
+  try {
+    // Topics collection'dan sınıf bazlı istatistikleri çek
+    const result = await typesenseClient
+      .collections(COLLECTIONS.TOPICS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'main_topic',
+        filter_by: `subject_code:=${subjectCode}`,
+        facet_by: 'grade',
+        per_page: 0,
+        max_facet_values: 20
+      })
+    
+    const gradeFacet = result.facet_counts?.find((f: any) => f.field_name === 'grade')
+    const gradeCounts = gradeFacet?.counts || []
+    
+    // Her sınıf için konu ve soru sayısını hesapla
+    const grades = await Promise.all(
+      gradeCounts.map(async (g: any) => {
+        // Bu sınıftaki toplam soru sayısını questions collection'dan al
+        const questionResult = await typesenseClient
+          .collections(COLLECTIONS.QUESTIONS)
+          .documents()
+          .search({
+            q: '*',
+            query_by: 'question_text',
+            filter_by: `subject_code:=${subjectCode} && grade:=${g.value}`,
+            per_page: 0
+          })
+        
+        return {
+          grade: parseInt(g.value),
+          topicCount: g.count, // Topic sayısı
+          questionCount: questionResult.found || 0
+        }
+      })
+    )
+    
+    // Sınıfa göre sırala
+    return grades.sort((a, b) => a.grade - b.grade)
+  } catch (error) {
+    console.error('⚠️ Typesense topics error:', error)
+    return []
+  }
+}
+
+// Supabase fallback
+async function getGradesWithCountsFromSupabase(subjectCode: string) {
   const supabase = await createClient()
   
-  // RPC fonksiyonu ile tek sorguda tüm sınıf istatistiklerini al
   const { data, error } = await supabase
     .rpc('get_subject_grade_stats', { p_subject_code: subjectCode })
   
@@ -216,23 +266,78 @@ async function getGradesWithCounts(subjectCode: string) {
   }))
 }
 
-async function getSubjectStats(subjectCode: string) {
+// ⚡ TYPESENSE - Toplam istatistikler
+async function getSubjectStatsFromTypesense(subjectCode: string) {
+  try {
+    // Questions collection'dan toplam soru sayısı
+    const questionResult = await typesenseClient
+      .collections(COLLECTIONS.QUESTIONS)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'question_text',
+        filter_by: `subject_code:=${subjectCode}`,
+        per_page: 0,
+        facet_by: 'main_topic',
+        max_facet_values: 500
+      })
+    
+    const topicFacet = questionResult.facet_counts?.find((f: any) => f.field_name === 'main_topic')
+    
+    return {
+      totalQuestions: questionResult.found || 0,
+      totalTopics: topicFacet?.counts?.length || 0,
+      source: 'typesense'
+    }
+  } catch (error) {
+    console.error('⚠️ Typesense stats error:', error)
+    return { totalQuestions: 0, totalTopics: 0, source: 'error' }
+  }
+}
+
+// Supabase fallback
+async function getSubjectStatsFromSupabase(subjectCode: string) {
   const supabase = await createClient()
   
-  // RPC fonksiyonu ile tek sorguda toplam istatistikleri al
   const { data, error } = await supabase
     .rpc('get_subject_total_stats', { p_subject_code: subjectCode })
   
   if (error) {
     console.error('RPC error:', error)
-    return { totalQuestions: 0, totalTopics: 0 }
+    return { totalQuestions: 0, totalTopics: 0, source: 'error' }
   }
   
   const stats = data?.[0] || { total_questions: 0, total_topics: 0 }
   return {
     totalQuestions: Number(stats.total_questions) || 0,
     totalTopics: Number(stats.total_topics) || 0,
+    source: 'supabase'
   }
+}
+
+// Ana data fetcher - Typesense öncelikli
+async function getGradesWithCounts(subjectCode: string) {
+  if (isTypesenseAvailable()) {
+    try {
+      const result = await getGradesWithCountsFromTypesense(subjectCode)
+      if (result.length > 0) return result
+    } catch (error) {
+      console.warn('⚠️ Typesense failed, falling back to Supabase')
+    }
+  }
+  return await getGradesWithCountsFromSupabase(subjectCode)
+}
+
+async function getSubjectStats(subjectCode: string) {
+  if (isTypesenseAvailable()) {
+    try {
+      const result = await getSubjectStatsFromTypesense(subjectCode)
+      if (result.totalQuestions > 0) return result
+    } catch (error) {
+      console.warn('⚠️ Typesense failed, falling back to Supabase')
+    }
+  }
+  return await getSubjectStatsFromSupabase(subjectCode)
 }
 
 export default async function SubjectPage({ params }: Props) {
@@ -296,8 +401,14 @@ export default async function SubjectPage({ params }: Props) {
                 {icon}
               </div>
               <div>
-                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3">
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-3 flex items-center gap-3">
                   {subjectInfo.name} Soruları
+                  {(stats as any).source === 'typesense' && (
+                    <span className="inline-flex items-center gap-1 text-sm font-normal bg-white/20 px-3 py-1 rounded-full">
+                      <Zap className="w-4 h-4" />
+                      Turbo
+                    </span>
+                  )}
                 </h1>
                 <p className="text-lg text-white/90 max-w-2xl">
                   {description}

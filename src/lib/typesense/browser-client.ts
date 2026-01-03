@@ -40,6 +40,7 @@ export function getTypesenseBrowserClient(): Client {
 export const COLLECTIONS = {
   LEADERBOARD: 'leaderboard',
   QUESTIONS: 'questions',
+  TOPICS: 'topics',  // 📚 Konu sayfaları için (şimşek hız!)
   LOCATIONS: 'locations',
   SCHOOLS: 'schools',
   QUESTION_ACTIVITY: 'question_activity'  // Soru çözüm aktiviteleri
@@ -337,7 +338,7 @@ export async function searchQuestionsFast(
         q: query,
         query_by: 'question_text,main_topic,sub_topic',
         filter_by: filterParts.length > 0 ? filterParts.join(' && ') : undefined,
-        sort_by: '_text_match:desc,created_at:desc',  // Optimize schema - times_answered yok
+        sort_by: '_text_match:desc,times_answered:desc,created_at:desc',
         per_page: limit,
         highlight_full_fields: 'question_text',
         num_typos: 2

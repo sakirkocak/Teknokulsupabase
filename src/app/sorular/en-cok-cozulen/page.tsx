@@ -64,7 +64,7 @@ async function getPopularQuestionsFromTypesense(): Promise<{
       .search({
         q: '*',
         query_by: 'question_text',
-        sort_by: 'created_at:desc',  // EN ÇOK ÇÖZÜLENE GÖRE SIRALA
+        sort_by: 'times_answered:desc',  // EN ÇOK ÇÖZÜLENE GÖRE SIRALA
         per_page: 100,
         filter_by: 'times_answered:>0',  // En az 1 kez çözülmüş
         facet_by: 'subject_name,difficulty',
@@ -185,8 +185,8 @@ async function getPopularQuestions() {
   if (isTypesenseAvailable()) {
     try {
       return await getPopularQuestionsFromTypesense()
-    } catch {
-      console.log('⚠️ Typesense failed, falling back to Supabase')
+    } catch (error) {
+      console.warn('⚠️ Typesense hatası, Supabase fallback:', error)
     }
   }
   return await getPopularQuestionsFromSupabase()

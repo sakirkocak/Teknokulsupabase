@@ -82,40 +82,59 @@ const leaderboardSchema = {
   default_sorting_field: 'total_points'
 }
 
-// Questions Collection Schema
+// Questions Collection Schema - OPTİMİZE (RAM tasarrufu!)
+// Detaylar (options, explanation, correct_answer, image_url) Supabase'den çekilir
+// Embedding'ler Supabase pgvector'da tutulur
 const questionsSchema = {
   name: 'questions',
   fields: [
+    // Temel
     { name: 'question_id', type: 'string' },
     { name: 'question_text', type: 'string' },
-    { name: 'explanation', type: 'string', optional: true },
     
-    // Şıklar (4 şık ortaokul, 5 şık lise)
-    { name: 'option_a', type: 'string', optional: true },
-    { name: 'option_b', type: 'string', optional: true },
-    { name: 'option_c', type: 'string', optional: true },
-    { name: 'option_d', type: 'string', optional: true },
-    { name: 'option_e', type: 'string', optional: true },  // Lise için 5. şık
-    { name: 'correct_answer', type: 'string' },
-    { name: 'image_url', type: 'string', optional: true },
-    
+    // Filtreleme
     { name: 'difficulty', type: 'string', facet: true },
-    { name: 'subject_id', type: 'string', facet: true },
     { name: 'subject_code', type: 'string', facet: true },
     { name: 'subject_name', type: 'string', facet: true },
-    { name: 'topic_id', type: 'string', facet: true },
     { name: 'main_topic', type: 'string', facet: true },
     { name: 'sub_topic', type: 'string', facet: true, optional: true },
     { name: 'grade', type: 'int32', facet: true },
     { name: 'has_image', type: 'bool', facet: true, optional: true },
     
-    { name: 'times_answered', type: 'int32' },
+    // İstatistikler
+    { name: 'times_answered', type: 'int32', facet: true },
     { name: 'times_correct', type: 'int32' },
     { name: 'success_rate', type: 'float', optional: true },
     
+    // Sıralama
     { name: 'created_at', type: 'int64' }
   ],
   default_sorting_field: 'created_at'
+}
+
+// ============================================
+// 📚 TOPICS - Konu Koleksiyonu (Şimşek Hız!)
+// ============================================
+// /sorular/[subject] ve /sorular/[subject]/[grade] sayfaları için
+// Çok hafif: ~1000 topic × ~150 byte = ~150KB RAM
+const topicsSchema = {
+  name: 'topics',
+  fields: [
+    // Temel
+    { name: 'topic_id', type: 'string' },
+    
+    // Filtreleme
+    { name: 'subject_code', type: 'string', facet: true },
+    { name: 'subject_name', type: 'string', facet: true },
+    { name: 'grade', type: 'int32', facet: true },
+    
+    // Konu bilgisi
+    { name: 'main_topic', type: 'string', facet: true },
+    { name: 'sub_topic', type: 'string', facet: true, optional: true },
+    
+    // İstatistik
+    { name: 'question_count', type: 'int32' }
+  ]
 }
 
 // Locations Collection Schema (İller ve İlçeler)
@@ -227,6 +246,7 @@ const questionActivitySchema = {
 const ALL_SCHEMAS = [
   leaderboardSchema,
   questionsSchema,
+  topicsSchema,  // 📚 Konu sayfaları için (şimşek hız!)
   locationsSchema,
   schoolsSchema,
   studentStatsSchema,

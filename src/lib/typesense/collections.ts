@@ -71,8 +71,7 @@ export const leaderboardSchema: CollectionCreateSchema = {
   default_sorting_field: 'total_points'
 }
 
-// Questions Collection Schema - OPTİMİZE (RAM tasarrufu!)
-// Detaylar (şıklar, açıklama, görsel URL) Supabase'de tutulur
+// Questions Collection Schema
 export const questionsSchema: CollectionCreateSchema = {
   name: 'questions',
   fields: [
@@ -92,12 +91,42 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'has_image', type: 'bool', facet: true, optional: true },
     { name: 'lang', type: 'string', facet: true, optional: true },
     
+    // 📊 İSTATİSTİKLER - Popüler sorular sayfaları için
+    { name: 'times_answered', type: 'int32', facet: true },
+    { name: 'times_correct', type: 'int32' },
+    { name: 'success_rate', type: 'float', optional: true },
+    
     // ⏱️ SIRALAMA için
     { name: 'created_at', type: 'int64' }
   ],
   default_sorting_field: 'created_at'
 }
-// ❌ Çıkarılanlar (Supabase'de): explanation, options, correct_answer, image_url, embedding, times_answered
+
+// ============================================
+// 📚 TOPICS - Konu Koleksiyonu (Şimşek Hız!)
+// ============================================
+// /sorular/[subject] ve /sorular/[subject]/[grade] sayfaları için
+// Çok hafif: ~1000 topic × ~150 byte = ~150KB RAM
+
+export const topicsSchema: CollectionCreateSchema = {
+  name: 'topics',
+  fields: [
+    // Temel
+    { name: 'topic_id', type: 'string' },
+    
+    // 🏷️ FİLTRELEME için
+    { name: 'subject_code', type: 'string', facet: true },
+    { name: 'subject_name', type: 'string', facet: true },
+    { name: 'grade', type: 'int32', facet: true },
+    
+    // 📚 KONU BİLGİSİ
+    { name: 'main_topic', type: 'string', facet: true },
+    { name: 'sub_topic', type: 'string', facet: true, optional: true },
+    
+    // 📊 İSTATİSTİK
+    { name: 'question_count', type: 'int32' }
+  ]
+}
 
 // Locations Collection Schema (İller ve İlçeler)
 export const locationsSchema: CollectionCreateSchema = {
@@ -257,7 +286,7 @@ export interface LeaderboardDocument {
   last_activity_at: number
 }
 
-// Questions document tipi - OPTİMİZE (sadece Typesense'deki alanlar)
+// Questions document tipi
 export interface QuestionDocument {
   id: string
   question_id: string
@@ -271,10 +300,25 @@ export interface QuestionDocument {
   grade: number
   has_image?: boolean
   lang?: string
+  // İstatistikler
+  times_answered: number
+  times_correct: number
+  success_rate?: number
   // Sıralama
   created_at: number
 }
-// Not: Detaylı alanlar (explanation, options, image_url vs.) Supabase'den çekilir
+
+// Topic document tipi (konu sayfaları için)
+export interface TopicDocument {
+  id: string
+  topic_id: string
+  subject_code: string
+  subject_name: string
+  grade: number
+  main_topic: string
+  sub_topic?: string
+  question_count: number
+}
 
 // Location document tipi
 export interface LocationDocument {

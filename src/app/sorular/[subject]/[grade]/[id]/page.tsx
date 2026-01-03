@@ -12,8 +12,9 @@ import {
   Share2, Bookmark, ThumbsUp, MessageCircle
 } from 'lucide-react'
 
-// Fully dynamic - no caching issues
-export const dynamic = 'force-dynamic'
+// ISR - 1 saat cache (şimşek hız için!)
+// Soru içeriği nadiren değişir, cache'lenebilir
+export const revalidate = 3600
 
 // Cookie-free Supabase client for public pages
 function createPublicClient() {

@@ -29,6 +29,7 @@ export const USE_TYPESENSE = typeof window === 'undefined'
 export const COLLECTIONS = {
   LEADERBOARD: 'leaderboard',
   QUESTIONS: 'questions',
+  TOPICS: 'topics',  // 📚 Konu sayfaları için (şimşek hız!)
   LOCATIONS: 'locations',
   SCHOOLS: 'schools',
   STUDENT_STATS: 'student_stats',
