@@ -71,8 +71,9 @@ export default function TeknoTeacherChat() {
   const [currentPersona, setCurrentPersona] = useState<PersonaType>('energetic') // Aktif persona
   const [ragUsed, setRagUsed] = useState(false) // RAG kullanıldı mı
   
-  // 🔒 Mutex: Herhangi bir özellik aktifken diğerleri engellenir
-  const isAnyFeatureActive = isExplaining || isSummaryLoading || (explanationAudio !== null)
+  // 🔒 Mutex: Sadece özel modlar aktifken (özet, konu anlatımı) engellenir
+  // NOT: Audio çalarken normal sohbet engellenmemeli!
+  const isSpecialModeActive = isExplaining || isSummaryLoading
   
   // 🧹 Emoji temizleme (TTS için)
   const cleanTextForTTS = (text: string): string => {
@@ -289,14 +290,29 @@ export default function TeknoTeacherChat() {
           const audio = new Audio(audioUrl)
           setExplanationAudio(audio)
           
+          // 🔇 Ses başlarken mikrofonu kapat
+          if (isListening) {
+            console.log('🔇 Ses başlıyor, mikrofon kapatılıyor...')
+            stopListening()
+          }
+          
           audio.onended = () => {
+            console.log('🔊 Ses bitti')
             setAvatarVolume(0)
             setExplanationAudio(null)
             setSummaryStatus('')
             URL.revokeObjectURL(audioUrl)
-            // Auto-listen için callback
+            
+            // 🎤 Ses bitti - Mikrofonu otomatik aç (voiceSession aktifse)
             if (voiceSessionRef.current) {
-              setShouldAutoListen(true)
+              console.log('🎤 Ses bitti, mikrofon açılıyor...')
+              setTimeout(() => {
+                if (voiceSessionRef.current) {
+                  resetTranscript()
+                  startListening()
+                  setConversationMode('listening')
+                }
+              }, 500)
             }
           }
           
@@ -584,7 +600,7 @@ export default function TeknoTeacherChat() {
   // GÜNLÜK ÖZET - Gemini + ElevenLabs TTS ile sesli özet
   // =====================================================
   const getDailySummary = async () => {
-    if (isLoading || isAnyFeatureActive) return
+    if (isLoading || isSpecialModeActive) return
 
     setIsSummaryLoading(true)
     setSummaryStatus('🤔 Özet hazırlanıyor...')
@@ -789,7 +805,7 @@ export default function TeknoTeacherChat() {
         <div className="p-3 border-b border-gray-100 dark:border-gray-700 flex gap-2">
           <button
             onClick={getDailySummary}
-            disabled={isLoading || isAnyFeatureActive}
+            disabled={isLoading || isSpecialModeActive}
             className="flex-1 py-2 px-3 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
             <TrendingUp className="w-3 h-3" />
@@ -797,7 +813,7 @@ export default function TeknoTeacherChat() {
           </button>
           <button
             onClick={() => setShowTopicModal(true)}
-            disabled={isLoading || isAnyFeatureActive}
+            disabled={isLoading || isSpecialModeActive}
             className="flex-1 py-2 px-3 text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
             <BookOpen className="w-3 h-3" />
@@ -914,16 +930,20 @@ export default function TeknoTeacherChat() {
         
         {/* Input */}
         <div className="p-3 border-t border-gray-100 dark:border-gray-700">
-          {/* Sesli dinleme göstergesi */}
+          {/* 🎤 Sesli dinleme göstergesi - Yeşil tema */}
           {isListening && (
-            <div className="mb-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg text-sm">
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="font-medium">Dinleniyor...</span>
+            <div className="mb-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="font-medium">🎤 Seni dinliyorum...</span>
               </div>
-              {(interimTranscript || transcript) && (
-                <p className="mt-1 text-gray-600 dark:text-gray-400 italic">
+              {(interimTranscript || transcript) ? (
+                <p className="mt-1 text-green-700 dark:text-green-300 font-medium">
                   "{interimTranscript || transcript}"
+                </p>
+              ) : (
+                <p className="mt-1 text-green-600/70 dark:text-green-400/70 italic">
+                  (konuşmaya başla!)
                 </p>
               )}
             </div>
@@ -940,7 +960,7 @@ export default function TeknoTeacherChat() {
               disabled={isLoading || isListening}
             />
             
-            {/* Mikrofon butonu */}
+            {/* 🎤 Mikrofon butonu - Yeşil tema */}
             {voiceSupported && !voiceSessionActive && (
               <button
                 onClick={() => {
@@ -951,15 +971,15 @@ export default function TeknoTeacherChat() {
                     startListening()
                   }
                 }}
-                disabled={isLoading || isSpeaking}
-                className={`p-2 rounded-xl transition-colors ${
+                disabled={isLoading || isSpeaking || explanationAudio !== null}
+                className={`p-2 rounded-xl transition-all ${
                   isListening 
-                    ? 'bg-red-500 text-white hover:bg-red-600' 
+                    ? 'bg-green-500 text-white hover:bg-green-600 animate-pulse shadow-lg shadow-green-500/50' 
                     : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                 } disabled:opacity-50`}
                 title={isListening ? 'Dinlemeyi durdur' : 'Sesle konuş'}
               >
-                {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
               </button>
             )}
             
