@@ -197,11 +197,25 @@ export async function POST(req: NextRequest) {
     
     let query = supabase
       .from('questions')
-      .select('id, question_text, difficulty, topic_id, options, correct_answer, explanation, question_image_url, topic:topics(main_topic, grade, subject:subjects(name, code))')
+      .select('id, question_text, difficulty, topic_id, options, correct_answer, explanation, question_image_url, topic:topics!inner(id, main_topic, grade, subject:subjects!inner(id, name, code))')
       .eq('is_active', true)
     
     if (topicId) {
       query = query.eq('topic_id', topicId)
+    } else if (subjectCode && grade) {
+      // ✅ Ders ve sınıf filtrelemesi - topics üzerinden
+      query = query
+        .eq('topic.subject.code', subjectCode)
+        .eq('topic.grade', grade)
+      console.log(`🎯 Adaptive: subjectCode=${subjectCode}, grade=${grade}`)
+    } else if (subjectCode) {
+      // Sadece ders filtrelemesi
+      query = query.eq('topic.subject.code', subjectCode)
+      console.log(`🎯 Adaptive: subjectCode=${subjectCode}`)
+    } else if (grade) {
+      // Sadece sınıf filtrelemesi
+      query = query.eq('topic.grade', grade)
+      console.log(`🎯 Adaptive: grade=${grade}`)
     }
     
     // Adaptif zorluk filtresi

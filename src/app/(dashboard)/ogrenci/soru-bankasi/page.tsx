@@ -844,6 +844,15 @@ export default function SoruBankasiPage() {
     const topicToUse = topic || selectedTopic
 
     // Adaptive Learning: Önce API'den akıllı soru seç
+    // ✅ REF'lerden subject code bul - state async güncellemesinden bağımsız!
+    const currentSubjectId = activeSubjectIdRef.current
+    const currentGrade = activeGradeRef.current
+    const currentSubjectCode = currentSubjectId 
+      ? gradeSubjects.find(gs => gs.subject_id === currentSubjectId)?.subject?.code 
+      : null
+    
+    console.log(`🔍 loadNextQuestion: subjectId=${currentSubjectId}, code=${currentSubjectCode}, grade=${currentGrade}`)
+    
     if (studentProfile?.id && !selectedDifficulty) {
       try {
         const response = await fetch('/api/adaptive-question', {
@@ -852,8 +861,8 @@ export default function SoruBankasiPage() {
           body: JSON.stringify({
             studentId: studentProfile.id,
             topicId: topicToUse?.id,
-            subjectCode: selectedSubject?.subject?.code,
-            grade: selectedGrade,
+            subjectCode: currentSubjectCode, // ✅ REF'ten alınan code!
+            grade: currentGrade, // ✅ REF'ten alınan grade!
             consecutiveCorrect: consecutiveCorrectCount,
             consecutiveWrong: consecutiveWrongCount,
             currentDifficulty: adaptiveDifficulty,
