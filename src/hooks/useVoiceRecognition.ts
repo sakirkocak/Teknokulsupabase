@@ -23,9 +23,14 @@ interface UseVoiceRecognitionReturn {
 }
 
 /**
- * useVoiceRecognition Hook
+ * useVoiceRecognition Hook v2
  * Web Speech Recognition API ile sesli girdi
  * TeknoÖğretmen için "Dinleme Modu"
+ * 
+ * Düzeltmeler:
+ * - Callback'ler useRef ile saklanıyor (re-render sorunu çözüldü)
+ * - Debug logları eklendi
+ * - Recognition state daha iyi yönetiliyor
  */
 export function useVoiceRecognition(
   options: UseVoiceRecognitionOptions = {}
@@ -34,10 +39,6 @@ export function useVoiceRecognition(
     language = 'tr-TR',
     continuous = true,
     interimResults = true,
-    onResult,
-    onStart,
-    onEnd,
-    onError
   } = options
 
   const [isListening, setIsListening] = useState(false)
@@ -45,130 +46,196 @@ export function useVoiceRecognition(
   const [transcript, setTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
   
+  // 🔧 Callback'leri ref ile sakla - re-render'da kaybolmasın
+  const callbacksRef = useRef(options)
+  callbacksRef.current = options
+  
   const recognitionRef = useRef<any>(null)
-  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isInitializedRef = useRef(false)
+  const shouldRestartRef = useRef(false)
 
-  // Browser desteğini kontrol et
+  // Browser desteğini kontrol et ve recognition'ı bir kere oluştur
   useEffect(() => {
+    if (isInitializedRef.current) return
+    
     const SpeechRecognition = 
       (window as any).SpeechRecognition || 
       (window as any).webkitSpeechRecognition
 
-    if (SpeechRecognition) {
-      setIsSupported(true)
-      recognitionRef.current = new SpeechRecognition()
+    if (!SpeechRecognition) {
+      console.warn('🎤 Speech Recognition desteklenmiyor')
+      setIsSupported(false)
+      return
+    }
+
+    console.log('🎤 Speech Recognition başlatılıyor...')
+    setIsSupported(true)
+    isInitializedRef.current = true
+    
+    const recognition = new SpeechRecognition()
+    recognition.lang = language
+    recognition.continuous = continuous
+    recognition.interimResults = interimResults
+    recognition.maxAlternatives = 1
+    
+    // 🎯 Sonuç geldiğinde
+    recognition.onresult = (event: any) => {
+      console.log('🎤 onresult tetiklendi, results:', event.results.length)
       
-      const recognition = recognitionRef.current
-      recognition.lang = language
-      recognition.continuous = continuous
-      recognition.interimResults = interimResults
+      let finalTranscript = ''
+      let interimText = ''
       
-      // Sonuç geldiğinde
-      recognition.onresult = (event: any) => {
-        let finalTranscript = ''
-        let interimText = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i]
+        const text = result[0].transcript
+        const confidence = result[0].confidence
         
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i]
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript
-          } else {
-            interimText += result[0].transcript
-          }
+        console.log(`🎤 Result[${i}]: "${text}" (final: ${result.isFinal}, confidence: ${confidence?.toFixed(2) || 'N/A'})`)
+        
+        if (result.isFinal) {
+          finalTranscript += text
+        } else {
+          interimText += text
         }
-        
-        if (finalTranscript) {
-          setTranscript(prev => prev + finalTranscript)
-          onResult?.(finalTranscript, true)
-        }
-        
+      }
+      
+      if (finalTranscript) {
+        console.log('✅ Final transcript:', finalTranscript)
+        setTranscript(prev => prev + finalTranscript)
+        callbacksRef.current.onResult?.(finalTranscript, true)
+      }
+      
+      if (interimText) {
+        console.log('⏳ Interim transcript:', interimText)
         setInterimTranscript(interimText)
-        if (interimText) {
-          onResult?.(interimText, false)
-        }
-      }
-      
-      // Başladığında
-      recognition.onstart = () => {
-        setIsListening(true)
-        onStart?.()
-      }
-      
-      // Bittiğinde
-      recognition.onend = () => {
-        setIsListening(false)
-        onEnd?.()
-        
-        // Continuous mode'da otomatik restart
-        if (continuous && recognitionRef.current?._shouldRestart) {
-          restartTimeoutRef.current = setTimeout(() => {
-            try {
-              recognition.start()
-            } catch (e) {
-              // Zaten başlamış olabilir
-            }
-          }, 100)
-        }
-      }
-      
-      // Hata durumunda
-      recognition.onerror = (event: any) => {
-        console.error('Speech recognition error:', event.error)
-        
-        if (event.error === 'no-speech') {
-          // Ses algılanmadı - normal durum
-          return
-        }
-        
-        if (event.error === 'aborted') {
-          // Kullanıcı durdurdu
-          return
-        }
-        
-        onError?.(event.error)
-        setIsListening(false)
+        callbacksRef.current.onResult?.(interimText, false)
       }
     }
     
-    return () => {
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current)
-      }
-      if (recognitionRef.current) {
-        recognitionRef.current._shouldRestart = false
-        try {
-          recognitionRef.current.stop()
-        } catch (e) {}
+    // 🟢 Başladığında
+    recognition.onstart = () => {
+      console.log('🟢 Recognition başladı')
+      setIsListening(true)
+      callbacksRef.current.onStart?.()
+    }
+    
+    // 🔴 Bittiğinde
+    recognition.onend = () => {
+      console.log('🔴 Recognition bitti, shouldRestart:', shouldRestartRef.current)
+      setIsListening(false)
+      callbacksRef.current.onEnd?.()
+      
+      // Continuous mode'da otomatik restart
+      if (shouldRestartRef.current) {
+        console.log('🔄 Otomatik restart (500ms sonra)...')
+        setTimeout(() => {
+          if (shouldRestartRef.current) {
+            try {
+              recognition.start()
+              console.log('🟢 Restart başarılı')
+            } catch (e: any) {
+              console.warn('⚠️ Restart hatası:', e.message)
+            }
+          }
+        }, 500)
       }
     }
-  }, [language, continuous, interimResults, onResult, onStart, onEnd, onError])
+    
+    // ⚠️ Ses algılanamadığında (no-speech)
+    recognition.onspeechend = () => {
+      console.log('🔇 Konuşma sonu algılandı')
+    }
+    
+    recognition.onsoundstart = () => {
+      console.log('🔊 Ses algılandı')
+    }
+    
+    recognition.onsoundend = () => {
+      console.log('🔇 Ses bitti')
+    }
+    
+    // ❌ Hata durumunda
+    recognition.onerror = (event: any) => {
+      console.error('❌ Speech recognition error:', event.error)
+      
+      // no-speech: Ses algılanmadı - restart yap
+      if (event.error === 'no-speech') {
+        console.log('🔇 Ses algılanmadı, tekrar dinleniyor...')
+        // onend otomatik tetiklenecek, orada restart yapılıyor
+        return
+      }
+      
+      // aborted: Kullanıcı durdurdu
+      if (event.error === 'aborted') {
+        console.log('⏹️ Kullanıcı tarafından durduruldu')
+        return
+      }
+      
+      // not-allowed: Mikrofon izni yok
+      if (event.error === 'not-allowed') {
+        console.error('🚫 Mikrofon izni verilmedi!')
+        callbacksRef.current.onError?.('Mikrofon izni gerekli. Lütfen tarayıcı ayarlarından mikrofon iznini verin.')
+        shouldRestartRef.current = false
+        setIsListening(false)
+        return
+      }
+      
+      // network: Ağ hatası
+      if (event.error === 'network') {
+        console.error('🌐 Ağ hatası')
+        callbacksRef.current.onError?.('İnternet bağlantısı gerekli')
+        return
+      }
+      
+      callbacksRef.current.onError?.(event.error)
+      setIsListening(false)
+    }
+    
+    recognitionRef.current = recognition
+    console.log('✅ Speech Recognition hazır')
+    
+    return () => {
+      console.log('🧹 Speech Recognition temizleniyor...')
+      shouldRestartRef.current = false
+      try {
+        recognition.stop()
+      } catch (e) {}
+    }
+  }, [language, continuous, interimResults])
 
   // Dinlemeyi başlat
   const startListening = useCallback(() => {
     if (!recognitionRef.current || !isSupported) {
-      onError?.('Ses tanıma desteklenmiyor')
+      console.warn('🎤 Recognition desteklenmiyor veya hazır değil')
+      callbacksRef.current.onError?.('Ses tanıma desteklenmiyor')
       return
     }
     
+    console.log('🎤 startListening çağrıldı')
+    shouldRestartRef.current = true
+    setTranscript('')
+    setInterimTranscript('')
+    
     try {
-      recognitionRef.current._shouldRestart = true
       recognitionRef.current.start()
-      setTranscript('')
-      setInterimTranscript('')
+      console.log('✅ Recognition.start() çağrıldı')
     } catch (error: any) {
       if (error.message?.includes('already started')) {
-        // Zaten başlamış, sorun yok
+        console.log('ℹ️ Recognition zaten çalışıyor')
+        setIsListening(true)
       } else {
-        console.error('Start listening error:', error)
-        onError?.(error.message)
+        console.error('❌ Start hatası:', error)
+        callbacksRef.current.onError?.(error.message)
       }
     }
-  }, [isSupported, onError])
+  }, [isSupported])
 
   // Dinlemeyi durdur
   const stopListening = useCallback(() => {
+    console.log('🛑 stopListening çağrıldı')
+    shouldRestartRef.current = false
+    
     if (recognitionRef.current) {
-      recognitionRef.current._shouldRestart = false
       try {
         recognitionRef.current.stop()
       } catch (e) {}

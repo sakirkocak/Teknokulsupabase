@@ -353,6 +353,18 @@ export default function TeknoTeacherLive({
               </div>
             )}
 
+            {/* 🎤 Dinleme durumu göstergesi */}
+            {isListening && (
+              <div className="mx-4 mb-2 px-3 py-2 bg-green-500/20 border border-green-500/30 rounded-lg text-green-300 text-sm flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                {interimTranscript ? (
+                  <span>🎤 "{interimTranscript}"</span>
+                ) : (
+                  <span>🎤 Seni dinliyorum... (konuş!)</span>
+                )}
+              </div>
+            )}
+
             {/* Input alanı */}
             <div className="p-4 border-t border-gray-700">
               <div className="flex items-center gap-2">
@@ -362,9 +374,10 @@ export default function TeknoTeacherLive({
                   disabled={isSpeaking || status === 'thinking'}
                   className={`p-3 rounded-full transition-all ${
                     isListening
-                      ? 'bg-green-500 text-white animate-pulse'
+                      ? 'bg-green-500 text-white animate-pulse shadow-lg shadow-green-500/50'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   } disabled:opacity-50`}
+                  title={isListening ? 'Mikrofonu kapat' : 'Mikrofonu aç'}
                 >
                   {isListening ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                 </button>
