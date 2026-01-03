@@ -15,8 +15,8 @@ import {
 
 // difficultyConfig kaldırıldı - QuestionPreviewList'te kullanılıyor
 
-// ISR - Her istekte yenile (test için)
-export const revalidate = 0
+// ISR - 1 saat cache (şimşek hız!)
+export const revalidate = 3600
 
 // Veritabanından ders bilgisini çek
 async function getSubjectInfo(subjectCode: string) {

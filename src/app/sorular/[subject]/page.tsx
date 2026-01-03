@@ -12,8 +12,8 @@ import {
   Hammer, Monitor, Zap
 } from 'lucide-react'
 
-// ISR - Her istekte yenile (test için)
-export const revalidate = 0
+// ISR - 1 saat cache (şimşek hız!)
+export const revalidate = 3600
 
 // Sabit meta bilgileri (opsiyonel - veritabanındaki ders için zenginleştirilmiş SEO)
 const subjectMetaEnhancements: Record<string, { description: string; keywords: string[] }> = {
