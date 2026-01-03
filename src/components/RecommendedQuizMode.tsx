@@ -26,6 +26,7 @@ interface Question {
   explanation?: string | null
   difficulty: string
   subject_name: string
+  subject_code?: string // Ders bazlı liderlik için
   main_topic: string
   grade: number
 }
@@ -153,7 +154,8 @@ export default function RecommendedQuizMode({ isOpen, onClose, questions, userId
           source: 'recommended_quiz',
           questionId,
           isCorrect: correct,
-          questionShownAt // Anti-bot: zaman doğrulaması için
+          questionShownAt, // Anti-bot: zaman doğrulaması için
+          subjectCode: currentQuestion?.subject_code // Ders bazlı liderlik için (varsa)
         })
       })
 

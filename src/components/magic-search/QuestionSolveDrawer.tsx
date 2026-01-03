@@ -227,7 +227,8 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
             source: 'quick_solve',
             questionId: question.id,
             isCorrect: correct,
-            questionShownAt // Anti-bot: zaman doğrulaması
+            questionShownAt, // Anti-bot: zaman doğrulaması
+            subjectCode: question.topic?.subject?.code // Ders bazlı liderlik için
           })
         })
         

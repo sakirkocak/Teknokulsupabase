@@ -446,6 +446,29 @@ export default function LeaderboardPage() {
               </div>
             </div>
           </motion.div>
+          <motion.div 
+            className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 relative overflow-hidden"
+            whileHover={{ scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                <Flame className="h-5 w-5 text-orange-400" />
+              </div>
+              <div>
+                {loading && !shouldPoll ? (
+                  <div className="h-8 w-16 bg-white/10 rounded animate-pulse" />
+                ) : (
+                  <div className="text-2xl font-bold text-white">
+                    <AnimatedNumber 
+                      value={leaderboard.length > 0 ? Math.max(...leaderboard.map(l => l.max_streak || 0)) : 0} 
+                    />
+                  </div>
+                )}
+                <div className="text-xs text-white/50">En Uzun Seri</div>
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Sınıf Filtresi */}

@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
       isCorrect, 
       source = 'question',
       questionId,
-      questionShownAt  // YENİ: Client'tan gelen timestamp
+      questionShownAt,  // YENİ: Client'tan gelen timestamp
+      subjectCode  // Ders kodu (örn: 'matematik', 'fizik', 'hayat_bilgisi')
     } = body
 
     if (!userId || xp === undefined) {
@@ -346,6 +347,49 @@ export async function POST(req: NextRequest) {
             ? (existingDoc?.today_correct || 0) + (isCorrect ? 1 : 0)
             : (isCorrect ? 1 : 0)
 
+          // 🎯 Ders bazlı puan hesapla - subjectCode'a göre
+          const subjectFieldMap: Record<string, string> = {
+            'matematik': 'matematik', 'turkce': 'turkce', 'fen_bilimleri': 'fen',
+            'inkilap_tarihi': 'inkilap', 'din_kulturu': 'din', 'ingilizce': 'ingilizce',
+            'sosyal_bilgiler': 'sosyal', 'hayat_bilgisi': 'hayat', 'edebiyat': 'edebiyat',
+            'fizik': 'fizik', 'kimya': 'kimya', 'biyoloji': 'biyoloji',
+            'tarih': 'tarih', 'cografya': 'cografya', 'felsefe': 'felsefe',
+            'gorsel_sanatlar': 'gorsel', 'muzik': 'muzik', 'beden_egitimi': 'beden',
+            'bilisim': 'bilisim', 'teknoloji_tasarim': 'teknoloji'
+          }
+          const mappedSubject = subjectCode ? subjectFieldMap[subjectCode] : null
+          const subjectPointsField = mappedSubject ? `${mappedSubject}_points` : null
+          
+          // Ders puanlarını hesapla
+          const subjectPoints: Record<string, number> = {
+            matematik_points: existingDoc?.matematik_points || 0,
+            turkce_points: existingDoc?.turkce_points || 0,
+            fen_points: existingDoc?.fen_points || 0,
+            inkilap_points: existingDoc?.inkilap_points || 0,
+            din_points: existingDoc?.din_points || 0,
+            ingilizce_points: existingDoc?.ingilizce_points || 0,
+            sosyal_points: existingDoc?.sosyal_points || 0,
+            hayat_points: existingDoc?.hayat_points || 0,
+            edebiyat_points: existingDoc?.edebiyat_points || 0,
+            fizik_points: existingDoc?.fizik_points || 0,
+            kimya_points: existingDoc?.kimya_points || 0,
+            biyoloji_points: existingDoc?.biyoloji_points || 0,
+            tarih_points: existingDoc?.tarih_points || 0,
+            cografya_points: existingDoc?.cografya_points || 0,
+            felsefe_points: existingDoc?.felsefe_points || 0,
+            gorsel_points: existingDoc?.gorsel_points || 0,
+            muzik_points: existingDoc?.muzik_points || 0,
+            beden_points: existingDoc?.beden_points || 0,
+            bilisim_points: existingDoc?.bilisim_points || 0,
+            teknoloji_points: existingDoc?.teknoloji_points || 0,
+          }
+          
+          // ✅ İlgili ders puanını artır (XP verilirse)
+          if (!skipXpGrant && subjectPointsField && subjectPoints[subjectPointsField] !== undefined) {
+            subjectPoints[subjectPointsField] += xp
+            console.log(`📚 Ders puanı artırıldı: ${subjectCode} -> ${subjectPointsField} = ${subjectPoints[subjectPointsField]}`)
+          }
+
           // Leaderboard'a upsert - TÜM ZORUNLU ALANLAR dahil
           await typesenseClient
             .collections(COLLECTIONS.LEADERBOARD)
@@ -378,27 +422,8 @@ export async function POST(req: NextRequest) {
               today_questions: newTodayQuestions,
               today_correct: newTodayCorrect,
               today_date: todayTR,
-              // Ders puanları (mevcut değerleri koru)
-              matematik_points: existingDoc?.matematik_points || 0,
-              turkce_points: existingDoc?.turkce_points || 0,
-              fen_points: existingDoc?.fen_points || 0,
-              inkilap_points: existingDoc?.inkilap_points || 0,
-              din_points: existingDoc?.din_points || 0,
-              ingilizce_points: existingDoc?.ingilizce_points || 0,
-              sosyal_points: existingDoc?.sosyal_points || 0,
-              hayat_points: existingDoc?.hayat_points || 0,
-              edebiyat_points: existingDoc?.edebiyat_points || 0,
-              fizik_points: existingDoc?.fizik_points || 0,
-              kimya_points: existingDoc?.kimya_points || 0,
-              biyoloji_points: existingDoc?.biyoloji_points || 0,
-              tarih_points: existingDoc?.tarih_points || 0,
-              cografya_points: existingDoc?.cografya_points || 0,
-              felsefe_points: existingDoc?.felsefe_points || 0,
-              gorsel_points: existingDoc?.gorsel_points || 0,
-              muzik_points: existingDoc?.muzik_points || 0,
-              beden_points: existingDoc?.beden_points || 0,
-              bilisim_points: existingDoc?.bilisim_points || 0,
-              teknoloji_points: existingDoc?.teknoloji_points || 0,
+              // ✅ Ders puanları - artık dinamik güncelleniyor!
+              ...subjectPoints,
               // Timestamp
               last_activity_at: Date.now(),
               updated_at: Date.now()
