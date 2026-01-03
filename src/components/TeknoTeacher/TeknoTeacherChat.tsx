@@ -131,22 +131,25 @@ export default function TeknoTeacherChat() {
     onResult: (text, isFinal) => {
       if (isFinal && text.trim().length > 2) {
         // Final sonuç geldi - mesaj gönder
-        console.log('🗣️ Ses algılandı:', text)
+        console.log('🗣️ Ses algılandı (final):', text)
         pendingVoiceInput.current = text.trim()
         handleVoiceInput(text.trim())
+      } else if (!isFinal && text.trim().length > 3) {
+        // Interim sonuç - kaydet (no-speech durumunda kullanılacak)
+        console.log('⏳ Interim kayıt:', text)
+        pendingVoiceInput.current = text.trim()
       }
     },
-    onEnd: () => {
-      // Sürekli dinleme için otomatik restart
-      if (voiceSessionRef.current && !isSpeaking) {
-        console.log('👂 Dinleme bitti, tekrar başlatılıyor...')
-        setTimeout(() => {
-          if (voiceSessionRef.current) {
-            startListening()
-          }
-        }, 200) // Daha kısa bekleme
+    onError: (error) => {
+      // 🔇 no-speech hatası - interim transcript varsa kullan
+      if (error === 'no-speech' && pendingVoiceInput.current.length > 3) {
+        console.log('🔇 no-speech ama interim var, gönderiliyor:', pendingVoiceInput.current)
+        const textToSend = pendingVoiceInput.current
+        pendingVoiceInput.current = ''
+        handleVoiceInput(textToSend)
       }
     }
+    // NOT: onEnd kaldırıldı - hook zaten otomatik restart yapıyor
   })
   
   // 🎙️ AUTO-LISTEN: TTS bitince mikrofonu otomatik aç

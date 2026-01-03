@@ -125,19 +125,23 @@ export function useVoiceRecognition(
       setIsListening(false)
       callbacksRef.current.onEnd?.()
       
-      // Continuous mode'da otomatik restart
+      // Continuous mode'da otomatik restart (sadece shouldRestart true ise)
       if (shouldRestartRef.current) {
-        console.log('🔄 Otomatik restart (500ms sonra)...')
+        console.log('🔄 Otomatik restart (800ms sonra)...')
         setTimeout(() => {
-          if (shouldRestartRef.current) {
+          // Tekrar kontrol et - bu sürede değişmiş olabilir
+          if (shouldRestartRef.current && !recognition.started) {
             try {
               recognition.start()
               console.log('🟢 Restart başarılı')
             } catch (e: any) {
-              console.warn('⚠️ Restart hatası:', e.message)
+              // Already started ise sorun yok
+              if (!e.message?.includes('already started')) {
+                console.warn('⚠️ Restart hatası:', e.message)
+              }
             }
           }
-        }, 500)
+        }, 800) // Daha uzun bekleme - çakışmayı önle
       }
     }
     
@@ -158,9 +162,11 @@ export function useVoiceRecognition(
     recognition.onerror = (event: any) => {
       console.error('❌ Speech recognition error:', event.error)
       
-      // no-speech: Ses algılanmadı - restart yap
+      // no-speech: Ses algılanmadı - callback'e bildir, restart yap
       if (event.error === 'no-speech') {
         console.log('🔇 Ses algılanmadı, tekrar dinleniyor...')
+        // onError callback'i çağır - component interim transcript'i kullanabilir
+        callbacksRef.current.onError?.('no-speech')
         // onend otomatik tetiklenecek, orada restart yapılıyor
         return
       }
