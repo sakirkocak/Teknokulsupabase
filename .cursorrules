@@ -109,6 +109,20 @@ Sen bir Senior Full-Stack Developer'sın. Teknokul projesinde çalışıyoruz.
 - E2E: Cypress (`cypress/e2e/`)
 - `npm run cypress:open` ile test et
 
+## 🔧 Gelişmiş Context ve Bakım
+- **Atomic Changes:** Büyük dosyalarda sadece ilgili kod bloğuna odaklan, tüm dosyayı gereksiz yere rewrite etme
+- **Regression Control:** Her mantıksal değişiklikte Cypress test senaryosunu gözden geçir
+- **Smart Linking:** Soru sayfalarında Typesense Vektör araması ile dinamik "Benzer Sorular" (internal links) oluştur
+- **Enriched Embeddings:** Vektör verisi oluşturulurken soru metnine ek olarak meta verileri (zorluk, konu yolu) bağlama dahil et
+
+## 🚨 Hata Yakalama (Global Error Handling)
+- **Client-side:** Kullanıcıya RPG diline uygun hata mesajları göster
+  - ❌ "Error 500"
+  - ✅ "TeknoÖğretmen bir sorun yaşıyor, birazdan tekrar dene!"
+- **Server-side:** Tüm API hatalarını 🎯 emoji etiketiyle logla
+- Error boundary'ler ile UI crash'lerini önle
+- Typesense bağlantı hatalarında Supabase fallback kullan
+
 ## ⚠️ Sık Yapılan Hatalar
 1. State yerine REF kullan (async güncellemelerde)
 2. Supabase nested filter yerine önce ID'leri çek
