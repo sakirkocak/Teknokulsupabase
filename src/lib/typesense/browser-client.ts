@@ -201,7 +201,7 @@ export async function getStatsFast(): Promise<StatsResult> {
 
   try {
     // ⚡ Paralel Typesense sorguları
-    const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
+    const [questionsResult, leaderboardResult] = await Promise.all([
       // 1. Soru bankası istatistikleri
       client
         .collections(COLLECTIONS.QUESTIONS)
@@ -214,30 +214,15 @@ export async function getStatsFast(): Promise<StatsResult> {
           max_facet_values: 50
         }),
       
-      // 2. Aktif öğrenci sayısı
+      // 2. ✅ Leaderboard - öğrenci sayısı VE bugün çözülen sorular (today_questions toplamı)
       client
         .collections(COLLECTIONS.LEADERBOARD)
         .documents()
         .search({
           q: '*',
           query_by: 'full_name',
-          per_page: 0
-        }),
-      
-      // 3. ✅ Bugün çözülen sorular - question_activity'den (hızlı + doğru!)
-      client
-        .collections(COLLECTIONS.QUESTION_ACTIVITY)
-        .documents()
-        .search({
-          q: '*',
-          query_by: 'activity_id',
-          filter_by: `date:=${todayTR}`,
-          per_page: 0  // Sadece count
-        })
-        .catch(() => {
-          // Koleksiyon yoksa veya boşsa 0 döndür (fallback API'ye)
-          console.warn('⚠️ question_activity koleksiyonu henüz hazır değil')
-          return { found: 0 }
+          per_page: 250,  // Tüm öğrencileri al (today_questions toplamı için)
+          sort_by: 'total_questions:desc'
         })
     ])
 
@@ -259,11 +244,14 @@ export async function getStatsFast(): Promise<StatsResult> {
       }))
       .sort((a: any, b: any) => a.grade - b.grade)
 
-    // Bugün çözülen soru sayısı
-    const todayQuestions = todayQuestionsResult.found || 0
+    // ✅ Bugün çözülen soru sayısı - leaderboard'daki today_questions toplamı
+    let todayQuestions = 0
+    leaderboardResult.hits?.forEach((hit: any) => {
+      todayQuestions += hit.document.today_questions || 0
+    })
 
     const duration = Math.round(performance.now() - startTime)
-    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions}`)
+    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions} (from leaderboard)`)
 
     return {
       totalQuestions: questionsResult.found || 0,

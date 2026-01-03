@@ -131,7 +131,7 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
   // ⚡ TUM SORGULARI PARALEL YAP - Tamamen Typesense!
-  const [questionsResult, leaderboardResult, todayQuestionsResult] = await Promise.all([
+  const [questionsResult, leaderboardResult] = await Promise.all([
     // 1. Questions collection facet sorgusu (Typesense)
     typesenseClient
       .collections(COLLECTIONS.QUESTIONS)
@@ -144,42 +144,15 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         max_facet_values: 50
       }),
     
-    // 2. Leaderboard collection ogrenci sayisi (Typesense)
+    // 2. ✅ Leaderboard - öğrenci sayısı VE bugün çözülen sorular (today_questions toplamı)
     typesenseClient
       .collections(COLLECTIONS.LEADERBOARD)
       .documents()
       .search({
         q: '*',
         query_by: 'full_name',
-        per_page: 0
-      }),
-    
-    // 3. ✅ Bugün çözülen sorular - Typesense question_activity'den (hızlı + doğru!)
-    // Eğer koleksiyon yoksa veya boşsa fallback yapılacak
-    typesenseClient
-      .collections(COLLECTIONS.QUESTION_ACTIVITY)
-      .documents()
-      .search({
-        q: '*',
-        query_by: 'activity_id',
-        filter_by: `date:=${todayTR}`,
-        per_page: 0  // Sadece count istiyoruz
-      })
-      .catch(async () => {
-        // Koleksiyon yoksa veya hata olursa Supabase'e fallback
-        console.log('⚠️ question_activity koleksiyonu yok veya boş, Supabase fallback...')
-        const now = new Date()
-        const todayStart = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }))
-        todayStart.setHours(0, 0, 0, 0)
-        const todayStartUTC = new Date(todayStart.getTime() - (3 * 60 * 60 * 1000))
-        
-        const result = await supabase
-          .from('point_history')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', todayStartUTC.toISOString())
-          .eq('source', 'question')
-        
-        return { found: result.count || 0, _source: 'supabase' }
+        per_page: 250,  // Tüm öğrencileri al (today_questions toplamı için)
+        sort_by: 'total_questions:desc'
       })
   ])
 
@@ -191,11 +164,13 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   // Aktif ogrenci sayisi
   const activeStudents = leaderboardResult.found || 0
   
-  // ✅ Bugün çözülen toplam soru sayısı
-  const todayQuestions = todayQuestionsResult.found || 0
-  const source = (todayQuestionsResult as any)._source === 'supabase' ? 'supabase' : 'typesense'
+  // ✅ Bugün çözülen toplam soru sayısı - leaderboard'daki today_questions toplamı
+  let todayQuestions = 0
+  leaderboardResult.hits?.forEach((hit: any) => {
+    todayQuestions += hit.document.today_questions || 0
+  })
   
-  console.log(`📊 todayQuestions from ${source}: ${todayQuestions}`)
+  console.log(`📊 todayQuestions from leaderboard: ${todayQuestions}`)
   
   // Ders bazli dagilim
   const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
