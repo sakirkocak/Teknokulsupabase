@@ -696,18 +696,18 @@ export default function TeknoTeacherChat() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center group z-50"
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center group z-40"
       >
-        <Sparkles className="w-7 h-7 text-white group-hover:scale-110 transition-transform" />
-        <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full animate-pulse" />
+        <Sparkles className="w-6 h-6 sm:w-7 sm:h-7 text-white group-hover:scale-110 transition-transform" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-green-500 rounded-full animate-pulse" />
       </button>
     )
   }
   
   return (
     <>
-      {/* Chat Window */}
-      <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-gray-200 dark:border-gray-700">
+      {/* Chat Window - Mobilde tam genişlik */}
+      <div className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 h-[85vh] sm:h-[600px] bg-white dark:bg-gray-800 sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border-t sm:border border-gray-200 dark:border-gray-700">
         {/* Header */}
         <div className={`p-4 text-white ${voiceSessionActive 
           ? 'bg-gradient-to-r from-green-600 to-emerald-600' 

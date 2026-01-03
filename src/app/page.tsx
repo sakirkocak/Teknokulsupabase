@@ -740,9 +740,10 @@ export default function HomePage() {
       <ActivityFeed />
 
       {/* Mobile Floating Action Button - TeknoÖğretmen'in üstünde */}
-      <Link 
+      {/* Mobil Soru Çöz butonu - TeknoÖğretmen widget'ın üstünde */}
+      <Link
         href="/hizli-coz"
-        className="fixed bottom-24 right-6 z-40 md:hidden flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg shadow-orange-500/30 font-semibold"
+        className="fixed bottom-28 right-6 z-40 md:hidden flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full shadow-lg shadow-orange-500/30 font-semibold"
       >
         <Target className="w-5 h-5" />
         Soru Çöz
@@ -906,12 +907,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Mobile Menu - Sadeleştirilmiş */}
+        {/* Mobile Menu - Scroll yapılabilir */}
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="md:hidden bg-white border-b border-surface-100 px-4 py-4"
+            className="md:hidden bg-white border-b border-surface-100 px-4 py-4 max-h-[80vh] overflow-y-auto"
           >
             <div className="space-y-2">
               {/* 🎓 TeknoÖğretmen - Mobile */}
@@ -1049,10 +1050,20 @@ export default function HomePage() {
                   </Link>
                 ) : (
                   <>
-                    <Link href="/giris" className="btn btn-ghost btn-md w-full">
+                    <Link 
+                      href="/giris" 
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-primary-500 text-primary-600 rounded-xl font-semibold hover:bg-primary-50 transition-colors"
+                    >
+                      <User className="w-5 h-5" />
                       Giriş Yap
                     </Link>
-                    <Link href="/kayit" className="btn btn-primary btn-md w-full">
+                    <Link 
+                      href="/kayit" 
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-semibold shadow-lg shadow-primary-500/30"
+                    >
+                      <Sparkles className="w-5 h-5" />
                       Ücretsiz Başla
                     </Link>
                   </>
