@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { createClient } from '@/lib/supabase/server'
 import { BreadcrumbSchema, QuizSchema, QuizQuestion } from '@/components/JsonLdSchema'
+import TypesenseLogger from '@/components/TypesenseLogger'
 import QuestionPreviewList from '@/components/QuestionPreviewList'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
@@ -374,6 +375,11 @@ export default async function GradePage({ params }: Props) {
 
   return (
     <>
+      <TypesenseLogger 
+        source={data.source || 'unknown'} 
+        page={`/sorular/${subject}/${grade}-sinif`}
+        data={{ topics: data.topics?.length, questions: data.totalCount }}
+      />
       <BreadcrumbSchema
         items={[
           { name: 'Ana Sayfa', url: '/' },

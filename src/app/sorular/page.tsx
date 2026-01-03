@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { typesenseClient, isTypesenseAvailable, COLLECTIONS } from '@/lib/typesense/client'
 import { BreadcrumbSchema, QuestionListSchema } from '@/components/JsonLdSchema'
+import TypesenseLogger from '@/components/TypesenseLogger'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
@@ -270,6 +271,12 @@ export default async function SorularPage() {
 
   return (
     <>
+      <TypesenseLogger 
+        source={stats.source} 
+        duration={stats.duration} 
+        page="/sorular" 
+        data={{ subjects: subjects.length, questions: stats.totalQuestions }}
+      />
       <BreadcrumbSchema
         items={[
           { name: 'Ana Sayfa', url: '/' },
