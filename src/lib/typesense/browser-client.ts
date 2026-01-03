@@ -201,7 +201,7 @@ export async function getStatsFast(): Promise<StatsResult> {
 
   try {
     // ⚡ Paralel Typesense sorguları
-    const [questionsResult, leaderboardResult] = await Promise.all([
+    const [questionsResult, leaderboardResult, todayResult] = await Promise.all([
       // 1. Soru bankası istatistikleri
       client
         .collections(COLLECTIONS.QUESTIONS)
@@ -214,16 +214,27 @@ export async function getStatsFast(): Promise<StatsResult> {
           max_facet_values: 50
         }),
       
-      // 2. ✅ Leaderboard - öğrenci sayısı VE bugün çözülen sorular (today_questions toplamı)
+      // 2. Aktif öğrenci sayısı
       client
         .collections(COLLECTIONS.LEADERBOARD)
         .documents()
         .search({
           q: '*',
           query_by: 'full_name',
-          per_page: 250,  // Tüm öğrencileri al (today_questions toplamı için)
-          sort_by: 'total_questions:desc'
+          per_page: 0
+        }),
+      
+      // 3. ✅ Bugün çözülen sorular - question_activity'den (tarih filtresi ile)
+      client
+        .collections(COLLECTIONS.QUESTION_ACTIVITY)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'activity_id',
+          filter_by: `date:=${todayTR}`,
+          per_page: 0
         })
+        .catch(() => ({ found: 0 }))
     ])
 
     const facets = questionsResult.facet_counts || []
@@ -244,14 +255,11 @@ export async function getStatsFast(): Promise<StatsResult> {
       }))
       .sort((a: any, b: any) => a.grade - b.grade)
 
-    // ✅ Bugün çözülen soru sayısı - leaderboard'daki today_questions toplamı
-    let todayQuestions = 0
-    leaderboardResult.hits?.forEach((hit: any) => {
-      todayQuestions += hit.document.today_questions || 0
-    })
+    // ✅ Bugün çözülen soru sayısı - question_activity'den (doğru kaynak!)
+    const todayQuestions = todayResult.found || 0
 
     const duration = Math.round(performance.now() - startTime)
-    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions} (from leaderboard)`)
+    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions} (from question_activity)`)
 
     return {
       totalQuestions: questionsResult.found || 0,

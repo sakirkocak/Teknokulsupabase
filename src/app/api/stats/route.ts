@@ -131,7 +131,7 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
   // ⚡ TUM SORGULARI PARALEL YAP - Tamamen Typesense!
-  const [questionsResult, leaderboardResult] = await Promise.all([
+  const [questionsResult, leaderboardResult, todayResult] = await Promise.all([
     // 1. Questions collection facet sorgusu (Typesense)
     typesenseClient
       .collections(COLLECTIONS.QUESTIONS)
@@ -144,16 +144,27 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         max_facet_values: 50
       }),
     
-    // 2. ✅ Leaderboard - öğrenci sayısı VE bugün çözülen sorular (today_questions toplamı)
+    // 2. Aktif öğrenci sayısı
     typesenseClient
       .collections(COLLECTIONS.LEADERBOARD)
       .documents()
       .search({
         q: '*',
         query_by: 'full_name',
-        per_page: 250,  // Tüm öğrencileri al (today_questions toplamı için)
-        sort_by: 'total_questions:desc'
+        per_page: 0
+      }),
+    
+    // 3. ✅ Bugün çözülen sorular - question_activity'den (tarih filtresi ile)
+    typesenseClient
+      .collections(COLLECTIONS.QUESTION_ACTIVITY)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'activity_id',
+        filter_by: `date:=${todayTR}`,
+        per_page: 0
       })
+      .catch(() => ({ found: 0 }))
   ])
 
   const facets = questionsResult.facet_counts || []
@@ -164,13 +175,10 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   // Aktif ogrenci sayisi
   const activeStudents = leaderboardResult.found || 0
   
-  // ✅ Bugün çözülen toplam soru sayısı - leaderboard'daki today_questions toplamı
-  let todayQuestions = 0
-  leaderboardResult.hits?.forEach((hit: any) => {
-    todayQuestions += hit.document.today_questions || 0
-  })
+  // ✅ Bugün çözülen toplam soru sayısı - question_activity'den (doğru kaynak!)
+  const todayQuestions = todayResult.found || 0
   
-  console.log(`📊 todayQuestions from leaderboard: ${todayQuestions}`)
+  console.log(`📊 todayQuestions from question_activity: ${todayQuestions}`)
   
   // Ders bazli dagilim
   const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')
