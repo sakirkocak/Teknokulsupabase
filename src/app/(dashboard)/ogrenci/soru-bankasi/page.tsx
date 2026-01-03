@@ -1101,15 +1101,31 @@ export default function SoruBankasiPage() {
         .eq('student_id', studentProfile.id)
         .single()
 
-      // Ders bazlı puan kolonları (student_points tablosunda varsa güncellenir)
+      // Ders bazlı puan kolonları - TÜM DERSLER
       const subjectMap: Record<string, { points: string; correct: string; wrong: string }> = {
+        // Ana dersler (LGS/Ortaokul)
         'turkce': { points: 'turkce_points', correct: 'turkce_correct', wrong: 'turkce_wrong' },
         'matematik': { points: 'matematik_points', correct: 'matematik_correct', wrong: 'matematik_wrong' },
         'fen_bilimleri': { points: 'fen_points', correct: 'fen_correct', wrong: 'fen_wrong' },
         'inkilap_tarihi': { points: 'inkilap_points', correct: 'inkilap_correct', wrong: 'inkilap_wrong' },
         'din_kulturu': { points: 'din_points', correct: 'din_correct', wrong: 'din_wrong' },
         'ingilizce': { points: 'ingilizce_points', correct: 'ingilizce_correct', wrong: 'ingilizce_wrong' },
-        // Diğer dersler için genel puanlama yapılır (total_points)
+        'sosyal_bilgiler': { points: 'sosyal_points', correct: 'sosyal_correct', wrong: 'sosyal_wrong' },
+        'hayat_bilgisi': { points: 'hayat_points', correct: 'hayat_correct', wrong: 'hayat_wrong' },
+        // Lise dersleri
+        'edebiyat': { points: 'edebiyat_points', correct: 'edebiyat_correct', wrong: 'edebiyat_wrong' },
+        'fizik': { points: 'fizik_points', correct: 'fizik_correct', wrong: 'fizik_wrong' },
+        'kimya': { points: 'kimya_points', correct: 'kimya_correct', wrong: 'kimya_wrong' },
+        'biyoloji': { points: 'biyoloji_points', correct: 'biyoloji_correct', wrong: 'biyoloji_wrong' },
+        'tarih': { points: 'tarih_points', correct: 'tarih_correct', wrong: 'tarih_wrong' },
+        'cografya': { points: 'cografya_points', correct: 'cografya_correct', wrong: 'cografya_wrong' },
+        'felsefe': { points: 'felsefe_points', correct: 'felsefe_correct', wrong: 'felsefe_wrong' },
+        // Diğer dersler
+        'gorsel_sanatlar': { points: 'gorsel_points', correct: 'gorsel_correct', wrong: 'gorsel_wrong' },
+        'muzik': { points: 'muzik_points', correct: 'muzik_correct', wrong: 'muzik_wrong' },
+        'beden_egitimi': { points: 'beden_points', correct: 'beden_correct', wrong: 'beden_wrong' },
+        'bilisim': { points: 'bilisim_points', correct: 'bilisim_correct', wrong: 'bilisim_wrong' },
+        'teknoloji_tasarim': { points: 'teknoloji_points', correct: 'teknoloji_correct', wrong: 'teknoloji_wrong' },
       }
       
       // Ders kodu bulunamazsa yine de total puanlar güncellenir
