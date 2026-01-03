@@ -288,6 +288,33 @@ export async function getStatsFast(): Promise<StatsResult> {
 }
 
 /**
+ * ⚡ Bugün çözülen soru sayısı - question_activity'den (~10ms)
+ * Liderlik sayfası ve ana sayfa için
+ */
+export async function getTodayQuestionsFast(): Promise<number> {
+  const client = getTypesenseBrowserClient()
+  const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
+  
+  try {
+    const result = await client
+      .collections(COLLECTIONS.QUESTION_ACTIVITY)
+      .documents()
+      .search({
+        q: '*',
+        query_by: 'activity_id',
+        filter_by: `date:=${todayTR}`,
+        per_page: 0
+      })
+    
+    console.log(`⚡ Today questions: ${result.found} (from question_activity)`)
+    return result.found || 0
+  } catch (error) {
+    console.error('getTodayQuestionsFast error:', error)
+    return 0
+  }
+}
+
+/**
  * ⚡ Soru arama - Doğrudan Typesense'den (~20ms)
  */
 export async function searchQuestionsFast(
