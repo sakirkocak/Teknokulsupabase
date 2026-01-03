@@ -160,6 +160,10 @@ export default function SoruBankasiPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('')
   const [showImageOnly, setShowImageOnly] = useState(false) // Görüntülü soru filtresi
   const [expandedMainTopics, setExpandedMainTopics] = useState<string[]>([])
+  
+  // ✅ REF'ler - async state güncellemesinden bağımsız (Sonraki Soru için)
+  const activeSubjectIdRef = useRef<string | null>(null)
+  const activeGradeRef = useRef<number>(8)
 
   // Soru çözme state
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
@@ -586,6 +590,12 @@ export default function SoruBankasiPage() {
 
   // Hızlı Başla - Rastgele soru çöz (tüm derslerden)
   const quickStart = async () => {
+    // ✅ REF'leri sıfırla - tüm derslerden soru gelecek
+    activeSubjectIdRef.current = null
+    activeGradeRef.current = selectedGrade
+    
+    console.log(`🚀 quickStart: Tüm dersler, grade=${selectedGrade}`)
+    
     setSelectedSubject(null)
     setSelectedTopic(null)
     setSelectedDifficulty('')
@@ -602,9 +612,11 @@ export default function SoruBankasiPage() {
 
   // Ders bazlı hızlı başla
   const quickStartSubject = async (gs: GradeSubject) => {
-    // ✅ Grade'i şu an al - state async güncellenebilir!
-    const currentGrade = selectedGrade
-    console.log(`🚀 quickStartSubject: ${gs.subject.name}, grade=${currentGrade}`)
+    // ✅ REF'leri güncelle - loadNextQuestion bunları kullanacak!
+    activeSubjectIdRef.current = gs.subject_id
+    activeGradeRef.current = selectedGrade
+    
+    console.log(`🚀 quickStartSubject: ${gs.subject.name}, grade=${selectedGrade}, subjectId=${gs.subject_id}`)
     
     setSelectedSubject(gs)
     setSelectedTopic(null)
@@ -616,7 +628,7 @@ export default function SoruBankasiPage() {
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
     setPracticeLoading(true)
-    await loadRandomQuestionFromSubject(gs.subject_id, currentGrade)
+    await loadRandomQuestionFromSubject(gs.subject_id, selectedGrade)
     setPracticeLoading(false)
   }
 
@@ -891,17 +903,20 @@ export default function SoruBankasiPage() {
 
     if (topicToUse) {
       query = query.eq('topic_id', topicToUse.id)
-    } else if (selectedSubject) {
-      // ✅ topics state'ine güvenme - doğrudan Supabase'den çek!
+    } else if (activeSubjectIdRef.current) {
+      // ✅ REF kullan - state async güncellemesinden bağımsız!
+      const currentSubjectId = activeSubjectIdRef.current
+      const currentGrade = activeGradeRef.current
+      
       const { data: subjectTopics } = await supabase
         .from('topics')
         .select('id')
-        .eq('subject_id', selectedSubject.subject_id)
-        .eq('grade', selectedGrade)
+        .eq('subject_id', currentSubjectId)
+        .eq('grade', currentGrade)
         .eq('is_active', true)
       
       const topicIds = subjectTopics?.map(t => t.id) || []
-      console.log(`🔍 loadNextQuestion: ${selectedSubject.subject.name}, grade=${selectedGrade}, topics=${topicIds.length}`)
+      console.log(`🔍 loadNextQuestion (REF): subjectId=${currentSubjectId}, grade=${currentGrade}, topics=${topicIds.length}`)
       
       if (topicIds.length > 0) {
         query = query.in('topic_id', topicIds)
@@ -909,6 +924,21 @@ export default function SoruBankasiPage() {
         // Hiç topic yoksa boş dön
         setCurrentQuestion(null)
         return
+      }
+    } else {
+      // ✅ Hiç ders seçili değilse - tüm sınıftan soru çek
+      const currentGrade = activeGradeRef.current
+      const { data: allTopics } = await supabase
+        .from('topics')
+        .select('id')
+        .eq('grade', currentGrade)
+        .eq('is_active', true)
+      
+      const topicIds = allTopics?.map(t => t.id) || []
+      console.log(`🔍 loadNextQuestion (ALL): grade=${currentGrade}, topics=${topicIds.length}`)
+      
+      if (topicIds.length > 0) {
+        query = query.in('topic_id', topicIds)
       }
     }
 
