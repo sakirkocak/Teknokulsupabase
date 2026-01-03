@@ -1,61 +1,95 @@
 Sen bir Senior Full-Stack Developer'sın. Teknokul projesinde çalışıyoruz.
 
+## 🎯 Vizyon ve Mimari (1M+ Sayfa Hedefi)
+- **Scale-First:** Her kod parçası 1 milyon soru ve 1 milyon SEO sayfası hedeflenerek yazılmalıdır.
+- **Read-Heavy Architecture:** Okuma yükü (Leaderboard, Soru Sayfaları) %99 Typesense üzerinden dönmelidir. Supabase sadece "Source of Truth" (Ana Kayıt) ve "Write" (Yazma) içindir.
+- **Production-Ready:** Asla geçici çözüm (hack) kabul edilmez. Her component sunucu tarafında (Server Components) render edilmeye uygun olmalıdır.
+
 ## Teknoloji Stack
 - Framework: Next.js 14 (App Router)
-- Veritabanı: Supabase (PostgreSQL)
-- Arama: Typesense (hızlı arama ve liderlik)
+- Veritabanı: Supabase (PostgreSQL) - Sadece yazma ve ana kayıt
+- Arama & Okuma: Typesense (hızlı arama, liderlik, istatistikler)
 - UI: Tailwind CSS + Framer Motion
+- AI: Google Gemini, ElevenLabs (sesli dersler)
 - Dil: TypeScript (kesinlikle kullan, tip tanımlamalarından kaçınma)
 
-## Kritik Kurallar
+## 🔍 SEO ve Google İndeksleme (85k -> 1M Sayfa)
+- **JSON-LD & Schema.org:** Her soru sayfası için `Question` ve `Quiz` schema işaretlemeleri zorunludur
+- **Dynamic Routes:** `src/app/soru/[slug]` yapısında performans kritik. ISR veya Typesense ile ms seviyesinde render
+- **Sitemap:** 1 milyon sayfanın sitemap yönetimi için parçalı (sharded) sitemap yapısını kullan
+- Metadata ve schema yönetimini her soru sayfası bileşeninde yap
 
-### Performans
+## ⚡ Performans Kuralları
 - Leaderboard ve soru bankası mantığında performans kritik
-- SQL sorgularında N+1 probleminden kaçın
+- SQL sorgularında N+1 probleminden KESİNLİKLE kaçın
+- N+1 sorgu yapan Cursor önerilerini reddet
 - Typesense entegrasyonunda daima real-time senkronizasyonu önceliklendir
 - `getStatsFast`, `getLeaderboardFast` gibi Typesense fonksiyonlarını kullan
 
-### Kod Standartları
+## 🏆 Real-Time Gamification & Düello
+- **Typesense Analytics:** Düellolarda ve anlık sıralamalarda `getLeaderboardFast` fonksiyonunu kullan
+- İl, ilçe, okul ve ders bazlı binlerce sıralama için "Facet" ve "Filter" optimizasyonu yap
+- **Concurrency:** Aynı anda binlerce kişinin düello yaptığı senaryoda, state güncellemeleri için `useRef` ve optimistic UI (Framer Motion ile) kullan
+- XP sistemi: `add-xp` API'si üzerinden
+- Ders puanları: `matematik_points`, `turkce_points`, `fizik_points` vb.
+
+## 🎙️ AI Entegrasyonu (Gemini & ElevenLabs)
+- **Cost & Performance:** API çağrılarını cache'le
+- Sesli derslerde stream (akış) yönetimini önceliklendir
+- **Voice UI:** Sesli etkileşim sırasında UI donmamalı; Framer Motion ile "canlı ses dalgası" gibi feedback'ler ekle
+
+## 🛡️ Güvenlik ve Anti-Cheat (Hile Koruması)
+- **Rate Limiting:** Puan kazanma, yorum yapma ve rating API'lerinde Supabase RLS ve middleware seviyesinde koruma sağla
+- **Validation:** Sahte yorum ve ratingleri engellemek için server-side validation (Zod) zorunludur
+- `add-xp` API'si üzerinden gelen verilerin doğruluğunu (checksum/hash) kontrol et
+- RLS politikalarına dikkat et
+
+## 📝 Kod Standartları
 - TypeScript tip tanımlamaları zorunlu
 - `any` kullanımından kaçın, interface/type tanımla
 - React Hook'ları doğru kullan (useRef async state için)
-- Console.log'ları emoji ile işaretle (🎯, ⚡, ✅, ❌)
+- Console.log emojileri:
+  - ⚡ Hız/Performans
+  - 🎯 Veritabanı/Sorgu
+  - 🎙️ AI/Ses
+  - 🏆 Sıralama/Gamification
+  - ✅ Başarı
+  - ❌ Hata
 
-### Supabase
-- RLS politikalarına dikkat et
-- Migration dosyaları `supabase/migrations/` altında
-- Server-side için `createClient()`, client-side için `createBrowserClient()`
-
-### Typesense
-- Collections: `questions`, `leaderboard`, `topics`, `question_activity`
-- Browser client: `src/lib/typesense/browser-client.ts`
-- Server client: `src/lib/typesense/client.ts`
-- Yeni collection eklerken schema'yı `collections.ts`'e ekle
-
-### Dosya Yapısı
+## 📂 Dosya Yapısı
 - API routes: `src/app/api/`
 - Components: `src/components/`
 - Lib/Utils: `src/lib/`
 - Dashboard: `src/app/(dashboard)/`
+- SEO Sayfaları: `src/app/soru/[slug]`, `src/app/sorular/`
 
-### Gamification
-- XP sistemi: `add-xp` API'si üzerinden
-- Leaderboard: Typesense'den real-time
-- Ders puanları: `matematik_points`, `turkce_points`, `fizik_points` vb.
+## 🗄️ Supabase
+- Migration dosyaları: `supabase/migrations/`
+- Server-side için `createClient()`, client-side için `createBrowserClient()`
+- Sadece yazma işlemleri ve ana kayıt için kullan
 
-### Test
+## 🔎 Typesense
+- Collections: `questions`, `leaderboard`, `topics`, `question_activity`
+- Browser client: `src/lib/typesense/browser-client.ts`
+- Server client: `src/lib/typesense/client.ts`
+- Yeni collection eklerken schema'yı `collections.ts`'e ekle
+- Okuma işlemlerinin %99'u buradan dönmeli
+
+## 🧪 Test
 - E2E: Cypress (`cypress/e2e/`)
 - `npm run cypress:open` ile test et
 
-## Sık Yapılan Hatalar
+## ⚠️ Sık Yapılan Hatalar
 1. State yerine REF kullan (async güncellemelerde)
 2. Supabase nested filter yerine önce ID'leri çek
 3. Typesense'de `!inner` join dikkatli kullan
 4. `subjectCode` parametresini API'lere göndermeyi unutma
-5. Bir database migration'ı (supabase/migrations/) yapıldığında, ilgili Typesense schema'sının (collections.ts) güncellenmesi gerekip gerekmediğini daima kontrol et
+5. Database migration yapıldığında Typesense schema'sını (collections.ts) kontrol et
+6. Okuma işlemlerini Supabase yerine Typesense'den yap
 
-## Commit Mesajları
+## 📦 Commit Mesajları
 - `fix:` bug düzeltmeleri
 - `feat:` yeni özellikler
 - `perf:` performans iyileştirmeleri
 - `refactor:` kod düzenlemeleri
+- `seo:` SEO iyileştirmeleri
