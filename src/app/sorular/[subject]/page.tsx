@@ -317,27 +317,45 @@ async function getSubjectStatsFromSupabase(subjectCode: string) {
 
 // Ana data fetcher - Typesense öncelikli
 async function getGradesWithCounts(subjectCode: string) {
+  const startTime = Date.now()
+  
   if (isTypesenseAvailable()) {
     try {
       const result = await getGradesWithCountsFromTypesense(subjectCode)
-      if (result.length > 0) return result
+      if (result.length > 0) {
+        console.log(`⚡ [${subjectCode}] Grades from Typesense: ${Date.now() - startTime}ms`)
+        return result
+      }
     } catch (error) {
-      console.warn('⚠️ Typesense failed, falling back to Supabase')
+      console.warn('⚠️ Typesense failed, falling back to Supabase:', error)
     }
+  } else {
+    console.log(`⚠️ Typesense NOT available - HOST: ${!!process.env.TYPESENSE_HOST}, KEY: ${!!process.env.TYPESENSE_API_KEY}`)
   }
-  return await getGradesWithCountsFromSupabase(subjectCode)
+  
+  const result = await getGradesWithCountsFromSupabase(subjectCode)
+  console.log(`📊 [${subjectCode}] Grades from Supabase: ${Date.now() - startTime}ms`)
+  return result
 }
 
 async function getSubjectStats(subjectCode: string) {
+  const startTime = Date.now()
+  
   if (isTypesenseAvailable()) {
     try {
       const result = await getSubjectStatsFromTypesense(subjectCode)
-      if (result.totalQuestions > 0) return result
+      if (result.totalQuestions > 0) {
+        console.log(`⚡ [${subjectCode}] Stats from Typesense: ${Date.now() - startTime}ms`)
+        return result
+      }
     } catch (error) {
-      console.warn('⚠️ Typesense failed, falling back to Supabase')
+      console.warn('⚠️ Typesense stats failed, falling back to Supabase:', error)
     }
   }
-  return await getSubjectStatsFromSupabase(subjectCode)
+  
+  const result = await getSubjectStatsFromSupabase(subjectCode)
+  console.log(`📊 [${subjectCode}] Stats from Supabase: ${Date.now() - startTime}ms`)
+  return result
 }
 
 export default async function SubjectPage({ params }: Props) {
