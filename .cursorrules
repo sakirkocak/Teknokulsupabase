@@ -52,6 +52,7 @@ Sen bir Senior Full-Stack Developer'sın. Teknokul projesinde çalışıyoruz.
 2. Supabase nested filter yerine önce ID'leri çek
 3. Typesense'de `!inner` join dikkatli kullan
 4. `subjectCode` parametresini API'lere göndermeyi unutma
+5. Bir database migration'ı (supabase/migrations/) yapıldığında, ilgili Typesense schema'sının (collections.ts) güncellenmesi gerekip gerekmediğini daima kontrol et
 
 ## Commit Mesajları
 - `fix:` bug düzeltmeleri
