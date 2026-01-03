@@ -131,7 +131,7 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
 
   // ⚡ TUM SORGULARI PARALEL YAP - Tamamen Typesense!
-  const [questionsResult, leaderboardResult, todayResult] = await Promise.all([
+  const [questionsResult, leaderboardResult, todayActiveResult] = await Promise.all([
     // 1. Questions collection facet sorgusu (Typesense)
     typesenseClient
       .collections(COLLECTIONS.QUESTIONS)
@@ -154,17 +154,17 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
         per_page: 0
       }),
     
-    // 3. ✅ Bugün çözülen sorular - question_activity'den (tarih filtresi ile)
+    // 3. ✅ Bugün çözülen sorular - LEADERBOARD'dan (today_date filtresi ile)
     typesenseClient
-      .collections(COLLECTIONS.QUESTION_ACTIVITY)
+      .collections(COLLECTIONS.LEADERBOARD)
       .documents()
       .search({
         q: '*',
-        query_by: 'activity_id',
-        filter_by: `date:=${todayTR}`,
-        per_page: 0
+        query_by: 'full_name',
+        filter_by: `today_date:=${todayTR}`,
+        per_page: 250
       })
-      .catch(() => ({ found: 0 }))
+      .catch(() => ({ hits: [] }))
   ])
 
   const facets = questionsResult.facet_counts || []
@@ -175,10 +175,14 @@ async function getStatsFromTypesense(): Promise<StatsResponse> {
   // Aktif ogrenci sayisi
   const activeStudents = leaderboardResult.found || 0
   
-  // ✅ Bugün çözülen toplam soru sayısı - question_activity'den (doğru kaynak!)
-  const todayQuestions = todayResult.found || 0
+  // ✅ Bugün çözülen toplam soru sayısı - LEADERBOARD'dan (today_questions toplamı)
+  let todayQuestions = 0
+  const todayHits = (todayActiveResult as any).hits || []
+  todayHits.forEach((hit: any) => {
+    todayQuestions += hit.document?.today_questions || 0
+  })
   
-  console.log(`📊 todayQuestions from question_activity: ${todayQuestions}`)
+  console.log(`📊 todayQuestions from leaderboard: ${todayQuestions} (${todayHits.length} active students)`)
   
   // Ders bazli dagilim
   const subjectFacet = facets.find((f: any) => f.field_name === 'subject_name')

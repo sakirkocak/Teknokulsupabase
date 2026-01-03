@@ -288,26 +288,33 @@ export async function getStatsFast(): Promise<StatsResult> {
 }
 
 /**
- * ⚡ Bugün çözülen soru sayısı - question_activity'den (~10ms)
- * Liderlik sayfası ve ana sayfa için
+ * ⚡ Bugün çözülen soru sayısı - LEADERBOARD'dan (~10ms)
+ * today_date filtresiyle bugün aktif öğrencilerin today_questions toplamı
  */
 export async function getTodayQuestionsFast(): Promise<number> {
   const client = getTypesenseBrowserClient()
   const todayTR = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
   
   try {
+    // Bugün aktif öğrencileri çek (today_date = bugün olanlar)
     const result = await client
-      .collections(COLLECTIONS.QUESTION_ACTIVITY)
+      .collections(COLLECTIONS.LEADERBOARD)
       .documents()
       .search({
         q: '*',
-        query_by: 'activity_id',
-        filter_by: `date:=${todayTR}`,
-        per_page: 0
+        query_by: 'full_name',
+        filter_by: `today_date:=${todayTR}`,
+        per_page: 250
       })
     
-    console.log(`⚡ Today questions: ${result.found} (from question_activity)`)
-    return result.found || 0
+    // today_questions toplamını hesapla
+    let total = 0
+    result.hits?.forEach((hit: any) => {
+      total += hit.document.today_questions || 0
+    })
+    
+    console.log(`⚡ Today questions: ${total} (from leaderboard, ${result.found} active students)`)
+    return total
   } catch (error) {
     console.error('getTodayQuestionsFast error:', error)
     return 0

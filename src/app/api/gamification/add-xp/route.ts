@@ -330,10 +330,21 @@ export async function POST(req: NextRequest) {
           }
 
           // Yeni değerleri hesapla
+          // ⚠️ total_* sadece XP verilirse artar (bot koruması)
+          // ✅ today_* HER ZAMAN artar (bugün çözülen soru sayısı için)
           const newTotalPoints = skipXpGrant ? existingTotalPoints : (existingTotalPoints + xp)
           const newTotalQuestions = skipXpGrant ? existingTotalQuestions : (existingTotalQuestions + 1)
           const newTotalCorrect = skipXpGrant ? existingTotalCorrect : (existingTotalCorrect + (isCorrect ? 1 : 0))
           const newTotalWrong = skipXpGrant ? existingTotalWrong : (existingTotalWrong + (isCorrect ? 0 : 1))
+          
+          // ✅ today_questions HER ZAMAN güncellenir (XP verilmese bile!)
+          // Bu sayede "bugün çözülen soru" sayısı doğru olur
+          const newTodayQuestions = (existingDoc?.today_date === todayTR) 
+            ? (existingDoc?.today_questions || 0) + 1 
+            : 1
+          const newTodayCorrect = (existingDoc?.today_date === todayTR)
+            ? (existingDoc?.today_correct || 0) + (isCorrect ? 1 : 0)
+            : (isCorrect ? 1 : 0)
 
           // Leaderboard'a upsert - TÜM ZORUNLU ALANLAR dahil
           await typesenseClient
@@ -363,9 +374,9 @@ export async function POST(req: NextRequest) {
                 : 0,
               current_streak: newStreak,
               max_streak: maxStreak,
-              // Bugünün istatistikleri - HER ZAMAN güncellenir
-              today_questions: todayQuestions,
-              today_correct: todayCorrect,
+              // ✅ Bugünün istatistikleri - HER ZAMAN güncellenir (XP verilmese bile!)
+              today_questions: newTodayQuestions,
+              today_correct: newTodayCorrect,
               today_date: todayTR,
               // Ders puanları (mevcut değerleri koru)
               matematik_points: existingDoc?.matematik_points || 0,
