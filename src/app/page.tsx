@@ -760,6 +760,18 @@ export default function HomePage() {
                 Tekn<span className="text-primary-500">okul</span>
               </span>
             </Link>
+
+            {/* 🎓 TeknoÖğretmen - Tam Ortada */}
+            <Link 
+              href="/tekno-ogretmen" 
+              className="hidden md:flex absolute left-1/2 -translate-x-1/2 group items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-xl font-bold text-base hover:shadow-xl hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
+            >
+              {/* Glow Effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity -z-10" />
+              <Brain className="w-5 h-5" />
+              <span>TeknoÖğretmen</span>
+              <span className="px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase tracking-wide">Yeni</span>
+            </Link>
             
             {/* Desktop Navigation - Sadeleştirilmiş */}
             <div className="hidden md:flex items-center gap-4">
@@ -767,21 +779,6 @@ export default function HomePage() {
                 <Target className="w-4 h-4" />
                 Soru Çöz
               </Link>
-              
-              {/* 🎓 TeknoÖğretmen - Özel Büyük Buton */}
-              <Link 
-                href="/tekno-ogretmen" 
-                className="relative group flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white rounded-xl font-bold text-base hover:shadow-xl hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
-              >
-                {/* Glow Effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity -z-10" />
-                <Brain className="w-5 h-5" />
-                <span className="relative">
-                  TeknoÖğretmen
-                  <span className="absolute -top-1 -right-6 px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase tracking-wide">Yeni</span>
-                </span>
-              </Link>
-              
               <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
                 <Trophy className="w-4 h-4" />
                 Liderlik
@@ -914,7 +911,7 @@ export default function HomePage() {
               <Link 
                 href="/tekno-ogretmen" 
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30"
+                className="flex items-center gap-3 px-4 py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-purple-500/30"
               >
                 <Brain className="w-6 h-6" />
                 <div>

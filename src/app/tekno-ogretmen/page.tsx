@@ -183,7 +183,7 @@ export default function TeknoOgretmenPage() {
               </Link>
               <Link 
                 href="/kayit" 
-                className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+                className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-500/25 transition-all"
               >
                 Ücretsiz Başla
               </Link>
@@ -206,7 +206,7 @@ export default function TeknoOgretmenPage() {
             <Link href="/liderlik" className="block py-2 text-gray-600 dark:text-gray-400">Liderlik</Link>
             <div className="pt-3 border-t border-gray-200 dark:border-gray-800 space-y-2">
               <Link href="/giris" className="block py-2 text-gray-700 dark:text-gray-300 font-medium">Giriş Yap</Link>
-              <Link href="/kayit" className="block py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold text-center">
+              <Link href="/kayit" className="block py-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-xl font-semibold text-center">
                 Ücretsiz Başla
               </Link>
             </div>
@@ -238,7 +238,7 @@ export default function TeknoOgretmenPage() {
 
             {/* Main Title */}
             <h1 className="text-5xl md:text-7xl font-black mb-6">
-              <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 bg-clip-text text-transparent">
                 TeknoÖğretmen
               </span>
             </h1>
@@ -253,7 +253,7 @@ export default function TeknoOgretmenPage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
               <Link
                 href="/ogrenci"
-                className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl font-bold text-lg hover:shadow-2xl hover:shadow-purple-500/30 hover:scale-105 transition-all duration-300"
+                className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-2xl font-bold text-lg hover:shadow-2xl hover:shadow-purple-500/30 hover:scale-105 transition-all duration-300"
               >
                 <Play className="w-6 h-6 group-hover:scale-110 transition-transform" />
                 Dersi Başlat
@@ -516,7 +516,7 @@ export default function TeknoOgretmenPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-purple-600 via-pink-600 to-red-500 relative overflow-hidden">
+      <section className="py-20 px-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2" />
