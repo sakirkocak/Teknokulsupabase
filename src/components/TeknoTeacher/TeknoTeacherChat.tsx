@@ -25,10 +25,17 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import TeknoTeacherAvatar from './TeknoTeacherAvatar'
-import MathRenderer from '@/components/MathRenderer'
+import dynamic from 'next/dynamic'
 import { useSpeech } from '@/hooks/useSpeech'
+
+// MathRenderer'ı dinamik import - hata durumunda fallback
+const MathRenderer = dynamic(() => import('@/components/MathRenderer'), {
+  ssr: false,
+  loading: () => <span>...</span>
+})
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition'
 import { PERSONAS, PersonaType } from '@/lib/personas'
+
 
 interface Message {
   id: string
@@ -368,6 +375,8 @@ export default function TeknoTeacherChat() {
       })
       
       const data = await res.json()
+      // API hem 'text' hem 'response' olarak döndürebilir
+      const aiResponse = String(data.response || data.text || '')
 
       // 🔒 Auth kontrolü - Kayıt sayfasına yönlendir
       if (res.status === 401 || data.requireAuth) {
@@ -383,11 +392,11 @@ export default function TeknoTeacherChat() {
         return
       }
       
-      if (data.success) {
+      if (data.success && aiResponse) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: data.response,
+          content: aiResponse,
           timestamp: new Date()
         }
         
@@ -399,12 +408,12 @@ export default function TeknoTeacherChat() {
         }
         
         // Sesli yanıt - ElevenLabs TTS kullan
-        if ((autoSpeak || isVoice) && data.response) {
+        if ((autoSpeak || isVoice) && aiResponse) {
           setConversationMode('voice')
-          await speakWithElevenLabs(data.response)
+          await speakWithElevenLabs(aiResponse)
         }
       } else {
-        throw new Error(data.error)
+        throw new Error(data.error || 'AI yanıtı alınamadı')
       }
     } catch (error: any) {
       // Auth hatası kontrolü - kayıt sayfasına yönlendir
@@ -862,11 +871,12 @@ export default function TeknoTeacherChat() {
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-bl-md'
                   }`}
                 >
-                  {/* Matematik formülleri destekli mesaj */}
-                  <MathRenderer 
-                    content={msg.content} 
-                    className="text-sm whitespace-pre-wrap"
-                  />
+                  {/* Mesaj içeriği - LaTeX/KaTeX destekli */}
+                  {msg.content ? (
+                    <MathRenderer content={msg.content} className="text-sm whitespace-pre-wrap" />
+                  ) : (
+                    <span className="text-sm">...</span>
+                  )}
                   
                   {/* Asistan mesajları için ses butonu */}
                   {msg.role === 'assistant' && (

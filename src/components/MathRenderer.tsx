@@ -21,63 +21,79 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
   const inputText = text || content || ''
   
   const renderedContent = useMemo(() => {
-    if (!inputText) return ''
+    // 🛡️ Boş veya geçersiz input kontrolü
+    if (!inputText || typeof inputText !== 'string') {
+      return ''
+    }
     
-    let result = inputText
-    
-    // Block math: \[...\] veya $$...$$
-    result = result.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => {
-      try {
-        return `<div class="math-block my-2 overflow-x-auto">${katex.renderToString(math.trim(), { 
-          displayMode: true,
-          throwOnError: false,
-          trust: true
-        })}</div>`
-      } catch (e) {
-        return `<code class="text-red-500">${math}</code>`
-      }
-    })
-    
-    result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
-      try {
-        return `<div class="math-block my-2 overflow-x-auto">${katex.renderToString(math.trim(), { 
-          displayMode: true,
-          throwOnError: false,
-          trust: true
-        })}</div>`
-      } catch (e) {
-        return `<code class="text-red-500">${math}</code>`
-      }
-    })
-    
-    // Inline math: \(...\) veya $...$
-    result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => {
-      try {
-        return katex.renderToString(math.trim(), { 
-          displayMode: false,
-          throwOnError: false,
-          trust: true
-        })
-      } catch (e) {
-        return `<code class="text-red-500">${math}</code>`
-      }
-    })
-    
-    // Tek $ işareti için (ama $$ içinde olanları atla)
-    result = result.replace(/(?<!\$)\$(?!\$)((?:[^$\\]|\\.)+?)\$(?!\$)/g, (_, math) => {
-      try {
-        return katex.renderToString(math.trim(), { 
-          displayMode: false,
-          throwOnError: false,
-          trust: true
-        })
-      } catch (e) {
-        return `<code class="text-red-500">${math}</code>`
-      }
-    })
-    
-    return result
+    try {
+      let result = inputText
+      
+      // Block math: \[...\] veya $$...$$
+      result = result.replace(/\\\[([\s\S]*?)\\\]/g, (_, math) => {
+        try {
+          return `<div class="math-block my-2 overflow-x-auto">${katex.renderToString(math.trim(), { 
+            displayMode: true,
+            throwOnError: false,
+            trust: true
+          })}</div>`
+        } catch (e) {
+          return `<code class="text-red-500">${math}</code>`
+        }
+      })
+      
+      result = result.replace(/\$\$([\s\S]*?)\$\$/g, (_, math) => {
+        try {
+          return `<div class="math-block my-2 overflow-x-auto">${katex.renderToString(math.trim(), { 
+            displayMode: true,
+            throwOnError: false,
+            trust: true
+          })}</div>`
+        } catch (e) {
+          return `<code class="text-red-500">${math}</code>`
+        }
+      })
+      
+      // Inline math: \(...\) veya $...$
+      result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, math) => {
+        try {
+          return katex.renderToString(math.trim(), { 
+            displayMode: false,
+            throwOnError: false,
+            trust: true
+          })
+        } catch (e) {
+          return `<code class="text-red-500">${math}</code>`
+        }
+      })
+      
+      // Tek $ işareti için - daha güvenli regex (lookbehind olmadan)
+      result = result.replace(/\$([^$]+)\$/g, (match, math) => {
+        // $$ içinde olanları atla
+        if (match.startsWith('$$') || match.endsWith('$$')) return match
+        try {
+          return katex.renderToString(math.trim(), { 
+            displayMode: false,
+            throwOnError: false,
+            trust: true
+          })
+        } catch (e) {
+          return `<code class="text-red-500">${math}</code>`
+        }
+      })
+      
+      return result
+    } catch (error) {
+      // 🛡️ Herhangi bir hata durumunda orijinal metni göster
+      console.error('MathRenderer error:', error)
+      return inputText
+    }
   }, [inputText])
+  
+  // 🛡️ Render hatası durumunda fallback
+  if (!renderedContent && inputText) {
+    return <div className={className}>{inputText}</div>
+  }
   
   return (
     <div 

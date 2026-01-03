@@ -7,91 +7,48 @@
   - Environments: .env.local
 
  ✓ Starting...
- ✓ Ready in 1590ms
- ✓ Compiled /src/middleware in 479ms (203 modules)
- [AuthApiError: Invalid Refresh Token: Refresh Token Not Found] {
-  __isAuthError: true,
-  name: 'AuthApiError',
-  status: 400,
-  code: 'refresh_token_not_found'
-}
- [AuthApiError: Invalid Refresh Token: Refresh Token Not Found] {
-  __isAuthError: true,
-  name: 'AuthApiError',
-  status: 400,
-  code: 'refresh_token_not_found'
-}
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+ ✓ Ready in 2.1s
+ ○ Compiling /src/middleware ...
+ ✓ Compiled /src/middleware in 588ms (203 modules)
  ○ Compiling / ...
- ✓ Compiled / in 3.6s (1800 modules)
- GET / 200 in 4213ms
- ✓ Compiled in 582ms (841 modules)
-<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (129kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled / in 7.3s (1953 modules)
+ GET / 200 in 8754ms
+ ✓ Compiled in 1467ms (879 modules)
  ○ Compiling /_not-found ...
- ✓ Compiled /_not-found in 2.2s (1789 modules)
- GET /images/favicon.ico 404 in 2270ms
- ✓ Compiled /giris in 388ms (1811 modules)
- ✓ Compiled /ogrenci in 420ms (1856 modules)
- ○ Compiling /api/ai-coach/analyze ...
- ✓ Compiled /api/ai-coach/analyze in 707ms (1239 modules)
- ✓ Compiled (1246 modules)
- GET /api/student-dashboard 200 in 1720ms
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (129kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled /_not-found in 6.4s (1868 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 6621ms
+ GET /images/favicon.ico 404 in 6490ms
+ ○ Compiling /tekno-ogretmen ...
+ ✓ Compiled /tekno-ogretmen in 817ms (1880 modules)
+ ○ Compiling /ogrenci ...
+ ✓ Compiled /ogrenci in 548ms (1931 modules)
+ ○ Compiling /api/student-dashboard ...
+ ✓ Compiled /api/ai-coach/analyze in 1865ms (1278 modules)
+ ✓ Compiled (1285 modules)
+📊 [Dashboard] Typesense: aktif
 📦 Cache kullanılıyor (Gemini çağrılmadı)
- GET /api/ai-coach/analyze 200 in 1547ms
- ○ Compiling /ogrenci/soru-bankasi ...
- ✓ Compiled /ogrenci/soru-bankasi in 1118ms (2259 modules)
- ✓ Compiled /api/typesense/sync-student in 187ms (1288 modules)
-⚡ Typesense sync: 83c5e3ac-635d-414e-8014-1920e07a9373 - 825ms
- POST /api/typesense/sync-student 200 in 1074ms
- ✓ Compiled /api/adaptive-question in 182ms (1290 modules)
- POST /api/adaptive-question 200 in 520ms
-⚡ Typesense sync: 83c5e3ac-635d-414e-8014-1920e07a9373 - 731ms
- POST /api/typesense/sync-student 200 in 748ms
- POST /api/adaptive-question 200 in 90ms
- ✓ Compiled in 3s (1948 modules)
- ✓ Compiled in 2.8s (1948 modules)
- ✓ Compiled in 761ms (912 modules)
- ✓ Compiled in 536ms (912 modules)
- ✓ Compiled in 447ms (912 modules)
- ✓ Compiled in 458ms (912 modules)
- ✓ Compiled in 504ms (912 modules)
- ✓ Compiled in 435ms (912 modules)
- ✓ Compiled in 642ms (912 modules)
- ✓ Compiled in 616ms (912 modules)
- ✓ Compiled in 482ms (912 modules)
- ✓ Compiled in 486ms (912 modules)
- ✓ Compiled in 510ms (912 modules)
- ✓ Compiled in 303ms (912 modules)
- ✓ Compiled in 371ms (912 modules)
- ✓ Compiled in 682ms (912 modules)
- ✓ Compiled in 495ms (912 modules)
- ✓ Compiled in 456ms (912 modules)
- ✓ Compiled in 399ms (912 modules)
- ✓ Compiled in 727ms (912 modules)
- ✓ Compiled in 1432ms (2151 modules)
- ✓ Compiled in 374ms (912 modules)
- ✓ Compiled in 675ms (912 modules)
- ✓ Compiled in 522ms (912 modules)
- ✓ Compiled in 577ms (912 modules)
- ✓ Compiled in 916ms (912 modules)
- ✓ Compiled in 350ms (912 modules)
- ✓ Compiled in 398ms (912 modules)
- ✓ Compiled in 568ms (912 modules)
- ✓ Compiled in 609ms (912 modules)
- ✓ Compiled in 1431ms (912 modules)
- ✓ Compiled in 330ms (912 modules)
- ✓ Compiled in 574ms (912 modules)
- ✓ Compiled in 425ms (912 modules)
- ✓ Compiled in 522ms (912 modules)
- ✓ Compiled in 510ms (912 modules)
- ✓ Compiled in 587ms (912 modules)
- ✓ Compiled in 407ms (912 modules)
- ✓ Compiled in 527ms (912 modules)
- ✓ Compiled in 558ms (912 modules)
- ✓ Compiled in 982ms (912 modules)
- ✓ Compiled in 876ms (912 modules)
- ✓ Compiled in 576ms (912 modules)
- ✓ Compiled in 461ms (912 modules)
- ✓ Compiled in 437ms (912 modules)
- ✓ Compiled in 921ms (912 modules)
- ○ Compiling /_error ...
- ✓ Compiled /_error in 1690ms (2157 modules)
+ GET /api/ai-coach/analyze 200 in 3218ms
+ GET /api/student-dashboard 200 in 5018ms
+📊 [Dashboard] Typesense: aktif
+📦 Cache kullanılıyor (Gemini çağrılmadı)
+ GET /api/ai-coach/analyze 200 in 884ms
+ GET /api/student-dashboard 200 in 1880ms
+ ✓ Compiled in 6.8s (1948 modules)
+ ✓ Compiled in 3.5s (1948 modules)
+ ○ Compiling /api/tekno-teacher/credits ...
+ ✓ Compiled /api/tekno-teacher/credits in 1280ms (1155 modules)
+ GET /api/tekno-teacher/credits 200 in 1999ms
+ ○ Compiling /api/tekno-teacher/chat ...
+ ✓ Compiled /api/tekno-teacher/chat in 594ms (1159 modules)
+ POST /api/tekno-teacher/chat 200 in 12719ms
+ ○ Compiling /api/tekno-teacher/elevenlabs-tts ...
+ ✓ Compiled /api/tekno-teacher/elevenlabs-tts in 3.9s (3954 modules)
+🔊 [ELEVENLABS] User: 77f7d837... Ses üretiliyor: Öğrenci, Osmanlı Devleti'nin temelleri 1299 yılınd...
+✅ [ELEVENLABS] Ses üretildi: 2426ms, 647045 bytes
+ POST /api/tekno-teacher/elevenlabs-tts 200 in 6754ms
