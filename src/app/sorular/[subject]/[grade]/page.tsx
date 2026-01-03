@@ -408,13 +408,19 @@ export default async function GradePage({ params }: Props) {
                 {icon}
               </div>
               <div>
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3 mb-2 flex-wrap">
                   <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold">
                     {grade}. Sınıf {subjectName}
                   </h1>
                   {(isLGS || isYKS) && (
                     <span className={`px-3 py-1 ${isLGS ? 'bg-orange-500' : 'bg-purple-500'} text-white text-sm font-semibold rounded-full`}>
                       {isLGS ? 'LGS' : 'YKS'}
+                    </span>
+                  )}
+                  {data.source === 'typesense' && (
+                    <span className="inline-flex items-center gap-1 text-sm font-normal bg-white/20 px-3 py-1 rounded-full">
+                      <Zap className="w-4 h-4" />
+                      Turbo
                     </span>
                   )}
                 </div>
