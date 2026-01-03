@@ -752,19 +752,34 @@ export default function HomePage() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-surface-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
+            {/* Sol: Logo + Sol Menü */}
+            <div className="flex items-center gap-4">
+              <Link href="/" className="flex items-center gap-2">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center">
+                  <GraduationCap className="w-6 h-6 text-white" />
+                </div>
+                <span className="text-xl font-bold">
+                  Tekn<span className="text-primary-500">okul</span>
+                </span>
+              </Link>
+              
+              {/* Sol Menü Öğeleri */}
+              <div className="hidden lg:flex items-center gap-3 ml-4">
+                <Link href="/hizli-coz" className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
+                  <Target className="w-4 h-4" />
+                  Soru Çöz
+                </Link>
+                <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
+                  <Trophy className="w-4 h-4" />
+                  Liderlik
+                </Link>
               </div>
-              <span className="text-xl font-bold">
-                Tekn<span className="text-primary-500">okul</span>
-              </span>
-            </Link>
+            </div>
 
             {/* 🎓 TeknoÖğretmen - Tam Ortada */}
             <Link 
               href="/tekno-ogretmen" 
-              className="hidden md:flex absolute left-1/2 -translate-x-1/2 group items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-xl font-bold text-base hover:shadow-xl hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
+              className="hidden md:flex group items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 text-white rounded-xl font-bold text-base hover:shadow-xl hover:shadow-purple-500/40 hover:scale-105 transition-all duration-300"
             >
               {/* Glow Effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity -z-10" />
@@ -773,16 +788,9 @@ export default function HomePage() {
               <span className="px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase tracking-wide">Yeni</span>
             </Link>
             
-            {/* Desktop Navigation - Sadeleştirilmiş */}
-            <div className="hidden md:flex items-center gap-4">
-              <Link href="/hizli-coz" className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-600 rounded-full font-medium text-sm hover:bg-orange-200 transition-colors">
-                <Target className="w-4 h-4" />
-                Soru Çöz
-              </Link>
-              <Link href="/liderlik" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
-                <Trophy className="w-4 h-4" />
-                Liderlik
-              </Link>
+            {/* Sağ: Sağ Menü + Butonlar */}
+            <div className="hidden lg:flex items-center gap-3">
+              {/* Sağ Menü Öğeleri */}
               <Link href="/koclar" className="text-surface-600 hover:text-primary-500 font-medium transition-colors flex items-center gap-1 text-sm">
                 <Users className="w-4 h-4" />
                 Koçlar
@@ -798,7 +806,7 @@ export default function HomePage() {
                   Araçlar
                   <ChevronDown className="w-3 h-3 group-hover:rotate-180 transition-transform" />
                 </button>
-                <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-surface-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-2">
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-surface-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-2">
                   <Link 
                     href="/sorular" 
                     className="flex items-center gap-3 px-4 py-2.5 text-surface-600 hover:bg-surface-50 hover:text-primary-500 transition-colors"
@@ -847,46 +855,45 @@ export default function HomePage() {
                   </Link>
                 </div>
               </div>
-            </div>
-
-            <div className="hidden md:flex items-center gap-3">
-              {/* Koç Ol Butonu */}
-              <Link 
-                href="/koc-ol" 
-                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm"
-              >
-                <UserPlus className="w-4 h-4" />
-                Koç Ol
-              </Link>
               
-              {authLoading ? (
-                <div className="w-8 h-8 rounded-full bg-surface-100 animate-pulse" />
-              ) : user && userProfile ? (
-                <>
+              {/* Butonlar - Sağ Menüde */}
+              <div className="flex items-center gap-2 ml-2 pl-2 border-l border-surface-200">
+                {/* Koç Ol Butonu */}
+                <Link 
+                  href="/koc-ol" 
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-emerald-500/25 transition-all text-sm"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Koç Ol
+                </Link>
+                
+                {authLoading ? (
+                  <div className="w-8 h-8 rounded-full bg-surface-100 animate-pulse" />
+                ) : user && userProfile ? (
                   <Link 
                     href={userProfile.role === 'admin' ? '/admin' : userProfile.role === 'ogretmen' ? '/koc' : userProfile.role === 'veli' ? '/veli' : '/ogrenci'}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium hover:shadow-lg transition-all"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium hover:shadow-lg transition-all text-sm"
                   >
                     {userProfile.avatar_url ? (
-                      <img src={userProfile.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      <img src={userProfile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                      <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
                         {getInitials(userProfile.full_name)}
                       </div>
                     )}
                     Dashboard
                   </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/giris" className="btn btn-ghost btn-md">
-                    Giriş Yap
-                  </Link>
-                  <Link href="/kayit" className="btn btn-primary btn-md">
-                    Ücretsiz Başla
-                  </Link>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Link href="/giris" className="text-surface-600 hover:text-primary-500 font-medium text-sm px-2">
+                      Giriş Yap
+                    </Link>
+                    <Link href="/kayit" className="px-3 py-1.5 bg-primary-500 text-white rounded-xl font-medium text-sm hover:bg-primary-600 transition-colors">
+                      Ücretsiz Başla
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Mobile Menu Button */}
