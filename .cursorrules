@@ -44,6 +44,16 @@ Sen bir Senior Full-Stack Developer'sın. Teknokul projesinde çalışıyoruz.
 - `add-xp` API'si üzerinden gelen verilerin doğruluğunu (checksum/hash) kontrol et
 - RLS politikalarına dikkat et
 
+## 🚫 Veri Dürüstlüğü ve Anti-Manipulation (KESİN KURALLAR)
+- **No Fake Data:** Sistemde ASLA manuel girilmiş sahte yorum sayısı, sahte yıldız (rating) veya şişirilmiş istatistik gösterilmemelidir
+- **Veracity:** Tüm yorumlar ve puanlamalar veritabanındaki (`comments`, `ratings`) gerçek kayıtlara dayanmalıdır
+- **YASAK:** UI üzerinde statik veya rastgele (random) sayı üreterek "şişirme" YAPILMAZ
+- **Empty State Management:** Eğer bir soruya hiç yorum yapılmamışsa:
+  - ❌ Sahte yorum gösterme
+  - ✅ "İlk yorumu sen yap" veya "Henüz değerlendirilmedi" göster
+- **Rating Logic:** Yıldız ortalamaları, her zaman Typesense'deki güncel koleksiyon verisinden dinamik olarak hesaplanmalıdır
+- **Transparency:** Gösterilen her sayı (yorum, rating, çözülen soru) veritabanından doğrulanabilir olmalıdır
+
 ## 📝 Kod Standartları
 - TypeScript tip tanımlamaları zorunlu
 - `any` kullanımından kaçın, interface/type tanımla
