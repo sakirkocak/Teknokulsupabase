@@ -291,8 +291,9 @@ async function getSampleQuestions(subjectCode: string, grade: number) {
   return data || []
 }
 
-// Ana data fetcher - Typesense öncelikli
+// Ana data fetcher - Typesense öncelikli (DOĞRUDAN ÇAĞIR!)
 async function getQuestionsData(subjectCode: string, grade: number) {
+  const startTime = Date.now()
   const supabase = await createClient()
   
   // Subject bilgisini al (Supabase'den - hızlı, küçük sorgu)
@@ -304,18 +305,21 @@ async function getQuestionsData(subjectCode: string, grade: number) {
   
   if (!subject) return null
   
-  // Typesense'den istatistikleri çek
+  // Typesense'i DOĞRUDAN dene
   let statsData = null
-  if (isTypesenseAvailable()) {
-    try {
-      statsData = await getQuestionsDataFromTypesense(subjectCode, grade, subject.name)
-    } catch (error) {
-      console.warn('⚠️ Typesense failed, falling back to Supabase')
+  try {
+    console.log(`🔍 [${subjectCode}/${grade}] Trying Typesense...`)
+    statsData = await getQuestionsDataFromTypesense(subjectCode, grade, subject.name)
+    if (statsData) {
+      console.log(`⚡ [${subjectCode}/${grade}] Stats from Typesense: ${Date.now() - startTime}ms`)
     }
+  } catch (error) {
+    console.error(`❌ [${subjectCode}/${grade}] Typesense FAILED:`, error)
   }
   
   // Typesense başarısızsa Supabase fallback
   if (!statsData) {
+    console.log(`📊 [${subjectCode}/${grade}] Falling back to Supabase...`)
     statsData = await getQuestionsDataFromSupabase(subjectCode, grade)
   }
   
