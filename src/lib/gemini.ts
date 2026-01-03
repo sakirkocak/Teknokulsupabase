@@ -986,13 +986,17 @@ ${subjectGuidelines}
       throw new Error('AI yanıtında JSON bulunamadı')
     }
     
-    // JSON temizleme
+    // 🛡️ Gelişmiş JSON temizleme
     jsonStr = jsonStr
       .replace(/,(\s*[}\]])/g, '$1') // Trailing commas
       .replace(/[\x00-\x1F\x7F]/g, ' ') // Control characters
       .replace(/\n/g, ' ')
       .replace(/\r/g, '')
       .replace(/\t/g, ' ')
+      .replace(/\u00A0/g, ' ') // Non-breaking space
+      .replace(/\u2028/g, ' ') // Line separator
+      .replace(/\u2029/g, ' ') // Paragraph separator
+      .replace(/\s+/g, ' ') // Multiple spaces to single
     
     // LaTeX backslash'lerini düzelt - JSON'da tek \ geçersiz
     // \frac, \sqrt, \cdot, \times, \div gibi LaTeX komutlarını çift \\ yap
@@ -1009,45 +1013,62 @@ ${subjectGuidelines}
     // Tek kalan backslash'leri de düzelt (örn: \$ gibi)
     jsonStr = jsonStr.replace(/\\([^\\nrtbfu"])/g, '\\\\$1')
     
-    try {
-      const data = JSON.parse(jsonStr)
-      const questions = data.questions || []
-      
-      console.log(`${questions.length} soru başarıyla parse edildi`)
-      
-      // Soruları doğrula ve düzelt
-      return questions.map((q: any) => ({
-        question_text: q.question_text || q.question || '',
-        options: {
-          A: q.options?.A || q.options?.a || '',
-          B: q.options?.B || q.options?.b || '',
-          C: q.options?.C || q.options?.c || '',
-          D: q.options?.D || q.options?.d || '',
-          ...(isHighSchool && { E: q.options?.E || q.options?.e || '' })
-        },
-        correct_answer: (q.correct_answer || q.answer || 'A').toUpperCase(),
-        explanation: q.explanation || '',
-        difficulty: q.difficulty || difficulty,
-        bloom_level: q.bloom_level || 'kavrama'
-      })) as CurriculumQuestion[]
-      
-    } catch (parseError: any) {
-      console.error('JSON Parse Hatası:', parseError.message)
-      console.error('Temizlenmiş JSON:', jsonStr.substring(0, 500))
-      
-      // Son çare: Regex ile soruları çıkarmayı dene
+    // 🛡️ Kırık Unicode karakterleri temizle
+    jsonStr = jsonStr.replace(/[\uFFFD\uFFFE\uFFFF]/g, '')
+    
+    // 🛡️ Çoklu parse denemesi
+    let data: any = null
+    let parseAttempts = [
+      () => JSON.parse(jsonStr),
+      // Trailing comma farklı pattern
+      () => JSON.parse(jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')),
+      // Tek tırnak varsa çift tırnağa çevir
+      () => JSON.parse(jsonStr.replace(/'/g, '"')),
+    ]
+    
+    let lastParseError: any = null
+    for (const attempt of parseAttempts) {
       try {
-        const questionMatches = jsonStr.match(/"question_text"\s*:\s*"([^"]+)"/g)
-        if (questionMatches && questionMatches.length > 0) {
-          console.log('Regex ile soru bulundu, manuel parse deneniyor...')
-          // Manuel parse çok karmaşık, hata fırlat
-        }
+        data = attempt()
+        break
       } catch (e) {
-        // Ignore
+        lastParseError = e
+      }
+    }
+    
+    if (!data) {
+      console.error('JSON Parse Hatası (tüm denemeler başarısız):', lastParseError?.message)
+      console.error('Temizlenmiş JSON (ilk 800 karakter):', jsonStr.substring(0, 800))
+      throw new Error(`JSON parse hatası: ${lastParseError?.message}. AI yanıtı geçersiz format içeriyor.`)
+    }
+    
+    const questions = data.questions || []
+    
+    console.log(`${questions.length} soru başarıyla parse edildi`)
+    
+    // 🛡️ Soruları doğrula ve düzelt - eksik alanları kontrol et
+    return questions.map((q: any, idx: number) => {
+      // Zorunlu alanlar kontrolü
+      if (!q.question_text && !q.question) {
+        console.warn(`Soru ${idx + 1}: question_text boş, atlanıyor`)
+        return null
       }
       
-      throw new Error(`JSON parse hatası: ${parseError.message}. Lütfen tekrar deneyin.`)
-    }
+      return {
+        question_text: String(q.question_text || q.question || '').trim(),
+        options: {
+          A: String(q.options?.A || q.options?.a || '').trim(),
+          B: String(q.options?.B || q.options?.b || '').trim(),
+          C: String(q.options?.C || q.options?.c || '').trim(),
+          D: String(q.options?.D || q.options?.d || '').trim(),
+          ...(isHighSchool && { E: String(q.options?.E || q.options?.e || '').trim() })
+        },
+        correct_answer: String(q.correct_answer || q.answer || 'A').toUpperCase().charAt(0),
+        explanation: String(q.explanation || '').trim(),
+        difficulty: q.difficulty || difficulty,
+        bloom_level: q.bloom_level || 'kavrama'
+      }
+    }).filter(Boolean) as CurriculumQuestion[]
   } catch (error: any) {
     console.error('Müfredat sorusu üretme hatası:', error)
     throw error

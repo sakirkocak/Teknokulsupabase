@@ -28,6 +28,24 @@ interface WebhookPayload {
   schema: string
 }
 
+// 🛡️ Typesense için güvenli değer dönüştürücü
+function safeString(value: any, defaultValue: string = ''): string {
+  if (value === null || value === undefined) return defaultValue
+  return String(value).trim() || defaultValue
+}
+
+function safeNumber(value: any, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue
+  const num = Number(value)
+  return isNaN(num) ? defaultValue : num
+}
+
+function safeTimestamp(value: any): number {
+  if (!value) return Date.now()
+  const timestamp = new Date(value).getTime()
+  return isNaN(timestamp) ? Date.now() : timestamp
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Webhook secret kontrolü
@@ -40,6 +58,7 @@ export async function POST(req: NextRequest) {
     const payload: WebhookPayload = await req.json()
     const { type, table, record, old_record } = payload
     
+    // 📊 Minimal loglama - sadece tablo adı
     console.log(`Webhook: ${type} on ${table}`)
     
     // student_points tablosu için sync (leaderboard + student_stats)
@@ -75,9 +94,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
     
   } catch (error) {
-    console.error('Typesense sync error:', error)
+    // 🔍 Detaylı hata loglama
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error('Typesense sync error:', {
+      message: errorMessage,
+      stack: errorStack?.split('\n').slice(0, 3).join('\n') // İlk 3 satır
+    })
+    
     return NextResponse.json(
-      { error: 'Sync failed', details: (error as Error).message }, 
+      { error: 'Sync failed', details: errorMessage }, 
       { status: 500 }
     )
   }
@@ -92,8 +119,15 @@ async function handleStudentPointsSync(
   old_record?: Record<string, any>
 ) {
   if (type === 'INSERT' || type === 'UPDATE') {
+    // 🛡️ Student ID kontrolü
+    const studentId = safeString(record.student_id)
+    if (!studentId) {
+      console.warn('Webhook: student_id boş, atlanıyor')
+      return
+    }
+    
     // Öğrenci bilgilerini çek
-    const { data: studentData } = await supabase
+    const { data: studentData, error: studentError } = await supabase
       .from('student_profiles')
       .select(`
         id,
@@ -107,82 +141,90 @@ async function handleStudentPointsSync(
         district:turkey_districts!student_profiles_district_id_fkey(name),
         school:schools!student_profiles_school_id_fkey(name)
       `)
-      .eq('id', record.student_id)
+      .eq('id', studentId)
       .single()
     
-    if (studentData) {
-      const fullName = (studentData.profile as any)?.full_name || 'Anonim'
-      const totalQuestions = record.total_questions || 0
-      const totalCorrect = record.total_correct || 0
-      const totalWrong = record.total_wrong || 0
-      
-      // Leaderboard document
-      const leaderboardDoc = {
-        id: record.student_id,
-        student_id: record.student_id,
-        user_id: studentData.user_id || '',
-        full_name: fullName,
-        avatar_url: (studentData.profile as any)?.avatar_url || '',
-        total_points: record.total_points || 0,
-        total_questions: totalQuestions,
-        total_correct: totalCorrect,
-        total_wrong: totalWrong,
-        max_streak: record.max_streak || 0,
-        current_streak: record.current_streak || 0,
-        grade: studentData.grade || 0,
-        city_id: studentData.city_id || '',
-        city_name: (studentData.city as any)?.name || '',
-        district_id: studentData.district_id || '',
-        district_name: (studentData.district as any)?.name || '',
-        school_id: studentData.school_id || '',
-        school_name: (studentData.school as any)?.name || '',
-        matematik_points: record.matematik_points || 0,
-        turkce_points: record.turkce_points || 0,
-        fen_points: record.fen_points || 0,
-        inkilap_points: record.inkilap_points || 0,
-        din_points: record.din_points || 0,
-        ingilizce_points: record.ingilizce_points || 0,
-        last_activity_at: record.last_activity_at 
-          ? new Date(record.last_activity_at).getTime() 
-          : Date.now()
-      }
-      
+    if (studentError || !studentData) {
+      console.warn(`Webhook: student_profiles bulunamadı: ${studentId}`)
+      return
+    }
+    
+    const fullName = safeString((studentData.profile as any)?.full_name, 'Anonim')
+    const totalQuestions = safeNumber(record.total_questions)
+    const totalCorrect = safeNumber(record.total_correct)
+    const totalWrong = safeNumber(record.total_wrong)
+    
+    // 🛡️ Leaderboard document - tüm değerler güvenli
+    const leaderboardDoc = {
+      id: studentId,
+      student_id: studentId,
+      user_id: safeString(studentData.user_id, 'unknown'),
+      full_name: fullName,
+      avatar_url: safeString((studentData.profile as any)?.avatar_url),
+      total_points: safeNumber(record.total_points),
+      total_questions: totalQuestions,
+      total_correct: totalCorrect,
+      total_wrong: totalWrong,
+      max_streak: safeNumber(record.max_streak),
+      current_streak: safeNumber(record.current_streak),
+      grade: safeNumber(studentData.grade),
+      city_id: safeString(studentData.city_id, 'unknown'),
+      city_name: safeString((studentData.city as any)?.name, 'Belirtilmemiş'),
+      district_id: safeString(studentData.district_id, 'unknown'),
+      district_name: safeString((studentData.district as any)?.name, 'Belirtilmemiş'),
+      school_id: safeString(studentData.school_id, 'unknown'),
+      school_name: safeString((studentData.school as any)?.name, 'Belirtilmemiş'),
+      matematik_points: safeNumber(record.matematik_points),
+      turkce_points: safeNumber(record.turkce_points),
+      fen_points: safeNumber(record.fen_points),
+      inkilap_points: safeNumber(record.inkilap_points),
+      din_points: safeNumber(record.din_points),
+      ingilizce_points: safeNumber(record.ingilizce_points),
+      last_activity_at: safeTimestamp(record.last_activity_at)
+    }
+    
+    try {
       await typesense.collections('leaderboard').documents().upsert(leaderboardDoc)
-      console.log(`Leaderboard upserted: ${record.student_id}`)
-      
-      // Student Stats document
-      const studentStatsDoc = {
-        id: record.student_id,
-        student_id: record.student_id,
-        student_name: fullName,
-        grade: studentData.grade || 0,
-        total_questions: totalQuestions,
-        total_correct: totalCorrect,
-        total_wrong: totalWrong,
-        overall_success_rate: totalQuestions > 0 
-          ? (totalCorrect / totalQuestions) * 100 
-          : 0,
-        total_points: record.total_points || 0,
-        current_streak: record.current_streak || 0,
-        max_streak: record.max_streak || 0,
-        weak_topics: [], // TODO: calculate from student_topic_stats
-        strong_topics: [], // TODO: calculate from student_topic_stats
-        last_activity_at: record.last_activity_at 
-          ? new Date(record.last_activity_at).getTime() 
-          : Date.now()
-      }
-      
+    } catch (leaderboardError) {
+      console.error(`Leaderboard upsert hatası (${studentId}):`, (leaderboardError as Error).message)
+      throw leaderboardError
+    }
+    
+    // 🛡️ Student Stats document
+    const studentStatsDoc = {
+      id: studentId,
+      student_id: studentId,
+      student_name: fullName,
+      grade: safeNumber(studentData.grade),
+      total_questions: totalQuestions,
+      total_correct: totalCorrect,
+      total_wrong: totalWrong,
+      overall_success_rate: totalQuestions > 0 
+        ? Math.round((totalCorrect / totalQuestions) * 100 * 100) / 100 
+        : 0,
+      total_points: safeNumber(record.total_points),
+      current_streak: safeNumber(record.current_streak),
+      max_streak: safeNumber(record.max_streak),
+      weak_topics: [],
+      strong_topics: [],
+      last_activity_at: safeTimestamp(record.last_activity_at)
+    }
+    
+    try {
       await typesense.collections('student_stats').documents().upsert(studentStatsDoc)
-      console.log(`Student stats upserted: ${record.student_id}`)
+    } catch (statsError) {
+      console.error(`Student stats upsert hatası (${studentId}):`, (statsError as Error).message)
+      // Leaderboard başarılıysa stats hatasını yutabiliriz
     }
   }
   
   if (type === 'DELETE') {
     try {
-      const studentId = old_record?.student_id || record.student_id
-      await typesense.collections('leaderboard').documents(studentId).delete()
-      await typesense.collections('student_stats').documents(studentId).delete()
-      console.log(`Leaderboard + Student stats deleted: ${studentId}`)
+      const studentId = safeString(old_record?.student_id || record.student_id)
+      if (studentId) {
+        await typesense.collections('leaderboard').documents(studentId).delete()
+        await typesense.collections('student_stats').documents(studentId).delete()
+      }
     } catch (e) {
       // Document bulunamadı - sorun yok
     }
@@ -198,11 +240,16 @@ async function handleQuestionsSync(
   old_record?: Record<string, any>
 ) {
   if (type === 'INSERT' || type === 'UPDATE') {
+    const questionId = safeString(record.id)
+    if (!questionId) {
+      console.warn('Webhook: question id boş, atlanıyor')
+      return
+    }
+    
     // Aktif değilse silme işlemi yap
     if (!record.is_active) {
       try {
-        await typesense.collections('questions').documents(record.id).delete()
-        console.log(`Question deleted (inactive): ${record.id}`)
+        await typesense.collections('questions').documents(questionId).delete()
       } catch (e) {
         // Document bulunamadı - sorun yok
       }
@@ -210,7 +257,7 @@ async function handleQuestionsSync(
     }
     
     // Topic bilgilerini çek
-    const { data: topicData } = await supabase
+    const { data: topicData, error: topicError } = await supabase
       .from('topics')
       .select(`
         id,
@@ -222,79 +269,85 @@ async function handleQuestionsSync(
       .eq('id', record.topic_id)
       .single()
     
-    if (topicData) {
-      // Options JSONB'den şıkları çıkar
-      const options = record.options || {}
-      
-      // 🧠 Semantic Search için embedding üret
-      let embedding: number[] | undefined
-      try {
-        embedding = await getQuestionEmbedding({
-          questionText: record.question_text || '',
-          mainTopic: topicData.main_topic,
-          subTopic: topicData.sub_topic,
-          subjectName: (topicData.subject as any)?.name,
-          options: {
-            A: options.A || options.a || '',
-            B: options.B || options.b || '',
-            C: options.C || options.c || '',
-            D: options.D || options.d || '',
-            E: options.E || options.e || ''
-          }
-        })
-        console.log(`🧠 Embedding generated for question: ${record.id}`)
-      } catch (embeddingError) {
-        console.warn(`⚠️ Embedding failed for ${record.id}:`, (embeddingError as Error).message)
-        // Embedding başarısız olsa bile soruyu kaydet
-      }
+    if (topicError || !topicData) {
+      console.warn(`Webhook: topic bulunamadı: ${record.topic_id}`)
+      return
+    }
+    
+    // Options JSONB'den şıkları çıkar
+    const options = record.options || {}
+    
+    // 🧠 Semantic Search için embedding üret (opsiyonel)
+    let embedding: number[] | undefined
+    try {
+      embedding = await getQuestionEmbedding({
+        questionText: safeString(record.question_text),
+        mainTopic: safeString(topicData.main_topic),
+        subTopic: safeString(topicData.sub_topic),
+        subjectName: safeString((topicData.subject as any)?.name),
+        options: {
+          A: safeString(options.A || options.a),
+          B: safeString(options.B || options.b),
+          C: safeString(options.C || options.c),
+          D: safeString(options.D || options.d),
+          E: safeString(options.E || options.e)
+        }
+      })
+    } catch (embeddingError) {
+      // Embedding hatası soruyu kaydetmeyi engellemez
+    }
 
-      const document: Record<string, any> = {
-        id: record.id,
-        question_id: record.id,
-        question_text: record.question_text || '',
-        explanation: record.explanation || '',
-        // Şıklar (4 şık ortaokul, 5 şık lise)
-        option_a: options.A || options.a || '',
-        option_b: options.B || options.b || '',
-        option_c: options.C || options.c || '',
-        option_d: options.D || options.d || '',
-        option_e: options.E || options.e || '',  // Lise için 5. şık
-        correct_answer: record.correct_answer || '',
-        difficulty: record.difficulty || 'medium',
-        subject_id: (topicData.subject as any)?.id || '',
-        subject_code: (topicData.subject as any)?.code || '',
-        subject_name: (topicData.subject as any)?.name || '',
-        topic_id: topicData.id,
-        main_topic: topicData.main_topic || '',
-        sub_topic: topicData.sub_topic || '',
-        grade: topicData.grade || 0,
-        has_image: !!record.question_image_url,
-        image_url: record.question_image_url || '',
-        times_answered: record.times_answered || 0,
-        times_correct: record.times_correct || 0,
-        success_rate: record.times_answered > 0
-          ? (record.times_correct / record.times_answered) * 100
-          : 0,
-        created_at: record.created_at
-          ? new Date(record.created_at).getTime()
-          : Date.now()
-      }
+    const timesAnswered = safeNumber(record.times_answered)
+    const timesCorrect = safeNumber(record.times_correct)
 
-      // Embedding varsa ekle
-      if (embedding && embedding.length === 768) {
-        document.embedding = embedding
-      }
+    const document: Record<string, any> = {
+      id: questionId,
+      question_id: questionId,
+      question_text: safeString(record.question_text),
+      explanation: safeString(record.explanation),
+      option_a: safeString(options.A || options.a),
+      option_b: safeString(options.B || options.b),
+      option_c: safeString(options.C || options.c),
+      option_d: safeString(options.D || options.d),
+      option_e: safeString(options.E || options.e),
+      correct_answer: safeString(record.correct_answer),
+      difficulty: safeString(record.difficulty, 'medium'),
+      subject_id: safeString((topicData.subject as any)?.id, 'unknown'),
+      subject_code: safeString((topicData.subject as any)?.code, 'unknown'),
+      subject_name: safeString((topicData.subject as any)?.name, 'Bilinmeyen'),
+      topic_id: safeString(topicData.id),
+      main_topic: safeString(topicData.main_topic),
+      sub_topic: safeString(topicData.sub_topic),
+      grade: safeNumber(topicData.grade),
+      has_image: !!record.question_image_url,
+      image_url: safeString(record.question_image_url),
+      times_answered: timesAnswered,
+      times_correct: timesCorrect,
+      success_rate: timesAnswered > 0
+        ? Math.round((timesCorrect / timesAnswered) * 100 * 100) / 100
+        : 0,
+      created_at: safeTimestamp(record.created_at)
+    }
 
+    // Embedding varsa ekle
+    if (embedding && embedding.length === 768) {
+      document.embedding = embedding
+    }
+
+    try {
       await typesense.collections('questions').documents().upsert(document)
-      console.log(`Question upserted: ${record.id} ${embedding ? '(with embedding)' : '(no embedding)'}`)
+    } catch (questionError) {
+      console.error(`Question upsert hatası (${questionId}):`, (questionError as Error).message)
+      throw questionError
     }
   }
   
   if (type === 'DELETE') {
     try {
-      const questionId = old_record?.id || record.id
-      await typesense.collections('questions').documents(questionId).delete()
-      console.log(`Question deleted: ${questionId}`)
+      const questionId = safeString(old_record?.id || record.id)
+      if (questionId) {
+        await typesense.collections('questions').documents(questionId).delete()
+      }
     } catch (e) {
       // Document bulunamadı - sorun yok
     }
@@ -310,8 +363,16 @@ async function handleStudentTopicStatsSync(
   old_record?: Record<string, any>
 ) {
   if (type === 'INSERT' || type === 'UPDATE') {
+    const studentId = safeString(record.student_id)
+    const topicId = safeString(record.topic_id)
+    
+    if (!studentId || !topicId) {
+      console.warn('Webhook: student_id veya topic_id boş, atlanıyor')
+      return
+    }
+    
     // Topic bilgilerini çek
-    const { data: topicData } = await supabase
+    const { data: topicData, error: topicError } = await supabase
       .from('topics')
       .select(`
         id,
@@ -319,46 +380,53 @@ async function handleStudentTopicStatsSync(
         grade,
         subject:subjects!inner(code, name)
       `)
-      .eq('id', record.topic_id)
+      .eq('id', topicId)
       .single()
     
-    if (topicData) {
-      const totalAttempted = record.total_attempted || 0
-      const totalCorrect = record.total_correct || 0
-      
-      const document = {
-        id: `${record.student_id}_${record.topic_id}`,
-        progress_id: `${record.student_id}_${record.topic_id}`,
-        student_id: record.student_id,
-        topic_id: record.topic_id,
-        subject_code: (topicData.subject as any)?.code || '',
-        subject_name: (topicData.subject as any)?.name || '',
-        main_topic: topicData.main_topic || '',
-        grade: topicData.grade || 0,
-        total_attempted: totalAttempted,
-        total_correct: totalCorrect,
-        success_rate: totalAttempted > 0 
-          ? (totalCorrect / totalAttempted) * 100 
-          : 0,
-        mastery_level: record.mastery_level || 'beginner',
-        current_difficulty: record.current_difficulty || 'medium',
-        consecutive_correct: record.consecutive_correct || 0,
-        last_practiced_at: record.last_attempted_at 
-          ? new Date(record.last_attempted_at).getTime() 
-          : Date.now()
-      }
-      
+    if (topicError || !topicData) {
+      console.warn(`Webhook: topic bulunamadı: ${topicId}`)
+      return
+    }
+    
+    const totalAttempted = safeNumber(record.total_attempted)
+    const totalCorrect = safeNumber(record.total_correct)
+    const docId = `${studentId}_${topicId}`
+    
+    const document = {
+      id: docId,
+      progress_id: docId,
+      student_id: studentId,
+      topic_id: topicId,
+      subject_code: safeString((topicData.subject as any)?.code, 'unknown'),
+      subject_name: safeString((topicData.subject as any)?.name, 'Bilinmeyen'),
+      main_topic: safeString(topicData.main_topic),
+      grade: safeNumber(topicData.grade),
+      total_attempted: totalAttempted,
+      total_correct: totalCorrect,
+      success_rate: totalAttempted > 0 
+        ? Math.round((totalCorrect / totalAttempted) * 100 * 100) / 100 
+        : 0,
+      mastery_level: safeString(record.mastery_level, 'beginner'),
+      current_difficulty: safeString(record.current_difficulty, 'medium'),
+      consecutive_correct: safeNumber(record.consecutive_correct),
+      last_practiced_at: safeTimestamp(record.last_attempted_at)
+    }
+    
+    try {
       await typesense.collections('student_topic_progress').documents().upsert(document)
-      console.log(`Student topic progress upserted: ${record.student_id}_${record.topic_id}`)
+    } catch (progressError) {
+      console.error(`Topic progress upsert hatası (${docId}):`, (progressError as Error).message)
+      throw progressError
     }
   }
   
   if (type === 'DELETE') {
     try {
-      const studentId = old_record?.student_id || record.student_id
-      const topicId = old_record?.topic_id || record.topic_id
-      await typesense.collections('student_topic_progress').documents(`${studentId}_${topicId}`).delete()
-      console.log(`Student topic progress deleted: ${studentId}_${topicId}`)
+      const studentId = safeString(old_record?.student_id || record.student_id)
+      const topicId = safeString(old_record?.topic_id || record.topic_id)
+      if (studentId && topicId) {
+        await typesense.collections('student_topic_progress').documents(`${studentId}_${topicId}`).delete()
+      }
     } catch (e) {
       // Document bulunamadı - sorun yok
     }
@@ -374,10 +442,15 @@ async function handleSchoolsSync(
   old_record?: Record<string, any>
 ) {
   if (type === 'INSERT' || type === 'UPDATE') {
+    const schoolId = safeString(record.id)
+    if (!schoolId) {
+      console.warn('Webhook: school id boş, atlanıyor')
+      return
+    }
+    
     if (!record.is_active) {
       try {
-        await typesense.collections('schools').documents(record.id).delete()
-        console.log(`School deleted (inactive): ${record.id}`)
+        await typesense.collections('schools').documents(schoolId).delete()
       } catch (e) {
         // Document bulunamadı - sorun yok
       }
@@ -396,29 +469,32 @@ async function handleSchoolsSync(
       .eq('id', record.district_id)
       .single()
     
-    if (districtData) {
-      const document = {
-        id: record.id,
-        school_id: record.id,
-        name: record.name || '',
-        city_id: (districtData.city as any)?.id || '',
-        city_name: (districtData.city as any)?.name || '',
-        district_id: districtData.id,
-        district_name: districtData.name || '',
-        school_type: record.school_type || '',
-        ownership_type: record.ownership_type || ''
-      }
-      
+    const document = {
+      id: schoolId,
+      school_id: schoolId,
+      name: safeString(record.name, 'İsimsiz Okul'),
+      city_id: safeString((districtData?.city as any)?.id, 'unknown'),
+      city_name: safeString((districtData?.city as any)?.name, 'Belirtilmemiş'),
+      district_id: safeString(districtData?.id, 'unknown'),
+      district_name: safeString(districtData?.name, 'Belirtilmemiş'),
+      school_type: safeString(record.school_type, 'other'),
+      ownership_type: safeString(record.ownership_type, 'public')
+    }
+    
+    try {
       await typesense.collections('schools').documents().upsert(document)
-      console.log(`School upserted: ${record.id}`)
+    } catch (schoolError) {
+      console.error(`School upsert hatası (${schoolId}):`, (schoolError as Error).message)
+      throw schoolError
     }
   }
   
   if (type === 'DELETE') {
     try {
-      const schoolId = old_record?.id || record.id
-      await typesense.collections('schools').documents(schoolId).delete()
-      console.log(`School deleted: ${schoolId}`)
+      const schoolId = safeString(old_record?.id || record.id)
+      if (schoolId) {
+        await typesense.collections('schools').documents(schoolId).delete()
+      }
     } catch (e) {
       // Document bulunamadı - sorun yok
     }
@@ -434,23 +510,34 @@ async function handleCitiesSync(
   old_record?: Record<string, any>
 ) {
   if (type === 'INSERT' || type === 'UPDATE') {
-    const document = {
-      id: `city_${record.id}`,
-      location_id: record.id,
-      name: record.name || '',
-      type: 'city',
-      plate_code: record.plate_code || 0
+    const cityId = safeString(record.id)
+    if (!cityId) {
+      console.warn('Webhook: city id boş, atlanıyor')
+      return
     }
     
-    await typesense.collections('locations').documents().upsert(document)
-    console.log(`City upserted: ${record.id}`)
+    const document = {
+      id: `city_${cityId}`,
+      location_id: cityId,
+      name: safeString(record.name, 'İsimsiz Şehir'),
+      type: 'city',
+      plate_code: safeNumber(record.plate_code)
+    }
+    
+    try {
+      await typesense.collections('locations').documents().upsert(document)
+    } catch (cityError) {
+      console.error(`City upsert hatası (${cityId}):`, (cityError as Error).message)
+      throw cityError
+    }
   }
   
   if (type === 'DELETE') {
     try {
-      const cityId = old_record?.id || record.id
-      await typesense.collections('locations').documents(`city_${cityId}`).delete()
-      console.log(`City deleted: ${cityId}`)
+      const cityId = safeString(old_record?.id || record.id)
+      if (cityId) {
+        await typesense.collections('locations').documents(`city_${cityId}`).delete()
+      }
     } catch (e) {
       // Document bulunamadı - sorun yok
     }
@@ -466,6 +553,12 @@ async function handleDistrictsSync(
   old_record?: Record<string, any>
 ) {
   if (type === 'INSERT' || type === 'UPDATE') {
+    const districtId = safeString(record.id)
+    if (!districtId) {
+      console.warn('Webhook: district id boş, atlanıyor')
+      return
+    }
+    
     // City bilgisini çek
     const { data: cityData } = await supabase
       .from('turkey_cities')
@@ -474,23 +567,28 @@ async function handleDistrictsSync(
       .single()
     
     const document = {
-      id: `district_${record.id}`,
-      location_id: record.id,
-      name: record.name || '',
+      id: `district_${districtId}`,
+      location_id: districtId,
+      name: safeString(record.name, 'İsimsiz İlçe'),
       type: 'district',
-      parent_id: record.city_id || '',
-      parent_name: cityData?.name || ''
+      parent_id: safeString(record.city_id, 'unknown'),
+      parent_name: safeString(cityData?.name, 'Belirtilmemiş')
     }
     
-    await typesense.collections('locations').documents().upsert(document)
-    console.log(`District upserted: ${record.id}`)
+    try {
+      await typesense.collections('locations').documents().upsert(document)
+    } catch (districtError) {
+      console.error(`District upsert hatası (${districtId}):`, (districtError as Error).message)
+      throw districtError
+    }
   }
   
   if (type === 'DELETE') {
     try {
-      const districtId = old_record?.id || record.id
-      await typesense.collections('locations').documents(`district_${districtId}`).delete()
-      console.log(`District deleted: ${districtId}`)
+      const districtId = safeString(old_record?.id || record.id)
+      if (districtId) {
+        await typesense.collections('locations').documents(`district_${districtId}`).delete()
+      }
     } catch (e) {
       // Document bulunamadı - sorun yok
     }
