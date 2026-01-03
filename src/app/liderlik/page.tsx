@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { LeaderboardEntry } from '@/types/database'
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
-import { isTypesenseEnabled, getTodayQuestionsFast } from '@/lib/typesense/browser-client'
+import { isTypesenseEnabled } from '@/lib/typesense/browser-client'
 // 🎮 Real-time özellikler
 import { useLeaderboardPolling, LeaderboardDiff } from '@/hooks/useLeaderboardPolling'
 import { useTypesenseLocations } from '@/hooks/useTypesenseLocations'
@@ -120,7 +120,6 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true)
   const [totalStudents, setTotalStudents] = useState(0)
   const [totalQuestions, setTotalQuestions] = useState(0)
-  const [todayQuestions, setTodayQuestions] = useState(0)
   
   // Auth state
   const [user, setUser] = useState<any>(null)
@@ -205,21 +204,6 @@ export default function LeaderboardPage() {
       setLoading(false)
     }
   }, [shouldPoll, polledLeaderboard, polledStats, pollingLoading])
-  
-  // ⚡ Bugün çözülen soru sayısını yükle (polling ile birlikte)
-  useEffect(() => {
-    async function loadTodayQuestions() {
-      if (isTypesenseEnabled()) {
-        const count = await getTodayQuestionsFast()
-        setTodayQuestions(count)
-      }
-    }
-    loadTodayQuestions()
-    
-    // Her 5 saniyede güncelle
-    const interval = setInterval(loadTodayQuestions, 5000)
-    return () => clearInterval(interval)
-  }, [])
   
   // Diff'leri sıra değişimi için map'e dönüştür
   const diffMap = useMemo(() => {
@@ -459,27 +443,6 @@ export default function LeaderboardPage() {
                   </div>
                 )}
                 <div className="text-xs text-white/50">En Yüksek Puan</div>
-              </div>
-            </div>
-          </motion.div>
-          <motion.div 
-            className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 relative overflow-hidden"
-            whileHover={{ scale: 1.02 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center">
-                <Zap className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                {loading && !shouldPoll ? (
-                  <div className="h-8 w-16 bg-white/10 rounded animate-pulse" />
-                ) : (
-                  <div className="text-2xl font-bold text-white">
-                    <AnimatedNumber value={todayQuestions} />
-                  </div>
-                )}
-                <div className="text-xs text-white/50">Bugün Çözülen</div>
               </div>
             </div>
           </motion.div>

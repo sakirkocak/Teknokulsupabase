@@ -349,8 +349,8 @@ function LiveStatsBanner() {
           {loading ? (
             <StatSkeleton />
           ) : (
-            <span className="font-bold text-surface-900">{formatNumber(stats.todayQuestions)}+</span>
-          )} soru bugün çözüldü
+            <span className="font-bold text-surface-900">{formatNumber(stats.totalQuestions)}+</span>
+          )} çözülen soru
         </span>
       </div>
       <div className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm border border-surface-100">
