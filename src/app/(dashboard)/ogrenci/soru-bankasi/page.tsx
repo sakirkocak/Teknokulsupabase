@@ -602,6 +602,10 @@ export default function SoruBankasiPage() {
 
   // Ders bazlı hızlı başla
   const quickStartSubject = async (gs: GradeSubject) => {
+    // ✅ Grade'i şu an al - state async güncellenebilir!
+    const currentGrade = selectedGrade
+    console.log(`🚀 quickStartSubject: ${gs.subject.name}, grade=${currentGrade}`)
+    
     setSelectedSubject(gs)
     setSelectedTopic(null)
     setSelectedDifficulty('')
@@ -612,7 +616,7 @@ export default function SoruBankasiPage() {
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
     setPracticeLoading(true)
-    await loadRandomQuestionFromSubject(gs.subject_id)
+    await loadRandomQuestionFromSubject(gs.subject_id, currentGrade)
     setPracticeLoading(false)
   }
 
@@ -768,19 +772,21 @@ export default function SoruBankasiPage() {
     }
   }
 
-  // Belirli dersten rastgele soru yükle
-  const loadRandomQuestionFromSubject = async (subjectId: string) => {
+  // Belirli dersten rastgele soru yükle - grade parametresi ZORUNLU!
+  const loadRandomQuestionFromSubject = async (subjectId: string, grade: number) => {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
 
+    console.log(`🎯 loadRandomQuestionFromSubject: subjectId=${subjectId}, grade=${grade}`)
+
     const { data: subjectTopics } = await supabase
       .from('topics')
       .select('id')
       .eq('subject_id', subjectId)
-      .eq('grade', selectedGrade)
+      .eq('grade', grade)
       .eq('is_active', true)
 
     if (!subjectTopics || subjectTopics.length === 0) {
@@ -886,9 +892,23 @@ export default function SoruBankasiPage() {
     if (topicToUse) {
       query = query.eq('topic_id', topicToUse.id)
     } else if (selectedSubject) {
-      const topicIds = topics.map(t => t.id)
+      // ✅ topics state'ine güvenme - doğrudan Supabase'den çek!
+      const { data: subjectTopics } = await supabase
+        .from('topics')
+        .select('id')
+        .eq('subject_id', selectedSubject.subject_id)
+        .eq('grade', selectedGrade)
+        .eq('is_active', true)
+      
+      const topicIds = subjectTopics?.map(t => t.id) || []
+      console.log(`🔍 loadNextQuestion: ${selectedSubject.subject.name}, grade=${selectedGrade}, topics=${topicIds.length}`)
+      
       if (topicIds.length > 0) {
         query = query.in('topic_id', topicIds)
+      } else {
+        // Hiç topic yoksa boş dön
+        setCurrentQuestion(null)
+        return
       }
     }
 

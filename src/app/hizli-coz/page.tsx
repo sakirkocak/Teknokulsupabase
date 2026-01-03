@@ -174,16 +174,18 @@ function HizliCozPageContent() {
       // 1. URL parametrelerini oku
       const nicknameParam = searchParams.get('nickname')
       const sinifParam = searchParams.get('sinif')
+      const gradeParam = searchParams.get('grade') // ✅ YENİ: /sorular sayfasından gelen
       const dersIdParam = searchParams.get('dersId')
+      const subjectParam = searchParams.get('subject') // ✅ YENİ: /sorular sayfasından gelen (ders kodu)
       const autostartParam = searchParams.get('autostart')
       
-      // Değerleri belirle
-      const gradeFromUrl = sinifParam ? parseInt(sinifParam) : null
+      // Değerleri belirle - önce 'grade' sonra 'sinif' parametresine bak
+      const gradeFromUrl = gradeParam ? parseInt(gradeParam.replace('-sinif', '')) : (sinifParam ? parseInt(sinifParam) : null)
       const finalGrade = gradeFromUrl || 8
       const finalNickname = nicknameParam || ''
       const shouldAuto = autostartParam === 'true' && !!nicknameParam
       
-      console.log('📋 URL parametreleri:', { finalNickname, finalGrade, dersIdParam, shouldAuto })
+      console.log('📋 URL parametreleri:', { finalNickname, finalGrade, subjectParam, dersIdParam, shouldAuto })
       
       // 2. State'leri güncelle
       setSelectedGrade(finalGrade)
@@ -233,15 +235,28 @@ function HizliCozPageContent() {
         console.log('✅ Dersler yüklendi:', loadedSubjects.length, 'adet')
       }
       
-      // 5. Ders eşleştir (varsa)
+      // 5. Ders eşleştir (varsa) - subject kodu VEYA dersId ile
       let matchedSubject: Subject | null = null
-      if (dersIdParam && loadedSubjects.length > 0) {
-        matchedSubject = loadedSubjects.find(s => s.id === dersIdParam) || null
-        if (matchedSubject) {
-          setSelectedSubject(matchedSubject)
-          console.log('🎯 Ders eşleşti:', matchedSubject.name)
-        } else {
-          console.log('⚠️ Ders bulunamadı, karışık devam:', dersIdParam)
+      if (loadedSubjects.length > 0) {
+        // Önce subject parametresi (kod ile) kontrol et
+        if (subjectParam) {
+          matchedSubject = loadedSubjects.find(s => s.code === subjectParam) || null
+          if (matchedSubject) {
+            setSelectedSubject(matchedSubject)
+            console.log('🎯 Ders eşleşti (kod ile):', matchedSubject.name)
+          } else {
+            console.log('⚠️ Ders bulunamadı (kod):', subjectParam)
+          }
+        }
+        // Eğer subject ile bulunamadıysa, dersId (UUID) ile dene
+        if (!matchedSubject && dersIdParam) {
+          matchedSubject = loadedSubjects.find(s => s.id === dersIdParam) || null
+          if (matchedSubject) {
+            setSelectedSubject(matchedSubject)
+            console.log('🎯 Ders eşleşti (id ile):', matchedSubject.name)
+          } else {
+            console.log('⚠️ Ders bulunamadı (id):', dersIdParam)
+          }
         }
       }
       
