@@ -189,14 +189,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  // Popüler dersleri statik olarak oluştur
-  const popularSubjects = [
+  // TÜM dersleri build time'da oluştur (şimşek hız!)
+  const allSubjects = [
     'matematik', 'turkce', 'fen_bilimleri', 'sosyal_bilgiler', 
     'ingilizce', 'fizik', 'kimya', 'biyoloji', 
-    'inkilap_tarihi', 'din_kulturu'
+    'inkilap_tarihi', 'din_kulturu', 'bilisim', 'edebiyat',
+    'tarih', 'cografya', 'felsefe', 'hayat_bilgisi',
+    'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'teknoloji_tasarim', 'trafik'
   ]
   
-  return popularSubjects.map((subject) => ({ subject }))
+  return allSubjects.map((subject) => ({ subject })) // 21 ders sayfası
 }
 
 // ⚡ TYPESENSE - Şimşek hızında veri çekme!

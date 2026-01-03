@@ -140,23 +140,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export async function generateStaticParams() {
-  // Popüler kombinasyonları statik olarak oluştur
-  const popularSubjects = [
+  // TÜM ders ve sınıf kombinasyonlarını build time'da oluştur (şimşek hız!)
+  const allSubjects = [
     'matematik', 'turkce', 'fen_bilimleri', 'sosyal_bilgiler', 
     'ingilizce', 'fizik', 'kimya', 'biyoloji', 
-    'inkilap_tarihi', 'din_kulturu'
+    'inkilap_tarihi', 'din_kulturu', 'bilisim', 'edebiyat',
+    'tarih', 'cografya', 'felsefe', 'hayat_bilgisi',
+    'gorsel_sanatlar', 'muzik', 'beden_egitimi', 'teknoloji_tasarim', 'trafik'
   ]
-  const popularGrades = [5, 6, 7, 8, 9, 10, 11, 12] // En popüler sınıflar
+  const allGrades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] // TÜM sınıflar
   
   const params: { subject: string; grade: string }[] = []
   
-  popularSubjects.forEach((subject) => {
-    popularGrades.forEach((grade) => {
+  allSubjects.forEach((subject) => {
+    allGrades.forEach((grade) => {
       params.push({ subject, grade: `${grade}-sinif` })
     })
   })
   
-  return params
+  return params // 21 ders × 12 sınıf = 252 sayfa
 }
 
 // ⚡ TYPESENSE - Şimşek hızında veri çekme!
