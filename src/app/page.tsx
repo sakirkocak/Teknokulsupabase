@@ -285,7 +285,8 @@ function LiveStatsBanner() {
   const [stats, setStats] = useState({
     todayQuestions: 0,
     activeStudents: 0,
-    totalQuestions: 0
+    totalQuestions: 0,
+    totalSolvedQuestions: 0
   })
 
   useEffect(() => {
@@ -305,9 +306,10 @@ function LiveStatsBanner() {
           setStats({
             todayQuestions: result.todayQuestions || 0,
             activeStudents: result.activeStudents || 0,
-            totalQuestions: result.totalQuestions || 0
+            totalQuestions: result.totalQuestions || 0,
+            totalSolvedQuestions: result.totalSolvedQuestions || 0
           })
-          console.log(`⚡ Stats (client-side): ${result.duration}ms, today: ${result.todayQuestions}, total: ${result.totalQuestions}`)
+          console.log(`⚡ Stats (client-side): ${result.duration}ms, solved: ${result.totalSolvedQuestions}, bank: ${result.totalQuestions}`)
         } catch (typesenseError) {
           // Typesense hatası - API'ye fallback
           console.warn('Typesense hata, API fallback:', typesenseError)
@@ -325,9 +327,10 @@ function LiveStatsBanner() {
         setStats({
           todayQuestions: result.todayQuestions || 0,
           activeStudents: result.activeStudents || 0,
-          totalQuestions: result.totalQuestions || 0
+          totalQuestions: result.totalQuestions || 0,
+          totalSolvedQuestions: result.totalSolvedQuestions || 0
         })
-        console.log(`⚡ Stats (API fallback): ${result.duration}ms, today: ${result.todayQuestions}, total: ${result.totalQuestions}`)
+        console.log(`⚡ Stats (API fallback): ${result.duration}ms, solved: ${result.totalSolvedQuestions}, bank: ${result.totalQuestions}`)
       } catch (apiError) {
         console.error('Stats yüklenemedi:', apiError)
         // Mevcut değerleri koru, sıfırlama
@@ -349,7 +352,7 @@ function LiveStatsBanner() {
           {loading ? (
             <StatSkeleton />
           ) : (
-            <span className="font-bold text-surface-900">{formatNumber(stats.totalQuestions)}+</span>
+            <span className="font-bold text-surface-900">{formatNumber(stats.totalSolvedQuestions)}+</span>
           )} çözülen soru
         </span>
       </div>

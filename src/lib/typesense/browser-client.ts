@@ -170,7 +170,8 @@ export async function getLeaderboardFast(filters: LeaderboardFilters = {}): Prom
 }
 
 export interface StatsResult {
-  totalQuestions: number
+  totalQuestions: number      // Soru bankasındaki toplam soru
+  totalSolvedQuestions: number // Toplam çözülen soru (leaderboard'dan)
   activeStudents: number
   todayQuestions: number
   bySubject: Array<{
@@ -201,7 +202,7 @@ export async function getStatsFast(): Promise<StatsResult> {
 
   try {
     // ⚡ Paralel Typesense sorguları
-    const [questionsResult, leaderboardResult, todayResult] = await Promise.all([
+    const [questionsResult, leaderboardResult, todayResult, solvedResult] = await Promise.all([
       // 1. Soru bankası istatistikleri
       client
         .collections(COLLECTIONS.QUESTIONS)
@@ -234,7 +235,19 @@ export async function getStatsFast(): Promise<StatsResult> {
           filter_by: `date:=${todayTR}`,
           per_page: 0
         })
-        .catch(() => ({ found: 0 }))
+        .catch(() => ({ found: 0 })),
+      
+      // 4. ✅ Toplam çözülen soru - leaderboard'dan total_questions toplamı
+      client
+        .collections(COLLECTIONS.LEADERBOARD)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'full_name',
+          per_page: 250, // Tüm öğrencileri al
+          include_fields: 'total_questions'
+        })
+        .catch(() => ({ hits: [] }))
     ])
 
     const facets = questionsResult.facet_counts || []
@@ -257,12 +270,20 @@ export async function getStatsFast(): Promise<StatsResult> {
 
     // ✅ Bugün çözülen soru sayısı - question_activity'den (doğru kaynak!)
     const todayQuestions = todayResult.found || 0
+    
+    // ✅ Toplam çözülen soru - leaderboard'daki tüm öğrencilerin total_questions toplamı
+    let totalSolvedQuestions = 0
+    const solvedHits = (solvedResult as any).hits || []
+    solvedHits.forEach((hit: any) => {
+      totalSolvedQuestions += hit.document?.total_questions || 0
+    })
 
     const duration = Math.round(performance.now() - startTime)
-    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions} (from question_activity)`)
+    console.log(`⚡ Stats (browser): ${duration}ms, todayQuestions: ${todayQuestions}, totalSolved: ${totalSolvedQuestions}`)
 
     return {
       totalQuestions: questionsResult.found || 0,
+      totalSolvedQuestions,
       activeStudents: leaderboardResult.found || 0,
       todayQuestions,
       bySubject,
@@ -278,6 +299,7 @@ export async function getStatsFast(): Promise<StatsResult> {
     const duration = Math.round(performance.now() - startTime)
     return {
       totalQuestions: result.totalQuestions || 0,
+      totalSolvedQuestions: result.totalSolvedQuestions || 0,
       activeStudents: result.activeStudents || 0,
       todayQuestions: result.todayQuestions || 0,
       bySubject: [],
