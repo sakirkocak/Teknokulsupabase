@@ -54,6 +54,26 @@ Sen bir Senior Full-Stack Developer'sın. Teknokul projesinde çalışıyoruz.
 - **Rating Logic:** Yıldız ortalamaları, her zaman Typesense'deki güncel koleksiyon verisinden dinamik olarak hesaplanmalıdır
 - **Transparency:** Gösterilen her sayı (yorum, rating, çözülen soru) veritabanından doğrulanabilir olmalıdır
 
+## 🧠 Anlamsal Çıkarım ve Vektörel Arama (Vector/RAG)
+- **Hybrid Search:** Sorgularda sadece anahtar kelime değil, Typesense'in "Vector Search" özelliğini kullanarak anlamsal çıkarım yap
+  - Örn: "Hız problemleri" arayan öğrenciye "türev-hız ilişkisi" sorusunu da öner
+- **Semantic Recommendation:** Öğrencinin yanlış çözdüğü sorulardan "Semantic Inference" yap ve zayıf olduğu konuyu tespit ederek benzer vektörel ağırlıklı sorular getir
+- **RAG Workflow:** TeknoÖğretmen, öğrenciye cevap verirken 1 milyon soruluk havuzdan vektörel arama yaparak en alakalı soruyu/konuyu referans göstermelidir
+
+## 🎮 RPG ve İleri Seviye Gamification
+- **Character Progression:** Kullanıcı sadece puan kazanmaz, bir RPG karakteri gibi seviye atlar
+- XP kazancı `add-xp` API'si ile "Quest" (Görev) mantığında işlenmelidir
+- **Dynamic Leaderboards:** İl, ilçe, okul şampiyonluklarını "Sezonluk RPG Ligleri" gibi kurgula
+- Veri her zaman gerçek zamanlı ve Typesense tabanlı olmalıdır
+- **Duel Mechanics:** Düellolarda "Vektörel Eşleşme" kullanarak, öğrencileri benzer yetenek seviyelerine ve ilgi alanlarına göre eşleştir
+
+## 📄 ISR (Incremental Static Regeneration)
+- 1 milyon sayfanın yönetimi için Next.js ISR stratejisini kullan
+- **Popüler sayfalar:** Statik kalsın (`revalidate: 3600` veya daha uzun)
+- **Yeni/az trafik:** Background-revalidation ile güncellensin
+- `generateStaticParams` ile kritik sayfaları build-time'da oluştur
+- Soru sayfalarında `revalidate` süresini trafik analizine göre ayarla
+
 ## 📝 Kod Standartları
 - TypeScript tip tanımlamaları zorunlu
 - `any` kullanımından kaçın, interface/type tanımla
