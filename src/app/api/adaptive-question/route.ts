@@ -195,27 +195,48 @@ export async function POST(req: NextRequest) {
     // Supabase fallback
     const supabase = await createClient()
     
-    let query = supabase
-      .from('questions')
-      .select('id, question_text, difficulty, topic_id, options, correct_answer, explanation, question_image_url, topic:topics!inner(id, main_topic, grade, subject:subjects!inner(id, name, code))')
-      .eq('is_active', true)
+    // ✅ Önce topic_id'leri al - daha güvenilir filtreleme
+    let topicIds: string[] = []
     
     if (topicId) {
-      query = query.eq('topic_id', topicId)
-    } else if (subjectCode && grade) {
-      // ✅ Ders ve sınıf filtrelemesi - topics üzerinden
-      query = query
-        .eq('topic.subject.code', subjectCode)
-        .eq('topic.grade', grade)
-      console.log(`🎯 Adaptive: subjectCode=${subjectCode}, grade=${grade}`)
-    } else if (subjectCode) {
-      // Sadece ders filtrelemesi
-      query = query.eq('topic.subject.code', subjectCode)
-      console.log(`🎯 Adaptive: subjectCode=${subjectCode}`)
-    } else if (grade) {
-      // Sadece sınıf filtrelemesi
-      query = query.eq('topic.grade', grade)
-      console.log(`🎯 Adaptive: grade=${grade}`)
+      topicIds = [topicId]
+    } else if (subjectCode || grade) {
+      // Subject ve/veya grade'e göre topic'leri bul
+      let topicQuery = supabase
+        .from('topics')
+        .select('id, subject:subjects!inner(code)')
+        .eq('is_active', true)
+      
+      if (grade) {
+        topicQuery = topicQuery.eq('grade', grade)
+      }
+      
+      const { data: topicsData } = await topicQuery
+      
+      if (topicsData && topicsData.length > 0) {
+        // SubjectCode filtresi varsa uygula
+        if (subjectCode) {
+          topicIds = topicsData
+            .filter((t: any) => t.subject?.code === subjectCode)
+            .map((t: any) => t.id)
+        } else {
+          topicIds = topicsData.map((t: any) => t.id)
+        }
+      }
+      
+      console.log(`🎯 Adaptive: subjectCode=${subjectCode}, grade=${grade}, topics=${topicIds.length}`)
+    }
+    
+    let query = supabase
+      .from('questions')
+      .select('id, question_text, difficulty, topic_id, options, correct_answer, explanation, question_image_url, topic:topics(id, main_topic, grade, subject:subjects(id, name, code))')
+      .eq('is_active', true)
+    
+    // Topic filtrelemesi
+    if (topicIds.length > 0) {
+      query = query.in('topic_id', topicIds)
+    } else if (!topicId && !subjectCode && !grade) {
+      // Hiçbir filtre yoksa - tüm sorulardan seç (sınırsız)
     }
     
     // Adaptif zorluk filtresi
