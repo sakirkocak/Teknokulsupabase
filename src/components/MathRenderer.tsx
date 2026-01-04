@@ -156,6 +156,7 @@ function sanitizeLatex(latex: string): string {
   // Gemini bazen "times" yerine "\times" yazmıyor - bunu düzelt
   // Sadece bağımsız kelimeler olarak geçenleri değiştir (örn: "times3" -> "\times 3")
   sanitized = sanitized
+    // Matematiksel operatörler
     .replace(/\btimes(\d)/gi, '\\times $1')  // times3 -> \times 3
     .replace(/\btimes\b/gi, '\\times')        // times -> \times
     .replace(/\bdiv(\d)/gi, '\\div $1')       // div12 -> \div 12
@@ -164,16 +165,46 @@ function sanitizeLatex(latex: string): string {
     .replace(/\bfrac\b/gi, '\\frac')          // frac -> \frac
     .replace(/\bpm\b/gi, '\\pm')              // pm -> \pm
     .replace(/\bcdot\b/gi, '\\cdot')          // cdot -> \cdot
+    // Karşılaştırma operatörleri
     .replace(/\bleq\b/gi, '\\leq')            // leq -> \leq
     .replace(/\bgeq\b/gi, '\\geq')            // geq -> \geq
     .replace(/\bneq\b/gi, '\\neq')            // neq -> \neq
+    .replace(/\bapprox\b/gi, '\\approx')      // approx -> \approx (≈)
+    .replace(/\bequiv\b/gi, '\\equiv')        // equiv -> \equiv (≡)
+    .replace(/\bsim\b/gi, '\\sim')            // sim -> \sim (~)
+    // Oklar
+    .replace(/\brightarrow\b/gi, '\\rightarrow')  // rightarrow -> \rightarrow (→)
+    .replace(/\bleftarrow\b/gi, '\\leftarrow')    // leftarrow -> \leftarrow (←)
+    .replace(/\bRightarrow\b/g, '\\Rightarrow')   // Rightarrow -> \Rightarrow (⇒)
+    .replace(/\bLeftarrow\b/g, '\\Leftarrow')     // Leftarrow -> \Leftarrow (⇐)
+    .replace(/\bto\b/gi, '\\to')                  // to -> \to (→)
+    // Semboller
     .replace(/\binfty\b/gi, '\\infty')        // infty -> \infty
+    .replace(/\bforall\b/gi, '\\forall')      // forall -> \forall (∀)
+    .replace(/\bexists\b/gi, '\\exists')      // exists -> \exists (∃)
+    .replace(/\bsum\b/gi, '\\sum')            // sum -> \sum (∑)
+    .replace(/\bprod\b/gi, '\\prod')          // prod -> \prod (∏)
+    .replace(/\bint\b/gi, '\\int')            // int -> \int (∫)
+    // Yunan harfleri
     .replace(/\balpha\b/gi, '\\alpha')        // alpha -> \alpha
     .replace(/\bbeta\b/gi, '\\beta')          // beta -> \beta
     .replace(/\bgamma\b/gi, '\\gamma')        // gamma -> \gamma
     .replace(/\bdelta\b/gi, '\\delta')        // delta -> \delta
+    .replace(/\bepsilon\b/gi, '\\epsilon')    // epsilon -> \epsilon
+    .replace(/\blambda\b/gi, '\\lambda')      // lambda -> \lambda
+    .replace(/\bmu\b/gi, '\\mu')              // mu -> \mu
+    .replace(/\bsigma\b/gi, '\\sigma')        // sigma -> \sigma
+    .replace(/\bomega\b/gi, '\\omega')        // omega -> \omega
     .replace(/\bpi\b/gi, '\\pi')              // pi -> \pi
     .replace(/\btheta\b/gi, '\\theta')        // theta -> \theta
+    .replace(/\bphi\b/gi, '\\phi')            // phi -> \phi
+    // Trigonometri
+    .replace(/\bsin\b/gi, '\\sin')            // sin -> \sin
+    .replace(/\bcos\b/gi, '\\cos')            // cos -> \cos
+    .replace(/\btan\b/gi, '\\tan')            // tan -> \tan
+    .replace(/\bcot\b/gi, '\\cot')            // cot -> \cot
+    .replace(/\blog\b/gi, '\\log')            // log -> \log
+    .replace(/\bln\b/gi, '\\ln')              // ln -> \ln
 
   // 2.6. LaTeX tablo komutlarını düzelt
   // begin/end environment komutları

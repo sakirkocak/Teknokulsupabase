@@ -7,6 +7,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import MathRenderer from '@/components/MathRenderer'
+import DOMPurify from 'isomorphic-dompurify'
 import { 
   Wand2, 
   Sparkles, 
@@ -379,7 +380,10 @@ export default function AIQuestionGeneratorPage() {
             source: selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated',
             is_active: true,
             created_by: profile?.id,
-            lang: selectedLanguage  // 🌍 Questly Global için dil desteği
+            lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
+            // 🆕 Yeni Nesil Soru alanları
+            visual_type: question.visual_type || null,
+            visual_content: question.visual_content || null
           })
           .select('id')
           .single()
@@ -578,7 +582,10 @@ export default function AIQuestionGeneratorPage() {
             source: selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated (Batch)',
             is_active: true,
             created_by: profile?.id,
-            lang: selectedLanguage  // 🌍 Questly Global için dil desteği
+            lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
+            // 🆕 Yeni Nesil Soru alanları
+            visual_type: question.visual_type || null,
+            visual_content: question.visual_content || null
           })
           .select('id')
           .single()
@@ -1548,7 +1555,38 @@ export default function AIQuestionGeneratorPage() {
                                     <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">
                                       📊 Görsel İçerik ({question.visual_type})
                                     </div>
-                                    <MathRenderer text={question.visual_content} />
+                                    {/* 🎨 Görsel içerik render - HTML/SVG veya LaTeX fallback */}
+                                    {question.visual_content.includes('<svg') || question.visual_content.includes('<div') || question.visual_content.includes('<table') ? (
+                                      // HTML/SVG içerik - DOMPurify ile güvenli render
+                                      <div 
+                                        className="overflow-x-auto visual-content-render"
+                                        dangerouslySetInnerHTML={{ 
+                                          __html: DOMPurify.sanitize(question.visual_content, {
+                                            ALLOWED_TAGS: [
+                                              // HTML
+                                              'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption', 'colgroup', 'col', 
+                                              'div', 'span', 'p', 'br', 'strong', 'b', 'em', 'i',
+                                              // SVG
+                                              'svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+                                              'text', 'tspan', 'defs', 'linearGradient', 'radialGradient', 'stop', 'marker', 'use'
+                                            ],
+                                            ALLOWED_ATTR: [
+                                              // HTML
+                                              'style', 'class', 'colspan', 'rowspan',
+                                              // SVG
+                                              'viewBox', 'xmlns', 'width', 'height', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
+                                              'cx', 'cy', 'r', 'rx', 'ry', 'd', 'fill', 'stroke', 'stroke-width', 
+                                              'transform', 'text-anchor', 'font-size', 'font-weight', 'font-family',
+                                              'id', 'offset', 'stop-color', 'gradientUnits', 'markerWidth', 'markerHeight',
+                                              'refX', 'refY', 'orient', 'markerUnits', 'points', 'marker-end', 'href'
+                                            ]
+                                          })
+                                        }} 
+                                      />
+                                    ) : (
+                                      // LaTeX fallback - MathRenderer ile render
+                                      <MathRenderer text={question.visual_content} />
+                                    )}
                                   </div>
                                 )}
                               </div>

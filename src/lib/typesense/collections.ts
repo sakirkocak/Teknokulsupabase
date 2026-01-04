@@ -91,6 +91,10 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'has_image', type: 'bool', facet: true, optional: true },
     { name: 'lang', type: 'string', facet: true, optional: true },
     
+    // 🆕 YENİ NESİL SORU alanları
+    { name: 'is_new_generation', type: 'bool', facet: true, optional: true },  // Yeni nesil mi?
+    { name: 'visual_type', type: 'string', facet: true, optional: true },      // table, chart, flowchart, pie, diagram
+    
     // 📊 İSTATİSTİKLER - Popüler sorular sayfaları için
     { name: 'times_answered', type: 'int32', facet: true },
     { name: 'times_correct', type: 'int32' },
@@ -300,6 +304,9 @@ export interface QuestionDocument {
   grade: number
   has_image?: boolean
   lang?: string
+  // 🆕 Yeni Nesil Soru alanları
+  is_new_generation?: boolean
+  visual_type?: string  // 'table' | 'chart' | 'flowchart' | 'pie' | 'diagram'
   // İstatistikler
   times_answered: number
   times_correct: number

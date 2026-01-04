@@ -22,6 +22,9 @@ export interface SearchResult {
   times_correct: number
   success_rate: number
   highlight?: string
+  // 🆕 Yeni Nesil Soru alanları
+  is_new_generation?: boolean
+  visual_type?: string
 }
 
 export interface SearchResponse {
@@ -133,10 +136,46 @@ async function searchQuestionsFromTypesense(params: {
   page: number
   perPage: number
 }): Promise<{ results: SearchResult[], total: number, page: number, per_page: number }> {
-  const { query, grade, subject, difficulty, page, perPage } = params
+  let { query, grade, subject, difficulty, page, perPage } = params
   
   // Filtre olustur
   const filters: string[] = []
+  
+  // 🆕 "yeni nesil" keyword algılama
+  const yeniNesilKeywords = ['yeni nesil', 'yeninesi̇l', 'yeninesil', 'new generation']
+  const queryLower = query.toLowerCase()
+  let isNewGenerationSearch = false
+  
+  for (const keyword of yeniNesilKeywords) {
+    if (queryLower.includes(keyword)) {
+      isNewGenerationSearch = true
+      // Keyword'ü sorgudan çıkar
+      query = query.replace(new RegExp(keyword, 'gi'), '').trim()
+      break
+    }
+  }
+  
+  // 🆕 Görsel tip keyword algılama
+  const visualTypeKeywords: Record<string, string> = {
+    'tablo': 'table',
+    'tablolu': 'table',
+    'grafik': 'chart',
+    'grafikli': 'chart',
+    'akış şeması': 'flowchart',
+    'akis semasi': 'flowchart',
+    'pasta grafik': 'pie',
+    'diyagram': 'diagram'
+  }
+  
+  let visualTypeFilter: string | null = null
+  for (const [keyword, type] of Object.entries(visualTypeKeywords)) {
+    if (queryLower.includes(keyword)) {
+      visualTypeFilter = type
+      isNewGenerationSearch = true // Görsel tip varsa yeni nesil demektir
+      query = query.replace(new RegExp(keyword, 'gi'), '').trim()
+      break
+    }
+  }
   
   if (grade) {
     filters.push(`grade:=${grade}`)
@@ -148,10 +187,18 @@ async function searchQuestionsFromTypesense(params: {
     filters.push(`difficulty:=${difficulty}`)
   }
   
+  // 🆕 Yeni nesil filtresi
+  if (isNewGenerationSearch) {
+    filters.push(`is_new_generation:=true`)
+  }
+  if (visualTypeFilter) {
+    filters.push(`visual_type:=${visualTypeFilter}`)
+  }
+  
   const searchParams: any = {
-    q: query,
-    query_by: 'question_text,main_topic,sub_topic,explanation',
-    sort_by: '_text_match:desc,created_at:desc',
+    q: query || '*',  // Boş kalırsa tüm sonuçları getir
+    query_by: 'question_text,main_topic,sub_topic',
+    sort_by: query ? '_text_match:desc,created_at:desc' : 'created_at:desc',
     page,
     per_page: perPage,
     highlight_full_fields: 'question_text',
@@ -183,7 +230,10 @@ async function searchQuestionsFromTypesense(params: {
       times_answered: doc.times_answered || 0,
       times_correct: doc.times_correct || 0,
       success_rate: doc.success_rate || 0,
-      highlight: hit.highlight?.question_text?.snippet || undefined
+      highlight: hit.highlight?.question_text?.snippet || undefined,
+      // 🆕 Yeni Nesil alanları
+      is_new_generation: doc.is_new_generation || false,
+      visual_type: doc.visual_type || undefined
     }
   })
   

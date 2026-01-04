@@ -167,7 +167,10 @@ const curriculumQuestionSchema = {
           correct_answer: { type: SchemaType.STRING, description: 'Doğru cevap harfi (A, B, C, D veya E)' },
           explanation: { type: SchemaType.STRING, description: 'Açıklama' },
           difficulty: { type: SchemaType.STRING, description: 'Zorluk seviyesi' },
-          bloom_level: { type: SchemaType.STRING, description: 'Bloom taksonomisi seviyesi' }
+          bloom_level: { type: SchemaType.STRING, description: 'Bloom taksonomisi seviyesi' },
+          // 🆕 Yeni Nesil Soru alanları
+          visual_type: { type: SchemaType.STRING, description: 'Görsel türü: table, chart, flowchart, pie, diagram veya none', nullable: true },
+          visual_content: { type: SchemaType.STRING, description: 'LaTeX tablo, Mermaid grafik veya SVG kodu', nullable: true }
         },
         required: ['question_text', 'options', 'correct_answer', 'explanation', 'difficulty', 'bloom_level']
       }
@@ -703,107 +706,56 @@ const getVisualInstructions = (visualType: VisualType, subject: string): string 
 • Görsel gerektiren durumları metin açıklaması yap`
   }
 
-  const visualTypeInstructions: Record<string, string> = {
-    'table': `
-📊 TABLO İÇEREN SORU (YENİ NESİL) - ZORUNLU:
-🚨 HER SORUDA MUTLAKA TABLO OLMALI!
+  const commonRules = `
+🚨 GÖRSEL ÜRETİM KURALLARI (KESİNLİKLE UY):
+1. Kütüphane Bağımlılığından Kaçın: Mermaid.js veya harici JS kütüphaneleri KULLANMA.
+2. Inline SVG veya Tailwind HTML Kullan: Tüm görselleri saf SVG veya Tailwind CSS destekli HTML ile oluştur.
+3. PDF Uyumluluğu: Renkleri net (High Contrast) seç. Karmaşık gölgelerden kaçın.
+4. Kod Temizliği: "visual_content" alanına SADECE kodu yaz. Başına veya sonuna açıklama ekleme.
+5. Matematik için Unicode: SVG/HTML içinde LaTeX ($$) yerine Unicode (√, ², π, →, x², a/b) kullan.
+`
 
-1. SORU METNİNDE tablo verilerini açıkla (örn: "Aşağıdaki tabloda X ve Y değerleri verilmiştir...")
-2. "visual_content" alanına LaTeX tablo kodunu YAZ
-3. "visual_type": "table" olarak belirt
+  const tableInstructions = `
+📊 TABLOLAR (PROFESYONEL RENKLİ STİL):
+- <table style="width:100%; border-collapse:collapse; font-family:sans-serif; margin:10px 0; border-radius:8px; overflow:hidden; border:1px solid #ddd;"> formatı kullan.
+- Başlık satırı (<thead>): <tr style="background:linear-gradient(135deg,#667eea,#764ba2); color:white; font-weight:bold;">...</tr>
+- Başlık hücreleri (<th>): <th style="border:1px solid #ddd; padding:12px 16px; text-align:left;">...</th>
+- Veri hücreleri (<td>): <td style="border:1px solid #ddd; padding:10px 16px;">...</td>
+- Satır renkleri: <tbody> içinde <tr style="background:#f8fafc;"> ve <tr style="background:#ffffff;"> (alternating) kullan.
+- ÖZELLİKLE "KARIŞIK" (MIXED) MODDA BU RENKLİ VE GRADYANLI STİLDEN ASLA TAVİZ VERME.
+`
 
-LaTeX Tablo Formatı:
-$$\\\\begin{array}{|c|c|c|}\\\\hline \\\\textbf{Sütun1} & \\\\textbf{Sütun2} & \\\\textbf{Sütun3} \\\\\\\\ \\\\hline Veri1 & Veri2 & Veri3 \\\\\\\\ \\\\hline Veri4 & Veri5 & Veri6 \\\\\\\\ \\\\hline \\\\end{array}$$
+  const svgInstructions = `
+📈 GRAFİK / DİYAGRAM / AKIŞ ŞEMASI:
+- <svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg"> kullanarak vektörel çizim yap.
+- Eksenler, kutular ve çizgiler için <rect>, <line>, <circle>, <polyline> kullan.
+- Metinleri <text text-anchor="middle" font-family="sans-serif" font-size="12"> ile SVG içine yerleştir.
+- Renkli gradyanlar (<linearGradient>) ve profesyonel renkler kullan.
+`
 
-ÖRNEK:
-{
-  "question_text": "Aşağıdaki tabloda bir sınıftaki öğrencilerin aldıkları notlar gösterilmektedir. Buna göre sınıf ortalaması kaçtır?",
-  "visual_type": "table",
-  "visual_content": "$$\\\\begin{array}{|c|c|}\\\\hline \\\\textbf{Öğrenci} & \\\\textbf{Not} \\\\\\\\ \\\\hline Ali & 85 \\\\\\\\ \\\\hline Ayşe & 90 \\\\\\\\ \\\\hline Mehmet & 75 \\\\\\\\ \\\\hline \\\\end{array}$$"
-}
+  const pieInstructions = `
+🥧 PASTA GRAFİĞİ:
+- SVG içinde <circle> ve "stroke-dasharray" kullanarak dilimleri oluştur.
+- Her dilim için farklı canlı renkler kullan.
+- Yanına mutlaka renkli göstergeler (Legend) ekle.
+`
 
-⚠️ visual_content OLMADAN soru KABUL EDİLMEZ!`,
+  if (visualType === 'table') return tableInstructions + commonRules;
+  if (visualType === 'chart' || visualType === 'flowchart' || visualType === 'diagram') return svgInstructions + commonRules;
+  if (visualType === 'pie') return pieInstructions + commonRules;
 
-    'chart': `
-📈 GRAFİK İÇEREN SORU (YENİ NESİL):
-• Mermaid xychart-beta formatı kullan
-• Çubuk/çizgi grafik formatı:
-\`\`\`mermaid
-xychart-beta
-    title "Grafik Başlığı"
-    x-axis [Oca, Şub, Mar, Nis, May]
-    y-axis "Değer" 0 --> 100
-    bar [30, 45, 60, 75, 90]
-\`\`\`
-• "visual_type": "chart" olarak belirt
-• "visual_content" alanına Mermaid kodunu yaz
-• Veri değerleri mantıklı ve tutarlı olmalı`,
+  // Mixed (Karışık) mod - Tüm detayları ver
+  return `
+🎨 KARIŞIK MOD (YENİ NESİL):
+Konuya en uygun görsel türünü seç ve aşağıdakilerden birini üret:
 
-    'flowchart': `
-🔄 AKIŞ ŞEMASI İÇEREN SORU (YENİ NESİL):
-• Mermaid flowchart formatı kullan
-• Akış şeması formatı:
-\`\`\`mermaid
-graph TD
-    A[Başlangıç] --> B{Karar}
-    B -->|Evet| C[Sonuç 1]
-    B -->|Hayır| D[Sonuç 2]
-    C --> E[Bitiş]
-    D --> E
-\`\`\`
-• Türkçe karakterler kullanabilirsin (ş, ğ, ü, ö, ı, ç)
-• "visual_type": "flowchart" olarak belirt
-• "visual_content" alanına Mermaid kodunu yaz
-• ${subject === 'Biyoloji' ? 'Fotosentez, solunum, sindirim gibi süreçler için ideal' : 
-   subject === 'Tarih' ? 'Kronolojik sıralama ve neden-sonuç ilişkileri için ideal' :
-   'Süreç ve adımları gösteren sorular için ideal'}`,
+${tableInstructions}
+${svgInstructions}
+${pieInstructions}
 
-    'pie': `
-🥧 PASTA GRAFİĞİ İÇEREN SORU (YENİ NESİL):
-• Mermaid pie chart formatı kullan
-• Pasta grafiği formatı:
-\`\`\`mermaid
-pie title Grafik Başlığı
-    "Kategori A" : 40
-    "Kategori B" : 30
-    "Kategori C" : 20
-    "Kategori D" : 10
-\`\`\`
-• Yüzdeler toplamı 100 olmalı
-• "visual_type": "pie" olarak belirt
-• "visual_content" alanına Mermaid kodunu yaz
-• ${subject === 'Coğrafya' ? 'Nüfus dağılımı, kaynak kullanımı için ideal' :
-   subject === 'Biyoloji' ? 'Element/madde oranları için ideal' :
-   'Dağılım ve oran soruları için ideal'}`,
-
-    'diagram': `
-🔬 BİLİMSEL DİYAGRAM İÇEREN SORU (YENİ NESİL):
-• Mermaid veya SVG formatı kullan
-• Basit diyagram için Mermaid:
-\`\`\`mermaid
-graph LR
-    A[Güneş Işığı] --> B[Yaprak]
-    C[CO₂] --> B
-    D[H₂O] --> B
-    B --> E[O₂]
-    B --> F[Glikoz]
-\`\`\`
-• "visual_type": "diagram" olarak belirt
-• "visual_content" alanına diyagram kodunu yaz
-• ${subject === 'Fen Bilimleri' || subject === 'Biyoloji' ? 'Hücre, organ, sistem şemaları' :
-   subject === 'Fizik' ? 'Devre, kuvvet diyagramları' :
-   subject === 'Kimya' ? 'Molekül yapıları, reaksiyon şemaları' :
-   'Kavramsal ilişki şemaları'}`,
-
-    'mixed': `
-🎨 KARIŞIK GÖRSEL (AI KARAR VERSİN):
-• Konuya en uygun görsel türünü seç: tablo, grafik, akış şeması, pasta grafiği veya diyagram
-• Seçtiğin türe göre yukarıdaki formatları uygula
-• "visual_type" alanına kullandığın türü yaz
-• Bazı sorular görsel içersin, bazıları metin tabanlı olabilir`
-  }
-
-  return visualTypeInstructions[visualType] || visualTypeInstructions['mixed']
+${commonRules}
+⚠️ visual_content alanı asla boş bırakılamaz ve seçtiğin türün tüm stil kurallarına (renkli gradyanlar, borderlar, paddingler) harfiyen uymalıdır.
+`
 }
 
 // Ders bazlı özel yönergeler
@@ -834,7 +786,7 @@ const getSubjectGuidelines = (subject: string, grade: number): string => {
    • Bilimsel süreç becerileri`,
     
     'Fizik': `
-   • ${grade >= 11 ? 'Modern fizik ve dalga mekaniği' : 'Kuvvet, hareket ve enerji temelleri'}
+   • ${grade >= 11 ? 'Modern fizik ve dalga mekaniği' : 'Kuvvet, hareket ve energy temelleri'}
    • Formül uygulaması ve birim dönüşümleri
    • Grafik yorumlama (konum-zaman, hız-zaman)
    • Deneysel verileri analiz etme`,
@@ -1245,28 +1197,34 @@ ${getVisualInstructions(visualType, subject)}
   return await withRetry(async () => {
     console.log(`AI Soru Üretimi başlatılıyor: ${grade}. Sınıf ${subject} - ${topic} [${lang.toUpperCase()}]`)
     
-    // 📤 Gemini API çağrısı - Structured Output denemesi
+    // 📤 Gemini API çağrısı
     let text = ''
-    let useStructuredOutput = true
+    let useStructuredOutput = visualType === 'none' // 🆕 Yeni Nesil sorularda Structured Output KULLANMA (prompt daha etkili)
     
-    try {
-      // Önce Structured Output ile dene (daha güvenilir JSON)
-      const result = await geminiModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          // @ts-ignore - responseSchema yeni özellik
-          responseSchema: curriculumQuestionSchema as any
-        }
-      })
-      const response = await result.response
-      text = response.text()
-      console.log('✅ Structured Output kullanıldı')
-    } catch (structuredError: any) {
-      // Structured Output başarısız olursa normal mod ile dene
-      console.warn('⚠️ Structured Output başarısız, normal mod deneniyor:', structuredError.message)
-      useStructuredOutput = false
-      
+    if (useStructuredOutput) {
+      try {
+        // Normal sorular için Structured Output (daha güvenilir JSON)
+        const result = await geminiModel.generateContent({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            // @ts-ignore - responseSchema yeni özellik
+            responseSchema: curriculumQuestionSchema as any
+          }
+        })
+        const response = await result.response
+        text = response.text()
+        console.log('✅ Structured Output kullanıldı')
+      } catch (structuredError: any) {
+        console.warn('⚠️ Structured Output başarısız, normal mod deneniyor:', structuredError.message)
+        useStructuredOutput = false
+        const result = await geminiModel.generateContent(prompt)
+        const response = await result.response
+        text = response.text()
+      }
+    } else {
+      // 🆕 Yeni Nesil sorular için normal mod (visual_content için prompt daha etkili)
+      console.log('🆕 Yeni Nesil Soru modu - Structured Output devre dışı, prompt tabanlı')
       const result = await geminiModel.generateContent(prompt)
       const response = await result.response
       text = response.text()
@@ -1903,4 +1861,3 @@ KURALLAR:
     }
   }
 }
-

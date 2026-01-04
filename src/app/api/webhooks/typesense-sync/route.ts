@@ -293,6 +293,9 @@ async function handleQuestionsSync(
       sub_topic: safeString(topicData.sub_topic),
       grade: safeNumber(topicData.grade),
       has_image: !!record.question_image_url,
+      // 🆕 Yeni Nesil Soru alanları
+      is_new_generation: !!record.visual_type && record.visual_type !== 'none',
+      visual_type: safeString(record.visual_type),
       // İstatistikler
       times_answered: timesAnswered,
       times_correct: timesCorrect,

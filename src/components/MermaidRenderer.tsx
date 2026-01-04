@@ -75,19 +75,32 @@ export default function MermaidRenderer({ chart, className = '' }: MermaidRender
       setIsLoading(true)
       setError(null)
 
+      // Timeout - 5 saniyede render olmazsa hata ver
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false)
+        setError('Diyagram render süresi aşıldı. Format desteklenmiyor olabilir.')
+      }, 5000)
+
       try {
         initializeMermaid()
         
         // Benzersiz ID oluştur
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`
         
-        // Chart'ı temizle (baştaki/sondaki boşluklar)
-        const cleanedChart = chart.trim()
+        // Chart'ı temizle
+        let cleanedChart = chart.trim()
+        
+        // "mermaid" kelimesini kaldır (bazen Gemini ekliyor)
+        if (cleanedChart.toLowerCase().startsWith('mermaid')) {
+          cleanedChart = cleanedChart.replace(/^mermaid\s*/i, '')
+        }
         
         // Render et
         const { svg: renderedSvg } = await mermaid.render(id, cleanedChart)
+        clearTimeout(timeoutId)
         setSvg(renderedSvg)
       } catch (err) {
+        clearTimeout(timeoutId)
         console.error('Mermaid render hatası:', err)
         setError(err instanceof Error ? err.message : 'Diyagram oluşturulamadı')
       } finally {

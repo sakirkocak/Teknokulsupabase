@@ -12,6 +12,7 @@ import {
 } from '@/lib/typesense/browser-client'
 
 import MathRenderer from '@/components/MathRenderer'
+import DOMPurify from 'isomorphic-dompurify'
 import { 
   BookOpen, Search, Filter, Edit2, Trash2, 
   CheckCircle, XCircle, Save, X, Eye, EyeOff,
@@ -53,6 +54,9 @@ interface Question {
   times_correct: number
   created_at: string
   topic?: Topic
+  // 🆕 Yeni Nesil Soru alanları
+  visual_type?: string | null
+  visual_content?: string | null
 }
 
 const difficultyConfig = {
@@ -256,11 +260,7 @@ export default function AdminSoruYonetimiPage() {
               topic_id,
               question_text,
               question_image_url,
-              option_a,
-              option_b,
-              option_c,
-              option_d,
-              option_e,
+              options,
               correct_answer,
               explanation,
               difficulty,
@@ -268,6 +268,8 @@ export default function AdminSoruYonetimiPage() {
               times_answered,
               times_correct,
               created_at,
+              visual_type,
+              visual_content,
               topic:topics(
                 id,
                 subject_id,
@@ -296,19 +298,15 @@ export default function AdminSoruYonetimiPage() {
                 difficulty: q.difficulty,
                 question_text: q.question_text,
                 question_image_url: q.question_image_url,
-                options: {
-                  A: q.option_a || '',
-                  B: q.option_b || '',
-                  C: q.option_c || '',
-                  D: q.option_d || '',
-                  E: q.option_e || undefined
-                },
+                options: q.options || { A: '', B: '', C: '', D: '' },
                 correct_answer: q.correct_answer,
                 explanation: q.explanation,
                 source: q.source,
                 times_answered: q.times_answered || 0,
                 times_correct: q.times_correct || 0,
                 created_at: q.created_at,
+                visual_type: q.visual_type,
+                visual_content: q.visual_content,
                 topic: q.topic || {
                   id: '',
                   subject_id: '',
@@ -387,6 +385,8 @@ export default function AdminSoruYonetimiPage() {
       .from('questions')
       .select(`
         *,
+        visual_type,
+        visual_content,
         topic:topics(
           id, subject_id, grade, main_topic, sub_topic, learning_outcome,
           subject:subjects(id, name, code, icon)
@@ -812,6 +812,27 @@ export default function AdminSoruYonetimiPage() {
                         </div>
                       )}
                       
+                      {/* 🆕 Yeni Nesil Görsel İçerik (tablo, grafik, diyagram vs.) */}
+                      {question.visual_content && (
+                        <div className="mb-3 rounded-lg overflow-hidden border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-surface-800 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded-full flex items-center gap-1">
+                              <Sparkles className="w-3 h-3" />
+                              Yeni Nesil {question.visual_type === 'table' ? 'Tablo' : question.visual_type === 'chart' ? 'Grafik' : question.visual_type === 'diagram' ? 'Diyagram' : question.visual_type === 'flowchart' ? 'Akış Şeması' : question.visual_type === 'pie' ? 'Pasta Grafiği' : 'Görsel'}
+                            </span>
+                          </div>
+                          <div 
+                            className="visual-content prose prose-sm dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{ 
+                              __html: DOMPurify.sanitize(question.visual_content, {
+                                ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
+                                ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
+                              })
+                            }} 
+                          />
+                        </div>
+                      )}
+                      
                       {/* Soru Metni */}
                       <div className="text-surface-900 dark:text-white mb-3">
                         <MathRenderer text={question.question_text || ''} />
@@ -1135,6 +1156,27 @@ export default function AdminSoruYonetimiPage() {
                       src={previewQuestion.question_image_url} 
                       alt="Soru görseli" 
                       className="max-w-full max-h-[300px] mx-auto object-contain rounded-lg"
+                    />
+                  </div>
+                )}
+
+                {/* 🆕 Yeni Nesil Görsel İçerik */}
+                {previewQuestion.visual_content && (
+                  <div className="mb-6 rounded-xl overflow-hidden border border-indigo-500/30 bg-white/10 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                      <span className="text-indigo-300 text-sm font-medium">
+                        Yeni Nesil {previewQuestion.visual_type === 'table' ? 'Tablo' : previewQuestion.visual_type === 'chart' ? 'Grafik' : previewQuestion.visual_type === 'diagram' ? 'Diyagram' : previewQuestion.visual_type === 'flowchart' ? 'Akış Şeması' : previewQuestion.visual_type === 'pie' ? 'Pasta Grafiği' : 'Görsel'}
+                      </span>
+                    </div>
+                    <div 
+                      className="visual-content bg-white rounded-lg p-3"
+                      dangerouslySetInnerHTML={{ 
+                        __html: DOMPurify.sanitize(previewQuestion.visual_content, {
+                          ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
+                          ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
+                        })
+                      }} 
                     />
                   </div>
                 )}

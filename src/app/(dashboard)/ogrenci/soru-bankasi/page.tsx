@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import MathRenderer from '@/components/MathRenderer'
+import DOMPurify from 'isomorphic-dompurify'
 import { CelebrationModal, BadgeToast } from '@/components/gamification'
 import { SingleXPFloat, MotivationFloat } from '@/components/XPFloatingAnimation'
 import ComboIndicator from '@/components/ComboIndicator'
@@ -84,6 +85,9 @@ interface Question {
   topic?: Topic
   times_answered?: number
   times_correct?: number
+  // 🆕 Yeni Nesil Soru alanları
+  visual_type?: string | null
+  visual_content?: string | null
 }
 
 interface StudentStats {
@@ -704,6 +708,7 @@ export default function SoruBankasiPage() {
       .select(`
         id, question_text, options, correct_answer, explanation, difficulty,
         question_image_url, topic_id, times_answered, times_correct,
+        visual_type, visual_content,
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
@@ -770,6 +775,7 @@ export default function SoruBankasiPage() {
       .select(`
         id, question_text, options, correct_answer, explanation, difficulty,
         question_image_url, topic_id, times_answered, times_correct,
+        visual_type, visual_content,
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
@@ -814,6 +820,7 @@ export default function SoruBankasiPage() {
       .select(`
         id, question_text, options, correct_answer, explanation, difficulty,
         question_image_url, topic_id, times_answered, times_correct,
+        visual_type, visual_content,
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
@@ -880,6 +887,7 @@ export default function SoruBankasiPage() {
               .select(`
                 id, question_text, options, correct_answer, explanation, difficulty,
                 question_image_url, topic_id, times_answered, times_correct,
+                visual_type, visual_content,
                 topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
               `)
               .eq('id', result.question.id)
@@ -906,6 +914,7 @@ export default function SoruBankasiPage() {
       .select(`
         id, question_text, options, correct_answer, explanation, difficulty,
         question_image_url, topic_id, times_answered, times_correct,
+        visual_type, visual_content,
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
@@ -1708,6 +1717,27 @@ export default function SoruBankasiPage() {
                   src={currentQuestion.image_url || currentQuestion.question_image_url || ''} 
                   alt="Soru görseli"
                   className="max-w-full max-h-[400px] mx-auto object-contain rounded-lg"
+                />
+              </div>
+            )}
+
+            {/* 🆕 Yeni Nesil Görsel İçerik (tablo, grafik, diyagram vs.) */}
+            {currentQuestion.visual_content && (
+              <div className="mb-8 rounded-xl overflow-hidden border border-indigo-500/30 bg-white p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <span className="text-indigo-600 text-sm font-medium">
+                    Yeni Nesil {currentQuestion.visual_type === 'table' ? 'Tablo' : currentQuestion.visual_type === 'chart' ? 'Grafik' : currentQuestion.visual_type === 'diagram' ? 'Diyagram' : currentQuestion.visual_type === 'flowchart' ? 'Akış Şeması' : currentQuestion.visual_type === 'pie' ? 'Pasta Grafiği' : 'Görsel'}
+                  </span>
+                </div>
+                <div 
+                  className="visual-content prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ 
+                    __html: DOMPurify.sanitize(currentQuestion.visual_content, {
+                      ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
+                      ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
+                    })
+                  }} 
                 />
               </div>
             )}
