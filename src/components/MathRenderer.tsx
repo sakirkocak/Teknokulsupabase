@@ -125,19 +125,28 @@ function latexToPlainText(latex: string): string {
 
 /**
  * LaTeX'i render öncesi temizler ve normalize eder
- * Bozuk escape sequence'ları düzeltir
+ * Bozuk escape sequence'ları ve boş ifadeleri düzeltir
  */
 function sanitizeLatex(latex: string): string {
   if (!latex) return ''
   
   let sanitized = latex
   
+  // 0. Görünmez karakterleri temizle (KaTeX "No character metrics" hatasını önler)
+  sanitized = sanitized
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width characters
+    .replace(/\u00A0/g, ' ')  // Non-breaking space -> normal space
+    .replace(/[\u2000-\u200A]/g, ' ')  // Various Unicode spaces
+    .replace(/\u202F/g, ' ')  // Narrow no-break space
+    .replace(/\u205F/g, ' ')  // Medium mathematical space
+    .replace(/\u3000/g, ' ')  // Ideographic space
+  
   // 1. Bozuk escape sequence'ları düzelt
   // Bazen \t, \r, \n gibi karakterler yanlışlıkla oluşur
   sanitized = sanitized
     .replace(/\t/g, ' ')  // Tab -> boşluk
     .replace(/\r/g, '')   // CR kaldır
-    // \f -> \f (form feed) literal olarak kalmalı ama LaTeX'te yok
+    .replace(/\f/g, '')   // Form feed kaldır
     
   // 2. Çoklu backslash'leri normalize et
   // \\\\times -> \\times (JSON'dan sonra 2 backslash kalmalı)
@@ -151,11 +160,27 @@ function sanitizeLatex(latex: string): string {
     sanitized += '}'.repeat(openBraces - closeBraces)
   }
   
-  // 4. Boş içerikleri kaldır
+  // 4. Boş içerikleri kaldır (KaTeX hatalarını önler)
   sanitized = sanitized
-    .replace(/\^\{\s*\}/g, '')  // Boş üst simge
-    .replace(/_\{\s*\}/g, '')   // Boş alt simge
-    .replace(/\\frac\{\s*\}\{\s*\}/g, '')  // Boş kesir
+    .replace(/\^\{\s*\}/g, '')  // Boş üst simge: ^{}
+    .replace(/_\{\s*\}/g, '')   // Boş alt simge: _{}
+    .replace(/\\frac\{\s*\}\{\s*\}/g, '')  // Boş kesir: \frac{}{}
+    .replace(/\\text\{\s*\}/g, '')  // Boş text: \text{}
+    .replace(/\\textbf\{\s*\}/g, '')  // Boş bold text
+    .replace(/\\textit\{\s*\}/g, '')  // Boş italic text
+    .replace(/\\mathrm\{\s*\}/g, '')  // Boş mathrm
+    .replace(/\\mathbf\{\s*\}/g, '')  // Boş mathbf
+    .replace(/\\sqrt\{\s*\}/g, '')  // Boş karekök: \sqrt{}
+    .replace(/\\overline\{\s*\}/g, '')  // Boş overline
+    .replace(/\\underline\{\s*\}/g, '')  // Boş underline
+    
+  // 5. Sadece boşluk içeren ifadeleri temizle
+  sanitized = sanitized.trim()
+  
+  // 6. Tamamen boş veya sadece whitespace ise boş döndür
+  if (!sanitized || /^\s*$/.test(sanitized)) {
+    return ''
+  }
     
   return sanitized
 }
