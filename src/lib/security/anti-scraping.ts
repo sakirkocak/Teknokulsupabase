@@ -349,7 +349,8 @@ export function createSecurityLog(
 // Periyodik temizlik
 setInterval(() => {
   const now = Date.now()
-  for (const [key, entry] of scrapingAttempts.entries()) {
+  const entries = Array.from(scrapingAttempts.entries())
+  entries.forEach(([key, entry]) => {
     // 24 saatten eski kayıtları sil
     if (now - entry.lastAttempt > 86400000) {
       scrapingAttempts.delete(key)
@@ -358,5 +359,5 @@ setInterval(() => {
     if (entry.blocked && entry.blockedUntil && now > entry.blockedUntil) {
       scrapingAttempts.delete(key)
     }
-  }
+  })
 }, 3600000) // Her saat temizle
