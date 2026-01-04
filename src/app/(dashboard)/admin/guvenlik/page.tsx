@@ -3,939 +3,629 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { 
-  Shield, AlertTriangle, Ban, CheckCircle, 
-  RefreshCw, Eye, Clock, Target, Zap,
-  TrendingUp, Users, Activity, Search,
-  ChevronDown, ChevronUp, X, History,
-  Trash2, RotateCcw
+  Shield, AlertTriangle, Ban, Eye, RefreshCw, 
+  Activity, Globe, Clock, UserX, Check, X,
+  TrendingUp, Filter, Search, Download
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-interface SuspiciousUser {
-  user_id: string
-  full_name: string
-  email: string
-  total_questions: number
-  total_correct: number
-  accuracy_rate: number
-  questions_last_hour: number
-  avg_answer_time_ms: number
-  risk_score: number
-  is_suspended: boolean
-  suspension_reason: string | null
+interface SuspiciousIP {
+  ip_address: string
+  total_requests: number
+  blocked_requests: number
+  avg_risk_score: number
+  max_risk_score: number
+  first_seen: string
+  last_seen: string
+  is_currently_blocked: boolean
 }
 
-interface HistoricalUser {
-  user_id: string
-  full_name: string
-  email: string
+interface BlockedIP {
+  id: string
+  ip_address: string
+  reason: string
+  blocked_at: string
+  expires_at: string | null
+  is_active: boolean
+}
+
+interface HoneypotTrigger {
+  id: string
+  ip_address: string
+  user_agent: string
+  trap_type: string
+  trap_path: string
   created_at: string
-  total_questions: number
-  total_correct: number
-  total_points: number
-  accuracy_rate: number
-  daily_average: number
-  days_since_registration: number
-  suspicion_reasons: string[]
-  risk_level: 'critical' | 'high' | 'medium'
 }
 
-interface ActivityDetail {
-  hour_bucket: string
-  question_count: number
-  correct_count: number
-  avg_answer_time_ms: number
+interface SecurityStats {
+  totalRequests24h: number
+  blockedRequests24h: number
+  suspiciousIPs: number
+  honeypotTriggers: number
+  activeBlocks: number
 }
-
-interface HistoricalSummary {
-  total_suspicious: number
-  critical_count: number
-  high_count: number
-  medium_count: number
-  total_suspicious_questions: number
-  total_suspicious_points: number
-}
-
-type TabType = 'live' | 'historical'
 
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('live')
-  
-  // Live monitoring state
-  const [suspiciousUsers, setSuspiciousUsers] = useState<SuspiciousUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedUser, setSelectedUser] = useState<SuspiciousUser | null>(null)
-  const [activityDetails, setActivityDetails] = useState<ActivityDetail[]>([])
-  const [loadingDetails, setLoadingDetails] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [hours, setHours] = useState(24)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  
-  // Historical analysis state
-  const [historicalUsers, setHistoricalUsers] = useState<HistoricalUser[]>([])
-  const [historicalLoading, setHistoricalLoading] = useState(false)
-  const [historicalSummary, setHistoricalSummary] = useState<HistoricalSummary | null>(null)
-  const [selectedHistoricalUser, setSelectedHistoricalUser] = useState<HistoricalUser | null>(null)
-  const [selectedForBulk, setSelectedForBulk] = useState<Set<string>>(new Set())
+  const [stats, setStats] = useState<SecurityStats>({
+    totalRequests24h: 0,
+    blockedRequests24h: 0,
+    suspiciousIPs: 0,
+    honeypotTriggers: 0,
+    activeBlocks: 0
+  })
+  const [suspiciousIPs, setSuspiciousIPs] = useState<SuspiciousIP[]>([])
+  const [blockedIPs, setBlockedIPs] = useState<BlockedIP[]>([])
+  const [honeypotTriggers, setHoneypotTriggers] = useState<HoneypotTrigger[]>([])
+  const [activeTab, setActiveTab] = useState<'overview' | 'suspicious' | 'blocked' | 'honeypot'>('overview')
+  const [blockingIP, setBlockingIP] = useState<string | null>(null)
+  const [blockDuration, setBlockDuration] = useState<number>(24)
+  const [blockReason, setBlockReason] = useState('')
   
   const supabase = createClient()
 
-  // ========================================
-  // Live Monitoring Functions
-  // ========================================
-  
-  const loadSuspiciousUsers = async () => {
+  const loadData = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.rpc('get_suspicious_users', { p_hours: hours })
+      // Şüpheli IP'leri yükle
+      const { data: suspicious } = await supabase.rpc('get_suspicious_ips', { p_hours: 24 })
+      if (suspicious) setSuspiciousIPs(suspicious)
+
+      // Engelli IP'leri yükle
+      const { data: blocked } = await supabase
+        .from('blocked_ips')
+        .select('*')
+        .eq('is_active', true)
+        .order('blocked_at', { ascending: false })
+      if (blocked) setBlockedIPs(blocked)
+
+      // Honeypot tetiklemelerini yükle
+      const { data: honeypot } = await supabase
+        .from('honeypot_triggers')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (honeypot) setHoneypotTriggers(honeypot)
+
+      // İstatistikleri hesapla
+      const { count: totalLogs } = await supabase
+        .from('security_logs')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
       
-      if (error) {
-        console.error('Error loading suspicious users:', error)
-        const { data: fallbackData } = await supabase
-          .from('profiles')
-          .select(`id, full_name, email, is_suspended, suspension_reason, risk_score`)
-          .eq('role', 'ogrenci')
-          .or('is_suspended.eq.true,risk_score.gt.50')
-          .limit(50)
-        
-        if (fallbackData) {
-          setSuspiciousUsers(fallbackData.map(u => ({
-            user_id: u.id,
-            full_name: u.full_name || 'İsimsiz',
-            email: u.email || '',
-            total_questions: 0,
-            total_correct: 0,
-            accuracy_rate: 0,
-            questions_last_hour: 0,
-            avg_answer_time_ms: 0,
-            risk_score: u.risk_score || 0,
-            is_suspended: u.is_suspended || false,
-            suspension_reason: u.suspension_reason
-          })))
-        }
-      } else {
-        setSuspiciousUsers(data || [])
-      }
+      const { count: blockedLogs } = await supabase
+        .from('security_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_blocked', true)
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+
+      const { count: honeypotCount } = await supabase
+        .from('honeypot_triggers')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+
+      setStats({
+        totalRequests24h: totalLogs || 0,
+        blockedRequests24h: blockedLogs || 0,
+        suspiciousIPs: suspicious?.length || 0,
+        honeypotTriggers: honeypotCount || 0,
+        activeBlocks: blocked?.length || 0
+      })
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Güvenlik verileri yüklenemedi:', error)
     }
     setLoading(false)
   }
 
-  const loadUserDetails = async (userId: string) => {
-    setLoadingDetails(true)
-    try {
-      const { data, error } = await supabase.rpc('get_user_activity_details', { p_user_id: userId })
-      if (!error) setActivityDetails(data || [])
-    } catch (error) {
-      console.error('Error:', error)
+  useEffect(() => {
+    loadData()
+    // Her 30 saniyede yenile
+    const interval = setInterval(loadData, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleBlockIP = async (ip: string) => {
+    if (!blockReason.trim()) {
+      alert('Engel sebebi giriniz')
+      return
     }
-    setLoadingDetails(false)
-  }
-
-  const suspendUser = async (userId: string, reason: string) => {
-    setActionLoading(userId)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      const { error } = await supabase.rpc('suspend_user', {
-        p_user_id: userId,
-        p_reason: reason,
-        p_admin_id: user?.id
-      })
-      
-      if (error) {
-        await supabase.from('profiles').update({
-          is_suspended: true,
-          suspension_reason: reason,
-          suspended_at: new Date().toISOString()
-        }).eq('id', userId)
-      }
-      
-      setSuspiciousUsers(prev => prev.map(u => 
-        u.user_id === userId ? { ...u, is_suspended: true, suspension_reason: reason } : u
-      ))
-      
-      // Historical listesini de güncelle
-      setHistoricalUsers(prev => prev.filter(u => u.user_id !== userId))
-    } catch (error) {
-      console.error('Suspend error:', error)
-    }
-    setActionLoading(null)
-  }
-
-  const unsuspendUser = async (userId: string) => {
-    setActionLoading(userId)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      const { error } = await supabase.rpc('unsuspend_user', {
-        p_user_id: userId,
-        p_admin_id: user?.id
-      })
-      
-      if (error) {
-        await supabase.from('profiles').update({
-          is_suspended: false,
-          suspension_reason: null,
-          suspended_at: null,
-          risk_score: 0
-        }).eq('id', userId)
-      }
-      
-      setSuspiciousUsers(prev => prev.map(u => 
-        u.user_id === userId ? { ...u, is_suspended: false, suspension_reason: null, risk_score: 0 } : u
-      ))
-    } catch (error) {
-      console.error('Unsuspend error:', error)
-    }
-    setActionLoading(null)
-  }
-
-  // ========================================
-  // Historical Analysis Functions
-  // ========================================
-
-  const loadHistoricalData = async () => {
-    setHistoricalLoading(true)
-    try {
-      // Özet istatistikleri yükle
-      const { data: summary, error: summaryError } = await supabase.rpc('get_historical_analysis_summary')
-      if (!summaryError && summary && summary.length > 0) {
-        setHistoricalSummary(summary[0])
-      }
-      
-      // Şüpheli kullanıcıları yükle
-      const { data: users, error: usersError } = await supabase.rpc('get_historical_suspicious_users')
-      
-      if (usersError) {
-        console.error('Historical RPC error:', usersError)
-        // Fallback sorgu
-        const { data: fallbackData } = await supabase
-          .from('profiles')
-          .select(`
-            id, full_name, email, created_at,
-            student_points!inner(total_questions, total_correct, total_points)
-          `)
-          .eq('role', 'ogrenci')
-          .gt('student_points.total_questions', 1000)
-          .order('student_points(total_questions)', { ascending: false })
-          .limit(50)
-        
-        if (fallbackData) {
-          setHistoricalUsers(fallbackData.map((u: any) => ({
-            user_id: u.id,
-            full_name: u.full_name || 'İsimsiz',
-            email: u.email || '',
-            created_at: u.created_at,
-            total_questions: u.student_points?.total_questions || 0,
-            total_correct: u.student_points?.total_correct || 0,
-            total_points: u.student_points?.total_points || 0,
-            accuracy_rate: u.student_points?.total_questions > 0 
-              ? Math.round((u.student_points.total_correct / u.student_points.total_questions) * 100)
-              : 0,
-            daily_average: 0,
-            days_since_registration: Math.floor((Date.now() - new Date(u.created_at).getTime()) / (1000 * 60 * 60 * 24)),
-            suspicion_reasons: ['Yüksek soru sayısı'],
-            risk_level: 'medium' as const
-          })))
-        }
-      } else {
-        setHistoricalUsers(users || [])
-      }
-    } catch (error) {
-      console.error('Error:', error)
-    }
-    setHistoricalLoading(false)
-  }
-
-  const bulkSuspend = async () => {
-    if (selectedForBulk.size === 0) return
-    
-    const userIds = Array.from(selectedForBulk)
-    setActionLoading('bulk')
     
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
-      const { data, error } = await supabase.rpc('bulk_suspend_users', {
-        p_user_ids: userIds,
-        p_reason: 'Geçmiş analizi - Toplu askıya alma',
-        p_admin_id: user?.id
-      })
-      
-      if (error) {
-        // Fallback: tek tek askıya al
-        for (const userId of userIds) {
-          await supabase.from('profiles').update({
-            is_suspended: true,
-            suspension_reason: 'Geçmiş analizi - Toplu askıya alma',
-            suspended_at: new Date().toISOString()
-          }).eq('id', userId)
-        }
-      }
-      
-      // Listeden kaldır
-      setHistoricalUsers(prev => prev.filter(u => !selectedForBulk.has(u.user_id)))
-      setSelectedForBulk(new Set())
-      
-      alert(`${userIds.length} kullanıcı başarıyla askıya alındı`)
-    } catch (error) {
-      console.error('Bulk suspend error:', error)
-      alert('Hata oluştu')
-    }
-    setActionLoading(null)
-  }
-
-  const resetUserPoints = async (userId: string) => {
-    if (!confirm('Bu kullanıcının TÜM puanları sıfırlanacak. Emin misiniz?')) return
-    
-    setActionLoading(userId)
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      const { error } = await supabase.rpc('reset_user_points', {
-        p_user_id: userId,
+      await supabase.rpc('block_ip', {
+        p_ip_address: ip,
+        p_reason: blockReason,
         p_admin_id: user?.id,
-        p_reason: 'Hile tespiti - Puan sıfırlama'
+        p_duration_hours: blockDuration
       })
       
-      if (error) {
-        // Fallback
-        await supabase.from('student_points').update({
-          total_points: 0,
-          total_questions: 0,
-          total_correct: 0,
-          total_wrong: 0,
-          current_streak: 0,
-          max_streak: 0
-        }).eq('student_id', userId)
-      }
-      
-      // Listeden kaldır
-      setHistoricalUsers(prev => prev.filter(u => u.user_id !== userId))
-      alert('Puanlar sıfırlandı')
+      setBlockingIP(null)
+      setBlockReason('')
+      loadData()
     } catch (error) {
-      console.error('Reset error:', error)
-    }
-    setActionLoading(null)
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedForBulk.size === historicalUsers.length) {
-      setSelectedForBulk(new Set())
-    } else {
-      setSelectedForBulk(new Set(historicalUsers.map(u => u.user_id)))
+      console.error('IP engellenemedi:', error)
     }
   }
 
-  const toggleSelect = (userId: string) => {
-    const newSet = new Set(selectedForBulk)
-    if (newSet.has(userId)) {
-      newSet.delete(userId)
-    } else {
-      newSet.add(userId)
+  const handleUnblockIP = async (ip: string) => {
+    try {
+      await supabase.rpc('unblock_ip', { p_ip_address: ip })
+      loadData()
+    } catch (error) {
+      console.error('Engel kaldırılamadı:', error)
     }
-    setSelectedForBulk(newSet)
   }
 
-  // ========================================
-  // Effects
-  // ========================================
-
-  useEffect(() => {
-    if (activeTab === 'live') {
-      loadSuspiciousUsers()
-    } else {
-      loadHistoricalData()
-    }
-  }, [activeTab, hours])
-
-  useEffect(() => {
-    if (selectedUser) loadUserDetails(selectedUser.user_id)
-  }, [selectedUser])
-
-  // ========================================
-  // Helpers
-  // ========================================
-
-  const filteredUsers = suspiciousUsers.filter(u => 
-    u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
 
   const getRiskColor = (score: number) => {
-    if (score >= 80) return 'text-red-600 bg-red-100'
-    if (score >= 50) return 'text-orange-600 bg-orange-100'
-    if (score >= 30) return 'text-yellow-600 bg-yellow-100'
-    return 'text-green-600 bg-green-100'
-  }
-
-  const getRiskLevelColor = (level: string) => {
-    if (level === 'critical') return 'text-red-600 bg-red-100'
-    if (level === 'high') return 'text-orange-600 bg-orange-100'
+    if (score >= 70) return 'text-red-600 bg-red-100'
+    if (score >= 40) return 'text-orange-600 bg-orange-100'
     return 'text-yellow-600 bg-yellow-100'
   }
 
-  const getRiskLevelLabel = (level: string) => {
-    if (level === 'critical') return 'Kritik'
-    if (level === 'high') return 'Yüksek'
-    return 'Orta'
-  }
-
-  const getSpeedStatus = (avgMs: number) => {
-    if (!avgMs || avgMs === 0) return { label: 'Bilinmiyor', color: 'text-gray-500' }
-    if (avgMs < 1500) return { label: 'Bot Şüphesi!', color: 'text-red-600' }
-    if (avgMs < 2500) return { label: 'Çok Hızlı', color: 'text-orange-600' }
-    if (avgMs < 5000) return { label: 'Hızlı', color: 'text-yellow-600' }
-    return { label: 'Normal', color: 'text-green-600' }
-  }
-
-  const stats = {
-    total: suspiciousUsers.length,
-    suspended: suspiciousUsers.filter(u => u.is_suspended).length,
-    highRisk: suspiciousUsers.filter(u => u.risk_score >= 80).length,
-    botSuspect: suspiciousUsers.filter(u => u.avg_answer_time_ms > 0 && u.avg_answer_time_ms < 2000).length
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-3 bg-red-100 rounded-xl">
-            <Shield className="w-8 h-8 text-red-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Güvenlik Merkezi</h1>
-            <p className="text-gray-500">Bot ve şüpheli aktivite tespiti</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setActiveTab('live')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'live'
-              ? 'bg-red-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          Canlı İzleme
-        </button>
-        <button
-          onClick={() => setActiveTab('historical')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-            activeTab === 'historical'
-              ? 'bg-red-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          Geçmiş Analizi
-        </button>
-      </div>
-
-      {activeTab === 'live' ? (
-        <>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                  <p className="text-sm text-gray-500">Şüpheli Kullanıcı</p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-xl">
+              <Shield className="h-8 w-8 text-red-600 dark:text-red-400" />
             </div>
-            
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <Ban className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.suspended}</p>
-                  <p className="text-sm text-gray-500">Askıya Alınmış</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.highRisk}</p>
-                  <p className="text-sm text-gray-500">Yüksek Risk</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Zap className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{stats.botSuspect}</p>
-                  <p className="text-sm text-gray-500">Bot Şüphesi</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="İsim veya email ara..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-              
-              <select
-                value={hours}
-                onChange={(e) => setHours(Number(e.target.value))}
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500"
-              >
-                <option value={1}>Son 1 saat</option>
-                <option value={6}>Son 6 saat</option>
-                <option value={24}>Son 24 saat</option>
-                <option value={72}>Son 3 gün</option>
-                <option value={168}>Son 1 hafta</option>
-              </select>
-              
-              <button
-                onClick={loadSuspiciousUsers}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                Yenile
-              </button>
-            </div>
-          </div>
-
-          {/* Live User List */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Kullanıcı</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Risk Skoru</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Soru/Saat</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Ort. Süre</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Doğruluk</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Durum</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center">
-                        <RefreshCw className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
-                        <p className="text-gray-500">Yükleniyor...</p>
-                      </td>
-                    </tr>
-                  ) : filteredUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center">
-                        <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                        <p className="text-gray-500">Şüpheli aktivite bulunamadı</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredUsers.map((user) => {
-                      const speedStatus = getSpeedStatus(user.avg_answer_time_ms)
-                      return (
-                        <tr key={user.user_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
-                            <div>
-                              <p className="font-medium text-gray-900">{user.full_name}</p>
-                              <p className="text-sm text-gray-500">{user.email}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-lg text-sm font-medium ${getRiskColor(user.risk_score)}`}>
-                              {user.risk_score}/100
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={user.questions_last_hour > 50 ? 'text-red-600 font-bold' : ''}>
-                              {user.questions_last_hour}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`text-sm font-medium ${speedStatus.color}`}>
-                              {user.avg_answer_time_ms > 0 ? `${(user.avg_answer_time_ms / 1000).toFixed(1)}s` : '-'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={user.accuracy_rate > 95 ? 'text-orange-600 font-bold' : ''}>
-                              %{user.accuracy_rate?.toFixed(0) || 0}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {user.is_suspended ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-lg text-sm">
-                                <Ban className="w-3 h-3" /> Askıda
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-lg text-sm">
-                                <CheckCircle className="w-3 h-3" /> Aktif
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setSelectedUser(selectedUser?.user_id === user.user_id ? null : user)}
-                                className="p-2 hover:bg-gray-100 rounded-lg"
-                                title="Detayları Gör"
-                              >
-                                <Eye className="w-4 h-4 text-gray-600" />
-                              </button>
-                              
-                              {user.is_suspended ? (
-                                <button
-                                  onClick={() => unsuspendUser(user.user_id)}
-                                  disabled={actionLoading === user.user_id}
-                                  className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
-                                >
-                                  {actionLoading === user.user_id ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Kaldır'}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => suspendUser(user.user_id, 'Manuel askıya alma - Şüpheli aktivite')}
-                                  disabled={actionLoading === user.user_id}
-                                  className="px-3 py-1 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  {actionLoading === user.user_id ? <RefreshCw className="w-4 h-4 animate-spin" /> : 'Askıya Al'}
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Historical Stats */}
-          {historicalSummary && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{historicalSummary.total_suspicious}</p>
-                    <p className="text-sm text-gray-500">Toplam Şüpheli</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <Ban className="w-5 h-5 text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-red-600">{historicalSummary.critical_count}</p>
-                    <p className="text-sm text-gray-500">Kritik Risk</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Target className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{historicalSummary.total_suspicious_questions.toLocaleString()}</p>
-                    <p className="text-sm text-gray-500">Şüpheli Soru</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-yellow-600" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-gray-900">{historicalSummary.total_suspicious_points.toLocaleString()}</p>
-                    <p className="text-sm text-gray-500">Şüpheli Puan</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Bulk Actions */}
-          {selectedForBulk.size > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-              <p className="text-red-700 font-medium">
-                {selectedForBulk.size} kullanıcı seçildi
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Güvenlik Merkezi
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Anti-scraping ve bot koruma sistemi
               </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setSelectedForBulk(new Set())}
-                  className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  İptal
-                </button>
-                <button
-                  onClick={bulkSuspend}
-                  disabled={actionLoading === 'bulk'}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {actionLoading === 'bulk' ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-                  Toplu Askıya Al
-                </button>
+            </div>
+          </div>
+          
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Yenile
+          </button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Activity className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.totalRequests24h.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Toplam İstek (24s)
+                </p>
               </div>
             </div>
-          )}
+          </motion.div>
 
-          {/* Refresh Button */}
-          <div className="flex justify-end mb-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <Ban className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-red-600">
+                  {stats.blockedRequests24h.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Engellenen (24s)
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-orange-600">
+                  {stats.suspiciousIPs}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Şüpheli IP
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                <Eye className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-purple-600">
+                  {stats.honeypotTriggers}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Honeypot (24s)
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                <UserX className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {stats.activeBlocks}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Aktif Engel
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {[
+            { id: 'overview', label: 'Genel Bakış', icon: TrendingUp },
+            { id: 'suspicious', label: 'Şüpheli IP\'ler', icon: AlertTriangle },
+            { id: 'blocked', label: 'Engelli IP\'ler', icon: Ban },
+            { id: 'honeypot', label: 'Honeypot Logları', icon: Eye },
+          ].map(tab => (
             <button
-              onClick={loadHistoricalData}
-              disabled={historicalLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
             >
-              <RefreshCw className={`w-4 h-4 ${historicalLoading ? 'animate-spin' : ''}`} />
-              Analiz Et
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
             </button>
-          </div>
+          ))}
+        </div>
 
-          {/* Historical User List */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Content */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+          {/* Şüpheli IP'ler */}
+          {activeTab === 'suspicious' && (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={selectedForBulk.size === historicalUsers.length && historicalUsers.length > 0}
-                        onChange={toggleSelectAll}
-                        className="rounded border-gray-300"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Kullanıcı</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Risk</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Toplam Soru</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Doğruluk</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Günlük Ort.</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Sebepler</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">İşlemler</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">IP Adresi</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">İstek</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Engellenen</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Risk</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Son Görülme</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Durum</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">İşlem</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {historicalLoading ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center">
-                        <RefreshCw className="w-6 h-6 text-gray-400 animate-spin mx-auto mb-2" />
-                        <p className="text-gray-500">Geçmiş veriler analiz ediliyor...</p>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {suspiciousIPs.map((ip, i) => (
+                    <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-sm">{ip.ip_address}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">{ip.total_requests.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-red-600">{ip.blocked_requests.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRiskColor(ip.max_risk_score)}`}>
+                          {ip.max_risk_score}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(ip.last_seen)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {ip.is_currently_blocked ? (
+                          <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">Engelli</span>
+                        ) : (
+                          <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">İzleniyor</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {!ip.is_currently_blocked && (
+                          <button
+                            onClick={() => setBlockingIP(ip.ip_address)}
+                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                          >
+                            Engelle
+                          </button>
+                        )}
                       </td>
                     </tr>
-                  ) : historicalUsers.length === 0 ? (
+                  ))}
+                  {suspiciousIPs.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center">
-                        <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                        <p className="text-gray-500">Geçmişte şüpheli aktivite bulunamadı</p>
+                      <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                        <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Şüpheli aktivite tespit edilmedi</p>
                       </td>
                     </tr>
-                  ) : (
-                    historicalUsers.map((user) => (
-                      <tr key={user.user_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedForBulk.has(user.user_id)}
-                            onChange={() => toggleSelect(user.user_id)}
-                            className="rounded border-gray-300"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div>
-                            <p className="font-medium text-gray-900">{user.full_name}</p>
-                            <p className="text-sm text-gray-500">{user.email}</p>
-                            <p className="text-xs text-gray-400">
-                              {user.days_since_registration} gün önce kayıt
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-lg text-sm font-medium ${getRiskLevelColor(user.risk_level)}`}>
-                            {getRiskLevelLabel(user.risk_level)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="font-bold text-gray-900">{user.total_questions.toLocaleString()}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={user.accuracy_rate > 95 ? 'text-orange-600 font-bold' : ''}>
-                            %{user.accuracy_rate}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={user.daily_average > 300 ? 'text-red-600 font-bold' : ''}>
-                            {user.daily_average}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {user.suspicion_reasons?.slice(0, 2).map((reason, i) => (
-                              <span key={i} className="text-xs px-2 py-1 bg-red-50 text-red-700 rounded">
-                                {reason.substring(0, 30)}...
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => suspendUser(user.user_id, 'Geçmiş analizi - Hile tespiti')}
-                              disabled={actionLoading === user.user_id}
-                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 disabled:opacity-50"
-                              title="Askıya Al"
-                            >
-                              {actionLoading === user.user_id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
-                            </button>
-                            <button
-                              onClick={() => resetUserPoints(user.user_id)}
-                              disabled={actionLoading === user.user_id}
-                              className="p-2 bg-orange-100 text-orange-600 rounded-lg hover:bg-orange-200 disabled:opacity-50"
-                              title="Puanları Sıfırla"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
-        </>
-      )}
+          )}
 
-      {/* User Detail Modal */}
-      <AnimatePresence>
-        {selectedUser && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-            onClick={() => setSelectedUser(null)}
-          >
+          {/* Engelli IP'ler */}
+          {activeTab === 'blocked' && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">IP Adresi</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sebep</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Engellenme</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bitiş</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">İşlem</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {blockedIPs.map(ip => (
+                    <tr key={ip.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-sm">{ip.ip_address}</td>
+                      <td className="px-6 py-4 text-sm max-w-xs truncate">{ip.reason}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(ip.blocked_at)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {ip.expires_at ? formatDate(ip.expires_at) : <span className="text-red-600">Kalıcı</span>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleUnblockIP(ip.ip_address)}
+                          className="text-green-600 hover:text-green-700 text-sm font-medium"
+                        >
+                          Engeli Kaldır
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {blockedIPs.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <Check className="h-12 w-12 mx-auto mb-4 text-green-500 opacity-50" />
+                        <p>Aktif IP engeli yok</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Honeypot Logları */}
+          {activeTab === 'honeypot' && (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">IP Adresi</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tuzak Tipi</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Path</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">User Agent</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Tarih</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {honeypotTriggers.map(trigger => (
+                    <tr key={trigger.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-sm">{trigger.ip_address}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                          {trigger.trap_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600 font-mono">{trigger.trap_path}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{trigger.user_agent}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatDate(trigger.created_at)}</td>
+                    </tr>
+                  ))}
+                  {honeypotTriggers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                        <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Honeypot tetiklemesi yok</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Genel Bakış */}
+          {activeTab === 'overview' && (
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Koruma Durumu */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6">
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-green-600" />
+                    Koruma Durumu
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Bot User-Agent Engeli</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Aktif</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Rate Limiting</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Aktif</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Honeypot Tuzakları</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Aktif</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Headless Browser Tespiti</span>
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Aktif</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Son Aktivite */}
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6">
+                  <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-blue-600" />
+                    Özet (Son 24 Saat)
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Toplam API İsteği</span>
+                      <span className="font-mono font-bold">{stats.totalRequests24h.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Engellenen İstek</span>
+                      <span className="font-mono font-bold text-red-600">{stats.blockedRequests24h.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Engel Oranı</span>
+                      <span className="font-mono font-bold">
+                        {stats.totalRequests24h > 0 
+                          ? ((stats.blockedRequests24h / stats.totalRequests24h) * 100).toFixed(1) 
+                          : 0}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Bot Tespiti</span>
+                      <span className="font-mono font-bold text-purple-600">{stats.honeypotTriggers}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bilgilendirme */}
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                  🛡️ Anti-Scraping Koruma Sistemi
+                </h4>
+                <p className="text-sm text-blue-700 dark:text-blue-400">
+                  Bu sistem web kazıma (scraping) ve bot saldırılarına karşı koruma sağlar. 
+                  Şüpheli aktiviteler otomatik tespit edilir ve engellenir. Honeypot tuzakları 
+                  sayesinde botlar erken aşamada yakalanır.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* IP Engelleme Modal */}
+        <AnimatePresence>
+          {blockingIP && (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+              onClick={() => setBlockingIP(null)}
             >
-              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">{selectedUser.full_name}</h2>
-                  <p className="text-sm text-gray-500">{selectedUser.email}</p>
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold mb-4">IP Engelle</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  <span className="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{blockingIP}</span> adresini engellemek üzeresiniz.
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Engel Sebebi</label>
+                    <input
+                      type="text"
+                      value={blockReason}
+                      onChange={e => setBlockReason(e.target.value)}
+                      placeholder="örn: Bot aktivitesi tespit edildi"
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Engel Süresi</label>
+                    <select
+                      value={blockDuration}
+                      onChange={e => setBlockDuration(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+                    >
+                      <option value={1}>1 Saat</option>
+                      <option value={6}>6 Saat</option>
+                      <option value={24}>24 Saat</option>
+                      <option value={72}>3 Gün</option>
+                      <option value={168}>1 Hafta</option>
+                      <option value={720}>30 Gün</option>
+                      <option value={0}>Kalıcı</option>
+                    </select>
+                  </div>
                 </div>
-                <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-gray-100 rounded-lg">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              
-              <div className="p-6 overflow-y-auto max-h-[60vh]">
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="text-center p-4 bg-gray-50 rounded-xl">
-                    <p className="text-2xl font-bold text-gray-900">{selectedUser.total_questions}</p>
-                    <p className="text-sm text-gray-500">Toplam Soru</p>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-xl">
-                    <p className="text-2xl font-bold text-gray-900">%{selectedUser.accuracy_rate?.toFixed(0) || 0}</p>
-                    <p className="text-sm text-gray-500">Doğruluk</p>
-                  </div>
-                  <div className="text-center p-4 bg-gray-50 rounded-xl">
-                    <p className={`text-2xl font-bold ${getRiskColor(selectedUser.risk_score).split(' ')[0]}`}>
-                      {selectedUser.risk_score}
-                    </p>
-                    <p className="text-sm text-gray-500">Risk Skoru</p>
-                  </div>
+                
+                <div className="flex gap-3 mt-6">
+                  <button
+                    onClick={() => setBlockingIP(null)}
+                    className="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={() => handleBlockIP(blockingIP)}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                  >
+                    Engelle
+                  </button>
                 </div>
-
-                {selectedUser.suspension_reason && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
-                    <p className="text-sm text-red-700">
-                      <strong>Askıya Alma Sebebi:</strong> {selectedUser.suspension_reason}
-                    </p>
-                  </div>
-                )}
-
-                <h3 className="font-semibold text-gray-900 mb-3">Son 7 Günlük Aktivite</h3>
-                {loadingDetails ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
-                  </div>
-                ) : activityDetails.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">Aktivite verisi bulunamadı</p>
-                ) : (
-                  <div className="space-y-2">
-                    {activityDetails.slice(0, 24).map((activity, i) => (
-                      <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
-                        <div className="w-32 text-sm text-gray-500">
-                          {new Date(activity.hour_bucket).toLocaleString('tr-TR', {
-                            month: 'short', day: 'numeric', hour: '2-digit'
-                          })}
-                        </div>
-                        <div className="flex-1 bg-gray-200 rounded-full h-4 overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500"
-                            style={{ width: `${Math.min(100, activity.question_count)}%` }}
-                          />
-                        </div>
-                        <div className="w-20 text-right text-sm">
-                          <span className="font-medium">{activity.question_count}</span>
-                          <span className="text-gray-400"> soru</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

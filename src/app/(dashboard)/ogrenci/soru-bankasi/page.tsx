@@ -44,6 +44,7 @@ import {
   type DailyProgress,
   type MotivationContext
 } from '@/lib/gamification'
+import { HoneypotTrap } from '@/components/security/HoneypotTrap'
 
 interface Subject {
   id: string
@@ -2437,6 +2438,9 @@ export default function SoruBankasiPage() {
   // Ana Sayfa - Ders Seçimi
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+      {/* Anti-scraping honeypot tuzağı */}
+      <HoneypotTrap />
+      
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
