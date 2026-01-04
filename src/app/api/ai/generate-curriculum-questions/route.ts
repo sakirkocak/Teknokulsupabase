@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateCurriculumQuestions, Difficulty } from '@/lib/gemini'
+import { generateCurriculumQuestions, Difficulty, VisualType } from '@/lib/gemini'
 import { getQuestionEmbedding } from '@/lib/gemini-embedding'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { grade, subject, topic, learningOutcome, difficulty, count, lang } = body
+    const { grade, subject, topic, learningOutcome, difficulty, count, lang, visualType } = body
 
     // Validasyon
     if (!grade || !subject || !topic || !learningOutcome) {
@@ -38,8 +38,13 @@ export async function POST(request: NextRequest) {
     
     // Dil kontrolü (varsayılan: tr)
     const language = lang === 'en' ? 'en' : 'tr'
+    
+    // 🆕 Yeni Nesil Soru: Görsel türü kontrolü
+    const validVisualTypes: VisualType[] = ['none', 'table', 'chart', 'flowchart', 'pie', 'diagram', 'mixed']
+    const selectedVisualType: VisualType = validVisualTypes.includes(visualType) ? visualType : 'none'
+    const isNewGeneration = selectedVisualType !== 'none'
 
-    console.log(`AI Soru Üretimi: ${gradeNum}. Sınıf - ${subject} - ${topic} [${language.toUpperCase()}]`)
+    console.log(`AI Soru Üretimi: ${gradeNum}. Sınıf - ${subject} - ${topic} [${language.toUpperCase()}]${isNewGeneration ? ` 🆕 Yeni Nesil: ${selectedVisualType}` : ''}`)
 
     const questions = await generateCurriculumQuestions(
       gradeNum,
@@ -48,7 +53,8 @@ export async function POST(request: NextRequest) {
       learningOutcome,
       (difficulty as Difficulty) || 'medium',
       questionCount,
-      language  // 🌍 Questly Global için dil desteği
+      language,  // 🌍 Questly Global için dil desteği
+      selectedVisualType  // 🆕 Yeni Nesil Soru görsel türü
     )
 
     // 🧠 Semantic Search: Her soru için embedding üret
@@ -82,7 +88,11 @@ export async function POST(request: NextRequest) {
         count: questionsWithEmbedding.length,
         optionCount: gradeNum >= 9 ? 5 : 4,
         lang: language,
-        embeddingsGenerated: questionsWithEmbedding.filter(q => q.embedding).length
+        embeddingsGenerated: questionsWithEmbedding.filter(q => q.embedding).length,
+        // 🆕 Yeni Nesil Soru meta bilgileri
+        visualType: selectedVisualType,
+        isNewGeneration,
+        visualQuestionsCount: questionsWithEmbedding.filter(q => q.visual_content).length
       }
     })
   } catch (error: any) {

@@ -95,6 +95,9 @@ interface GeneratedQuestion {
   explanation: string
   difficulty: string
   bloom_level: string
+  // 🆕 Yeni Nesil Soru alanları
+  visual_type?: string
+  visual_content?: string
 }
 
 const STEPS = [
@@ -167,11 +170,25 @@ export default function AIQuestionGeneratorPage() {
   // ========== DİL SEÇİMİ (QUESTLY GLOBAL) ==========
   const [selectedLanguage, setSelectedLanguage] = useState<'tr' | 'en'>('tr')
   
+  // ========== YENİ NESİL SORU (GÖRSEL TÜRÜ) ==========
+  type VisualType = 'none' | 'table' | 'chart' | 'flowchart' | 'pie' | 'diagram' | 'mixed'
+  const [selectedVisualType, setSelectedVisualType] = useState<VisualType>('none')
+  const visualTypeLabels: Record<VisualType, { label: string; emoji: string; description: string }> = {
+    none: { label: 'Metin', emoji: '📝', description: 'Sadece metin tabanlı sorular' },
+    table: { label: 'Tablo', emoji: '📊', description: 'LaTeX tablo içeren sorular' },
+    chart: { label: 'Grafik', emoji: '📈', description: 'Çubuk/çizgi grafik içeren sorular' },
+    flowchart: { label: 'Akış Şeması', emoji: '🔄', description: 'Süreç ve adım gösteren sorular' },
+    pie: { label: 'Pasta Grafiği', emoji: '🥧', description: 'Dağılım ve oran gösteren sorular' },
+    diagram: { label: 'Diyagram', emoji: '🔬', description: 'Bilimsel şema içeren sorular' },
+    mixed: { label: 'Karışık', emoji: '🎨', description: 'AI en uygun türü seçsin' },
+  }
+  
   // ========== TOPLU ÜRETİM MODÜ ==========
   const [generationMode, setGenerationMode] = useState<'single' | 'batch'>('single')
   const [batchSelectedSubjects, setBatchSelectedSubjects] = useState<string[]>([])
   const [batchSelectedDifficulties, setBatchSelectedDifficulties] = useState<string[]>(['medium'])
   const [batchQuestionsPerTopic, setBatchQuestionsPerTopic] = useState(5)
+  const [batchSelectedVisualType, setBatchSelectedVisualType] = useState<VisualType>('none')
   const [batchProgress, setBatchProgress] = useState<BatchProgress>({
     currentTopicIndex: 0,
     totalTopics: 0,
@@ -317,7 +334,8 @@ export default function AIQuestionGeneratorPage() {
           learningOutcome: topic.learning_outcome || topic.main_topic,
           difficulty: selectedDifficulty,
           count: questionCount,
-          lang: selectedLanguage  // 🌍 Questly Global için dil desteği
+          lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
+          visualType: selectedVisualType  // 🆕 Yeni Nesil Soru görsel türü
         })
       })
 
@@ -497,7 +515,8 @@ export default function AIQuestionGeneratorPage() {
           learningOutcome: topic.learning_outcome || topic.main_topic,
           difficulty: difficulty,
           count: batchQuestionsPerTopic,
-          lang: selectedLanguage  // 🌍 Questly Global için dil desteği
+          lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
+          visualType: batchSelectedVisualType  // 🆕 Yeni Nesil Soru görsel türü
         }),
         signal: controller.signal
       })
@@ -1191,6 +1210,49 @@ export default function AIQuestionGeneratorPage() {
                 </div>
               </div>
 
+              {/* 🆕 Yeni Nesil Soru - Görsel Türü */}
+              <div className="mb-8">
+                <label className="block text-lg font-semibold text-gray-800 mb-2">
+                  🆕 Yeni Nesil Soru Türü
+                </label>
+                <p className="text-sm text-gray-500 mb-4">
+                  Sorularınıza tablo, grafik ve diyagram ekleyebilirsiniz
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {Object.entries(visualTypeLabels).map(([key, { label, emoji, description }]) => (
+                    <button
+                      key={key}
+                      onClick={() => setSelectedVisualType(key as VisualType)}
+                      className={`p-3 rounded-xl border-2 transition-all group relative ${
+                        selectedVisualType === key
+                          ? 'border-indigo-500 bg-indigo-50 shadow-lg'
+                          : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                      }`}
+                      title={description}
+                    >
+                      <div className="text-2xl mb-1">{emoji}</div>
+                      <div className={`text-xs font-medium ${selectedVisualType === key ? 'text-indigo-700' : 'text-gray-600'}`}>
+                        {label}
+                      </div>
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                        {description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {selectedVisualType !== 'none' && (
+                  <div className="mt-3 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-100">
+                    <div className="flex items-center gap-2 text-indigo-700">
+                      <Sparkles className="w-4 h-4" />
+                      <span className="text-sm font-medium">
+                        Yeni Nesil: {visualTypeLabels[selectedVisualType].label} içeren sorular üretilecek
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Question Count */}
               <div className="mb-8">
                 <label className="block text-lg font-semibold text-gray-800 mb-4">Soru Sayısı</label>
@@ -1704,6 +1766,28 @@ export default function AIQuestionGeneratorPage() {
                         }`}
                       >
                         {count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 🆕 Yeni Nesil Soru Türü - Toplu Üretim */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">🆕 Yeni Nesil Soru Türü</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(visualTypeLabels).map(([key, { label, emoji }]) => (
+                      <button
+                        key={key}
+                        onClick={() => setBatchSelectedVisualType(key as VisualType)}
+                        className={`px-3 py-2 rounded-lg transition-all flex items-center gap-1 text-sm ${
+                          batchSelectedVisualType === key
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <span>{emoji}</span>
+                        <span>{label}</span>
+                        {batchSelectedVisualType === key && <Check className="w-3 h-3" />}
                       </button>
                     ))}
                   </div>

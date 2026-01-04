@@ -193,6 +193,9 @@ export type QuestionType = 'multiple_choice' | 'true_false' | 'open_ended' | 'fi
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'legendary'
 
 // Müfredat bazlı soru tipi
+// Yeni Nesil Soru görsel türleri
+export type VisualType = 'none' | 'table' | 'chart' | 'flowchart' | 'pie' | 'diagram' | 'mixed'
+
 export interface CurriculumQuestion {
   question_text: string
   options: {
@@ -206,6 +209,9 @@ export interface CurriculumQuestion {
   explanation: string
   difficulty: Difficulty
   bloom_level: 'bilgi' | 'kavrama' | 'uygulama' | 'analiz' | 'sentez' | 'değerlendirme'
+  // 🆕 Yeni Nesil Soru alanları
+  visual_type?: VisualType  // Görsel türü
+  visual_content?: string   // Mermaid/SVG/LaTeX tablo kodu
 }
 
 export interface GeneratedQuestion {
@@ -686,6 +692,116 @@ ${subjectTip ? `• Ders İpucu: ${subjectTip}` : ''}
 // TYT/AYT/LGS Sınavlarına Tam Uyumlu
 // =====================================================
 
+// 🆕 YENİ NESİL SORU: Görsel türüne göre talimatlar
+const getVisualInstructions = (visualType: VisualType, subject: string): string => {
+  if (visualType === 'none') {
+    return `
+🚫 MEDYA KISITLAMASI:
+• Tüm sorular SADECE METİN tabanlı olmalı
+• Görsel, tablo, grafik, diyagram KULLANMA
+• Görsel gerektiren durumları metin açıklaması yap`
+  }
+
+  const visualTypeInstructions: Record<string, string> = {
+    'table': `
+📊 TABLO İÇEREN SORU (YENİ NESİL):
+• Soru metninde LaTeX tablo kullan
+• Tablo formatı:
+$$
+\\\\begin{array}{|c|c|c|}
+\\\\hline
+\\\\text{Başlık 1} & \\\\text{Başlık 2} & \\\\text{Başlık 3} \\\\\\\\
+\\\\hline
+\\\\text{Veri 1} & \\\\text{Veri 2} & \\\\text{Veri 3} \\\\\\\\
+\\\\hline
+\\\\end{array}
+$$
+• "visual_type": "table" olarak belirt
+• "visual_content" alanına tablo kodunu AYRICA yaz
+• Tablo verileri soruyla DOĞRUDAN ilgili olmalı`,
+
+    'chart': `
+📈 GRAFİK İÇEREN SORU (YENİ NESİL):
+• Mermaid xychart-beta formatı kullan
+• Çubuk/çizgi grafik formatı:
+\`\`\`mermaid
+xychart-beta
+    title "Grafik Başlığı"
+    x-axis [Oca, Şub, Mar, Nis, May]
+    y-axis "Değer" 0 --> 100
+    bar [30, 45, 60, 75, 90]
+\`\`\`
+• "visual_type": "chart" olarak belirt
+• "visual_content" alanına Mermaid kodunu yaz
+• Veri değerleri mantıklı ve tutarlı olmalı`,
+
+    'flowchart': `
+🔄 AKIŞ ŞEMASI İÇEREN SORU (YENİ NESİL):
+• Mermaid flowchart formatı kullan
+• Akış şeması formatı:
+\`\`\`mermaid
+graph TD
+    A[Başlangıç] --> B{Karar}
+    B -->|Evet| C[Sonuç 1]
+    B -->|Hayır| D[Sonuç 2]
+    C --> E[Bitiş]
+    D --> E
+\`\`\`
+• Türkçe karakterler kullanabilirsin (ş, ğ, ü, ö, ı, ç)
+• "visual_type": "flowchart" olarak belirt
+• "visual_content" alanına Mermaid kodunu yaz
+• ${subject === 'Biyoloji' ? 'Fotosentez, solunum, sindirim gibi süreçler için ideal' : 
+   subject === 'Tarih' ? 'Kronolojik sıralama ve neden-sonuç ilişkileri için ideal' :
+   'Süreç ve adımları gösteren sorular için ideal'}`,
+
+    'pie': `
+🥧 PASTA GRAFİĞİ İÇEREN SORU (YENİ NESİL):
+• Mermaid pie chart formatı kullan
+• Pasta grafiği formatı:
+\`\`\`mermaid
+pie title Grafik Başlığı
+    "Kategori A" : 40
+    "Kategori B" : 30
+    "Kategori C" : 20
+    "Kategori D" : 10
+\`\`\`
+• Yüzdeler toplamı 100 olmalı
+• "visual_type": "pie" olarak belirt
+• "visual_content" alanına Mermaid kodunu yaz
+• ${subject === 'Coğrafya' ? 'Nüfus dağılımı, kaynak kullanımı için ideal' :
+   subject === 'Biyoloji' ? 'Element/madde oranları için ideal' :
+   'Dağılım ve oran soruları için ideal'}`,
+
+    'diagram': `
+🔬 BİLİMSEL DİYAGRAM İÇEREN SORU (YENİ NESİL):
+• Mermaid veya SVG formatı kullan
+• Basit diyagram için Mermaid:
+\`\`\`mermaid
+graph LR
+    A[Güneş Işığı] --> B[Yaprak]
+    C[CO₂] --> B
+    D[H₂O] --> B
+    B --> E[O₂]
+    B --> F[Glikoz]
+\`\`\`
+• "visual_type": "diagram" olarak belirt
+• "visual_content" alanına diyagram kodunu yaz
+• ${subject === 'Fen Bilimleri' || subject === 'Biyoloji' ? 'Hücre, organ, sistem şemaları' :
+   subject === 'Fizik' ? 'Devre, kuvvet diyagramları' :
+   subject === 'Kimya' ? 'Molekül yapıları, reaksiyon şemaları' :
+   'Kavramsal ilişki şemaları'}`,
+
+    'mixed': `
+🎨 KARIŞIK GÖRSEL (AI KARAR VERSİN):
+• Konuya en uygun görsel türünü seç: tablo, grafik, akış şeması, pasta grafiği veya diyagram
+• Seçtiğin türe göre yukarıdaki formatları uygula
+• "visual_type" alanına kullandığın türü yaz
+• Bazı sorular görsel içersin, bazıları metin tabanlı olabilir`
+  }
+
+  return visualTypeInstructions[visualType] || visualTypeInstructions['mixed']
+}
+
 // Ders bazlı özel yönergeler
 const getSubjectGuidelines = (subject: string, grade: number): string => {
   const guidelines: Record<string, string> = {
@@ -997,7 +1113,8 @@ export async function generateCurriculumQuestions(
   learningOutcome: string,
   difficulty: Difficulty,
   count: number = 5,
-  lang: 'tr' | 'en' = 'tr'  // 🌍 Questly Global için dil desteği
+  lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
+  visualType: VisualType = 'none'  // 🆕 Yeni Nesil Soru görsel türü
 ): Promise<CurriculumQuestion[]> {
   // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5)
   const isHighSchool = grade >= 9
@@ -1094,7 +1211,7 @@ ${subjectGuidelines}
 ════════════════════════════════════════════════════════════
 📤 ÇIKTI - SADECE JSON (başka metin YASAK)
 ════════════════════════════════════════════════════════════
-{"questions":[{"question_text":"Soru metni","options":{"A":"Şık A","B":"Şık B","C":"Şık C","D":"Şık D"${isHighSchool ? ',"E":"Şık E"' : ''}},"correct_answer":"B","explanation":"Açıklama","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"}]}
+{"questions":[{"question_text":"Soru metni","options":{"A":"Şık A","B":"Şık B","C":"Şık C","D":"Şık D"${isHighSchool ? ',"E":"Şık E"' : ''}},"correct_answer":"B","explanation":"Açıklama","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"${visualType !== 'none' ? ',"visual_type":"table","visual_content":"GÖRSEL KODU BURAYA"' : ''}}]}
 
 ⛔ YASAK:
 • JSON dışında metin yazma
@@ -1103,13 +1220,7 @@ ${subjectGuidelines}
 • "Hiçbiri" veya "Hepsi" şıkkı
 • Aynı harfin sürekli doğru cevap olması
 
-🚫 MEDYA KISITLAMASI (ÇOK ÖNEMLİ):
-• Resim, görsel, fotoğraf, tablo, grafik içeren sorular ÜRETME
-• Ses, dinleme, video içeren sorular ÜRETME
-• "Resimde ne görüyorsun?", "Aşağıdaki tabloya göre...", "Grafiğe bak..." gibi ifadeler KULLANMA
-• "Dinlediğin metne göre...", "Videoda gördüğün..." gibi ifadeler KULLANMA
-• Tüm sorular SADECE METİN tabanlı olmalı
-• Görsel materyal gerektiren kazanımlar için metin açıklaması yap (örn: "Ali'nin boyu 150 cm, ayakkabısı 40 numara..." şeklinde)
+${getVisualInstructions(visualType, subject)}
 
 ✅ ZORUNLU:
 • correct_answer: ${isHighSchool ? 'A, B, C, D veya E' : 'A, B, C veya D'}
@@ -1133,7 +1244,7 @@ ${subjectGuidelines}
         generationConfig: {
           responseMimeType: 'application/json',
           // @ts-ignore - responseSchema yeni özellik
-          responseSchema: curriculumQuestionSchema
+          responseSchema: curriculumQuestionSchema as any
         }
       })
       const response = await result.response
@@ -1261,6 +1372,10 @@ ${subjectGuidelines}
       const questionText = normalizeLatex(String(q.question_text || q.question || '').trim())
       const explanation = normalizeLatex(String(q.explanation || '').trim())
       
+      // 🆕 Yeni Nesil Soru: Görsel içerik
+      const visualContent = q.visual_content ? String(q.visual_content).trim() : undefined
+      const detectedVisualType = q.visual_type || (visualContent ? visualType : 'none')
+      
       return {
         question_text: questionText,
         options: {
@@ -1273,7 +1388,10 @@ ${subjectGuidelines}
         correct_answer: String(q.correct_answer || q.answer || 'A').toUpperCase().charAt(0),
         explanation: explanation,
         difficulty: q.difficulty || difficulty,
-        bloom_level: q.bloom_level || 'kavrama'
+        bloom_level: q.bloom_level || 'kavrama',
+        // 🆕 Yeni Nesil Soru alanları
+        visual_type: detectedVisualType !== 'none' ? detectedVisualType : undefined,
+        visual_content: visualContent
       }
     }).filter(Boolean) as CurriculumQuestion[]
     
