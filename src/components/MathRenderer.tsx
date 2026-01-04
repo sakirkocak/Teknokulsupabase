@@ -151,7 +151,30 @@ function sanitizeLatex(latex: string): string {
   // 2. Çoklu backslash'leri normalize et
   // \\\\times -> \\times (JSON'dan sonra 2 backslash kalmalı)
   sanitized = sanitized.replace(/\\{3,}/g, '\\\\')
-  
+
+  // 2.5. Backslash'sız LaTeX komutlarını düzelt
+  // Gemini bazen "times" yerine "\times" yazmıyor - bunu düzelt
+  // Sadece bağımsız kelimeler olarak geçenleri değiştir (örn: "times3" -> "\times 3")
+  sanitized = sanitized
+    .replace(/\btimes(\d)/gi, '\\times $1')  // times3 -> \times 3
+    .replace(/\btimes\b/gi, '\\times')        // times -> \times
+    .replace(/\bdiv(\d)/gi, '\\div $1')       // div12 -> \div 12
+    .replace(/\bdiv\b/gi, '\\div')            // div -> \div
+    .replace(/\bsqrt\b/gi, '\\sqrt')          // sqrt -> \sqrt
+    .replace(/\bfrac\b/gi, '\\frac')          // frac -> \frac
+    .replace(/\bpm\b/gi, '\\pm')              // pm -> \pm
+    .replace(/\bcdot\b/gi, '\\cdot')          // cdot -> \cdot
+    .replace(/\bleq\b/gi, '\\leq')            // leq -> \leq
+    .replace(/\bgeq\b/gi, '\\geq')            // geq -> \geq
+    .replace(/\bneq\b/gi, '\\neq')            // neq -> \neq
+    .replace(/\binfty\b/gi, '\\infty')        // infty -> \infty
+    .replace(/\balpha\b/gi, '\\alpha')        // alpha -> \alpha
+    .replace(/\bbeta\b/gi, '\\beta')          // beta -> \beta
+    .replace(/\bgamma\b/gi, '\\gamma')        // gamma -> \gamma
+    .replace(/\bdelta\b/gi, '\\delta')        // delta -> \delta
+    .replace(/\bpi\b/gi, '\\pi')              // pi -> \pi
+    .replace(/\btheta\b/gi, '\\theta')        // theta -> \theta
+
   // 3. Eksik kapanış parantezlerini dene
   // Basit kontrol - derinlemesine analiz yapmıyoruz
   const openBraces = (sanitized.match(/{/g) || []).length

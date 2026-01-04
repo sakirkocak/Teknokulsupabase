@@ -1513,7 +1513,16 @@ export default function AIQuestionGeneratorPage() {
                               {/* Question Text */}
                               <div className="mb-4">
                                 <div className="flex items-center justify-between">
-                                  <label className="text-xs text-gray-500 uppercase tracking-wide">Soru</label>
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-xs text-gray-500 uppercase tracking-wide">Soru</label>
+                                    {/* 🆕 Yeni Nesil Badge */}
+                                    {question.visual_type && question.visual_type !== 'none' && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs font-medium rounded-full">
+                                        <span>🆕</span>
+                                        <span>Yeni Nesil</span>
+                                      </span>
+                                    )}
+                                  </div>
                                   <SpeakButton 
                                     text={question.question_text} 
                                     size="sm"
@@ -1531,6 +1540,15 @@ export default function AIQuestionGeneratorPage() {
                                 ) : (
                                   <div className="mt-1 text-gray-800 font-medium">
                                     <MathRenderer text={question.question_text} />
+                                  </div>
+                                )}
+                                {/* 🆕 Visual Content (Tablo, Grafik, Diyagram) */}
+                                {question.visual_content && (
+                                  <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">
+                                      📊 Görsel İçerik ({question.visual_type})
+                                    </div>
+                                    <MathRenderer text={question.visual_content} />
                                   </div>
                                 )}
                               </div>

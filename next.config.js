@@ -19,9 +19,8 @@ const nextConfig = {
   // Vercel serverless function config - Puppeteer ve WebSocket için
   experimental: {
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'ws', 'bufferutil', 'utf-8-validate'],
+    instrumentationHook: true, // Instrumentation API (deprecation uyarılarını bastırmak için)
   },
-  // Instrumentation API'yi etkinleştir (deprecation uyarılarını bastırmak için)
-  instrumentationHook: true,
 }
 
 module.exports = nextConfig
