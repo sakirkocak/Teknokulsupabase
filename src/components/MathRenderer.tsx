@@ -175,6 +175,21 @@ function sanitizeLatex(latex: string): string {
     .replace(/\bpi\b/gi, '\\pi')              // pi -> \pi
     .replace(/\btheta\b/gi, '\\theta')        // theta -> \theta
 
+  // 2.6. LaTeX tablo komutlarını düzelt
+  // begin/end environment komutları
+  sanitized = sanitized
+    .replace(/\bbegin\{/gi, '\\begin{')       // begin{ -> \begin{
+    .replace(/\bend\{/gi, '\\end{')           // end{ -> \end{
+    .replace(/\bhline\b/gi, '\\hline')        // hline -> \hline
+    .replace(/\btextbf\{/gi, '\\textbf{')     // textbf{ -> \textbf{
+    .replace(/\btext\{/gi, '\\text{')         // text{ -> \text{
+  
+  // 2.7. Tablo satır sonlarını düzelt
+  // Tek backslash + boşluk + hline -> çift backslash + hline
+  sanitized = sanitized.replace(/\s*\\\s*\\hline/g, ' \\\\ \\hline')
+  // Tek backslash satır sonu (tablo içinde) -> çift backslash
+  sanitized = sanitized.replace(/([^\\])\\\s+\\hline/g, '$1 \\\\ \\hline')
+
   // 3. Eksik kapanış parantezlerini dene
   // Basit kontrol - derinlemesine analiz yapmıyoruz
   const openBraces = (sanitized.match(/{/g) || []).length

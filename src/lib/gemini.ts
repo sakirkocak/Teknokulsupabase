@@ -63,6 +63,7 @@ function normalizeLatex(text: string): string {
     'text', 'textbf', 'textit', 'mathrm', 'mathbf', 'mathit',
     'left', 'right', 'big', 'Big', 'bigg', 'Bigg',
     'begin', 'end', 'array', 'matrix', 'pmatrix', 'bmatrix',
+    'hline', 'cline', 'multicolumn', 'multirow',  // Tablo komutları
     'rightarrow', 'leftarrow', 'Rightarrow', 'Leftarrow', 'leftrightarrow',
     'infty', 'partial', 'nabla', 'forall', 'exists',
     'in', 'notin', 'subset', 'supset', 'cup', 'cap',
