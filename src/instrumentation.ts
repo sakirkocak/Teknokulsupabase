@@ -8,21 +8,27 @@
  */
 
 export async function register() {
-  // Node.js deprecation uyarılarını bastır
-  // DEP0169: url.parse() - Typesense/Supabase kütüphanelerinden geliyor
-  // Bu kütüphaneler güncellendiğinde bu satır kaldırılabilir
-  if (process.env.NODE_ENV === 'production') {
-    // Sadece production'da bastır - development'ta görmek isteyebiliriz
-    process.removeAllListeners('warning')
+  // Sadece Node.js runtime'da çalış (Edge runtime'da process.removeAllListeners yok)
+  if (typeof process !== 'undefined' && 
+      typeof process.removeAllListeners === 'function' &&
+      process.env.NODE_ENV === 'production') {
     
-    process.on('warning', (warning) => {
-      // DEP0169 (url.parse) uyarısını sessizce atla
-      if (warning.name === 'DeprecationWarning' && 
-          (warning as any).code === 'DEP0169') {
-        return // Bastır
-      }
-      // Diğer uyarıları normal şekilde logla
-      console.warn(warning)
-    })
+    // Node.js deprecation uyarılarını bastır
+    // DEP0169: url.parse() - Typesense/Supabase kütüphanelerinden geliyor
+    try {
+      process.removeAllListeners('warning')
+      
+      process.on('warning', (warning) => {
+        // DEP0169 (url.parse) uyarısını sessizce atla
+        if (warning.name === 'DeprecationWarning' && 
+            (warning as any).code === 'DEP0169') {
+          return // Bastır
+        }
+        // Diğer uyarıları normal şekilde logla
+        console.warn(warning)
+      })
+    } catch {
+      // Edge runtime'da hata verirse sessizce geç
+    }
   }
 }
