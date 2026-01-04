@@ -20,6 +20,8 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'ws', 'bufferutil', 'utf-8-validate'],
   },
+  // Instrumentation API'yi etkinleştir (deprecation uyarılarını bastırmak için)
+  instrumentationHook: true,
 }
 
 module.exports = nextConfig
