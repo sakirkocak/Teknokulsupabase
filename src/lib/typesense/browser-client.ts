@@ -1217,6 +1217,7 @@ export interface AdminQuestionFilters {
   difficulty?: string
   topicId?: string
   hasImage?: boolean
+  isNewGeneration?: boolean  // 🆕 Yeni nesil soru filtresi
   searchQuery?: string
   page?: number
   pageSize?: number
@@ -1250,6 +1251,7 @@ export async function searchQuestionsForAdmin(
     difficulty,
     topicId,
     hasImage,
+    isNewGeneration,
     searchQuery,
     page = 1,
     pageSize = 20
@@ -1261,7 +1263,8 @@ export async function searchQuestionsForAdmin(
   if (subjectCode) filterParts.push(`subject_code:=${subjectCode}`)
   if (difficulty) filterParts.push(`difficulty:=${difficulty}`)
   if (topicId) filterParts.push(`topic_id:=${topicId}`)
-  if (hasImage) filterParts.push(`image_url:!=null`)
+  if (hasImage) filterParts.push(`has_image:=true`)
+  if (isNewGeneration) filterParts.push(`is_new_generation:=true`)
 
   try {
     const result = await client
@@ -1357,6 +1360,7 @@ export async function getQuestionStatsFast(): Promise<{
   hard: number
   legendary: number
   withImage: number
+  newGeneration: number  // 🆕 Yeni nesil soru sayısı
   byGrade: Record<number, number>
   duration: number
 }> {
@@ -1364,8 +1368,8 @@ export async function getQuestionStatsFast(): Promise<{
   const client = getTypesenseBrowserClient()
 
   try {
-    // İki paralel sorgu: Tüm sorular + Görüntülü sorular
-    const [allResult, imageResult] = await Promise.all([
+    // Üç paralel sorgu: Tüm sorular + Görüntülü sorular + Yeni nesil sorular
+    const [allResult, imageResult, newGenResult] = await Promise.all([
       client
         .collections(COLLECTIONS.QUESTIONS)
         .documents()
@@ -1373,7 +1377,7 @@ export async function getQuestionStatsFast(): Promise<{
           q: '*',
           query_by: 'question_text',
           per_page: 0,
-          facet_by: 'difficulty,grade',
+          facet_by: 'difficulty,grade,has_image,is_new_generation',
           max_facet_values: 20
         }),
       client
@@ -1382,7 +1386,16 @@ export async function getQuestionStatsFast(): Promise<{
         .search({
           q: '*',
           query_by: 'question_text',
-          filter_by: 'image_url:!=null',
+          filter_by: 'has_image:=true',
+          per_page: 0
+        }),
+      client
+        .collections(COLLECTIONS.QUESTIONS)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'question_text',
+          filter_by: 'is_new_generation:=true',
           per_page: 0
         })
     ])
@@ -1405,7 +1418,7 @@ export async function getQuestionStatsFast(): Promise<{
     })
 
     const duration = Math.round(performance.now() - startTime)
-    console.log(`⚡ Question Stats (browser): ${duration}ms, total: ${allResult.found}, withImage: ${imageResult.found}`)
+    console.log(`⚡ Question Stats (browser): ${duration}ms, total: ${allResult.found}, withImage: ${imageResult.found}, newGen: ${newGenResult.found}`)
 
     return {
       total: allResult.found || 0,
@@ -1414,6 +1427,7 @@ export async function getQuestionStatsFast(): Promise<{
       hard: diffStats.hard,
       legendary: diffStats.legendary,
       withImage: imageResult.found || 0,
+      newGeneration: newGenResult.found || 0,
       byGrade,
       duration
     }

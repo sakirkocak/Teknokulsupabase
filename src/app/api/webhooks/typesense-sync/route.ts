@@ -284,6 +284,7 @@ async function handleQuestionsSync(
     const document: Record<string, any> = {
       id: questionId,
       question_id: questionId,
+      topic_id: safeString(record.topic_id),  // 🆕 Topic ID (filtre için)
       question_text: safeString(record.question_text),
       // Filtreleme alanları
       difficulty: safeString(record.difficulty, 'medium'),

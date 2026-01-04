@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { 
   searchQuestionsForAdmin, 
@@ -12,13 +12,82 @@ import {
 } from '@/lib/typesense/browser-client'
 
 import MathRenderer from '@/components/MathRenderer'
+import MermaidRenderer from '@/components/MermaidRenderer'
 import DOMPurify from 'isomorphic-dompurify'
+
+// ⚡ Görsel içerik türünü tespit et
+function detectVisualContentType(content: string): 'mermaid' | 'latex' | 'html' {
+  const trimmed = content.trim()
+  const lowerTrimmed = trimmed.toLowerCase()
+  
+  // Mermaid diyagramları
+  if (lowerTrimmed.startsWith('graph ') || 
+      lowerTrimmed.startsWith('flowchart ') || 
+      lowerTrimmed.startsWith('pie ') ||
+      lowerTrimmed.startsWith('xychart') ||
+      lowerTrimmed.startsWith('sequencediagram') ||
+      lowerTrimmed.startsWith('classdiagram') ||
+      lowerTrimmed.startsWith('statediagram') ||
+      lowerTrimmed.startsWith('erdiagram') ||
+      lowerTrimmed.startsWith('gantt') ||
+      lowerTrimmed.startsWith('journey') ||
+      lowerTrimmed.startsWith('timeline')) {
+    return 'mermaid'
+  }
+  
+  // LaTeX tablo/matematik
+  if (trimmed.includes('\\begin{') || 
+      trimmed.includes('\\hline') || 
+      trimmed.includes('$$') ||
+      trimmed.includes('\\frac') ||
+      trimmed.includes('\\sqrt')) {
+    return 'latex'
+  }
+  
+  // HTML/SVG
+  return 'html'
+}
+
+// ⚡ Görsel içeriği uygun renderer ile göster
+function VisualContentRenderer({ content, className = '' }: { content: string; className?: string }) {
+  const type = detectVisualContentType(content)
+  
+  if (type === 'mermaid') {
+    return (
+      <div className={className}>
+        <MermaidRenderer chart={content} />
+      </div>
+    )
+  }
+  
+  if (type === 'latex') {
+    return (
+      <div className={className}>
+        <MathRenderer text={content} />
+      </div>
+    )
+  }
+  
+  // HTML/SVG
+  return (
+    <div 
+      className={className}
+      dangerouslySetInnerHTML={{ 
+        __html: DOMPurify.sanitize(content, {
+          ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
+          ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
+        })
+      }} 
+    />
+  )
+}
 import { 
   BookOpen, Search, Filter, Edit2, Trash2, 
   CheckCircle, XCircle, Save, X, Eye, EyeOff,
   ChevronDown, ChevronUp, Star, Zap, Crown, Sparkles,
   AlertCircle, ChevronLeft, ChevronRight, RefreshCw,
-  GraduationCap, Layers, BarChart3, Clock, Plus, ImageIcon
+  GraduationCap, Layers, BarChart3, Clock, Plus, ImageIcon,
+  FlaskConical
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -81,8 +150,12 @@ export default function AdminSoruYonetimiPage() {
   const [filterDifficulty, setFilterDifficulty] = useState<string>('')
   const [filterTopic, setFilterTopic] = useState<string>('')
   const [filterHasImage, setFilterHasImage] = useState(false) // Görüntülü soru filtresi
+  const [filterNewGeneration, setFilterNewGeneration] = useState(false) // 🆕 Yeni nesil soru filtresi
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // ⚡ Debounced arama
   const [showFilters, setShowFilters] = useState(true)
+  const [isSearching, setIsSearching] = useState(false) // Arama animasyonu
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Sayfalama
   const [currentPage, setCurrentPage] = useState(1)
@@ -104,6 +177,7 @@ export default function AdminSoruYonetimiPage() {
     hard: 0,
     legendary: 0,
     withImage: 0, // Görüntülü soru sayısı
+    newGeneration: 0, // 🆕 Yeni nesil soru sayısı
     byGrade: {} as Record<number, number>
   })
   
@@ -116,9 +190,31 @@ export default function AdminSoruYonetimiPage() {
     loadStats()
   }, [])
 
+  // ⚡ Debounce arama - 300ms bekle
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+    
+    if (searchQuery !== debouncedSearchQuery) {
+      setIsSearching(true)
+      searchTimeoutRef.current = setTimeout(() => {
+        setDebouncedSearchQuery(searchQuery)
+        setCurrentPage(1)
+        setIsSearching(false)
+      }, 300)
+    }
+    
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchQuery])
+
   useEffect(() => {
     loadQuestions()
-  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, filterHasImage, currentPage])
+  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, filterHasImage, filterNewGeneration, debouncedSearchQuery, currentPage])
 
   useEffect(() => {
     if (filterGrade) {
@@ -197,6 +293,7 @@ export default function AdminSoruYonetimiPage() {
           hard: statsData.hard,
           legendary: statsData.legendary,
           withImage: statsData.withImage,
+          newGeneration: statsData.newGeneration,
           byGrade: statsData.byGrade
         })
         console.log(`⚡ Stats loaded from Typesense in ${statsData.duration}ms`)
@@ -217,6 +314,7 @@ export default function AdminSoruYonetimiPage() {
         hard: data.hard || 0,
         legendary: data.legendary || 0,
         withImage: data.withImage || 0,
+        newGeneration: data.newGeneration || 0,
         byGrade: data.byGrade || {}
       })
     } else {
@@ -243,7 +341,8 @@ export default function AdminSoruYonetimiPage() {
           difficulty: filterDifficulty,
           topicId: filterTopic,
           hasImage: filterHasImage,
-          searchQuery,
+          isNewGeneration: filterNewGeneration,
+          searchQuery: debouncedSearchQuery,
           page: currentPage,
           pageSize
         })
@@ -491,7 +590,9 @@ export default function AdminSoruYonetimiPage() {
     setFilterDifficulty('')
     setFilterTopic('')
     setFilterHasImage(false)
+    setFilterNewGeneration(false)
     setSearchQuery('')
+    setDebouncedSearchQuery('')
     setCurrentPage(1)
   }
 
@@ -574,7 +675,7 @@ export default function AdminSoruYonetimiPage() {
             <div className="flex items-center gap-2">
               <Filter className="h-5 w-5 text-primary-500" />
               <span className="font-medium text-surface-900 dark:text-white">Filtreler</span>
-              {(filterGrade || filterSubject || filterDifficulty || filterTopic || filterHasImage || searchQuery) && (
+              {(filterGrade || filterSubject || filterDifficulty || filterTopic || filterHasImage || filterNewGeneration || searchQuery) && (
                 <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">
                   Aktif
                 </span>
@@ -685,8 +786,9 @@ export default function AdminSoruYonetimiPage() {
                     </div>
                   </div>
                   
-                  {/* Görüntülü Soru Filtresi */}
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+                  {/* Görüntülü Soru ve Yeni Nesil Soru Filtreleri */}
+                  <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-surface-200 dark:border-surface-700">
+                    {/* Görüntülü Sorular */}
                     <button
                       onClick={() => {
                         setFilterHasImage(!filterHasImage)
@@ -705,28 +807,61 @@ export default function AdminSoruYonetimiPage() {
                         {stats.withImage}
                       </span>
                     </button>
+                    
+                    {/* 🆕 Yeni Nesil Sorular */}
+                    <button
+                      onClick={() => {
+                        setFilterNewGeneration(!filterNewGeneration)
+                        setCurrentPage(1)
+                      }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                        filterNewGeneration
+                          ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-200'
+                          : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100'
+                      }`}
+                    >
+                      <FlaskConical className="w-4 h-4" />
+                      Yeni Nesil Sorular
+                      {filterNewGeneration && <span className="ml-1">✓</span>}
+                      <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300">
+                        {stats.newGeneration}
+                      </span>
+                    </button>
                   </div>
                   
-                  {/* Arama ve Butonlar */}
+                  {/* ⚡ Anlık Arama */}
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400" />
+                      {isSearching ? (
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                          <div className="animate-spin w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full" />
+                        </div>
+                      ) : (
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-surface-400" />
+                      )}
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        placeholder="Soru metninde ara..."
-                        className="w-full pl-10 pr-4 py-2 border border-surface-300 dark:border-surface-600 rounded-lg bg-white dark:bg-surface-800"
+                        placeholder="⚡ Anlık arama... (yazın, otomatik arar)"
+                        className={`w-full pl-10 pr-4 py-2 border rounded-lg bg-white dark:bg-surface-800 transition-all ${
+                          isSearching 
+                            ? 'border-primary-400 ring-2 ring-primary-200 dark:ring-primary-800' 
+                            : 'border-surface-300 dark:border-surface-600'
+                        }`}
                       />
+                      {searchQuery && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('')
+                            setDebouncedSearchQuery('')
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
-                    <button
-                      onClick={handleSearch}
-                      className="btn btn-primary flex items-center gap-2"
-                    >
-                      <Search className="h-4 w-4" />
-                      Ara
-                    </button>
                     <button
                       onClick={clearFilters}
                       className="btn btn-secondary flex items-center gap-2"
@@ -821,14 +956,9 @@ export default function AdminSoruYonetimiPage() {
                               Yeni Nesil {question.visual_type === 'table' ? 'Tablo' : question.visual_type === 'chart' ? 'Grafik' : question.visual_type === 'diagram' ? 'Diyagram' : question.visual_type === 'flowchart' ? 'Akış Şeması' : question.visual_type === 'pie' ? 'Pasta Grafiği' : 'Görsel'}
                             </span>
                           </div>
-                          <div 
+                          <VisualContentRenderer 
+                            content={question.visual_content} 
                             className="visual-content prose prose-sm dark:prose-invert max-w-none"
-                            dangerouslySetInnerHTML={{ 
-                              __html: DOMPurify.sanitize(question.visual_content, {
-                                ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
-                                ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
-                              })
-                            }} 
                           />
                         </div>
                       )}
@@ -1169,14 +1299,9 @@ export default function AdminSoruYonetimiPage() {
                         Yeni Nesil {previewQuestion.visual_type === 'table' ? 'Tablo' : previewQuestion.visual_type === 'chart' ? 'Grafik' : previewQuestion.visual_type === 'diagram' ? 'Diyagram' : previewQuestion.visual_type === 'flowchart' ? 'Akış Şeması' : previewQuestion.visual_type === 'pie' ? 'Pasta Grafiği' : 'Görsel'}
                       </span>
                     </div>
-                    <div 
+                    <VisualContentRenderer 
+                      content={previewQuestion.visual_content} 
                       className="visual-content bg-white rounded-lg p-3"
-                      dangerouslySetInnerHTML={{ 
-                        __html: DOMPurify.sanitize(previewQuestion.visual_content, {
-                          ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
-                          ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
-                        })
-                      }} 
                     />
                   </div>
                 )}

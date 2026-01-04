@@ -77,6 +77,7 @@ export const questionsSchema: CollectionCreateSchema = {
   fields: [
     // Temel
     { name: 'question_id', type: 'string' },
+    { name: 'topic_id', type: 'string', facet: true, optional: true },  // 🆕 Topic ID (filtre için)
     
     // 🔍 ARAMA için
     { name: 'question_text', type: 'string' },
@@ -294,6 +295,7 @@ export interface LeaderboardDocument {
 export interface QuestionDocument {
   id: string
   question_id: string
+  topic_id?: string  // 🆕 Topic ID (filtre için)
   question_text: string
   // Filtreleme
   difficulty: string

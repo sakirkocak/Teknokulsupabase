@@ -708,11 +708,19 @@ const getVisualInstructions = (visualType: VisualType, subject: string): string 
 
   const commonRules = `
 🚨 GÖRSEL ÜRETİM KURALLARI (KESİNLİKLE UY):
-1. Kütüphane Bağımlılığından Kaçın: Mermaid.js veya harici JS kütüphaneleri KULLANMA.
-2. Inline SVG veya Tailwind HTML Kullan: Tüm görselleri saf SVG veya Tailwind CSS destekli HTML ile oluştur.
-3. PDF Uyumluluğu: Renkleri net (High Contrast) seç. Karmaşık gölgelerden kaçın.
-4. Kod Temizliği: "visual_content" alanına SADECE kodu yaz. Başına veya sonuna açıklama ekleme.
-5. Matematik için Unicode: SVG/HTML içinde LaTeX ($$) yerine Unicode (√, ², π, →, x², a/b) kullan.
+1. ❌ YASAK FORMATLAR (KESİNLİKLE KULLANMA):
+   - Mermaid.js: "graph TD", "flowchart", "pie", "xychart" → YASAK!
+   - LaTeX: "\\begin{tabular}", "\\hline", "$$", "\\frac" → YASAK!
+   - Markdown: "| --- |" tablo formatı → YASAK!
+   
+2. ✅ SADECE BU FORMATLARI KULLAN:
+   - HTML Tablo: <table style="..."><thead>...</thead><tbody>...</tbody></table>
+   - SVG Grafik: <svg viewBox="..." xmlns="..."><rect/><line/><text/></svg>
+   
+3. Inline SVG veya Styled HTML Kullan: Tüm görselleri saf SVG veya inline style HTML ile oluştur.
+4. PDF Uyumluluğu: Renkleri net (High Contrast) seç. Karmaşık gölgelerden kaçın.
+5. Kod Temizliği: "visual_content" alanına SADECE kodu yaz. Başına veya sonuna açıklama ekleme.
+6. Matematik için Unicode: SVG/HTML içinde LaTeX yerine Unicode (√, ², π, →, x², a/b) kullan.
 `
 
   const tableInstructions = `
@@ -1171,18 +1179,24 @@ ${visualType !== 'none' ? `
 🚨 ÇOK ÖNEMLİ - YENİ NESİL SORU FORMATI:
 Bu sorular MUTLAKA görsel içerik (${visualType}) içermelidir!
 
-Örnek JSON formatı:
-{"questions":[{"question_text":"Aşağıdaki tabloda... (tablo soru metninde görünmeli)","options":{"A":"...","B":"...","C":"...","D":"..."${isHighSchool ? ',"E":"..."' : ''}},"correct_answer":"B","explanation":"...","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}","visual_type":"${visualType}","visual_content":"$$\\\\begin{array}{|c|c|}\\\\hline ... \\\\end{array}$$"}]}
+📋 TABLO İÇİN ÖRNEK:
+{"questions":[{"question_text":"Aşağıdaki tabloda öğrencilerin ders notları verilmiştir.","options":{"A":"...","B":"...","C":"...","D":"..."${isHighSchool ? ',"E":"..."' : ''}},"correct_answer":"B","explanation":"...","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}","visual_type":"table","visual_content":"<table style=\\"width:100%;border-collapse:collapse;font-family:sans-serif;\\"><thead><tr style=\\"background:linear-gradient(135deg,#667eea,#764ba2);color:white;\\"><th style=\\"padding:12px;border:1px solid #ddd;\\">Öğrenci</th><th style=\\"padding:12px;border:1px solid #ddd;\\">Not</th></tr></thead><tbody><tr style=\\"background:#f8fafc;\\"><td style=\\"padding:10px;border:1px solid #ddd;\\">Ali</td><td style=\\"padding:10px;border:1px solid #ddd;\\">85</td></tr><tr style=\\"background:#fff;\\"><td style=\\"padding:10px;border:1px solid #ddd;\\">Ayşe</td><td style=\\"padding:10px;border:1px solid #ddd;\\">90</td></tr></tbody></table>"}]}
+
+📈 GRAFİK/AKIŞ ŞEMASI İÇİN ÖRNEK:
+{"questions":[{"question_text":"Grafikteki veriye göre...","visual_type":"chart","visual_content":"<svg viewBox=\\"0 0 400 200\\" xmlns=\\"http://www.w3.org/2000/svg\\"><rect x=\\"50\\" y=\\"20\\" width=\\"40\\" height=\\"100\\" fill=\\"#667eea\\"/><rect x=\\"110\\" y=\\"50\\" width=\\"40\\" height=\\"70\\" fill=\\"#764ba2\\"/><text x=\\"70\\" y=\\"140\\" text-anchor=\\"middle\\" font-size=\\"12\\">A</text><text x=\\"130\\" y=\\"140\\" text-anchor=\\"middle\\" font-size=\\"12\\">B</text></svg>","options":{"A":"...","B":"...","C":"...","D":"..."${isHighSchool ? ',"E":"..."' : ''}},"correct_answer":"A","explanation":"...","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"}]}
 
 ⚠️ visual_type ve visual_content alanları ZORUNLUDUR!
 ` : `{"questions":[{"question_text":"Soru metni","options":{"A":"Şık A","B":"Şık B","C":"Şık C","D":"Şık D"${isHighSchool ? ',"E":"Şık E"' : ''}},"correct_answer":"B","explanation":"Açıklama","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"}]}`}
 
-⛔ YASAK:
+⛔ YASAK (KESİNLİKLE KULLANMA):
 • JSON dışında metin yazma
 • Trailing comma (son elemandan sonra virgül)
-• Tek backslash (LaTeX için çift \\\\ kullan)
 • "Hiçbiri" veya "Hepsi" şıkkı
 • Aynı harfin sürekli doğru cevap olması
+• ❌ Mermaid.js (graph TD, flowchart, pie chart) - YASAK!
+• ❌ LaTeX tabloları (\\begin{tabular}, \\hline, $$) - YASAK!
+• ❌ Markdown tabloları (| --- |) - YASAK!
+• ✅ SADECE inline SVG ve HTML tablo kullan!
 
 ${getVisualInstructions(visualType, subject)}
 

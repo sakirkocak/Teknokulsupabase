@@ -48,15 +48,13 @@ async function main() {
         topic_id,
         difficulty,
         question_text,
-        options,
-        correct_answer,
-        explanation,
         question_image_url,
         is_active,
         times_answered,
         times_correct,
         created_at,
         lang,
+        visual_type,
         topic:topics!inner(
           id,
           main_topic,
@@ -79,39 +77,38 @@ async function main() {
       break
     }
     
-    // Typesense formatına çevir
+    // 🚀 OPTİMİZE Typesense formatına çevir - sadece arama/filtreleme için gereken alanlar
+    // Detaylar (options, explanation, correct_answer, image_url) Supabase'den çekilir
     const documents = questions.map(q => {
-      const options = q.options || {}
       const topic = q.topic || {}
       const subject = topic.subject || {}
+      const timesAnswered = q.times_answered || 0
+      const timesCorrect = q.times_correct || 0
       
       return {
         id: q.id,
         question_id: q.id,
+        topic_id: q.topic_id || '',  // 🆕 Topic ID (filtre için)
         question_text: q.question_text || '',
-        explanation: q.explanation || '',
-        option_a: options.A || options.a || '',
-        option_b: options.B || options.b || '',
-        option_c: options.C || options.c || '',
-        option_d: options.D || options.d || '',
-        option_e: options.E || options.e || '',
-        correct_answer: q.correct_answer || '',
+        // Filtreleme alanları
         difficulty: q.difficulty || 'medium',
-        subject_id: subject.id || '',
         subject_code: subject.code || '',
         subject_name: subject.name || '',
-        topic_id: topic.id || '',
         main_topic: topic.main_topic || '',
         sub_topic: topic.sub_topic || '',
         grade: topic.grade || 0,
         has_image: !!q.question_image_url,
-        image_url: q.question_image_url || '',
-        times_answered: q.times_answered || 0,
-        times_correct: q.times_correct || 0,
-        success_rate: q.times_answered > 0 
-          ? (q.times_correct / q.times_answered) * 100 
-          : 0,
         lang: q.lang || 'tr',
+        // 🆕 Yeni Nesil Soru alanları
+        is_new_generation: !!q.visual_type && q.visual_type !== 'none',
+        visual_type: q.visual_type || '',
+        // İstatistikler
+        times_answered: timesAnswered,
+        times_correct: timesCorrect,
+        success_rate: timesAnswered > 0 
+          ? Math.round((timesCorrect / timesAnswered) * 100 * 100) / 100
+          : 0,
+        // Sıralama
         created_at: q.created_at 
           ? new Date(q.created_at).getTime() 
           : Date.now()

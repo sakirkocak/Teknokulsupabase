@@ -30,6 +30,7 @@ async function updateQuestionsSchema() {
     
     // Yeni alanlar
     const newFields = [
+      { name: 'topic_id', type: 'string', facet: true, optional: true },
       { name: 'is_new_generation', type: 'bool', facet: true, optional: true },
       { name: 'visual_type', type: 'string', facet: true, optional: true }
     ]
