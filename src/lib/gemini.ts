@@ -704,21 +704,24 @@ const getVisualInstructions = (visualType: VisualType, subject: string): string 
 
   const visualTypeInstructions: Record<string, string> = {
     'table': `
-📊 TABLO İÇEREN SORU (YENİ NESİL):
-• Soru metninde LaTeX tablo kullan
-• Tablo formatı:
-$$
-\\\\begin{array}{|c|c|c|}
-\\\\hline
-\\\\text{Başlık 1} & \\\\text{Başlık 2} & \\\\text{Başlık 3} \\\\\\\\
-\\\\hline
-\\\\text{Veri 1} & \\\\text{Veri 2} & \\\\text{Veri 3} \\\\\\\\
-\\\\hline
-\\\\end{array}
-$$
-• "visual_type": "table" olarak belirt
-• "visual_content" alanına tablo kodunu AYRICA yaz
-• Tablo verileri soruyla DOĞRUDAN ilgili olmalı`,
+📊 TABLO İÇEREN SORU (YENİ NESİL) - ZORUNLU:
+🚨 HER SORUDA MUTLAKA TABLO OLMALI!
+
+1. SORU METNİNDE tablo verilerini açıkla (örn: "Aşağıdaki tabloda X ve Y değerleri verilmiştir...")
+2. "visual_content" alanına LaTeX tablo kodunu YAZ
+3. "visual_type": "table" olarak belirt
+
+LaTeX Tablo Formatı:
+$$\\\\begin{array}{|c|c|c|}\\\\hline \\\\textbf{Sütun1} & \\\\textbf{Sütun2} & \\\\textbf{Sütun3} \\\\\\\\ \\\\hline Veri1 & Veri2 & Veri3 \\\\\\\\ \\\\hline Veri4 & Veri5 & Veri6 \\\\\\\\ \\\\hline \\\\end{array}$$
+
+ÖRNEK:
+{
+  "question_text": "Aşağıdaki tabloda bir sınıftaki öğrencilerin aldıkları notlar gösterilmektedir. Buna göre sınıf ortalaması kaçtır?",
+  "visual_type": "table",
+  "visual_content": "$$\\\\begin{array}{|c|c|}\\\\hline \\\\textbf{Öğrenci} & \\\\textbf{Not} \\\\\\\\ \\\\hline Ali & 85 \\\\\\\\ \\\\hline Ayşe & 90 \\\\\\\\ \\\\hline Mehmet & 75 \\\\\\\\ \\\\hline \\\\end{array}$$"
+}
+
+⚠️ visual_content OLMADAN soru KABUL EDİLMEZ!`,
 
     'chart': `
 📈 GRAFİK İÇEREN SORU (YENİ NESİL):
@@ -1211,7 +1214,15 @@ ${subjectGuidelines}
 ════════════════════════════════════════════════════════════
 📤 ÇIKTI - SADECE JSON (başka metin YASAK)
 ════════════════════════════════════════════════════════════
-{"questions":[{"question_text":"Soru metni","options":{"A":"Şık A","B":"Şık B","C":"Şık C","D":"Şık D"${isHighSchool ? ',"E":"Şık E"' : ''}},"correct_answer":"B","explanation":"Açıklama","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"${visualType !== 'none' ? ',"visual_type":"table","visual_content":"GÖRSEL KODU BURAYA"' : ''}}]}
+${visualType !== 'none' ? `
+🚨 ÇOK ÖNEMLİ - YENİ NESİL SORU FORMATI:
+Bu sorular MUTLAKA görsel içerik (${visualType}) içermelidir!
+
+Örnek JSON formatı:
+{"questions":[{"question_text":"Aşağıdaki tabloda... (tablo soru metninde görünmeli)","options":{"A":"...","B":"...","C":"...","D":"..."${isHighSchool ? ',"E":"..."' : ''}},"correct_answer":"B","explanation":"...","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}","visual_type":"${visualType}","visual_content":"$$\\\\begin{array}{|c|c|}\\\\hline ... \\\\end{array}$$"}]}
+
+⚠️ visual_type ve visual_content alanları ZORUNLUDUR!
+` : `{"questions":[{"question_text":"Soru metni","options":{"A":"Şık A","B":"Şık B","C":"Şık C","D":"Şık D"${isHighSchool ? ',"E":"Şık E"' : ''}},"correct_answer":"B","explanation":"Açıklama","difficulty":"${difficulty}","bloom_level":"${bloomPriority[difficulty][0]}"}]}`}
 
 ⛔ YASAK:
 • JSON dışında metin yazma
