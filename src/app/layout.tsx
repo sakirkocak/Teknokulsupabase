@@ -98,13 +98,13 @@ export const metadata: Metadata = {
       'max-snippet': -1,
     },
   },
+  // Next.js App Router: src/app/icon.png ve apple-icon.png otomatik tanınır
   icons: {
     icon: [
-      { url: '/images/favicon.ico' },
-      { url: '/images/logo.png', type: 'image/png' },
+      { url: '/icon.png', sizes: '32x32', type: 'image/png' },
     ],
     apple: [
-      { url: '/images/logo.png' },
+      { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   category: 'education',
