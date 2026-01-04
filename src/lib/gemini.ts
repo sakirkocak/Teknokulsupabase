@@ -1,6 +1,179 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+
+// =====================================================
+// YARDIMCI FONKSİYONLAR - LaTeX & Retry
+// =====================================================
+
+/**
+ * Sleep fonksiyonu - retry mekanizması için
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * Retry mekanizması - hata durumunda otomatik yeniden deneme
+ * Exponential backoff ile 3 deneme yapar
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  context: string = 'operation'
+): Promise<T> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      lastError = error
+      console.warn(`⚠️ ${context} - Deneme ${attempt}/${maxRetries} başarısız:`, error.message)
+      
+      if (attempt < maxRetries) {
+        const delay = 500 * Math.pow(2, attempt - 1) // 500ms, 1000ms, 2000ms
+        console.log(`🔄 ${delay}ms sonra tekrar deneniyor...`)
+        await sleep(delay)
+      }
+    }
+  }
+  
+  throw lastError || new Error(`${context} - Tüm denemeler başarısız oldu`)
+}
+
+/**
+ * LaTeX ifadelerini normalize eder
+ * Gemini'nin tutarsız backslash kullanımını düzeltir
+ */
+function normalizeLatex(text: string): string {
+  if (!text || typeof text !== 'string') return text
+  
+  let normalized = text
+  
+  // 1. Üç veya daha fazla ardışık backslash'i iki backslash'e indir
+  normalized = normalized.replace(/\\{3,}/g, '\\\\')
+  
+  // 2. Tek backslash + LaTeX komutu -> çift backslash + komut
+  // Ama zaten çift olanları değiştirme
+  const latexCommands = [
+    'frac', 'sqrt', 'times', 'div', 'pm', 'mp', 'cdot', 'ast',
+    'leq', 'geq', 'neq', 'approx', 'equiv', 'sim',
+    'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'theta', 'lambda', 'mu', 'pi', 'sigma', 'omega',
+    'sum', 'prod', 'int', 'oint', 'lim', 'inf', 'sup',
+    'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'ln', 'exp',
+    'text', 'textbf', 'textit', 'mathrm', 'mathbf', 'mathit',
+    'left', 'right', 'big', 'Big', 'bigg', 'Bigg',
+    'begin', 'end', 'array', 'matrix', 'pmatrix', 'bmatrix',
+    'rightarrow', 'leftarrow', 'Rightarrow', 'Leftarrow', 'leftrightarrow',
+    'infty', 'partial', 'nabla', 'forall', 'exists',
+    'in', 'notin', 'subset', 'supset', 'cup', 'cap',
+    'ldots', 'cdots', 'vdots', 'ddots',
+    'overline', 'underline', 'hat', 'bar', 'vec', 'tilde',
+    'quad', 'qquad', 'space', 'hspace', 'vspace'
+  ]
+  
+  // Her LaTeX komutu için kontrol et
+  for (const cmd of latexCommands) {
+    // Tek backslash + komut (çift backslash olmayan) -> çift backslash + komut
+    const singleBackslashPattern = new RegExp(`(?<!\\\\)\\\\${cmd}(?![a-zA-Z])`, 'g')
+    normalized = normalized.replace(singleBackslashPattern, `\\\\${cmd}`)
+  }
+  
+  // 3. Sayısal subscript/superscript düzeltmeleri
+  // _{...} ve ^{...} formatlarını koru
+  normalized = normalized.replace(/(?<!\\)\\([_^])/g, '\\\\$1')
+  
+  // 4. Bozuk escape sequence'ları düzelt
+  // \t, \r, \f gibi yanlışlıkla oluşan escape'leri geri al
+  normalized = normalized
+    .replace(/(?<!\\)\t/g, '\\\\t')  // Tab -> \t (literal)
+    .replace(/(?<!\\)\r/g, '\\\\r')  // CR -> \r (literal)
+    .replace(/(?<!\\)\f/g, '\\\\f')  // FF -> \f (literal)
+  
+  return normalized
+}
+
+/**
+ * JSON string içindeki LaTeX'i normalize eder (parse öncesi)
+ * JSON parse hatalarını önlemek için
+ */
+function normalizeLatexInJson(jsonStr: string): string {
+  if (!jsonStr) return jsonStr
+  
+  let result = jsonStr
+  
+  // 1. Önce tüm string değerlerini bul ve içlerindeki LaTeX'i normalize et
+  // JSON string içindeki çift tırnak arasındaki değerleri yakala
+  result = result.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match, content) => {
+    // String içeriğini normalize et
+    let normalized = content
+    
+    // Üç+ backslash -> iki backslash (JSON içinde \\\ -> \\)
+    normalized = normalized.replace(/\\{4,}/g, '\\\\')
+    
+    // LaTeX komutları için tek backslash'leri kontrol et
+    // JSON'da \\ zaten tek backslash demek, \\\\ ise çift backslash
+    // Gemini bazen \\\ üretiyor (JSON'da 1.5 backslash gibi geçersiz)
+    normalized = normalized.replace(/\\{3}([a-zA-Z])/g, '\\\\$1')
+    
+    return `"${normalized}"`
+  })
+  
+  // 2. Control karakterlerini temizle
+  result = result
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ')  // Control chars (tab ve newline hariç)
+    .replace(/\t/g, ' ')  // Tab -> space
+    .replace(/\r\n/g, ' ')  // CRLF -> space
+    .replace(/\r/g, ' ')   // CR -> space
+    .replace(/\n/g, ' ')   // LF -> space
+  
+  // 3. Unicode sorunlarını düzelt
+  result = result
+    .replace(/\u00A0/g, ' ')  // Non-breaking space
+    .replace(/\u2028/g, ' ')  // Line separator
+    .replace(/\u2029/g, ' ')  // Paragraph separator
+    .replace(/[\uFFFD\uFFFE\uFFFF]/g, '')  // Replacement chars
+  
+  // 4. Çoklu boşlukları tek boşluğa indir (JSON değerlerinde)
+  result = result.replace(/  +/g, ' ')
+  
+  return result
+}
+
+/**
+ * Curriculum soruları için JSON Schema
+ * Gemini Structured Output için kullanılır
+ */
+const curriculumQuestionSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    questions: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          question_text: { type: SchemaType.STRING, description: 'Soru metni' },
+          options: {
+            type: SchemaType.OBJECT,
+            properties: {
+              A: { type: SchemaType.STRING },
+              B: { type: SchemaType.STRING },
+              C: { type: SchemaType.STRING },
+              D: { type: SchemaType.STRING },
+              E: { type: SchemaType.STRING, nullable: true }
+            },
+            required: ['A', 'B', 'C', 'D']
+          },
+          correct_answer: { type: SchemaType.STRING, description: 'Doğru cevap harfi (A, B, C, D veya E)' },
+          explanation: { type: SchemaType.STRING, description: 'Açıklama' },
+          difficulty: { type: SchemaType.STRING, description: 'Zorluk seviyesi' },
+          bloom_level: { type: SchemaType.STRING, description: 'Bloom taksonomisi seviyesi' }
+        },
+        required: ['question_text', 'options', 'correct_answer', 'explanation', 'difficulty', 'bloom_level']
+      }
+    }
+  },
+  required: ['questions']
+}
 
 // Gemini 3 Flash - Ocak 2025 bilgi tabanı, gelişmiş akıl yürütme
 export const geminiModel = genAI.getGenerativeModel({ 
@@ -945,12 +1118,36 @@ ${subjectGuidelines}
 
 ŞİMDİ ${count} ADET MÜKEMMEL ${subject.toUpperCase()} SORUSU ÜRET:`
 
-  try {
-    console.log(`AI Soru Üretimi başlatılıyor: ${grade}. Sınıf ${subject} - ${topic}`)
+  // 🚀 Retry mekanizması ile soru üretimi
+  return await withRetry(async () => {
+    console.log(`AI Soru Üretimi başlatılıyor: ${grade}. Sınıf ${subject} - ${topic} [${lang.toUpperCase()}]`)
     
-    const result = await geminiModel.generateContent(prompt)
-    const response = await result.response
-    let text = response.text()
+    // 📤 Gemini API çağrısı - Structured Output denemesi
+    let text = ''
+    let useStructuredOutput = true
+    
+    try {
+      // Önce Structured Output ile dene (daha güvenilir JSON)
+      const result = await geminiModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          // @ts-ignore - responseSchema yeni özellik
+          responseSchema: curriculumQuestionSchema
+        }
+      })
+      const response = await result.response
+      text = response.text()
+      console.log('✅ Structured Output kullanıldı')
+    } catch (structuredError: any) {
+      // Structured Output başarısız olursa normal mod ile dene
+      console.warn('⚠️ Structured Output başarısız, normal mod deneniyor:', structuredError.message)
+      useStructuredOutput = false
+      
+      const result = await geminiModel.generateContent(prompt)
+      const response = await result.response
+      text = response.text()
+    }
     
     console.log('AI Ham Yanıt (ilk 500 karakter):', text.substring(0, 500))
     
@@ -986,50 +1183,56 @@ ${subjectGuidelines}
       throw new Error('AI yanıtında JSON bulunamadı')
     }
     
-    // 🛡️ Gelişmiş JSON temizleme
-    jsonStr = jsonStr
-      .replace(/,(\s*[}\]])/g, '$1') // Trailing commas
-      .replace(/[\x00-\x1F\x7F]/g, ' ') // Control characters
-      .replace(/\n/g, ' ')
-      .replace(/\r/g, '')
-      .replace(/\t/g, ' ')
-      .replace(/\u00A0/g, ' ') // Non-breaking space
-      .replace(/\u2028/g, ' ') // Line separator
-      .replace(/\u2029/g, ' ') // Paragraph separator
-      .replace(/\s+/g, ' ') // Multiple spaces to single
+    // 🛡️ GELİŞMİŞ JSON + LaTeX TEMİZLEME
+    // 1. LaTeX normalize et (yeni fonksiyon)
+    jsonStr = normalizeLatexInJson(jsonStr)
     
-    // LaTeX backslash'lerini düzelt - JSON'da tek \ geçersiz
-    // \frac, \sqrt, \cdot, \times, \div gibi LaTeX komutlarını çift \\ yap
-    jsonStr = jsonStr.replace(/\\([a-zA-Z]+)/g, (match, cmd) => {
-      // Zaten valid JSON escape sequence ise dokunma
-      const validEscapes = ['n', 'r', 't', 'b', 'f', 'u']
-      if (validEscapes.includes(cmd) || cmd.startsWith('u')) {
-        return match
-      }
-      // LaTeX komutu ise çift backslash yap
-      return '\\\\' + cmd
-    })
+    // 2. Trailing commas temizle
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1')
     
-    // Tek kalan backslash'leri de düzelt (örn: \$ gibi)
-    jsonStr = jsonStr.replace(/\\([^\\nrtbfu"])/g, '\\\\$1')
-    
-    // 🛡️ Kırık Unicode karakterleri temizle
-    jsonStr = jsonStr.replace(/[\uFFFD\uFFFE\uFFFF]/g, '')
+    // 3. Çoklu boşlukları tek boşluğa indir
+    jsonStr = jsonStr.replace(/\s+/g, ' ')
     
     // 🛡️ Çoklu parse denemesi
     let data: any = null
-    let parseAttempts = [
+    const parseAttempts = [
+      // Deneme 1: Direkt parse
       () => JSON.parse(jsonStr),
-      // Trailing comma farklı pattern
+      
+      // Deneme 2: Trailing comma farklı pattern
       () => JSON.parse(jsonStr.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']')),
-      // Tek tırnak varsa çift tırnağa çevir
+      
+      // Deneme 3: Tek tırnak varsa çift tırnağa çevir
       () => JSON.parse(jsonStr.replace(/'/g, '"')),
+      
+      // Deneme 4: Backslash'leri daha agresif temizle
+      () => {
+        let cleaned = jsonStr
+          // Üçlü backslash -> çift
+          .replace(/\\\\\\/g, '\\\\')
+          // Dört+ backslash -> çift
+          .replace(/\\{4,}/g, '\\\\')
+        return JSON.parse(cleaned)
+      },
+      
+      // Deneme 5: Tüm backslash'leri kaldır (son çare - LaTeX bozulur ama parse olur)
+      () => {
+        console.warn('⚠️ Son çare: Backslash temizleme uygulanıyor')
+        let cleaned = jsonStr.replace(/\\+([a-zA-Z]+)/g, '$1')
+        return JSON.parse(cleaned)
+      }
     ]
     
     let lastParseError: any = null
+    let attemptIndex = 0
+    
     for (const attempt of parseAttempts) {
+      attemptIndex++
       try {
         data = attempt()
+        if (attemptIndex > 1) {
+          console.log(`✅ JSON parse başarılı (deneme ${attemptIndex})`)
+        }
         break
       } catch (e) {
         lastParseError = e
@@ -1037,42 +1240,50 @@ ${subjectGuidelines}
     }
     
     if (!data) {
-      console.error('JSON Parse Hatası (tüm denemeler başarısız):', lastParseError?.message)
+      console.error('❌ JSON Parse Hatası (tüm denemeler başarısız):', lastParseError?.message)
       console.error('Temizlenmiş JSON (ilk 800 karakter):', jsonStr.substring(0, 800))
       throw new Error(`JSON parse hatası: ${lastParseError?.message}. AI yanıtı geçersiz format içeriyor.`)
     }
     
     const questions = data.questions || []
     
-    console.log(`${questions.length} soru başarıyla parse edildi`)
+    console.log(`✅ ${questions.length} soru başarıyla parse edildi`)
     
-    // 🛡️ Soruları doğrula ve düzelt - eksik alanları kontrol et
-    return questions.map((q: any, idx: number) => {
+    // 🛡️ Soruları doğrula, düzelt ve LaTeX normalize et
+    const validatedQuestions = questions.map((q: any, idx: number) => {
       // Zorunlu alanlar kontrolü
       if (!q.question_text && !q.question) {
-        console.warn(`Soru ${idx + 1}: question_text boş, atlanıyor`)
+        console.warn(`⚠️ Soru ${idx + 1}: question_text boş, atlanıyor`)
         return null
       }
       
+      // LaTeX normalize et
+      const questionText = normalizeLatex(String(q.question_text || q.question || '').trim())
+      const explanation = normalizeLatex(String(q.explanation || '').trim())
+      
       return {
-        question_text: String(q.question_text || q.question || '').trim(),
+        question_text: questionText,
         options: {
-          A: String(q.options?.A || q.options?.a || '').trim(),
-          B: String(q.options?.B || q.options?.b || '').trim(),
-          C: String(q.options?.C || q.options?.c || '').trim(),
-          D: String(q.options?.D || q.options?.d || '').trim(),
-          ...(isHighSchool && { E: String(q.options?.E || q.options?.e || '').trim() })
+          A: normalizeLatex(String(q.options?.A || q.options?.a || '').trim()),
+          B: normalizeLatex(String(q.options?.B || q.options?.b || '').trim()),
+          C: normalizeLatex(String(q.options?.C || q.options?.c || '').trim()),
+          D: normalizeLatex(String(q.options?.D || q.options?.d || '').trim()),
+          ...(isHighSchool && { E: normalizeLatex(String(q.options?.E || q.options?.e || '').trim()) })
         },
         correct_answer: String(q.correct_answer || q.answer || 'A').toUpperCase().charAt(0),
-        explanation: String(q.explanation || '').trim(),
+        explanation: explanation,
         difficulty: q.difficulty || difficulty,
         bloom_level: q.bloom_level || 'kavrama'
       }
     }).filter(Boolean) as CurriculumQuestion[]
-  } catch (error: any) {
-    console.error('Müfredat sorusu üretme hatası:', error)
-    throw error
-  }
+    
+    if (validatedQuestions.length === 0) {
+      throw new Error('Hiç geçerli soru üretilemedi')
+    }
+    
+    return validatedQuestions
+    
+  }, 3, `${grade}. Sınıf ${subject} soru üretimi`)
 }
 
 // =====================================================
