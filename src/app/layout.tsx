@@ -3,9 +3,8 @@ import Script from 'next/script'
 import { Suspense } from 'react'
 import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import JsonLdSchema from '@/components/JsonLdSchema'
-import FeedbackWidget from '@/components/FeedbackWidget'
-import { TeknoTeacherChat } from '@/components/TeknoTeacher'
 import { MotionProvider } from '@/components/MotionProvider'
+import { LazyWidgets } from '@/components/LazyWidgets'
 import './globals.css'
 
 const baseUrl = 'https://www.teknokul.com.tr'
@@ -174,11 +173,8 @@ export default function RootLayout({
           {children}
         </MotionProvider>
         
-        {/* Geri Bildirim Widget */}
-        <FeedbackWidget />
-        
-        {/* TeknoÖğretmen AI Asistan */}
-        <TeknoTeacherChat />
+        {/* Lazy yüklenen widget'lar - sayfa yüklendikten sonra */}
+        <LazyWidgets />
       </body>
     </html>
   )
