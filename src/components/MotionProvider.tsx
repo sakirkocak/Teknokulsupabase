@@ -5,31 +5,34 @@ import { useEffect, useState } from 'react'
 
 /**
  * Global Framer Motion ayarları
- * INP optimizasyonu için animasyonları cihaza göre ayarlar
+ * Mobilde animasyonları KAPAT - performans için kritik
  */
 export function MotionProvider({ children }: { children: React.ReactNode }) {
-  const [reducedMotion, setReducedMotion] = useState(false)
+  const [shouldReduceMotion, setShouldReduceMotion] = useState(true) // Default: animasyonlar kapalı
   
   useEffect(() => {
+    // Mobil cihaz mı kontrol et (touch ekran)
+    const isMobile = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+    
     // Kullanıcı reduced motion tercih ediyor mu?
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReducedMotion(mediaQuery.matches)
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     
-    // Değişiklikleri dinle
-    const handler = (e: MediaQueryListEvent) => setReducedMotion(e.matches)
-    mediaQuery.addEventListener('change', handler)
+    // Düşük performanslı cihaz mı? (4 core altı veya 4GB altı RAM)
+    const isLowEnd = navigator.hardwareConcurrency < 4 || 
+                     (navigator as any).deviceMemory < 4
     
-    return () => mediaQuery.removeEventListener('change', handler)
+    // Mobil, reduced motion tercihi veya düşük performanslı cihazda animasyonları kapat
+    setShouldReduceMotion(isMobile || prefersReducedMotion || isLowEnd)
   }, [])
   
   return (
     <MotionConfig
-      reducedMotion={reducedMotion ? 'always' : 'never'}
+      reducedMotion={shouldReduceMotion ? 'always' : 'never'}
       transition={{
-        // Daha hızlı default transition - INP için önemli
+        // Çok hızlı geçişler
         type: 'tween',
-        duration: 0.2,
-        ease: 'easeOut'
+        duration: shouldReduceMotion ? 0 : 0.15,
+        ease: 'linear'
       }}
     >
       {children}
