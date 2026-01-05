@@ -238,38 +238,52 @@ function fixLatexEscapes(obj: any): any {
   if (typeof obj === 'string') {
     let fixed = obj
     
-    // Bozuk escape karakterlerini düzelt
-    // \t (tab) -> \t (literal)
-    fixed = fixed.replace(/\t/g, '\\t')
-    // \r (carriage return) -> \r (literal)  
-    fixed = fixed.replace(/\r/g, '\\r')
-    // \f (form feed) -> \f (literal)
-    fixed = fixed.replace(/\f/g, '\\f')
-    // \n (newline) zaten MathRenderer'da <br> yapılıyor, dokunmuyoruz
+    // 🛡️ ÖNCELİKLİ: Form Feed ve Tab karakterlerini LaTeX komutuna çevir
+    // Bu karakterler JSON.parse() sırasında \f ve \t escape sequence'larından oluşuyor
+    const FORM_FEED = String.fromCharCode(0x0C) // \f
+    const TAB = String.fromCharCode(0x09) // \t
     
-    // Yaygın bozuk pattern'leri düzelt
-    // "imes" -> "\times" (çarpma)
-    fixed = fixed.replace(/imes/g, '\\times')
+    // Form Feed + rac -> \frac (kesir)
+    fixed = fixed.split(FORM_FEED + 'rac').join('\\frac')
+    // Tab + imes -> \times (çarpma)
+    fixed = fixed.split(TAB + 'imes').join('\\times')
+    // Tab + ext -> \text (metin)
+    fixed = fixed.split(TAB + 'ext').join('\\text')
+    
+    // Kalan bozuk escape karakterlerini de temizle
+    fixed = fixed.replace(/\t/g, ' ')  // Tab -> boşluk
+    fixed = fixed.replace(/\r/g, '')   // CR -> sil
+    fixed = fixed.replace(/\f/g, '')   // FF -> sil
+    
+    // Yaygın bozuk pattern'leri düzelt (backslash olmadan yazılmış LaTeX komutları)
+    // "imes" -> "\times" (çarpma) - ama "times" kelimesi değil
+    fixed = fixed.replace(/([^a-zA-Z\\])imes([^a-zA-Z])/g, '$1\\times$2')
     // "rac{" -> "\frac{" (kesir)
-    fixed = fixed.replace(/rac\{/g, '\\frac{')
+    fixed = fixed.replace(/([^a-zA-Z\\])rac\{/g, '$1\\frac{')
     // "ightarrow" -> "\rightarrow" (ok)
     fixed = fixed.replace(/ightarrow/g, '\\rightarrow')
+    // "eftarrow" -> "\leftarrow" (ok)
+    fixed = fixed.replace(/eftarrow/g, '\\leftarrow')
     // "ext{" -> "\text{" (metin)
-    fixed = fixed.replace(/ext\{/g, '\\text{')
-    // "sqrt{" -> "\sqrt{" (karekök)
-    fixed = fixed.replace(/sqrt\{/g, '\\sqrt{')
+    fixed = fixed.replace(/([^a-zA-Z\\])ext\{/g, '$1\\text{')
+    // "sqrt" -> "\sqrt" (karekök)
+    fixed = fixed.replace(/([^a-zA-Z\\])sqrt/g, '$1\\sqrt')
     // "cdot" -> "\cdot" (nokta çarpım)
-    fixed = fixed.replace(/([^\\])cdot/g, '$1\\cdot')
+    fixed = fixed.replace(/([^a-zA-Z\\])cdot/g, '$1\\cdot')
     // "div" -> "\div" (bölme) - sadece boşlukla çevrili olanlar
     fixed = fixed.replace(/ div /g, ' \\div ')
     // "pm" -> "\pm" (artı/eksi)
     fixed = fixed.replace(/ pm /g, ' \\pm ')
     // "leq" -> "\leq" (küçük eşit)
-    fixed = fixed.replace(/([^\\])leq/g, '$1\\leq')
+    fixed = fixed.replace(/([^a-zA-Z\\])leq/g, '$1\\leq')
     // "geq" -> "\geq" (büyük eşit)
-    fixed = fixed.replace(/([^\\])geq/g, '$1\\geq')
+    fixed = fixed.replace(/([^a-zA-Z\\])geq/g, '$1\\geq')
     // "neq" -> "\neq" (eşit değil)
-    fixed = fixed.replace(/([^\\])neq/g, '$1\\neq')
+    fixed = fixed.replace(/([^a-zA-Z\\])neq/g, '$1\\neq')
+    // "approx" -> "\approx" (yaklaşık)
+    fixed = fixed.replace(/([^a-zA-Z\\])approx/g, '$1\\approx')
+    // "infty" -> "\infty" (sonsuz)
+    fixed = fixed.replace(/([^a-zA-Z\\])infty/g, '$1\\infty')
     
     return fixed
   }
@@ -1383,7 +1397,8 @@ ${getVisualInstructions(visualType, subject)}
       throw new Error('Hiç geçerli soru üretilemedi')
     }
     
-    return validatedQuestions
+    // 🛡️ Son adım: Bozuk escape karakterlerini düzelt (\f, \t vb.)
+    return fixLatexEscapes(validatedQuestions)
     
   }, 3, `${grade}. Sınıf ${subject} soru üretimi`)
 }
