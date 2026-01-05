@@ -5,6 +5,7 @@ import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import JsonLdSchema from '@/components/JsonLdSchema'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import { TeknoTeacherChat } from '@/components/TeknoTeacher'
+import { MotionProvider } from '@/components/MotionProvider'
 import './globals.css'
 
 const baseUrl = 'https://www.teknokul.com.tr'
@@ -160,7 +161,10 @@ export default function RootLayout({
           <GoogleAdsTracker />
         </Suspense>
         
-        {children}
+        {/* Framer Motion Performans Optimizasyonu */}
+        <MotionProvider>
+          {children}
+        </MotionProvider>
         
         {/* Geri Bildirim Widget */}
         <FeedbackWidget />

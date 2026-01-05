@@ -11,6 +11,44 @@
   body {
     @apply bg-surface-50 text-surface-900 antialiased;
   }
+  
+  /* 🚀 INP Performans Optimizasyonları */
+  
+  /* Reduced motion tercih eden kullanıcılar için animasyonları kapat */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+  
+  /* Mobil cihazlarda hover efektlerini basitleştir */
+  @media (hover: none) and (pointer: coarse) {
+    button, a, [role="button"] {
+      transition-duration: 0.1s !important;
+    }
+  }
+  
+  /* GPU hızlandırma için transform kullan */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+  
+  /* Layout thrashing önleme */
+  .contain-layout {
+    contain: layout;
+  }
+  
+  .contain-paint {
+    contain: paint;
+  }
+  
+  .contain-strict {
+    contain: strict;
+  }
 }
 
 @layer components {
