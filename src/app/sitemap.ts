@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
-const QUESTIONS_PER_SITEMAP = 10000
+const QUESTIONS_PER_SITEMAP = 1000
 const baseUrl = 'https://www.teknokul.com.tr'
 
 // Sitemap için service role client (build zamanında çalışır)
@@ -43,7 +43,7 @@ export default async function sitemap({ id }: { id: number }): Promise<MetadataR
     return await getStaticAndDynamicPages(supabase)
   }
   
-  // ID 1+ = Soru sayfaları (her biri 10.000 soru)
+  // ID 1+ = Soru sayfaları (her biri 1.000 soru)
   return await getQuestionPages(supabase, id)
 }
 
@@ -286,7 +286,7 @@ async function getStaticAndDynamicPages(supabase: any): Promise<MetadataRoute.Si
   ]
 }
 
-// Soru sayfaları - her sitemap için 10.000 soru
+// Soru sayfaları - her sitemap için 1.000 soru
 async function getQuestionPages(supabase: any, sitemapId: number): Promise<MetadataRoute.Sitemap> {
   const offset = (sitemapId - 1) * QUESTIONS_PER_SITEMAP
   
