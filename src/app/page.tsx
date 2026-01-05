@@ -12,6 +12,7 @@ const formatNumber = (num: number): string => {
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
+import { getOptimizedAvatarUrl } from '@/lib/image-utils'
 import { testimonials, activityMessages, universities, demoCoaches } from '@/lib/demoData'
 // ⚡ ŞIMŞEK HIZ - Doğrudan Typesense'e bağlan!
 import { getStatsFast, isTypesenseEnabled, getQuestionCountsByGradeFast } from '@/lib/typesense/browser-client'
@@ -883,7 +884,13 @@ export default function HomePage() {
                     className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium hover:shadow-lg transition-all text-sm"
                   >
                     {userProfile.avatar_url ? (
-                      <img src={userProfile.avatar_url} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      <img 
+                        src={getOptimizedAvatarUrl(userProfile.avatar_url, 32) || ''} 
+                        alt="" 
+                        className="w-5 h-5 rounded-full object-cover"
+                        width={20}
+                        height={20}
+                      />
                     ) : (
                       <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
                         {getInitials(userProfile.full_name)}
@@ -1047,7 +1054,13 @@ export default function HomePage() {
                     className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium"
                   >
                     {userProfile.avatar_url ? (
-                      <img src={userProfile.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                      <img 
+                        src={getOptimizedAvatarUrl(userProfile.avatar_url, 32) || ''} 
+                        alt="" 
+                        className="w-6 h-6 rounded-full object-cover"
+                        width={24}
+                        height={24}
+                      />
                     ) : (
                       <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
                         {getInitials(userProfile.full_name)}
@@ -1504,7 +1517,14 @@ export default function HomePage() {
                             <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl rotate-3 absolute inset-0 opacity-50 blur-sm group-hover:rotate-6 transition-transform"></div>
                             <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center text-white text-3xl font-bold shadow-xl overflow-hidden border-4 border-white/30 relative group-hover:scale-105 transition-transform">
                               {coach.profile?.avatar_url ? (
-                                <img src={coach.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                <img 
+                                  src={getOptimizedAvatarUrl(coach.profile.avatar_url, 128) || ''} 
+                                  alt="" 
+                                  className="w-full h-full object-cover"
+                                  width={96}
+                                  height={96}
+                                  loading="lazy"
+                                />
                               ) : (
                                 getInitials(coach.profile?.full_name || coach.full_name)
                               )}
@@ -1829,7 +1849,14 @@ export default function HomePage() {
                     <div className="text-4xl mb-2">🥈</div>
                     <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-xl overflow-hidden border-4 border-white shadow-lg">
                       {topLeaders[1].avatar ? (
-                        <img src={topLeaders[1].avatar} alt="" className="w-full h-full object-cover" />
+                        <img 
+                          src={getOptimizedAvatarUrl(topLeaders[1].avatar, 80) || ''} 
+                          alt="" 
+                          className="w-full h-full object-cover"
+                          width={64}
+                          height={64}
+                          loading="lazy"
+                        />
                       ) : (
                         getInitials(topLeaders[1].name)
                       )}
@@ -1854,7 +1881,14 @@ export default function HomePage() {
                     <div className="text-5xl mb-2">👑</div>
                     <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-3 text-white font-bold text-2xl shadow-lg shadow-yellow-500/30 overflow-hidden border-4 border-white">
                       {topLeaders[0].avatar ? (
-                        <img src={topLeaders[0].avatar} alt="" className="w-full h-full object-cover" />
+                        <img 
+                          src={getOptimizedAvatarUrl(topLeaders[0].avatar, 100) || ''} 
+                          alt="" 
+                          className="w-full h-full object-cover"
+                          width={80}
+                          height={80}
+                          loading="lazy"
+                        />
                       ) : (
                         getInitials(topLeaders[0].name)
                       )}
@@ -1880,7 +1914,14 @@ export default function HomePage() {
                     <div className="text-4xl mb-2">🥉</div>
                     <div className="w-16 h-16 bg-gradient-to-br from-amber-600 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-2 text-white font-bold text-xl overflow-hidden border-4 border-white shadow-lg">
                       {topLeaders[2].avatar ? (
-                        <img src={topLeaders[2].avatar} alt="" className="w-full h-full object-cover" />
+                        <img 
+                          src={getOptimizedAvatarUrl(topLeaders[2].avatar, 80) || ''} 
+                          alt="" 
+                          className="w-full h-full object-cover"
+                          width={64}
+                          height={64}
+                          loading="lazy"
+                        />
                       ) : (
                         getInitials(topLeaders[2].name)
                       )}
@@ -1907,7 +1948,14 @@ export default function HomePage() {
                       <span className="w-8 text-lg font-bold text-surface-400">{leader.rank}.</span>
                       <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden">
                         {leader.avatar ? (
-                          <img src={leader.avatar} alt="" className="w-full h-full object-cover" />
+                          <img 
+                            src={getOptimizedAvatarUrl(leader.avatar, 48) || ''} 
+                            alt="" 
+                            className="w-full h-full object-cover"
+                            width={40}
+                            height={40}
+                            loading="lazy"
+                          />
                         ) : (
                           getInitials(leader.name)
                         )}

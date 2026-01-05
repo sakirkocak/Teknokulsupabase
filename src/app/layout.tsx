@@ -128,7 +128,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="tr">
-      <head />
+      <head>
+        {/* 🚀 Preconnect - Erken bağlantı kurarak LCP'yi iyileştir */}
+        <link rel="preconnect" href="https://kc8bx4n1ldm30q6fp-1.a1.typesense.net" />
+        <link rel="preconnect" href="https://cnawnprwdcfmyswqolsu.supabase.co" />
+        <link rel="dns-prefetch" href="https://kc8bx4n1ldm30q6fp-1.a1.typesense.net" />
+        <link rel="dns-prefetch" href="https://cnawnprwdcfmyswqolsu.supabase.co" />
+        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+        <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
+      </head>
       <body className="font-sans">
         {/* JSON-LD Structured Data */}
         <JsonLdSchema />
@@ -149,10 +157,10 @@ export default function RootLayout({
           `}
         </Script>
         
-        {/* Google AdSense */}
+        {/* Google AdSense - lazyOnload ile yükle (LCP iyileştirmesi) */}
         <Script
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2370010010396512"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
           crossOrigin="anonymous"
         />
         
