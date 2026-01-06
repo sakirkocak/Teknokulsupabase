@@ -1,6 +1,6 @@
 """
 Teknokul Video Generator - Google Cloud Run Service
-Video üretir ve Supabase Storage'a yükler
+Video üretir ve YouTube'a yükler
 """
 
 import os
@@ -21,7 +21,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="Teknokul Video Generator",
     description="AI-powered video solution generator",
-    version="1.0.1"
+    version="1.0.2"
 )
 
 # Environment variables
@@ -29,13 +29,6 @@ API_SECRET = os.getenv("API_SECRET", "")
 TEKNOKUL_API_BASE = os.getenv("TEKNOKUL_API_BASE", "https://teknokul.com.tr")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
-
-# Teknokul renkleri
-TEKNOKUL_PURPLE = "#8B5CF6"
-TEKNOKUL_ORANGE = "#F97316"
-TEKNOKUL_DARK = "#1E1B4B"
 
 class VideoRequest(BaseModel):
     question_id: str
@@ -128,7 +121,7 @@ async def generate_audio_with_elevenlabs(text: str, output_path: Path) -> bool:
                     "Content-Type": "application/json"
                 },
                 json={
-                    "text": text[:1000],  # Max 1000 karakter
+                    "text": text[:1000],
                     "model_id": "eleven_multilingual_v2",
                     "voice_settings": {
                         "stability": 0.5,
@@ -151,27 +144,10 @@ async def generate_audio_with_elevenlabs(text: str, output_path: Path) -> bool:
     return False
 
 def create_simple_video(question: VideoRequest, solution: dict, output_path: Path, audio_path: Optional[Path] = None) -> bool:
-    """FFmpeg ile basit video oluştur (Manim yerine)"""
+    """FFmpeg ile basit video oluştur"""
     log("FFmpeg ile video oluşturuluyor...")
     
     try:
-        # Metin dosyası oluştur
-        text_content = f"""
-{question.topic_name or 'Soru Çözümü'}
-{question.grade}. Sınıf - {question.subject_name or 'Matematik'}
-
-SORU:
-{question.question_text[:200]}
-
-ÇÖZÜM:
-{chr(10).join(solution.get('steps', ['Çözüm adımları'])[:5])}
-
-DOĞRU CEVAP: {question.correct_answer}
-
-Teknokul.com.tr
-"""
-        
-        # Video süresi (ses varsa ses süresine göre, yoksa 10 saniye)
         duration = 10
         if audio_path and audio_path.exists():
             probe = subprocess.run(
@@ -182,25 +158,23 @@ Teknokul.com.tr
             if probe.returncode == 0:
                 duration = float(probe.stdout.strip()) + 1
         
-        # Basit renkli arka plan video oluştur
+        topic_safe = (question.topic_name or "Soru Cozumu").replace("'", "").replace('"', '')
+        
         cmd = [
             "ffmpeg", "-y",
             "-f", "lavfi",
             "-i", f"color=c=0x1E1B4B:s=1280x720:d={duration}",
-            "-vf", f"drawtext=text='{question.topic_name or 'Soru Cozumu'}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=50,drawtext=text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50",
+            "-vf", f"drawtext=text='{topic_safe}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=50,drawtext=text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50",
             "-c:v", "libx264",
             "-t", str(duration),
             "-pix_fmt", "yuv420p"
         ]
         
-        # Ses varsa ekle
         if audio_path and audio_path.exists():
             temp_video = output_path.with_suffix('.temp.mp4')
             cmd.append(str(temp_video))
-            
             subprocess.run(cmd, capture_output=True, timeout=60)
             
-            # Ses ekle
             merge_cmd = [
                 "ffmpeg", "-y",
                 "-i", str(temp_video),
@@ -225,37 +199,47 @@ Teknokul.com.tr
     
     return False
 
-async def upload_to_teknokul(video_path: Path, question: VideoRequest) -> Optional[str]:
-    """Videoyu Teknokul API'ye gönder (Supabase Storage'a yükler)"""
-    log("Video Teknokul'a yükleniyor...")
+async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optional[str]:
+    """Videoyu YouTube'a yükle (Teknokul API üzerinden)"""
+    log("YouTube'a yükleniyor...")
     
     try:
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         
         video_base64 = base64.b64encode(video_bytes).decode()
+        video_size_kb = len(video_bytes) / 1024
+        
+        log(f"Video boyutu: {video_size_kb:.1f} KB, YouTube'a gönderiliyor...")
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"{TEKNOKUL_API_BASE}/api/video/upload-storage",
+                f"{TEKNOKUL_API_BASE}/api/video/youtube-upload",
                 json={
                     "questionId": question.question_id,
                     "videoBase64": video_base64,
-                    "fileName": f"solution_{question.question_id[:8]}.mp4"
+                    "title": f"{question.grade}. Sınıf {question.subject_name} | {question.topic_name}",
+                    "grade": question.grade,
+                    "subject": question.subject_name,
+                    "topicName": question.topic_name,
+                    "questionText": question.question_text[:500]
                 },
                 headers={"Authorization": f"Bearer {API_SECRET}"},
-                timeout=120
+                timeout=300
             )
             
             if response.status_code == 200:
                 data = response.json()
                 video_url = data.get("videoUrl")
-                log(f"Video yüklendi: {video_url}")
+                log(f"✅ YouTube'a yüklendi: {video_url}")
                 return video_url
             else:
-                log(f"Upload hatası: {response.status_code} - {response.text[:200]}", "ERROR")
+                error_msg = response.text[:500]
+                log(f"YouTube upload hatası: {response.status_code} - {error_msg}", "ERROR")
+                return None
+                
     except Exception as e:
-        log(f"Upload hatası: {e}", "ERROR")
+        log(f"YouTube upload hatası: {e}", "ERROR")
     
     return None
 
@@ -265,7 +249,7 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="1.0.1"
+        version="1.0.2"
     )
 
 @app.post("/generate")
@@ -320,21 +304,15 @@ async def process_video(request: VideoRequest):
             if not video_success or not video_path.exists():
                 raise Exception("Video oluşturulamadı")
             
-            # 4. Teknokul'a yükle
-            video_url = await upload_to_teknokul(video_path, request)
+            # 4. YouTube'a yükle
+            video_url = await upload_to_youtube(video_path, request)
             
             if video_url:
                 result["success"] = True
                 result["videoUrl"] = video_url
                 log(f"✅ Video tamamlandı: {video_url}")
             else:
-                # Video oluştu ama yüklenemedi - base64 olarak dön
-                with open(video_path, "rb") as f:
-                    video_base64 = base64.b64encode(f.read()).decode()
-                result["success"] = True
-                result["videoBase64"] = video_base64
-                result["message"] = "Video oluşturuldu, yükleme bekliyor"
-                log("⚠️ Video oluşturuldu ama yüklenemedi")
+                raise Exception("YouTube yükleme başarısız")
                 
     except Exception as e:
         result["error"] = str(e)
