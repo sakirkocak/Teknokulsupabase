@@ -1,6 +1,6 @@
 /**
  * Video Çözüm Üretim API
- * Soru için video çözüm üretim isteği oluşturur
+ * Soru için video çözüm üretim isteği oluşturur ve işleme başlatır
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -9,32 +9,24 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
-// Gemini client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
+const VIDEO_GENERATOR_URL = process.env.VIDEO_GENERATOR_URL || ''
+const VIDEO_API_SECRET = process.env.VIDEO_API_SECRET || ''
 
 interface VideoGenerateRequest {
   questionId: string
   priority?: number
-}
-
-interface SolutionStep {
-  order: number
-  text: string
-  math?: string
-  duration: number // saniye
+  processImmediately?: boolean
 }
 
 interface SolutionData {
-  steps: SolutionStep[]
+  steps: { order: number; text: string; math?: string; duration: number }[]
   totalDuration: number
   narrationText: string
 }
 
-/**
- * Gemini ile çözüm adımları üret
- */
 async function generateSolutionSteps(question: {
   question_text: string
   options: Record<string, string>
@@ -53,44 +45,20 @@ ${Object.entries(question.options).map(([k, v]) => `${k}) ${v}`).join('\n')}
 DOĞRU CEVAP: ${question.correct_answer}
 ${question.explanation ? `AÇIKLAMA: ${question.explanation}` : ''}
 
-Lütfen aşağıdaki JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
+JSON formatında yanıt ver:
 {
-  "steps": [
-    {
-      "order": 1,
-      "text": "Seslendirme metni (Türkçe, doğal konuşma dili)",
-      "math": "LaTeX formatında matematiksel ifade (varsa)",
-      "duration": 5
-    }
-  ],
+  "steps": [{"order": 1, "text": "Seslendirme metni", "duration": 5}],
   "totalDuration": 30,
-  "narrationText": "Tüm adımların birleştirilmiş seslendirme metni"
-}
-
-KURALLAR:
-- Adımlar kısa ve net olsun (her biri 3-8 saniye)
-- Toplam süre 30-60 saniye arasında olsun
-- Türkçe ve anlaşılır bir dil kullan
-- Matematiksel ifadeler LaTeX formatında olsun
-- Son adımda doğru cevabı vurgula`
+  "narrationText": "Tüm seslendirme metni"
+}`
 
   try {
     const result = await model.generateContent(prompt)
     const responseText = result.response.text()
-    
-    // JSON parse et
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('JSON bulunamadı')
-    }
-    
-    const solutionData = JSON.parse(jsonMatch[0]) as SolutionData
-    return solutionData
-    
+    if (!jsonMatch) throw new Error('JSON bulunamadı')
+    return JSON.parse(jsonMatch[0]) as SolutionData
   } catch (error) {
-    console.error('Gemini çözüm üretme hatası:', error)
-    
-    // Fallback basit çözüm
     return {
       steps: [
         { order: 1, text: "Soruyu inceleyelim", duration: 3 },
@@ -103,22 +71,61 @@ KURALLAR:
   }
 }
 
+/**
+ * Cloud Run'a video üretim isteği gönder
+ */
+async function sendToCloudRun(question: any, topic: any): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
+  if (!VIDEO_GENERATOR_URL) {
+    return { success: false, error: 'VIDEO_GENERATOR_URL tanımlı değil' }
+  }
+  
+  console.log(`🎬 [CLOUD RUN] İstek gönderiliyor: ${question.id}`)
+  
+  try {
+    const response = await fetch(`${VIDEO_GENERATOR_URL}/generate-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${VIDEO_API_SECRET}`
+      },
+      body: JSON.stringify({
+        question_id: question.id,
+        question_text: question.question_text,
+        options: question.options,
+        correct_answer: question.correct_answer,
+        explanation: question.explanation,
+        topic_name: topic?.main_topic || 'Soru Çözümü',
+        subject_name: topic?.subject?.name || 'Matematik',
+        grade: topic?.grade || 8
+      })
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      console.log(`✅ [CLOUD RUN] Başarılı: ${data.videoUrl}`)
+      return { success: true, videoUrl: data.videoUrl }
+    } else {
+      const errorText = await response.text()
+      console.error(`❌ [CLOUD RUN] Hata: ${response.status} - ${errorText}`)
+      return { success: false, error: errorText }
+    }
+  } catch (error: any) {
+    console.error(`❌ [CLOUD RUN] Exception: ${error.message}`)
+    return { success: false, error: error.message }
+  }
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
-  
-  // Auth kontrolü
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
-    return NextResponse.json({ 
-      error: 'Giriş yapmanız gerekiyor',
-      requireAuth: true
-    }, { status: 401 })
+    return NextResponse.json({ error: 'Giriş yapmanız gerekiyor' }, { status: 401 })
   }
   
   try {
-    const { questionId, priority = 0 }: VideoGenerateRequest = await request.json()
+    const { questionId, priority = 0, processImmediately = true }: VideoGenerateRequest = await request.json()
     
     if (!questionId) {
       return NextResponse.json({ error: 'questionId gerekli' }, { status: 400 })
@@ -135,7 +142,7 @@ export async function POST(request: NextRequest) {
         explanation,
         video_status,
         video_solution_url,
-        topic:topics(main_topic, subject:subjects(name))
+        topic:topics(main_topic, grade, subject:subjects(name))
       `)
       .eq('id', questionId)
       .single()
@@ -149,78 +156,107 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         status: 'already_exists',
-        videoUrl: question.video_solution_url,
-        message: 'Video zaten mevcut'
+        videoUrl: question.video_solution_url
       })
     }
     
-    // Queue'da bekliyor mu?
-    if (question.video_status === 'pending' || question.video_status === 'processing') {
+    // Zaten işleniyor mu?
+    if (question.video_status === 'processing') {
       return NextResponse.json({
         success: true,
-        status: question.video_status,
-        message: 'Video üretimi zaten devam ediyor'
+        status: 'processing',
+        message: 'Video üretimi devam ediyor'
       })
     }
     
-    // Gemini ile çözüm adımları üret
-    console.log(`🎬 [VIDEO] Çözüm adımları üretiliyor: ${questionId}`)
-    const solutionData = await generateSolutionSteps({
-      question_text: question.question_text,
-      options: question.options as Record<string, string>,
-      correct_answer: question.correct_answer,
-      explanation: question.explanation
-    })
-    
     // Queue'ya ekle
-    const { data: queueItem, error: queueError } = await supabase
+    const { data: queueItem } = await supabase
       .from('video_generation_queue')
       .upsert({
         question_id: questionId,
         requested_by: user.id,
-        status: 'pending',
+        status: 'processing',
         priority: priority,
-      }, {
-        onConflict: 'question_id'
-      })
+      }, { onConflict: 'question_id' })
       .select()
       .single()
-    
-    if (queueError) {
-      console.error('Queue ekleme hatası:', queueError)
-      return NextResponse.json({ error: 'Queue hatası' }, { status: 500 })
-    }
     
     // Question durumunu güncelle
     await supabase
       .from('questions')
-      .update({ video_status: 'pending' })
+      .update({ video_status: 'processing' })
       .eq('id', questionId)
     
-    const duration = Date.now() - startTime
-    console.log(`✅ [VIDEO] Queue'ya eklendi: ${questionId} (${duration}ms)`)
+    console.log(`🎬 [VIDEO] İşlem başlıyor: ${questionId}`)
+    
+    // 🚀 Hemen Cloud Run'a gönder
+    if (processImmediately && VIDEO_GENERATOR_URL) {
+      const result = await sendToCloudRun(question, question.topic)
+      
+      if (result.success && result.videoUrl) {
+        // Başarılı - güncelle
+        await supabase
+          .from('questions')
+          .update({
+            video_status: 'completed',
+            video_solution_url: result.videoUrl
+          })
+          .eq('id', questionId)
+        
+        await supabase
+          .from('video_generation_queue')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('question_id', questionId)
+        
+        const duration = Date.now() - startTime
+        console.log(`✅ [VIDEO] Tamamlandı: ${questionId} (${duration}ms)`)
+        
+        return NextResponse.json({
+          success: true,
+          status: 'completed',
+          videoUrl: result.videoUrl,
+          duration
+        })
+      } else {
+        // Hata - pending'e al, tekrar denenebilir
+        await supabase
+          .from('questions')
+          .update({ video_status: 'pending' })
+          .eq('id', questionId)
+        
+        await supabase
+          .from('video_generation_queue')
+          .update({
+            status: 'pending',
+            error_message: result.error?.slice(0, 500)
+          })
+          .eq('question_id', questionId)
+        
+        return NextResponse.json({
+          success: false,
+          status: 'queued',
+          error: result.error,
+          message: 'Video kuyruğa eklendi, daha sonra işlenecek'
+        })
+      }
+    }
     
     return NextResponse.json({
       success: true,
       status: 'queued',
       queueId: queueItem?.id,
-      solutionData: solutionData,
-      estimatedDuration: solutionData.totalDuration,
       message: 'Video üretim kuyruğuna eklendi'
     })
     
   } catch (error: any) {
     console.error('❌ [VIDEO] Hata:', error.message)
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-/**
- * GET - Queue durumu
- */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -236,14 +272,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'questionId gerekli' }, { status: 400 })
   }
   
-  // Queue durumunu al
-  const { data: queueItem } = await supabase
-    .from('video_generation_queue')
-    .select('*')
-    .eq('question_id', questionId)
-    .single()
-  
-  // Question durumunu al
   const { data: question } = await supabase
     .from('questions')
     .select('video_status, video_solution_url')
@@ -253,7 +281,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     status: question?.video_status || 'none',
-    videoUrl: question?.video_solution_url,
-    queueItem: queueItem
+    videoUrl: question?.video_solution_url
   })
 }
