@@ -141,13 +141,14 @@ export async function POST(request: NextRequest) {
       throw new Error('Çözüm üretilemedi')
     }
     
-    const solutionData = await solutionResponse.json()
-    await addLog(supabase, item.queue_id, item.question_id, 'gemini_solution', 'completed', solutionData)
+    const generateResponse = await solutionResponse.json()
+    await addLog(supabase, item.queue_id, item.question_id, 'gemini_solution', 'completed', generateResponse)
     
     // 2. ElevenLabs TTS
     await addLog(supabase, item.queue_id, item.question_id, 'elevenlabs_tts', 'started')
     
-    const narrationText = solutionData.solutionData?.narrationText || item.explanation || 'Çözüm videosu'
+    // generateResponse.solutionData içinden narrationText al
+    const narrationText = generateResponse.solutionData?.narrationText || item.explanation || 'Çözüm videosu'
     const audioBase64 = await generateAudio(narrationText, supabase)
     
     if (audioBase64) {
