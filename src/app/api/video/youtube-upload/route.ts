@@ -5,39 +5,25 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { google, youtube_v3 } from 'googleapis'
+import { google } from 'googleapis'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// YouTube client'ı lazy initialization ile oluştur
-let youtubeClient: youtube_v3.Youtube | null = null
+// YouTube OAuth2 client
+const oauth2Client = new google.auth.OAuth2(
+  process.env.YOUTUBE_CLIENT_ID,
+  process.env.YOUTUBE_CLIENT_SECRET,
+  process.env.YOUTUBE_REDIRECT_URI
+)
 
-function getYouTubeClient(): youtube_v3.Youtube {
-  if (youtubeClient) {
-    return youtubeClient
-  }
-  
-  const clientId = process.env.YOUTUBE_CLIENT_ID
-  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET
-  const redirectUri = process.env.YOUTUBE_REDIRECT_URI
-  const refreshToken = process.env.YOUTUBE_REFRESH_TOKEN
-  
-  if (!clientId || !clientSecret) {
-    throw new Error('YouTube API credentials eksik: YOUTUBE_CLIENT_ID ve YOUTUBE_CLIENT_SECRET gerekli')
-  }
-  
-  if (!refreshToken) {
-    throw new Error('YouTube refresh token eksik: YOUTUBE_REFRESH_TOKEN gerekli. /api/youtube/auth adresinden alabilirsiniz.')
-  }
-  
-  const oauth2Client = new google.auth.OAuth2(clientId, clientSecret, redirectUri)
-  oauth2Client.setCredentials({ refresh_token: refreshToken })
-  
-  youtubeClient = google.youtube({ version: 'v3', auth: oauth2Client })
-  return youtubeClient
-}
+// Refresh token ile erişim token'ı al
+oauth2Client.setCredentials({
+  refresh_token: process.env.YOUTUBE_REFRESH_TOKEN
+})
+
+const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
 
 interface UploadRequest {
   videoPath: string // Video dosya yolu veya URL
@@ -78,9 +64,6 @@ export async function POST(request: NextRequest) {
     
     console.log(`📤 [YOUTUBE] Upload başlıyor: ${questionId}`)
     
-    // YouTube client'ı al (lazy initialization)
-    const youtube = getYouTubeClient()
-    
     // Video dosyasını al
     // Bu kısım video'nun nereden geldiğine göre değişir
     // Şimdilik placeholder
@@ -89,7 +72,7 @@ export async function POST(request: NextRequest) {
     const videoMetadata = {
       snippet: {
         title: title,
-        description: `${description}\n\n📚 Teknokul - Yapay Zeka Destekli Eğitim Platformu\n🌐 https://teknokul.com.tr`,
+        description: `${description}\n\n📚 Teknokul - Yapay Zeka Destekli Eğitim Platformu\n🌐 https://teknokul.com`,
         tags: ['teknokul', 'eğitim', 'matematik', 'soru çözümü', ...tags],
         categoryId: '27', // Education category
         defaultLanguage: 'tr',
@@ -163,9 +146,6 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    // YouTube client'ı al (lazy initialization)
-    const youtube = getYouTubeClient()
-    
     // YouTube API ile quota kontrolü yapılamıyor doğrudan
     // Ancak basit bir test yapabiliriz
     

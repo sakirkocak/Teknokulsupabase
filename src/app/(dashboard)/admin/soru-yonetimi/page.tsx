@@ -87,7 +87,7 @@ import {
   ChevronDown, ChevronUp, Star, Zap, Crown, Sparkles,
   AlertCircle, ChevronLeft, ChevronRight, RefreshCw,
   GraduationCap, Layers, BarChart3, Clock, Plus, ImageIcon,
-  FlaskConical
+  FlaskConical, Video, Youtube, Loader2, ExternalLink
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -126,6 +126,10 @@ interface Question {
   // 🆕 Yeni Nesil Soru alanları
   visual_type?: string | null
   visual_content?: string | null
+  // 🎬 Video Çözüm alanları
+  video_status?: string | null
+  video_solution_url?: string | null
+  video_youtube_id?: string | null
 }
 
 const difficultyConfig = {
@@ -182,6 +186,7 @@ export default function AdminSoruYonetimiPage() {
   })
   
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [generatingVideoFor, setGeneratingVideoFor] = useState<string | null>(null) // 🎬 Video oluşturma durumu
   
   const supabase = createClient()
 
@@ -369,6 +374,9 @@ export default function AdminSoruYonetimiPage() {
               created_at,
               visual_type,
               visual_content,
+              video_status,
+              video_solution_url,
+              video_youtube_id,
               topic:topics(
                 id,
                 subject_id,
@@ -486,6 +494,9 @@ export default function AdminSoruYonetimiPage() {
         *,
         visual_type,
         visual_content,
+        video_status,
+        video_solution_url,
+        video_youtube_id,
         topic:topics(
           id, subject_id, grade, main_topic, sub_topic, learning_outcome,
           subject:subjects(id, name, code, icon)
@@ -582,6 +593,35 @@ export default function AdminSoruYonetimiPage() {
     }
     
     setTimeout(() => setMessage(null), 3000)
+  }
+
+  // 🎬 Video çözümü oluştur
+  const handleGenerateVideo = async (questionId: string) => {
+    if (!confirm('Bu soru için video çözümü oluşturulacak. Devam etmek istiyor musunuz?')) return
+    
+    setGeneratingVideoFor(questionId)
+    
+    try {
+      const response = await fetch('/api/video/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId })
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        setMessage({ type: 'success', text: '🎬 Video kuyruğa eklendi! Admin > Videos sayfasından takip edebilirsiniz.' })
+        loadQuestions() // Listeyi güncelle
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Video oluşturulurken hata oluştu!' })
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: 'Bağlantı hatası: ' + error.message })
+    } finally {
+      setGeneratingVideoFor(null)
+      setTimeout(() => setMessage(null), 5000)
+    }
   }
 
   const clearFilters = () => {
@@ -928,6 +968,25 @@ export default function AdminSoruYonetimiPage() {
                         <span className={`text-xs px-2 py-1 rounded-full ${difficultyConfig[question.difficulty].bgLight} ${difficultyConfig[question.difficulty].textColor}`}>
                           {difficultyConfig[question.difficulty].emoji} {difficultyConfig[question.difficulty].label}
                         </span>
+                        {/* 🎬 Video durumu badge */}
+                        {question.video_status === 'completed' && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 flex items-center gap-1">
+                            <Youtube className="w-3 h-3" />
+                            Videolu
+                          </span>
+                        )}
+                        {question.video_status === 'pending' && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Bekliyor
+                          </span>
+                        )}
+                        {question.video_status === 'processing' && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            İşleniyor
+                          </span>
+                        )}
                       </div>
                       
                       {/* Soru Görseli (varsa) */}
@@ -1015,7 +1074,36 @@ export default function AdminSoruYonetimiPage() {
                     </div>
                     
                     {/* Aksiyonlar */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {/* 🎬 Video Çözümü */}
+                      {question.video_status === 'completed' && question.video_solution_url ? (
+                        <a
+                          href={question.video_solution_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title="YouTube'da İzle"
+                        >
+                          <Youtube className="h-5 w-5 text-red-500" />
+                        </a>
+                      ) : question.video_status === 'pending' || question.video_status === 'processing' ? (
+                        <div className="p-2" title="Video hazırlanıyor...">
+                          <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleGenerateVideo(question.id)}
+                          disabled={generatingVideoFor === question.id}
+                          className="p-2 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 rounded-lg transition-colors disabled:opacity-50"
+                          title="Video Çözümü Oluştur"
+                        >
+                          {generatingVideoFor === question.id ? (
+                            <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" />
+                          ) : (
+                            <Video className="h-5 w-5 text-indigo-500" />
+                          )}
+                        </button>
+                      )}
                       <button
                         onClick={() => setPreviewQuestion(question)}
                         className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"

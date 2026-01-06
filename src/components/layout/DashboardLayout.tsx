@@ -37,7 +37,8 @@ import {
   Bot,
   ImageIcon,
   Shield,
-  Activity
+  Activity,
+  Video
 } from 'lucide-react'
 
 type NavItem = {
@@ -95,6 +96,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
     { label: 'Görüntülü Soru Üretici', href: '/admin/goruntulu-soru-uretici', icon: ImageIcon },
+    { label: 'Video Çözümler', href: '/admin/videos', icon: Video },
     { label: 'Soru Bildirimleri', href: '/admin/soru-bildirimleri', icon: Flag },
     { label: 'Geri Bildirimler', href: '/admin/geri-bildirimler', icon: MessageSquare },
     { label: 'Sınav Takvimi', href: '/admin/sinav-takvimi', icon: Calendar },

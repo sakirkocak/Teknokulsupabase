@@ -13,7 +13,12 @@ import {
   TrendingUp,
   DollarSign,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  Youtube,
+  Copy,
+  Eye,
+  Ban,
+  Trash2
 } from 'lucide-react'
 
 interface VideoStats {
@@ -32,7 +37,12 @@ interface QueueItem {
   created_at: string
   completed_at: string | null
   estimated_cost_usd: number | null
-  questions: { question_text: string } | null
+  questions: { 
+    question_text: string
+    video_solution_url: string | null
+    video_youtube_id: string | null
+    video_status: string | null
+  } | null
 }
 
 export default function AdminVideosPage() {
@@ -42,6 +52,7 @@ export default function AdminVideosPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [batchCount, setBatchCount] = useState(10)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     if (profile?.role === 'admin') {
@@ -126,6 +137,40 @@ export default function AdminVideosPage() {
       alert('Hata: ' + error.message)
     } finally {
       setProcessing(false)
+    }
+  }
+
+  // Bekleyen ve işlenen tüm videoları iptal et
+  const cancelAllPending = async () => {
+    if (!confirm('Bekleyen ve işlenen TÜM videoları iptal etmek istediğinize emin misiniz?')) return
+    
+    setCancelling(true)
+    try {
+      const supabase = createClient()
+      
+      // 1. Queue'daki pending/processing kayıtları cancelled yap
+      const { error: queueError } = await supabase
+        .from('video_generation_queue')
+        .update({ status: 'cancelled' })
+        .in('status', ['pending', 'processing'])
+      
+      if (queueError) throw queueError
+      
+      // 2. Questions tablosundaki video_status'ları sıfırla
+      const { error: questionsError } = await supabase
+        .from('questions')
+        .update({ video_status: 'none' })
+        .in('video_status', ['pending', 'processing'])
+      
+      if (questionsError) throw questionsError
+      
+      alert('✅ Tüm bekleyen videolar iptal edildi!')
+      fetchData()
+      
+    } catch (error: any) {
+      alert('Hata: ' + error.message)
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -256,6 +301,18 @@ export default function AdminVideosPage() {
               Toplu Ekle
             </button>
           </div>
+          
+          {/* Tümünü İptal Et Butonu */}
+          {(stats?.pending_count || 0) + (stats?.processing_count || 0) > 0 && (
+            <button
+              onClick={cancelAllPending}
+              disabled={cancelling}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg disabled:opacity-50"
+            >
+              {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+              Tümünü İptal Et ({(stats?.pending_count || 0) + (stats?.processing_count || 0)})
+            </button>
+          )}
         </div>
       </div>
 
@@ -271,6 +328,7 @@ export default function AdminVideosPage() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Soru</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">YouTube</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Maliyet</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aksiyon</th>
@@ -290,6 +348,33 @@ export default function AdminVideosPage() {
                       {video.status}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    {video.questions?.video_solution_url ? (
+                      <div className="flex items-center gap-2">
+                        <a 
+                          href={video.questions.video_solution_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium"
+                        >
+                          <Youtube className="w-3 h-3" />
+                          İzle
+                        </a>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(video.questions?.video_solution_url || '')
+                            alert('Link kopyalandı!')
+                          }}
+                          className="p-1 hover:bg-gray-100 rounded"
+                          title="Linki kopyala"
+                        >
+                          <Copy className="w-3 h-3 text-gray-400" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">-</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     ${(video.estimated_cost_usd || 0).toFixed(3)}
                   </td>
@@ -297,18 +382,34 @@ export default function AdminVideosPage() {
                     {new Date(video.created_at).toLocaleDateString('tr-TR')}
                   </td>
                   <td className="px-6 py-4">
-                    {video.status === 'completed' && (
-                      <button className="text-indigo-600 hover:text-indigo-800">
-                        <ExternalLink className="w-4 h-4" />
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {video.questions?.video_solution_url && (
+                        <a
+                          href={video.questions.video_solution_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1 hover:bg-indigo-100 rounded text-indigo-600"
+                          title="Videoyu aç"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      <a
+                        href={`/sorular/matematik/8/${video.question_id}`}
+                        target="_blank"
+                        className="p-1 hover:bg-blue-100 rounded text-blue-600"
+                        title="Soruyu görüntüle"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </a>
+                    </div>
                   </td>
                 </tr>
               ))}
               
               {recentVideos.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     Henüz video işlenmemiş
                   </td>
                 </tr>
