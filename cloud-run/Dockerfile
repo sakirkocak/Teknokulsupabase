@@ -1,11 +1,15 @@
 # Teknokul Video Generator - Cloud Run
 FROM python:3.11-slim
 
-# Sistem bağımlılıkları
+# Sistem bağımlılıkları (build tools dahil)
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++ \
     ffmpeg \
     libcairo2-dev \
     libpango1.0-dev \
+    libgirepository1.0-dev \
     pkg-config \
     texlive-latex-base \
     texlive-fonts-recommended \
@@ -23,7 +27,8 @@ WORKDIR /app
 
 # Python bağımlılıkları
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Uygulama dosyaları
 COPY . .
