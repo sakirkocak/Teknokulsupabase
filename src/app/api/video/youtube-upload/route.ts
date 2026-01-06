@@ -49,26 +49,17 @@ interface UploadRequest {
   subject?: string
   topicName?: string
   questionText?: string
-  // Video data - base64 veya path
   videoBase64?: string
-  videoPath?: string
 }
 
-/**
- * Base64'ü Readable stream'e çevir
- */
 function base64ToStream(base64: string): Readable {
   const buffer = Buffer.from(base64, 'base64')
   return Readable.from(buffer)
 }
 
-/**
- * POST - Video yükle (gerçek YouTube upload)
- */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   
-  // Auth kontrolü - API secret veya user session
   const authHeader = request.headers.get('authorization')
   const apiSecret = process.env.VIDEO_API_SECRET
   const isApiCall = apiSecret && authHeader === `Bearer ${apiSecret}`
@@ -96,10 +87,10 @@ export async function POST(request: NextRequest) {
     const { 
       questionId, 
       videoBase64,
-      grade, 
-      subject,
-      topicName,
-      questionText
+      grade = 8, 
+      subject = 'Matematik',
+      topicName = 'Soru Çözümü',
+      questionText = ''
     } = body
     
     if (!questionId) {
@@ -110,7 +101,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'videoBase64 gerekli' }, { status: 400 })
     }
     
-    // 1. Rate limiting kontrolü
+    // Rate limiting
     const { data: canUpload } = await supabase.rpc('can_upload_video')
     
     if (!canUpload) {
@@ -118,14 +109,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         error: 'Günlük upload limiti aşıldı',
         todayUploads: stats?.today_uploads || 0,
-        maxDaily: RATE_LIMITS.MAX_UPLOADS_PER_DAY,
-        message: 'Yarın tekrar deneyin'
+        maxDaily: RATE_LIMITS.MAX_UPLOADS_PER_DAY
       }, { status: 429 })
     }
     
     console.log(`📤 [YOUTUBE] Upload başlıyor: ${questionId}`)
     
-    // 2. YouTube client al
     let youtube
     try {
       youtube = getYouTubeClient()
@@ -137,67 +126,60 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // 3. Video metadata hazırla
-    const videoTitle = body.title || generateVideoTitle({
-      grade: grade || 8,
-      subjectName: subject || 'Matematik',
-      topicName: topicName || 'Soru Çözümü',
-      questionId
-    })
+    // Video metadata - düzeltilmiş fonksiyon çağrıları
+    const videoTitle = body.title || generateVideoTitle(
+      grade,
+      subject,
+      topicName,
+      questionText.slice(0, 50)
+    )
     
     const videoDescription = body.description || generateVideoDescription({
-      questionText: questionText || '',
-      grade: grade || 8,
-      subjectName: subject || 'Matematik',
-      topicName: topicName || 'Soru Çözümü',
-      questionId
+      grade,
+      subject,
+      topic: topicName,
+      questionText,
+      questionId,
+      difficulty: 'Orta'
     })
     
-    const videoTags = body.tags || generateVideoTags({
-      grade: grade || 8,
-      subjectName: subject || 'Matematik',
-      topicName: topicName || ''
-    })
+    const videoTags = body.tags || generateVideoTags({ grade, subject, topic: topicName })
     
-    // 4. İlgili playlist'i bul
+    // Playlist bul
     let playlistId: string | null = null
-    if (grade && subject) {
-      const subjectCode = SUBJECT_CODES[subject] || subject.toLowerCase().replace(/\s+/g, '-')
-      const { data: playlist } = await supabase
-        .from('youtube_playlists')
-        .select('playlist_id')
-        .eq('grade', grade)
-        .eq('subject_code', subjectCode)
-        .single()
-      
-      playlistId = playlist?.playlist_id || null
-    }
+    const subjectCode = SUBJECT_CODES[subject] || subject.toLowerCase().replace(/\s+/g, '-')
+    const { data: playlist } = await supabase
+      .from('youtube_playlists')
+      .select('playlist_id')
+      .eq('grade', grade)
+      .eq('subject_code', subjectCode)
+      .single()
     
-    // 5. Video stream hazırla
+    playlistId = playlist?.playlist_id || null
+    
+    // Video stream
     const videoStream = base64ToStream(videoBase64)
     const videoSizeBytes = Buffer.from(videoBase64, 'base64').length
     
-    console.log(`📦 [YOUTUBE] Video boyutu: ${(videoSizeBytes / 1024).toFixed(1)} KB`)
+    console.log(`📦 [YOUTUBE] Video: ${(videoSizeBytes / 1024).toFixed(1)} KB`)
+    console.log(`🚀 [YOUTUBE] Yükleniyor...`)
     
-    // 6. GERÇEK YOUTUBE UPLOAD
-    console.log(`🚀 [YOUTUBE] YouTube'a yükleniyor...`)
-    
+    // YOUTUBE UPLOAD
     const uploadResponse = await youtube.videos.insert({
       part: ['snippet', 'status'],
       requestBody: {
         snippet: {
-          title: videoTitle.slice(0, 100), // Max 100 karakter
-          description: videoDescription.slice(0, 5000), // Max 5000 karakter
-          tags: videoTags.slice(0, 500), // Max 500 tag
-          categoryId: '27', // Education
+          title: videoTitle.slice(0, 100),
+          description: videoDescription.slice(0, 5000),
+          tags: videoTags.slice(0, 30),
+          categoryId: '27',
           defaultLanguage: 'tr',
           defaultAudioLanguage: 'tr'
         },
         status: {
           privacyStatus: 'public',
           selfDeclaredMadeForKids: false,
-          embeddable: true,
-          publicStatsViewable: true
+          embeddable: true
         }
       },
       media: {
@@ -209,19 +191,19 @@ export async function POST(request: NextRequest) {
     const youtubeVideoId = uploadResponse.data.id
     const videoUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`
     
-    console.log(`✅ [YOUTUBE] Video yüklendi: ${videoUrl}`)
+    console.log(`✅ [YOUTUBE] Yüklendi: ${videoUrl}`)
     
-    // 7. Upload logunu kaydet
+    // Log kaydet
     await supabase.from('youtube_upload_logs').insert({
       question_id: questionId,
       playlist_id: playlistId,
       youtube_video_id: youtubeVideoId,
       youtube_url: videoUrl,
-      quota_used: 1600, // videos.insert yaklaşık 1600 quota kullanır
+      quota_used: 1600,
       status: 'completed'
     })
     
-    // 8. Soruyu güncelle
+    // Soruyu güncelle
     await supabase
       .from('questions')
       .update({
@@ -232,7 +214,7 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', questionId)
     
-    // 9. Queue'yu güncelle
+    // Queue güncelle
     await supabase
       .from('video_generation_queue')
       .update({
@@ -241,14 +223,14 @@ export async function POST(request: NextRequest) {
       })
       .eq('question_id', questionId)
     
-    // 10. Playlist'e ekle (varsa)
+    // Playlist'e ekle
     if (playlistId && youtubeVideoId) {
       try {
         await youtube.playlistItems.insert({
           part: ['snippet'],
           requestBody: {
             snippet: {
-              playlistId: playlistId,
+              playlistId,
               resourceId: {
                 kind: 'youtube#video',
                 videoId: youtubeVideoId
@@ -256,35 +238,30 @@ export async function POST(request: NextRequest) {
             }
           }
         })
-        console.log(`📋 [YOUTUBE] Video playlist'e eklendi: ${playlistId}`)
-      } catch (playlistError: any) {
-        console.error('Playlist ekleme hatası:', playlistError.message)
+        console.log(`📋 [YOUTUBE] Playlist'e eklendi`)
+      } catch (e: any) {
+        console.error('Playlist hatası:', e.message)
       }
     }
     
-    // 11. İstatistikleri al
     const { data: stats } = await supabase.rpc('get_youtube_stats')
     
     return NextResponse.json({
       success: true,
       videoId: youtubeVideoId,
-      videoUrl: videoUrl,
-      playlistId: playlistId,
+      videoUrl,
+      playlistId,
       stats: {
         todayUploads: stats?.today_uploads || 0,
-        remainingToday: stats?.remaining_today || 0,
-        quotaUsed: stats?.quota_used || 0
+        remainingToday: stats?.remaining_today || 0
       }
     })
     
   } catch (error: any) {
-    console.error('❌ [YOUTUBE] Upload hatası:', error.message)
-    
-    // Detaylı hata bilgisi
+    console.error('❌ [YOUTUBE] Hata:', error.message)
     if (error.response?.data) {
-      console.error('YouTube API yanıtı:', JSON.stringify(error.response.data, null, 2))
+      console.error('API yanıtı:', JSON.stringify(error.response.data, null, 2))
     }
-    
     return NextResponse.json({ 
       error: error.message,
       details: error.response?.data?.error?.message || null
@@ -292,9 +269,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * GET - Upload istatistikleri
- */
 export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -313,31 +287,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Admin yetkisi gerekli' }, { status: 403 })
   }
   
-  try {
-    const { data: stats } = await supabase.rpc('get_youtube_stats')
-    
-    // YouTube credentials kontrolü
-    const hasCredentials = !!(
-      process.env.YOUTUBE_CLIENT_ID && 
-      process.env.YOUTUBE_CLIENT_SECRET && 
-      process.env.YOUTUBE_REFRESH_TOKEN
-    )
-    
-    return NextResponse.json({
-      success: true,
-      configured: hasCredentials,
-      stats: stats || {
-        total_playlists: 0,
-        total_videos_uploaded: 0,
-        today_uploads: 0,
-        remaining_today: 50,
-        quota_used: 0,
-        quota_remaining: 10000
-      },
-      limits: RATE_LIMITS
-    })
-    
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
+  const { data: stats } = await supabase.rpc('get_youtube_stats')
+  
+  const hasCredentials = !!(
+    process.env.YOUTUBE_CLIENT_ID && 
+    process.env.YOUTUBE_CLIENT_SECRET && 
+    process.env.YOUTUBE_REFRESH_TOKEN
+  )
+  
+  return NextResponse.json({
+    success: true,
+    configured: hasCredentials,
+    stats: stats || {
+      total_playlists: 0,
+      total_videos_uploaded: 0,
+      today_uploads: 0,
+      remaining_today: 50
+    },
+    limits: RATE_LIMITS
+  })
 }
