@@ -1,0 +1,25 @@
+# Web Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Manim
+manim==0.18.0
+
+# Audio
+pydub==0.25.1
+
+# HTTP
+httpx==0.26.0
+requests==2.31.0
+
+# Google Cloud
+google-cloud-storage==2.14.0
+
+# YouTube
+google-api-python-client==2.111.0
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+
+# Utils
+python-dotenv==1.0.0
+Pillow==10.2.0

@@ -1,23 +1,19 @@
 /**
  * Video İşleme API (Background Job)
- * Queue'dan video alıp orchestrator'ı çalıştırır
+ * Cloud Run'ı çağırarak video üretir
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { spawn } from 'child_process'
-import path from 'path'
-import { 
-  generateVideoDescription, 
-  generateVideoTags,
-  RATE_LIMITS 
-} from '@/lib/youtube-playlists'
+import { RATE_LIMITS } from '@/lib/youtube-playlists'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const CRON_SECRET = process.env.CRON_SECRET || ''
+const VIDEO_GENERATOR_URL = process.env.VIDEO_GENERATOR_URL || ''
+const VIDEO_API_SECRET = process.env.VIDEO_API_SECRET || ''
 
 interface QueueItem {
   queue_id: string
@@ -54,55 +50,47 @@ async function addLog(
 }
 
 /**
- * Python orchestrator'ı çalıştır
+ * Cloud Run'a video üretim isteği gönder
  */
-async function runOrchestrator(questionId: string): Promise<{ success: boolean; output: string; videoUrl?: string }> {
-  return new Promise((resolve) => {
-    const scriptPath = path.join(process.cwd(), 'scripts', 'video-orchestrator.py')
-    const apiBase = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    
-    console.log(`🎬 [ORCHESTRATOR] Başlatılıyor: ${questionId}`)
-    
-    const python = spawn('python3', [scriptPath, questionId, apiBase], {
-      cwd: process.cwd(),
-      env: { ...process.env }
+async function sendToCloudRun(item: QueueItem): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
+  if (!VIDEO_GENERATOR_URL) {
+    return { success: false, error: 'VIDEO_GENERATOR_URL tanımlı değil' }
+  }
+  
+  console.log(`🎬 [CLOUD RUN] İstek gönderiliyor: ${item.question_id}`)
+  
+  try {
+    const response = await fetch(`${VIDEO_GENERATOR_URL}/generate-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${VIDEO_API_SECRET}`
+      },
+      body: JSON.stringify({
+        question_id: item.question_id,
+        question_text: item.question_text,
+        options: item.options,
+        correct_answer: item.correct_answer,
+        explanation: item.explanation,
+        topic_name: item.topic_name,
+        subject_name: item.subject_name,
+        grade: item.grade || 8
+      })
     })
     
-    let output = ''
-    let errorOutput = ''
-    
-    python.stdout.on('data', (data) => {
-      output += data.toString()
-      console.log(`[ORCHESTRATOR] ${data.toString()}`)
-    })
-    
-    python.stderr.on('data', (data) => {
-      errorOutput += data.toString()
-      console.error(`[ORCHESTRATOR ERROR] ${data.toString()}`)
-    })
-    
-    python.on('close', (code) => {
-      if (code === 0) {
-        // Output'tan video URL'ini çıkar
-        const urlMatch = output.match(/YouTube URL: (https:\/\/[^\s]+)/)
-        const videoUrl = urlMatch ? urlMatch[1] : undefined
-        
-        resolve({ success: true, output, videoUrl })
-      } else {
-        resolve({ success: false, output: errorOutput || output })
-      }
-    })
-    
-    python.on('error', (err) => {
-      resolve({ success: false, output: err.message })
-    })
-    
-    // 5 dakika timeout
-    setTimeout(() => {
-      python.kill()
-      resolve({ success: false, output: 'Timeout: 5 dakika aşıldı' })
-    }, 300000)
-  })
+    if (response.ok) {
+      const data = await response.json()
+      console.log(`✅ [CLOUD RUN] Başarılı: ${data.videoUrl}`)
+      return { success: true, videoUrl: data.videoUrl }
+    } else {
+      const errorText = await response.text()
+      console.error(`❌ [CLOUD RUN] Hata: ${response.status} - ${errorText}`)
+      return { success: false, error: errorText }
+    }
+  } catch (error: any) {
+    console.error(`❌ [CLOUD RUN] Exception: ${error.message}`)
+    return { success: false, error: error.message }
+  }
 }
 
 /**
@@ -168,14 +156,14 @@ export async function POST(request: NextRequest) {
     console.log(`🎬 [VIDEO PROCESS] Başlıyor: ${item.question_id}`)
     
     // Log: Başladı
-    await addLog(supabase, item.queue_id, item.question_id, 'orchestrator', 'started')
+    await addLog(supabase, item.queue_id, item.question_id, 'cloud_run', 'started')
     
-    // Orchestrator'ı çalıştır
-    const result = await runOrchestrator(item.question_id)
+    // Cloud Run'a gönder
+    const result = await sendToCloudRun(item)
     
-    if (result.success) {
+    if (result.success && result.videoUrl) {
       // Başarılı
-      await addLog(supabase, item.queue_id, item.question_id, 'orchestrator', 'completed', {
+      await addLog(supabase, item.queue_id, item.question_id, 'cloud_run', 'completed', {
         videoUrl: result.videoUrl
       })
       
@@ -187,6 +175,15 @@ export async function POST(request: NextRequest) {
           completed_at: new Date().toISOString()
         })
         .eq('id', item.queue_id)
+      
+      // Questions tablosunu güncelle
+      await supabase
+        .from('questions')
+        .update({
+          video_status: 'completed',
+          video_solution_url: result.videoUrl
+        })
+        .eq('id', item.question_id)
       
       const duration = Date.now() - startTime
       console.log(`✅ [VIDEO PROCESS] Tamamlandı: ${item.question_id} (${duration}ms)`)
@@ -201,7 +198,7 @@ export async function POST(request: NextRequest) {
       
     } else {
       // Hata
-      await addLog(supabase, item.queue_id, item.question_id, 'orchestrator', 'failed', null, result.output)
+      await addLog(supabase, item.queue_id, item.question_id, 'cloud_run', 'failed', null, result.error)
       
       // Retry sayısını kontrol et
       const { data: queueItem } = await supabase
@@ -217,7 +214,7 @@ export async function POST(request: NextRequest) {
           .update({
             status: 'pending',
             retry_count: queueItem.retry_count + 1,
-            error_message: result.output.slice(0, 500)
+            error_message: result.error?.slice(0, 500)
           })
           .eq('id', item.queue_id)
       } else {
@@ -226,7 +223,7 @@ export async function POST(request: NextRequest) {
           .from('video_generation_queue')
           .update({
             status: 'failed',
-            error_message: result.output.slice(0, 500),
+            error_message: result.error?.slice(0, 500),
             completed_at: new Date().toISOString()
           })
           .eq('id', item.queue_id)
@@ -240,7 +237,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: false,
         error: 'Video işlenemedi',
-        details: result.output.slice(0, 500)
+        details: result.error?.slice(0, 500)
       }, { status: 500 })
     }
     
@@ -293,6 +290,9 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(20)
   
+  // Cloud Run durumu
+  const cloudRunStatus = VIDEO_GENERATOR_URL ? 'configured' : 'not_configured'
+  
   return NextResponse.json({
     success: true,
     stats: stats?.[0] || {
@@ -308,6 +308,10 @@ export async function GET(request: NextRequest) {
       remaining_today: 50
     },
     recentVideos: recentVideos || [],
-    limits: RATE_LIMITS
+    limits: RATE_LIMITS,
+    cloudRun: {
+      status: cloudRunStatus,
+      url: VIDEO_GENERATOR_URL ? '✓ Configured' : '✗ Not configured'
+    }
   })
 }
