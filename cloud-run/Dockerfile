@@ -1,36 +1,21 @@
-# Teknokul Video Generator - Cloud Run
-FROM python:3.11-slim
+# Teknokul Video Factory - Cloud Run
+# manimcommunity base image = sıfır kurulum hatası
+FROM manimcommunity/manim:latest
 
-# Sistem bağımlılıkları (build tools dahil)
+# Root yetkisiyle ek paketler
+USER root
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
-    g++ \
     ffmpeg \
     sox \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libgirepository1.0-dev \
-    pkg-config \
-    texlive-latex-base \
-    texlive-fonts-recommended \
-    texlive-latex-extra \
-    texlive-lang-other \
-    fonts-dejavu \
-    fonts-noto \
+    curl \
     && rm -rf /var/lib/apt/lists/*
-
-# Türkçe karakter desteği
-ENV LANG=C.UTF-8
-ENV LC_ALL=C.UTF-8
 
 # Çalışma dizini
 WORKDIR /app
 
 # Python bağımlılıkları
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Uygulama dosyaları
 COPY . .
