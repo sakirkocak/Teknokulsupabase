@@ -1,6 +1,6 @@
 """
-Teknokul Video Factory - Cloud Run Service
-Manim + ElevenLabs + VoiceoverScene ile profesyonel video üretimi
+Teknokul Video Factory - Cloud Run Service v5.1.0
+Basit ve stabil: Manim + ElevenLabs (ayrı) + FFmpeg birleştirme
 Hibrit Upload: Supabase Storage (hızlı) + YouTube (SEO)
 """
 
@@ -22,7 +22,7 @@ import httpx
 app = FastAPI(
     title="Teknokul Video Factory",
     description="AI-powered video solution generator",
-    version="5.0.0"
+    version="5.1.0"
 )
 
 # Environment variables
@@ -140,7 +140,7 @@ SINIF: {question.grade}. Sınıf"""
         "video_senaryosu": {
             "hook_cumlesi": "Bu soruyu birlikte çözelim!",
             "adimlar": [
-                {"adim_no": 1, "tts_metni": f"Sorumuzu inceleyelim: {question.question_text[:100]}", "ekranda_gosterilecek_metin": "Soru", "vurgu_rengi": "YELLOW"},
+                {"adim_no": 1, "tts_metni": f"Sorumuzu inceleyelim.", "ekranda_gosterilecek_metin": "Soru", "vurgu_rengi": "YELLOW"},
                 {"adim_no": 2, "tts_metni": "Adım adım çözelim.", "ekranda_gosterilecek_metin": "Çözüm", "vurgu_rengi": "GREEN"},
                 {"adim_no": 3, "tts_metni": f"Doğru cevap {question.correct_answer} şıkkı!", "ekranda_gosterilecek_metin": f"Cevap: {question.correct_answer}", "vurgu_rengi": "GREEN"}
             ],
@@ -155,23 +155,80 @@ SINIF: {question.grade}. Sınıf"""
 
 
 # ============================================================
-# MANİM VİDEO OLUŞTUR
+# ELEVENLABS SES OLUŞTUR
 # ============================================================
 
-def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path) -> Optional[Path]:
-    """Manim + VoiceoverScene ile video oluştur"""
+async def generate_audio(text: str, output_path: Path) -> bool:
+    """ElevenLabs ile ses oluştur"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
+                headers={
+                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "text": text,
+                    "model_id": "eleven_multilingual_v2",
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75
+                    }
+                },
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                return True
+            else:
+                log(f"❌ ElevenLabs hatası: {response.status_code}", "ERROR")
+                return False
+    except Exception as e:
+        log(f"❌ ElevenLabs hatası: {e}", "ERROR")
+        return False
+
+
+def get_audio_duration(audio_path: Path) -> float:
+    """FFprobe ile ses süresini al"""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", 
+             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
+            capture_output=True, text=True, timeout=30
+        )
+        return float(result.stdout.strip())
+    except:
+        return 3.0  # Fallback
+
+
+# ============================================================
+# MANİM VİDEO OLUŞTUR (BASİT VERSİYON)
+# ============================================================
+
+def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path, durations: dict) -> Optional[Path]:
+    """Basit Manim ile video oluştur (ses yok, sadece görsel)"""
     log("🎬 Manim ile video üretiliyor...")
     
     video_data = scenario.get("video_senaryosu", {})
+    hook = video_data.get("hook_cumlesi", "Soruyu çözelim!")
+    adimlar = video_data.get("adimlar", [])[:5]
+    kapanis = video_data.get("kapanis_cumlesi", "Teknokul'da kalın!")
+    
+    # Süreleri al
+    hook_dur = durations.get("hook", 3.0)
+    step_durs = durations.get("steps", [3.0] * len(adimlar))
+    kapanis_dur = durations.get("kapanis", 3.0)
+    
+    # Python string escape
+    def escape(s):
+        return s.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace('\n', ' ')
     
     # Manim script oluştur
     script_content = f'''
 from manim import *
-from manim_voiceover import VoiceoverScene
-from manim_voiceover.services.elevenlabs import ElevenLabsService
-import os
-
-os.environ["ELEVEN_API_KEY"] = "{ELEVENLABS_API_KEY}"
 
 config.frame_width = 9
 config.frame_height = 16
@@ -180,89 +237,66 @@ config.pixel_height = 1920
 config.frame_rate = 30
 config.background_color = "#1a1a2e"
 
-TEKNOKUL_PURPLE = "#8B5CF6"
-TEKNOKUL_ORANGE = "#F97316"
+PURPLE = "#8B5CF6"
+ORANGE = "#F97316"
 
-class VideoScene(VoiceoverScene):
+class VideoScene(Scene):
     def construct(self):
-        self.set_speech_service(
-            ElevenLabsService(
-                voice_id="21m00Tcm4TlvDq8ikWAM",
-                model="eleven_multilingual_v2",
-                transcription_model=None
-            )
-        )
-        
-        # Logo
-        logo = Text("teknokul.com.tr", font_size=28, color=TEKNOKUL_PURPLE)
+        # Logo (sabit)
+        logo = Text("teknokul.com.tr", font_size=28, color=PURPLE)
         logo.to_edge(DOWN, buff=0.3)
         self.add(logo)
         
-        # Hook
-        hook_text = """{video_data.get('hook_cumlesi', 'Soruyu çözelim!')}"""
-        with self.voiceover(text=hook_text) as tracker:
-            warning = Text("🚨 DİKKAT 🚨", font_size=72, color=RED)
-            self.play(FadeIn(warning, scale=1.5), run_time=tracker.duration * 0.4)
-            self.play(warning.animate.set_color(YELLOW), run_time=tracker.duration * 0.3)
-            self.play(FadeOut(warning), run_time=tracker.duration * 0.3)
+        # HOOK
+        warning = Text("DİKKAT", font_size=72, color=RED, weight=BOLD)
+        self.play(FadeIn(warning, scale=1.5), run_time=0.5)
+        self.wait({hook_dur - 1.0})
+        self.play(FadeOut(warning), run_time=0.5)
 '''
     
     # Adımları ekle
-    adimlar = video_data.get("adimlar", [])
-    for i, adim in enumerate(adimlar[:6], 1):
-        tts = adim.get("tts_metni", f"Adım {i}").replace('"', '\\"').replace("'", "\\'")
-        display = adim.get("ekranda_gosterilecek_metin", f"Adım {i}").replace('"', '\\"').replace("'", "\\'")
+    for i, adim in enumerate(adimlar):
+        display = escape(adim.get("ekranda_gosterilecek_metin", f"Adım {i+1}"))
         color = adim.get("vurgu_rengi", "WHITE")
+        dur = step_durs[i] if i < len(step_durs) else 3.0
         
         script_content += f'''
-        # Adım {i}
-        with self.voiceover(text="{tts}") as tracker:
-            badge = Circle(radius=0.7, color=TEKNOKUL_ORANGE, fill_opacity=1, stroke_color=WHITE, stroke_width=3)
-            badge_text = Text("{i}", font_size=56, color=WHITE, weight=BOLD)
-            badge_text.move_to(badge.get_center())
-            badge_group = VGroup(badge, badge_text)
-            badge_group.to_edge(UP, buff=1.5)
-            
-            box = RoundedRectangle(width=8, height=5, corner_radius=0.4, fill_color="#16213e", fill_opacity=0.95, stroke_color={color}, stroke_width=4)
-            box.move_to(DOWN * 1)
-            
-            content = Text("{display}", font_size=44, color={color}, weight=BOLD)
-            content.move_to(box.get_center())
-            if content.width > 7:
-                content.scale_to_fit_width(7)
-            
-            self.play(FadeIn(badge_group, shift=DOWN), run_time=tracker.duration * 0.15)
-            self.play(GrowFromCenter(box), run_time=tracker.duration * 0.15)
-            self.play(Write(content), run_time=tracker.duration * 0.5)
-            self.wait(tracker.duration * 0.2)
+        # Adım {i+1}
+        badge = Circle(radius=0.6, color=ORANGE, fill_opacity=1)
+        badge_num = Text("{i+1}", font_size=48, color=WHITE, weight=BOLD)
+        badge_num.move_to(badge.get_center())
+        badge_grp = VGroup(badge, badge_num).to_edge(UP, buff=1.5)
         
-        self.play(FadeOut(badge_group), FadeOut(box), FadeOut(content), run_time=0.3)
+        box = RoundedRectangle(width=8, height=4, corner_radius=0.3, fill_color="#16213e", fill_opacity=0.9, stroke_color={color}, stroke_width=3)
+        box.move_to(DOWN * 0.5)
+        
+        content = Text("{display}", font_size=36, color={color}, weight=BOLD)
+        content.move_to(box.get_center())
+        if content.width > 7:
+            content.scale_to_fit_width(7)
+        
+        self.play(FadeIn(badge_grp), GrowFromCenter(box), run_time=0.4)
+        self.play(Write(content), run_time=0.6)
+        self.wait({max(0.1, dur - 1.5)})
+        self.play(FadeOut(badge_grp, box, content), run_time=0.5)
 '''
     
     # Kapanış
-    kapanis = video_data.get("kapanis_cumlesi", "Teknokul'da kalın!").replace('"', '\\"').replace("'", "\\'")
     script_content += f'''
         # Kapanış
-        with self.voiceover(text="{kapanis}") as tracker:
-            result = Text("✅ SONUÇ", font_size=72, color=GREEN, weight=BOLD)
-            result.to_edge(UP, buff=1.5)
-            
-            outro = Text("{kapanis}", font_size=56, color=WHITE, weight=BOLD)
-            outro.move_to(UP * 0.5)
-            if outro.width > 8:
-                outro.scale_to_fit_width(8)
-            
-            big_logo = Text("Teknokul", font_size=64, color=TEKNOKUL_ORANGE, weight=BOLD)
-            big_logo.move_to(DOWN * 3)
-            
-            slogan = Text("Eğitimin Dijital Üssü", font_size=32, color=WHITE)
-            slogan.next_to(big_logo, DOWN, buff=0.3)
-            
-            self.play(FadeIn(result, shift=DOWN), run_time=tracker.duration * 0.2)
-            self.play(Write(outro), run_time=tracker.duration * 0.4)
-            self.play(FadeIn(big_logo, shift=UP), FadeIn(slogan, shift=UP), run_time=tracker.duration * 0.4)
+        result = Text("SONUÇ", font_size=64, color=GREEN, weight=BOLD)
+        result.to_edge(UP, buff=2)
         
-        self.wait(1)
+        big_logo = Text("Teknokul", font_size=72, color=ORANGE, weight=BOLD)
+        big_logo.move_to(ORIGIN)
+        
+        slogan = Text("Eğitimin Dijital Üssü", font_size=32, color=WHITE)
+        slogan.next_to(big_logo, DOWN, buff=0.4)
+        
+        self.play(FadeIn(result, shift=DOWN), run_time=0.4)
+        self.wait(0.5)
+        self.play(FadeIn(big_logo, scale=1.2), FadeIn(slogan), run_time=0.6)
+        self.wait({max(0.5, kapanis_dur - 1.5)})
 '''
     
     # Script'i kaydet
@@ -270,19 +304,22 @@ class VideoScene(VoiceoverScene):
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(script_content)
     
+    log(f"📝 Manim script oluşturuldu: {script_path}")
+    
     # Manim çalıştır
     try:
         result = subprocess.run(
-            ["manim", "-ql", "--format=mp4", str(script_path), "VideoScene"],
+            ["manim", "render", "-ql", "--format=mp4", str(script_path), "VideoScene"],
             cwd=temp_dir,
             capture_output=True,
             text=True,
-            timeout=600,
-            env={**os.environ, "ELEVEN_API_KEY": ELEVENLABS_API_KEY}
+            timeout=300
         )
         
+        log(f"📊 Manim exit code: {result.returncode}")
+        
         if result.returncode != 0:
-            log(f"❌ Manim hatası: {result.stderr[:500]}", "ERROR")
+            log(f"❌ Manim stderr: {result.stderr[:1000]}", "ERROR")
             return None
         
         # Video dosyasını bul
@@ -295,11 +332,63 @@ class VideoScene(VoiceoverScene):
         return None
         
     except subprocess.TimeoutExpired:
-        log("❌ Manim timeout (10 dakika)", "ERROR")
+        log("❌ Manim timeout (5 dakika)", "ERROR")
         return None
     except Exception as e:
         log(f"❌ Manim hatası: {e}", "ERROR")
         return None
+
+
+# ============================================================
+# SES VE VİDEO BİRLEŞTİR
+# ============================================================
+
+def merge_audio_video(video_path: Path, audio_path: Path, output_path: Path) -> bool:
+    """FFmpeg ile ses ve videoyu birleştir"""
+    log("🔊 Ses ve video birleştiriliyor...")
+    
+    try:
+        result = subprocess.run([
+            "ffmpeg", "-y",
+            "-i", str(video_path),
+            "-i", str(audio_path),
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-shortest",
+            str(output_path)
+        ], capture_output=True, text=True, timeout=120)
+        
+        if result.returncode == 0 and output_path.exists():
+            log("✅ Ses ve video birleştirildi")
+            return True
+        else:
+            log(f"❌ FFmpeg hatası: {result.stderr[:500]}", "ERROR")
+            return False
+    except Exception as e:
+        log(f"❌ FFmpeg hatası: {e}", "ERROR")
+        return False
+
+
+def concat_audios(audio_files: list, output_path: Path) -> bool:
+    """Ses dosyalarını birleştir"""
+    try:
+        # Concat file oluştur
+        concat_file = output_path.parent / "concat.txt"
+        with open(concat_file, "w") as f:
+            for audio in audio_files:
+                f.write(f"file '{audio}'\n")
+        
+        result = subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", str(concat_file),
+            "-c:a", "libmp3lame", "-q:a", "2",
+            str(output_path)
+        ], capture_output=True, text=True, timeout=60)
+        
+        return result.returncode == 0
+    except Exception as e:
+        log(f"❌ Ses birleştirme hatası: {e}", "ERROR")
+        return False
 
 
 # ============================================================
@@ -450,28 +539,76 @@ async def process_video(request: VideoRequest):
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
+            audio_dir = temp_path / "audio"
+            audio_dir.mkdir()
             
             # 1. Gemini ile senaryo üret
             scenario = await generate_scenario_with_gemini(request)
+            video_data = scenario.get("video_senaryosu", {})
             
-            # 2. Manim ile video oluştur
-            video_path = create_manim_video(scenario, request, temp_path)
+            # 2. Sesleri oluştur
+            log("🎤 Sesler oluşturuluyor...")
+            audio_files = []
+            durations = {"hook": 3.0, "steps": [], "kapanis": 3.0}
+            
+            # Hook sesi
+            hook_text = video_data.get("hook_cumlesi", "Soruyu çözelim!")
+            hook_audio = audio_dir / "hook.mp3"
+            if await generate_audio(hook_text, hook_audio):
+                audio_files.append(hook_audio)
+                durations["hook"] = get_audio_duration(hook_audio)
+            
+            # Adım sesleri
+            for i, adim in enumerate(video_data.get("adimlar", [])[:5]):
+                tts = adim.get("tts_metni", f"Adım {i+1}")
+                step_audio = audio_dir / f"step_{i}.mp3"
+                if await generate_audio(tts, step_audio):
+                    audio_files.append(step_audio)
+                    durations["steps"].append(get_audio_duration(step_audio))
+                else:
+                    durations["steps"].append(3.0)
+            
+            # Kapanış sesi
+            kapanis_text = video_data.get("kapanis_cumlesi", "Teknokul'da kalın!")
+            kapanis_audio = audio_dir / "kapanis.mp3"
+            if await generate_audio(kapanis_text, kapanis_audio):
+                audio_files.append(kapanis_audio)
+                durations["kapanis"] = get_audio_duration(kapanis_audio)
+            
+            log(f"✅ {len(audio_files)} ses dosyası oluşturuldu")
+            
+            # 3. Sesleri birleştir
+            combined_audio = temp_path / "combined_audio.mp3"
+            if audio_files:
+                concat_audios(audio_files, combined_audio)
+            
+            # 4. Manim ile video oluştur
+            video_path = create_manim_video(scenario, request, temp_path, durations)
             
             if not video_path or not video_path.exists():
                 raise Exception("Video oluşturulamadı")
             
-            # 3. Supabase Storage'a yükle (öncelikli - hızlı erişim)
-            storage_url = await upload_to_supabase_storage(video_path, request.question_id)
+            # 5. Ses ve videoyu birleştir
+            final_video = temp_path / "final_video.mp4"
+            if combined_audio.exists():
+                merge_audio_video(video_path, combined_audio, final_video)
+            else:
+                final_video = video_path
+            
+            if not final_video.exists():
+                final_video = video_path
+            
+            # 6. Supabase Storage'a yükle
+            storage_url = await upload_to_supabase_storage(final_video, request.question_id)
             
             if storage_url:
                 result["storageUrl"] = storage_url
                 result["success"] = True
                 
-                # Supabase'i güncelle
                 await update_question_in_supabase(request.question_id, storage_url)
                 
-                # 4. YouTube'a yükle (arka plan - SEO için)
-                youtube_url = await upload_to_youtube_background(video_path, request, scenario)
+                # 7. YouTube'a yükle (arka plan)
+                youtube_url = await upload_to_youtube_background(final_video, request, scenario)
                 
                 if youtube_url:
                     result["youtubeUrl"] = youtube_url
@@ -508,7 +645,7 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="5.0.0"
+        version="5.1.0"
     )
 
 
