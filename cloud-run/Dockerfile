@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     ffmpeg \
+    sox \
     libcairo2-dev \
     libpango1.0-dev \
     libgirepository1.0-dev \
@@ -16,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     texlive-latex-extra \
     texlive-lang-other \
     fonts-dejavu \
+    fonts-noto \
     && rm -rf /var/lib/apt/lists/*
 
 # Türkçe karakter desteği

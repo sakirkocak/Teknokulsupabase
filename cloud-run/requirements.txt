@@ -5,7 +5,7 @@ uvicorn[standard]==0.27.0
 # Manim + Voiceover (3Blue1Brown tarzı senkronize animasyonlar)
 manim==0.18.0
 manim-voiceover==0.3.6
-elevenlabs==1.0.0
+elevenlabs>=1.0.0
 
 # Audio
 pydub==0.25.1
@@ -23,5 +23,6 @@ google-auth-oauthlib==1.2.0
 google-auth-httplib2==0.2.0
 
 # Utils
-python-dotenv>=0.21.0,<0.22.0
-Pillow>=9.1,<10.0
+python-dotenv>=1.0.0
+Pillow>=9.1
+setuptools>=69.0.0
