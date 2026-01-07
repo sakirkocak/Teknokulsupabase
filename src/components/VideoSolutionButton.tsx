@@ -1,7 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { Play, Loader2, Video, ExternalLink, X, Youtube } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Play, Loader2, Video, ExternalLink, X, Youtube, Lock, Coins, LogIn } from 'lucide-react'
+import Link from 'next/link'
+
+interface CreditStatus {
+  remaining: number
+  is_premium: boolean
+  daily_credits: number
+  used_today: number
+}
 
 interface VideoSolutionButtonProps {
   questionId: string
@@ -28,12 +36,48 @@ export default function VideoSolutionButton({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPlayer, setShowPlayer] = useState(false)
+  
+  // Kredi durumu
+  const [credits, setCredits] = useState<CreditStatus | null>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null)
+  const [checkingCredits, setCheckingCredits] = useState(true)
 
   // En iyi URL'i seç (Supabase öncelikli)
   const bestVideoUrl = storageUrl || youtubeUrl
+  const hasVideo = status === 'completed' && bestVideoUrl
+
+  // Kredi durumunu kontrol et
+  useEffect(() => {
+    const checkCredits = async () => {
+      try {
+        const response = await fetch('/api/tekno-teacher/credits')
+        const data = await response.json()
+        
+        if (response.status === 401) {
+          setIsLoggedIn(false)
+          setCredits(null)
+        } else if (data.success) {
+          setIsLoggedIn(true)
+          setCredits(data.credits)
+        }
+      } catch (err) {
+        console.error('Kredi kontrolü hatası:', err)
+      } finally {
+        setCheckingCredits(false)
+      }
+    }
+    
+    checkCredits()
+  }, [])
 
   const handleGenerateVideo = async () => {
     if (loading || status === 'processing' || status === 'pending') return
+    
+    // Giriş kontrolü
+    if (!isLoggedIn) {
+      setError('Video üretmek için giriş yapmalısınız')
+      return
+    }
     
     setLoading(true)
     setError(null)
@@ -56,9 +100,14 @@ export default function VideoSolutionButton({
         if (data.videoUrl) setYoutubeUrl(data.videoUrl)
         setStatus('completed')
         onVideoGenerated?.(data.storageUrl || data.videoUrl)
-      } else if (data.status === 'queued') {
-        setStatus('pending')
-        pollVideoStatus()
+      } else if (data.status === 'queued' || data.status === 'completed') {
+        if (data.storageUrl) setStorageUrl(data.storageUrl)
+        if (data.videoUrl) setYoutubeUrl(data.videoUrl)
+        setStatus(data.status)
+        if (data.status !== 'completed') {
+          pollVideoStatus()
+        }
+        onVideoGenerated?.(data.storageUrl || data.videoUrl)
       }
       
     } catch (err: any) {
@@ -70,7 +119,7 @@ export default function VideoSolutionButton({
   }
 
   const pollVideoStatus = async () => {
-    const maxAttempts = 120 // 10 dakika (5 saniye aralıklarla)
+    const maxAttempts = 120
     let attempts = 0
     
     const checkStatus = async () => {
@@ -106,14 +155,49 @@ export default function VideoSolutionButton({
     setTimeout(checkStatus, 3000)
   }
 
-  const handlePlayVideo = () => {
+  const handlePlayVideo = async () => {
+    // Giriş kontrolü
+    if (!isLoggedIn) {
+      setError('Video izlemek için giriş yapmalısınız')
+      return
+    }
+    
+    // Kredi kontrolü (premium değilse)
+    if (credits && !credits.is_premium && credits.remaining <= 0) {
+      setError('Krediniz bitti! Premium üyelik alın.')
+      return
+    }
+    
+    // Kredi harca
+    if (credits && !credits.is_premium) {
+      try {
+        await fetch('/api/video/watch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questionId })
+        })
+        // Kredi güncelle
+        setCredits(prev => prev ? { ...prev, remaining: prev.remaining - 1, used_today: prev.used_today + 1 } : null)
+      } catch (err) {
+        console.error('Kredi harcama hatası:', err)
+      }
+    }
+    
     if (storageUrl) {
-      // Supabase video - inline player göster
       setShowPlayer(true)
     } else if (youtubeUrl) {
-      // YouTube - yeni sekmede aç
       window.open(youtubeUrl, '_blank')
     }
+  }
+
+  // Yükleniyor
+  if (checkingCredits) {
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 bg-gray-200 text-gray-500 text-sm font-medium rounded-lg ${className}`}>
+        <Loader2 className="w-4 h-4 animate-spin" />
+        {!compact && <span>Yükleniyor...</span>}
+      </div>
+    )
   }
 
   // Video Player Modal
@@ -121,7 +205,6 @@ export default function VideoSolutionButton({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
         <div className="relative w-full max-w-md">
-          {/* Kapatma butonu */}
           <button
             onClick={() => setShowPlayer(false)}
             className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
@@ -129,7 +212,6 @@ export default function VideoSolutionButton({
             <X className="w-8 h-8" />
           </button>
           
-          {/* Video Player - 9:16 dikey format */}
           <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '9/16' }}>
             <video
               src={storageUrl}
@@ -142,7 +224,6 @@ export default function VideoSolutionButton({
             </video>
           </div>
           
-          {/* YouTube linki (varsa) */}
           {youtubeUrl && (
             <a
               href={youtubeUrl}
@@ -159,17 +240,55 @@ export default function VideoSolutionButton({
     )
   }
 
-  // Video hazır
-  if (status === 'completed' && bestVideoUrl) {
+  // Giriş yapmamış - Video varsa
+  if (!isLoggedIn && hasVideo) {
     return (
-      <button
-        onClick={handlePlayVideo}
-        className={`inline-flex items-center gap-2 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${className}`}
+      <Link
+        href="/giris"
+        className={`inline-flex items-center gap-2 px-3 py-1.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-lg transition-colors ${className}`}
       >
-        <Play className="w-4 h-4" />
-        {!compact && <span>Video Çözüm İzle</span>}
-        {!storageUrl && youtubeUrl && <ExternalLink className="w-3 h-3" />}
-      </button>
+        <LogIn className="w-4 h-4" />
+        {!compact && <span>Giriş Yap & İzle</span>}
+      </Link>
+    )
+  }
+
+  // Video hazır - Kredi kontrolü
+  if (hasVideo) {
+    const hasCredits = credits?.is_premium || (credits?.remaining && credits.remaining > 0)
+    
+    if (!hasCredits) {
+      return (
+        <div className={`inline-flex flex-col gap-1 ${className}`}>
+          <Link
+            href="/premium"
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Lock className="w-4 h-4" />
+            {!compact && <span>Premium Al</span>}
+          </Link>
+          <span className="text-xs text-amber-600">Krediniz bitti</span>
+        </div>
+      )
+    }
+    
+    return (
+      <div className={`inline-flex flex-col gap-1 ${className}`}>
+        <button
+          onClick={handlePlayVideo}
+          className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Play className="w-4 h-4" />
+          {!compact && <span>Video Çözüm İzle</span>}
+          {!storageUrl && youtubeUrl && <ExternalLink className="w-3 h-3" />}
+        </button>
+        {!credits?.is_premium && (
+          <span className="text-xs text-gray-500 flex items-center gap-1">
+            <Coins className="w-3 h-3" />
+            {credits?.remaining} kredi kaldı
+          </span>
+        )}
+      </div>
     )
   }
 
@@ -203,6 +322,19 @@ export default function VideoSolutionButton({
         </button>
         {error && <span className="text-xs text-red-500">{error}</span>}
       </div>
+    )
+  }
+
+  // Giriş yapmamış - Video yok
+  if (!isLoggedIn) {
+    return (
+      <Link
+        href="/giris"
+        className={`inline-flex items-center gap-2 px-3 py-1.5 bg-gray-400 hover:bg-gray-500 text-white text-sm font-medium rounded-lg transition-colors ${className}`}
+      >
+        <LogIn className="w-4 h-4" />
+        {!compact && <span>Giriş Yap</span>}
+      </Link>
     )
   }
 
