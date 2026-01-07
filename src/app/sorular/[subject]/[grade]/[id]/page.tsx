@@ -4,12 +4,13 @@ import { notFound } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { BreadcrumbSchema, QuizSchema } from '@/components/JsonLdSchema'
 import MathRenderer from '@/components/MathRenderer'
+import VideoSolutionButton from '@/components/VideoSolutionButton'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
   ChevronRight, CheckCircle, XCircle, Star, Zap,
   ArrowLeft, ArrowRight, Target, Sparkles, Clock,
-  Share2, Bookmark, ThumbsUp, MessageCircle
+  Share2, Bookmark, ThumbsUp, MessageCircle, Video
 } from 'lucide-react'
 
 // ISR - 1 saat cache (şimşek hız için!)
@@ -113,9 +114,15 @@ async function getQuestionData(questionId: string) {
     const supabase = createPublicClient()
     
     // Paralel sorgular
-    const [questionResult, relatedResult] = await Promise.all([
+    const [questionResult, relatedResult, videoResult] = await Promise.all([
       supabase.rpc('get_question_detail', { p_question_id: questionId }),
       supabase.rpc('get_related_questions', { p_question_id: questionId, p_limit: 5 }),
+      // Video bilgilerini al
+      supabase
+        .from('questions')
+        .select('video_status, video_solution_url, video_storage_url')
+        .eq('id', questionId)
+        .single(),
     ])
     
     if (questionResult.error) {
@@ -125,8 +132,16 @@ async function getQuestionData(questionId: string) {
       console.error('get_related_questions error:', relatedResult.error)
     }
     
+    // Video bilgilerini question'a ekle
+    const question = questionResult.data?.[0] || null
+    if (question && videoResult.data) {
+      question.video_status = videoResult.data.video_status
+      question.video_solution_url = videoResult.data.video_solution_url
+      question.video_storage_url = videoResult.data.video_storage_url
+    }
+    
     return {
-      question: questionResult.data?.[0] || null,
+      question,
       relatedQuestions: relatedResult.data || [],
     }
   } catch (error) {
@@ -324,6 +339,29 @@ export default async function SingleQuestionPage({ params }: Props) {
                 </div>
               </div>
             )}
+            
+            {/* Video Çözüm */}
+            <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-t border-purple-100">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="text-sm font-semibold text-purple-800 mb-1 flex items-center gap-2">
+                    <Video className="w-4 h-4" />
+                    Video Çözüm
+                  </h3>
+                  <p className="text-xs text-purple-600">
+                    {question.video_storage_url || question.video_solution_url 
+                      ? 'Bu sorunun video çözümü hazır!' 
+                      : 'AI ile video çözüm oluştur'}
+                  </p>
+                </div>
+                <VideoSolutionButton
+                  questionId={question.id}
+                  videoUrl={question.video_solution_url}
+                  videoStorageUrl={question.video_storage_url}
+                  videoStatus={question.video_status || 'none'}
+                />
+              </div>
+            </div>
           </article>
 
           {/* Hızlı Çöz CTA */}
