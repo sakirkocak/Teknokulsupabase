@@ -10,6 +10,7 @@ import base64
 import httpx
 import tempfile
 import subprocess
+import textwrap
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -33,6 +34,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 class VideoRequest(BaseModel):
     question_id: str
     question_text: str
+    question_image_url: Optional[str] = None
     options: dict
     correct_answer: str
     explanation: Optional[str] = None
@@ -67,7 +69,7 @@ async def generate_solution_with_gemini(question: VideoRequest) -> dict:
     Yanıtını şu JSON formatında ver:
     {{
         "steps": ["Adım 1: ...", "Adım 2: ...", ...],
-        "narrationText": "Video için okunacak tam metin (doğal, öğretici bir dil ile, maksimum 500 karakter)",
+        "narrationText": "Video için okunacak tam metin (yavaş ve anlaşılır; kısa cümleler; bol noktalama ve duraklama; maksimum 500 karakter)",
         "finalAnswer": "Doğru cevap açıklaması"
     }}
     """
@@ -143,60 +145,294 @@ async def generate_audio_with_elevenlabs(text: str, output_path: Path) -> bool:
     
     return False
 
-def create_simple_video(question: VideoRequest, solution: dict, output_path: Path, audio_path: Optional[Path] = None) -> bool:
-    """FFmpeg ile basit video oluştur"""
-    log("FFmpeg ile video oluşturuluyor...")
-    
+def _ffmpeg_escape_path_for_filter(path: Path) -> str:
+    # drawtext textfile yolu için ':' kaçır (ör: /tmp/a:b.txt -> /tmp/a\:b.txt)
+    return str(path).replace("\\", "\\\\").replace(":", "\\:")
+
+def _pick_fontfile() -> Optional[str]:
+    candidates = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+    ]
+    for p in candidates:
+        if Path(p).exists():
+            return p
+    return None
+
+def _build_question_overlay_text(question: VideoRequest) -> str:
+    q = (question.question_text or "").strip().replace("\r", " ")
+    q = " ".join(q.split())
+    q_wrapped = textwrap.fill(q, width=44)
+
+    options_lines = []
+    if isinstance(question.options, dict):
+        for key in ["A", "B", "C", "D", "E"]:
+            if key in question.options and question.options.get(key):
+                opt = str(question.options.get(key)).strip().replace("\r", " ")
+                opt = " ".join(opt.split())
+                opt_wrapped = textwrap.fill(opt, width=42, subsequent_indent="   ")
+                options_lines.append(f"{key}) {opt_wrapped}")
+
+    parts = [
+        "SORU:",
+        q_wrapped,
+        "",
+    ]
+    if options_lines:
+        parts.append("ŞIKLAR:")
+        parts.extend(options_lines)
+        parts.append("")
+    parts.append(f"Doğru cevap: {question.correct_answer}")
+    return "\n".join(parts).strip()
+
+def _download_question_image(url: str, dest: Path) -> Optional[Path]:
+    if not url:
+        return None
     try:
-        duration = 10
-        if audio_path and audio_path.exists():
-            probe = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                 "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
-                capture_output=True, text=True
+        r = httpx.get(url, timeout=20)
+        if r.status_code == 200 and r.content:
+            dest.write_bytes(r.content)
+            return dest
+    except Exception:
+        return None
+    return None
+
+def _audio_duration_seconds(audio_path: Path) -> Optional[float]:
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
+            capture_output=True, text=True
+        )
+        if probe.returncode == 0:
+            return float(probe.stdout.strip())
+    except Exception:
+        return None
+    return None
+
+def _slow_down_audio(input_audio: Path, output_audio: Path, speed: float = 0.90) -> bool:
+    # speed<1 => yavaşlat. atempo faktörü 0.5-2.0 aralığında olmalı.
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-y", "-i", str(input_audio), "-filter:a", f"atempo={speed}", str(output_audio)],
+            capture_output=True, text=True, timeout=60
+        )
+        return result.returncode == 0 and output_audio.exists()
+    except Exception:
+        return False
+
+def create_thumbnail(question: VideoRequest, output_path: Path, image_path: Optional[Path] = None) -> bool:
+    """FFmpeg ile thumbnail üret"""
+    try:
+        fontfile = _pick_fontfile()
+        topic = (question.topic_name or "Soru Çözümü").strip()
+        grade = question.grade or 8
+        subject = (question.subject_name or "Matematik").strip()
+        q_short = (question.question_text or "").strip().replace("\n", " ")
+        q_short = " ".join(q_short.split())[:120]
+
+        textfile = output_path.with_suffix(".txt")
+        textfile.write_text(textwrap.fill(q_short, width=34), encoding="utf-8")
+        tf = _ffmpeg_escape_path_for_filter(textfile)
+
+        inputs = ["-f", "lavfi", "-i", "color=c=0x1E1B4B:s=1280x720:d=1"]
+        filter_parts = ["[0:v]"]
+
+        if image_path and image_path.exists():
+            inputs += ["-i", str(image_path)]
+            filter_parts.append(
+                "[1:v]scale=560:-1:force_original_aspect_ratio=decrease[img];"
+                "[0:v][img]overlay=60:180:format=auto[bg];"
+                "[bg]"
             )
-            if probe.returncode == 0:
-                duration = float(probe.stdout.strip()) + 1
-        
-        topic_safe = (question.topic_name or "Soru Cozumu").replace("'", "").replace('"', '')
-        
-        cmd = [
+
+        draw = []
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:text='{grade}. Sınıf {subject}':fontsize=44:fontcolor=white:x=60:y=60")
+            draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=52:fontcolor=0xF97316:x=60:y=120")
+            draw.append("drawbox=x=640:y=210:w=580:h=300:color=black@0.35:t=fill")
+            draw.append(f"drawtext=fontfile={fontfile}:textfile='{tf}':reload=0:fontsize=30:fontcolor=white:x=660:y=230:line_spacing=10")
+            draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
+        else:
+            draw.append(f"drawtext=text='{grade}. Sınıf {subject}':fontsize=44:fontcolor=white:x=60:y=60")
+            draw.append(f"drawtext=text='{topic}':fontsize=52:fontcolor=0xF97316:x=60:y=120")
+            draw.append("drawbox=x=640:y=210:w=580:h=300:color=black@0.35:t=fill")
+            draw.append(f"drawtext=textfile='{tf}':reload=0:fontsize=30:fontcolor=white:x=660:y=230:line_spacing=10")
+            draw.append("drawtext=text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
+
+        vf = ",".join(draw)
+        cmd = ["ffmpeg", "-y", *inputs, "-frames:v", "1", "-vf", vf, str(output_path)]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        textfile.unlink(missing_ok=True)
+        return res.returncode == 0 and output_path.exists()
+    except Exception:
+        return False
+
+def create_simple_video(question: VideoRequest, solution: dict, output_path: Path, audio_path: Optional[Path] = None) -> bool:
+    """FFmpeg ile video oluştur (intro + soru metni + varsa görsel)"""
+    log("FFmpeg ile video oluşturuluyor...")
+
+    try:
+        # --- Audio (yavaşlat) ---
+        intro_seconds = 2.0
+        final_audio: Optional[Path] = None
+        duration = 14.0
+
+        if audio_path and audio_path.exists():
+            slow_audio = audio_path.with_name("narration_slow.mp3")
+            if _slow_down_audio(audio_path, slow_audio, speed=0.90):
+                final_audio = slow_audio
+            else:
+                final_audio = audio_path
+
+            aud_dur = _audio_duration_seconds(final_audio)
+            if aud_dur:
+                duration = aud_dur + intro_seconds + 1.0
+
+        # --- Optional image download ---
+        img_path: Optional[Path] = None
+        if question.question_image_url:
+            img_path = _download_question_image(question.question_image_url, output_path.with_suffix(".img"))
+
+        fontfile = _pick_fontfile()
+        topic = (question.topic_name or "Soru Çözümü").strip().replace("'", "").replace('"', '')
+
+        # --- Main text file for drawtext ---
+        overlay_text = _build_question_overlay_text(question)
+        textfile = output_path.with_suffix(".txt")
+        textfile.write_text(overlay_text, encoding="utf-8")
+        tf = _ffmpeg_escape_path_for_filter(textfile)
+
+        # --- Intro clip ---
+        intro_path = output_path.with_suffix(".intro.mp4")
+        intro_draw = []
+        if fontfile:
+            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul':fontsize=78:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40")
+            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Video Soru Çözümü':fontsize=42:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+40")
+            intro_draw.append(f"drawtext=fontfile={fontfile}:text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-70")
+        else:
+            intro_draw.append("drawtext=text='Teknokul':fontsize=78:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40")
+            intro_draw.append("drawtext=text='Video Soru Çözümü':fontsize=42:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+40")
+            intro_draw.append("drawtext=text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-70")
+
+        intro_cmd = [
             "ffmpeg", "-y",
             "-f", "lavfi",
-            "-i", f"color=c=0x1E1B4B:s=1280x720:d={duration}",
-            "-vf", f"drawtext=text='{topic_safe}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=50,drawtext=text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50",
+            "-i", f"color=c=0x1E1B4B:s=1280x720:d={intro_seconds}",
+            "-vf", ",".join(intro_draw),
             "-c:v", "libx264",
-            "-t", str(duration),
-            "-pix_fmt", "yuv420p"
+            "-t", str(intro_seconds),
+            "-pix_fmt", "yuv420p",
+            str(intro_path)
         ]
-        
-        if audio_path and audio_path.exists():
-            temp_video = output_path.with_suffix('.temp.mp4')
-            cmd.append(str(temp_video))
-            subprocess.run(cmd, capture_output=True, timeout=60)
-            
+        subprocess.run(intro_cmd, capture_output=True, text=True, timeout=60)
+
+        # --- Main clip ---
+        main_seconds = max(8.0, duration - intro_seconds)
+        main_path = output_path.with_suffix(".main.mp4")
+
+        inputs = ["-f", "lavfi", "-i", f"color=c=0x1E1B4B:s=1280x720:d={main_seconds}"]
+        use_filter_complex = False
+
+        if img_path and img_path.exists():
+            inputs += ["-i", str(img_path)]
+            text_x = 660
+            box_x = 640
+            box_w = 580
+            use_filter_complex = True
+        else:
+            text_x = 120
+            box_x = 80
+            box_w = 1120
+
+        draw = []
+        # Başlık
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=50")
+        else:
+            draw.append(f"drawtext=text='{topic}':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=50")
+
+        # Metin kutusu
+        draw.append(f"drawbox=x={box_x}:y=160:w={box_w}:h=470:color=black@0.35:t=fill")
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:textfile='{tf}':reload=0:fontsize=28:fontcolor=white:x={text_x}:y=180:line_spacing=8")
+        else:
+            draw.append(f"drawtext=textfile='{tf}':reload=0:fontsize=28:fontcolor=white:x={text_x}:y=180:line_spacing=8")
+
+        # Footer
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=26:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
+        else:
+            draw.append("drawtext=text='Teknokul.com.tr':fontsize=26:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
+
+        if use_filter_complex:
+            # Görsel + text overlay
+            vf = (
+                "[1:v]scale=560:-1:force_original_aspect_ratio=decrease[img];"
+                f"[0:v][img]overlay=60:180:format=auto,{','.join(draw)}[v]"
+            )
+            cmd = [
+                "ffmpeg", "-y",
+                *inputs,
+                "-filter_complex", vf,
+                "-map", "[v]",
+                "-c:v", "libx264",
+                "-t", str(main_seconds),
+                "-pix_fmt", "yuv420p",
+                str(main_path)
+            ]
+        else:
+            vf = ",".join(draw)
+            cmd = ["ffmpeg", "-y", *inputs, "-vf", vf, "-c:v", "libx264",
+                   "-t", str(main_seconds), "-pix_fmt", "yuv420p", str(main_path)]
+        subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+        # --- Concat intro + main ---
+        concat_path = output_path.with_suffix(".concat.mp4")
+        concat_cmd = [
+            "ffmpeg", "-y",
+            "-i", str(intro_path),
+            "-i", str(main_path),
+            "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]",
+            "-map", "[v]",
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            str(concat_path)
+        ]
+        subprocess.run(concat_cmd, capture_output=True, text=True, timeout=120)
+
+        # --- Merge audio (intro kadar geciktir) ---
+        if final_audio and final_audio.exists():
             merge_cmd = [
                 "ffmpeg", "-y",
-                "-i", str(temp_video),
-                "-i", str(audio_path),
+                "-i", str(concat_path),
+                "-i", str(final_audio),
+                "-filter_complex", f"[1:a]adelay={int(intro_seconds*1000)}|{int(intro_seconds*1000)}[a]",
+                "-map", "0:v:0",
+                "-map", "[a]",
                 "-c:v", "copy",
                 "-c:a", "aac",
                 "-shortest",
                 str(output_path)
             ]
-            subprocess.run(merge_cmd, capture_output=True, timeout=60)
-            temp_video.unlink(missing_ok=True)
+            subprocess.run(merge_cmd, capture_output=True, text=True, timeout=120)
         else:
-            cmd.append(str(output_path))
-            subprocess.run(cmd, capture_output=True, timeout=60)
-        
+            concat_path.replace(output_path)
+
+        # Cleanup
+        textfile.unlink(missing_ok=True)
+        if img_path and img_path.exists():
+            img_path.unlink(missing_ok=True)
+        intro_path.unlink(missing_ok=True)
+        main_path.unlink(missing_ok=True)
+        concat_path.unlink(missing_ok=True)
+
         if output_path.exists():
             log(f"Video oluşturuldu: {output_path.name}")
             return True
-            
     except Exception as e:
         log(f"Video oluşturma hatası: {e}", "ERROR")
-    
     return False
 
 async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optional[str]:
@@ -204,11 +440,22 @@ async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optiona
     log("YouTube'a yükleniyor...")
     
     try:
+        # Thumbnail üret
+        thumb_path = video_path.with_suffix(".thumb.png")
+        img_path: Optional[Path] = None
+        if question.question_image_url:
+            img_path = _download_question_image(question.question_image_url, video_path.with_suffix(".thumb_img"))
+        create_thumbnail(question, thumb_path, image_path=img_path)
+
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         
         video_base64 = base64.b64encode(video_bytes).decode()
         video_size_kb = len(video_bytes) / 1024
+
+        thumbnail_base64: Optional[str] = None
+        if thumb_path.exists():
+            thumbnail_base64 = base64.b64encode(thumb_path.read_bytes()).decode()
         
         log(f"Video boyutu: {video_size_kb:.1f} KB, YouTube'a gönderiliyor...")
         
@@ -218,6 +465,8 @@ async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optiona
                 json={
                     "questionId": question.question_id,
                     "videoBase64": video_base64,
+                    "thumbnailBase64": thumbnail_base64,
+                    "thumbnailMimeType": "image/png",
                     "title": f"{question.grade}. Sınıf {question.subject_name} | {question.topic_name}",
                     "grade": question.grade,
                     "subject": question.subject_name,
@@ -232,6 +481,12 @@ async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optiona
                 data = response.json()
                 video_url = data.get("videoUrl")
                 log(f"✅ YouTube'a yüklendi: {video_url}")
+                try:
+                    thumb_path.unlink(missing_ok=True)
+                    if img_path:
+                        img_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
                 return video_url
             else:
                 error_msg = response.text[:500]

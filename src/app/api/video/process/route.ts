@@ -25,6 +25,7 @@ interface QueueItem {
   topic_name: string | null
   subject_name: string | null
   grade: number | null
+  question_image_url?: string | null
 }
 
 /**
@@ -69,6 +70,7 @@ async function sendToCloudRun(item: QueueItem): Promise<{ success: boolean; vide
       body: JSON.stringify({
         question_id: item.question_id,
         question_text: item.question_text,
+        question_image_url: item.question_image_url || null,
         options: item.options,
         correct_answer: item.correct_answer,
         explanation: item.explanation,

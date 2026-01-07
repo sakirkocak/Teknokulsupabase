@@ -50,6 +50,8 @@ interface UploadRequest {
   topicName?: string
   questionText?: string
   videoBase64?: string
+  thumbnailBase64?: string
+  thumbnailMimeType?: string
 }
 
 function base64ToStream(base64: string): Readable {
@@ -90,7 +92,9 @@ export async function POST(request: NextRequest) {
       grade = 8, 
       subject = 'Matematik',
       topicName = 'Soru Çözümü',
-      questionText = ''
+      questionText = '',
+      thumbnailBase64,
+      thumbnailMimeType
     } = body
     
     if (!questionId) {
@@ -157,6 +161,49 @@ export async function POST(request: NextRequest) {
     
     playlistId = playlist?.playlist_id || null
     
+    // Playlist yoksa otomatik oluştur (kanalda playlistler görünmüyor sorununu çözer)
+    if (!playlistId) {
+      try {
+        const title = `${grade}. Sınıf ${subject} Soru Çözümleri | Teknokul`
+        const description = generateVideoDescription({
+          grade,
+          subject,
+          topic: `${subject} Soru Çözümleri`,
+          questionText: '',
+          questionId,
+          difficulty: 'Orta'
+        })
+        
+        const created = await youtube.playlists.insert({
+          part: ['snippet', 'status'],
+          requestBody: {
+            snippet: {
+              title: title.slice(0, 150),
+              description: description.slice(0, 5000),
+              defaultLanguage: 'tr'
+            },
+            status: { privacyStatus: 'public' }
+          }
+        })
+        
+        playlistId = created.data.id || null
+        if (playlistId) {
+          const playlistUrl = `https://www.youtube.com/playlist?list=${playlistId}`
+          await supabase.from('youtube_playlists').upsert({
+            grade,
+            subject,
+            subject_code: subjectCode,
+            playlist_id: playlistId,
+            playlist_url: playlistUrl,
+            video_count: 0
+          }, { onConflict: 'grade,subject_code' })
+          console.log(`📋 [YOUTUBE] Playlist oluşturuldu: ${playlistId}`)
+        }
+      } catch (e: any) {
+        console.error('Playlist auto-create hatası:', e?.message || e)
+      }
+    }
+    
     // Video stream
     const videoStream = base64ToStream(videoBase64)
     const videoSizeBytes = Buffer.from(videoBase64, 'base64').length
@@ -192,6 +239,23 @@ export async function POST(request: NextRequest) {
     const videoUrl = `https://www.youtube.com/watch?v=${youtubeVideoId}`
     
     console.log(`✅ [YOUTUBE] Yüklendi: ${videoUrl}`)
+    
+    // Thumbnail set et (varsa)
+    if (youtubeVideoId && thumbnailBase64) {
+      try {
+        const thumbStream = base64ToStream(thumbnailBase64)
+        await youtube.thumbnails.set({
+          videoId: youtubeVideoId,
+          media: {
+            mimeType: thumbnailMimeType || 'image/png',
+            body: thumbStream
+          }
+        })
+        console.log(`🖼️ [YOUTUBE] Thumbnail yüklendi`)
+      } catch (e: any) {
+        console.error('Thumbnail upload hatası:', e.message)
+      }
+    }
     
     // Log kaydet
     await supabase.from('youtube_upload_logs').insert({

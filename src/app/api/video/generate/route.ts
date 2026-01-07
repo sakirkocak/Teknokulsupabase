@@ -91,6 +91,7 @@ async function sendToCloudRun(question: any, topic: any): Promise<{ success: boo
       body: JSON.stringify({
         question_id: question.id,
         question_text: question.question_text,
+        question_image_url: question.question_image_url,
         options: question.options,
         correct_answer: question.correct_answer,
         explanation: question.explanation,
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
       .select(`
         id,
         question_text,
+        question_image_url,
         options,
         correct_answer,
         explanation,
