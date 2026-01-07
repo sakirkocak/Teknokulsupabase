@@ -2,8 +2,10 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 
-# Manim
+# Manim + Voiceover (3Blue1Brown tarzı senkronize animasyonlar)
 manim==0.18.0
+manim-voiceover==0.3.6
+elevenlabs==1.0.0
 
 # Audio
 pydub==0.25.1

@@ -1,10 +1,12 @@
 """
-Teknokul Video Generator - Google Cloud Run Service
-Video üretir ve YouTube'a yükler
-MANIM 3Blue1Brown tarzı animasyonlar ile!
+Teknokul Video Fabrikası - Cloud Run Service
+3Blue1Brown tarzı senkronize animasyonlu video üretimi
+manim-voiceover + ElevenLabs + Gemini ile
+Version: 4.0.0
 """
 
 import os
+import re
 import json
 import time
 import base64
@@ -12,32 +14,18 @@ import httpx
 import tempfile
 import subprocess
 import textwrap
-import re
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-# Manim imports
-from manim import *
-import manim
-
-# Manim config for Cloud Run (headless)
-config.preview = False
-config.write_to_movie = True
-config.disable_caching = True
-config.pixel_width = 1280
-config.pixel_height = 720
-config.frame_rate = 30
-config.background_color = "#1E1B4B"  # Teknokul mor
-
 app = FastAPI(
-    title="Teknokul Video Generator",
-    description="AI-powered video solution generator with Manim animations",
-    version="3.0.0"
+    title="Teknokul Video Fabrikası",
+    description="3Blue1Brown tarzı senkronize animasyonlu video üretimi",
+    version="4.0.0"
 )
 
 # Environment variables
@@ -45,6 +33,9 @@ API_SECRET = os.getenv("API_SECRET", "")
 TEKNOKUL_API_BASE = os.getenv("TEKNOKUL_API_BASE", "https://teknokul.com.tr")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+# ElevenLabs Voice ID (Türkçe erkek sesi)
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 
 class VideoRequest(BaseModel):
     question_id: str
@@ -67,966 +58,356 @@ def log(message: str, level: str = "INFO"):
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] [{level}] {message}")
 
-def clean_latex_for_display(text: str) -> str:
-    """LaTeX ifadelerini ekran için temizle"""
-    import re
-    if not text:
-        return ""
-    # $ işaretlerini kaldır
-    text = re.sub(r'\$([^$]+)\$', r'\1', text)
-    # Bazı LaTeX komutlarını temizle
-    text = text.replace('\\int', '∫')
-    text = text.replace('\\sum', 'Σ')
-    text = text.replace('\\infty', '∞')
-    text = text.replace('\\pi', 'π')
-    text = text.replace('\\sqrt', '√')
-    text = text.replace('\\frac', '')
-    text = text.replace('\\left', '')
-    text = text.replace('\\right', '')
-    text = text.replace('\\cdot', '·')
-    text = text.replace('\\times', '×')
-    text = text.replace('\\div', '÷')
-    text = text.replace('\\leq', '≤')
-    text = text.replace('\\geq', '≥')
-    text = text.replace('\\neq', '≠')
-    text = text.replace('\\pm', '±')
-    text = text.replace('{', '')
-    text = text.replace('}', '')
-    text = text.replace('^', '')
-    text = text.replace('_', '')
-    text = text.replace('\\', '')
-    return text.strip()
 
 # ============================================================
-# MANIM SCENE SINIFLARI - 3Blue1Brown Tarzı Animasyonlar
+# SYSTEM PROMPT - Gemini'ye Manim kodu yazdırma talimatları
 # ============================================================
 
-class IntroScene(Scene):
-    """Teknokul intro animasyonu"""
-    def __init__(self, topic_name: str = "Soru Çözümü", grade: int = 8, subject: str = "Matematik", **kwargs):
-        super().__init__(**kwargs)
-        self.topic_name = topic_name
-        self.grade = grade
-        self.subject = subject
-    
+MANIM_SYSTEM_PROMPT = """Sen dünyanın en iyi matematik animasyon uzmanısın. manim ve manim-voiceover kütüphanelerini kullanarak eğitici videolar hazırlıyorsun.
+
+GÖREVİN: Sana verilen soruyu çöz ve çözüm için Python kodu üret.
+
+KESİN KURALLAR:
+
+1. Sınıfını VoiceoverScene'den türet, sınıf adı "SoruCozum" olsun.
+
+2. ElevenLabsService kullan, voice_id="{voice_id}" olacak.
+
+3. ASLA wait() komutunu manuel süreyle (örn: wait(3)) kullanma. Süreyi ses belirler.
+
+4. Her anlatım cümlesini `with self.voiceover(text="...") as tracker:` bloğu içine al.
+
+5. Animasyonları bu bloğun içine yaz. Böylece animasyon ve ses %100 senkronize olur.
+
+6. Matematiksel ifadeler için MathTex kullan. LaTeX formatında yaz.
+
+7. Arka plan rengi "#1E1B4B" (Teknokul mor) olsun, yazı rengi beyaz olsun.
+
+8. Türkçe konuş, sıcak ve öğretici bir üslup kullan.
+
+9. Vurgulama için SurroundingRectangle kullan (YELLOW renk).
+
+10. Yazılar için Write, FadeIn, GrowFromCenter gibi efektleri karıştır.
+
+11. Her adımı ayrı voiceover bloğunda anlat (4-6 adım ideal).
+
+12. Son adımda "SONUÇ" veya "CEVAP" başlığı ile doğru cevabı vurgula.
+
+13. Ekranın altına "Teknokul.com.tr" logosu ekle (Text ile).
+
+14. Çıktı olarak SADECE Python kodunu ver, açıklama yapma. Kod ```python ile başlasın.
+
+ÖRNEK YAPI:
+```python
+from manim import *
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.elevenlabs import ElevenLabsService
+
+class SoruCozum(VoiceoverScene):
     def construct(self):
-        # Logo metni
-        logo = Text("Teknokul", font_size=96, color=WHITE)
-        subtitle = Text("Video Soru Çözümü", font_size=48, color=ORANGE)
-        subtitle.next_to(logo, DOWN, buff=0.5)
-        
-        # Alt bilgi
-        info = Text(f"{self.grade}. Sınıf {self.subject}", font_size=36, color=PURPLE_A)
-        info.to_edge(DOWN, buff=0.8)
-        
-        # Website
-        website = Text("teknokul.com.tr", font_size=28, color=PURPLE_B)
-        website.next_to(info, DOWN, buff=0.3)
-        
-        # Animasyonlar
-        self.play(Write(logo), run_time=1.0)
-        self.play(FadeIn(subtitle, shift=UP*0.3), run_time=0.5)
-        self.play(FadeIn(info), FadeIn(website), run_time=0.5)
-        self.wait(0.5)
-
-
-class QuestionScene(Scene):
-    """Soru gösterimi"""
-    def __init__(self, question_text: str, options: dict, topic_name: str = "", image_path: str = None, **kwargs):
-        super().__init__(**kwargs)
-        self.question_text = question_text[:300]  # Max 300 karakter
-        self.options = options
-        self.topic_name = topic_name
-        self.image_path = image_path
-    
-    def construct(self):
-        # Başlık
-        title = Text(self.topic_name or "Soru", font_size=42, color=ORANGE)
-        title.to_edge(UP, buff=0.5)
-        
-        # Soru metni - wrap et
-        q_text = self.question_text.replace('\n', ' ')
-        q_text = ' '.join(q_text.split())
-        
-        # Uzun metni kısalt
-        if len(q_text) > 200:
-            q_text = q_text[:200] + "..."
-        
-        question = Text(q_text, font_size=28, color=WHITE)
-        question.scale_to_fit_width(11)  # Ekrana sığdır
-        question.next_to(title, DOWN, buff=0.6)
-        
-        # Şıklar
-        options_group = VGroup()
-        for i, key in enumerate(["A", "B", "C", "D", "E"]):
-            if key in self.options and self.options[key]:
-                opt_text = str(self.options[key])[:60]  # Max 60 karakter
-                opt = Text(f"{key}) {opt_text}", font_size=26, color=WHITE)
-                options_group.add(opt)
-        
-        options_group.arrange(DOWN, aligned_edge=LEFT, buff=0.3)
-        options_group.next_to(question, DOWN, buff=0.8)
-        options_group.shift(LEFT * 2)
-        
-        # Footer
-        footer = Text("Teknokul.com.tr", font_size=24, color=PURPLE_B)
-        footer.to_edge(DOWN, buff=0.4)
-        
-        # Animasyonlar
-        self.play(Write(title), run_time=0.5)
-        self.play(FadeIn(question), run_time=1.0)
-        
-        # Şıkları sırayla göster
-        for opt in options_group:
-            self.play(FadeIn(opt, shift=RIGHT*0.2), run_time=0.3)
-        
-        self.play(FadeIn(footer), run_time=0.3)
-        self.wait(1.0)
-
-
-class SolutionStepScene(Scene):
-    """Çözüm adımı animasyonu"""
-    def __init__(self, step_num: int, step_text: str, display_text: str, topic_name: str = "", **kwargs):
-        super().__init__(**kwargs)
-        self.step_num = step_num
-        self.step_text = step_text[:150]
-        self.display_text = display_text[:100]
-        self.topic_name = topic_name
-    
-    def construct(self):
-        # Başlık
-        title = Text(self.topic_name or "Çözüm", font_size=36, color=WHITE)
-        title.to_edge(UP, buff=0.4)
-        
-        # Adım numarası - vurgulu
-        step_badge = Text(f"Adım {self.step_num}", font_size=56, color=ORANGE)
-        step_badge.next_to(title, DOWN, buff=0.5)
-        
-        # Ana içerik kutusu
-        box = RoundedRectangle(
-            width=12, height=4,
-            corner_radius=0.3,
-            fill_color=BLACK,
-            fill_opacity=0.4,
-            stroke_color=PURPLE_A,
-            stroke_width=2
+        self.camera.background_color = "#1E1B4B"
+        self.set_speech_service(
+            ElevenLabsService(
+                voice_id="{voice_id}",
+                model="eleven_multilingual_v2"
+            )
         )
-        box.move_to(ORIGIN)
         
-        # İçerik metni
-        content = Text(self.display_text, font_size=32, color=WHITE)
-        content.scale_to_fit_width(10)
-        content.move_to(box.get_center())
+        # Logo
+        logo = Text("Teknokul.com.tr", font_size=24, color="#8B5CF6")
+        logo.to_edge(DOWN, buff=0.3)
+        self.add(logo)
         
-        # Footer
-        footer = Text("Teknokul.com.tr", font_size=22, color=PURPLE_B)
-        footer.to_edge(DOWN, buff=0.4)
+        with self.voiceover(text="Merhaba arkadaşlar, bu soruyu birlikte çözelim.") as tracker:
+            baslik = Text("Soru Çözümü", font_size=48, color=WHITE)
+            self.play(Write(baslik), run_time=tracker.duration)
         
-        # Animasyonlar
-        self.play(FadeIn(title), run_time=0.3)
-        self.play(Write(step_badge), run_time=0.5)
-        self.play(Create(box), run_time=0.5)
-        self.play(Write(content), run_time=1.5)
-        self.play(FadeIn(footer), run_time=0.2)
-        self.wait(0.5)
-
-
-class ResultScene(Scene):
-    """Sonuç animasyonu"""
-    def __init__(self, correct_answer: str, final_text: str = "", **kwargs):
-        super().__init__(**kwargs)
-        self.correct_answer = correct_answer
-        self.final_text = final_text[:80] if final_text else f"Doğru cevap: {correct_answer}"
-    
-    def construct(self):
-        # Tebrik başlığı
-        congrats = Text("SONUÇ", font_size=72, color=GREEN)
-        congrats.to_edge(UP, buff=1.5)
-        
-        # Çember içinde cevap
-        answer_circle = Circle(radius=1.2, color=GREEN, stroke_width=6)
-        answer_text = Text(self.correct_answer, font_size=96, color=GREEN)
-        answer_group = VGroup(answer_circle, answer_text)
-        answer_group.move_to(ORIGIN)
-        
-        # Açıklama
-        explanation = Text(self.final_text, font_size=32, color=WHITE)
-        explanation.scale_to_fit_width(10)
-        explanation.next_to(answer_group, DOWN, buff=0.8)
-        
-        # Footer
-        footer = Text("Daha fazlası için: Teknokul.com.tr", font_size=28, color=PURPLE_B)
-        footer.to_edge(DOWN, buff=0.5)
-        
-        # Animasyonlar
-        self.play(Write(congrats), run_time=0.5)
-        self.play(
-            Create(answer_circle),
-            Write(answer_text),
-            run_time=1.0
-        )
-        self.play(FadeIn(explanation, shift=UP*0.3), run_time=0.5)
-        self.play(FadeIn(footer), run_time=0.3)
-        self.wait(0.7)
+        # ... diğer adımlar
+```
+"""
 
 
 # ============================================================
-# YARDIMCI FONKSİYONLAR
+# GEMINI İLE MANIM KODU ÜRETME
 # ============================================================
 
-def clean_latex_for_speech(text: str) -> str:
-    """LaTeX ifadelerini konuşma için temizle"""
-    import re
-    if not text:
-        return ""
+async def generate_manim_code_with_gemini(question: VideoRequest, error_feedback: str = None) -> str:
+    """Gemini ile Manim kodu üret"""
+    log("🤖 Gemini'den Manim kodu isteniyor...")
     
-    # $...$ içindeki ifadeleri sözelleştir
-    def replace_math(match):
-        expr = match.group(1)
-        # Temel dönüşümler
-        expr = re.sub(r'(\w)\^2', r"\1'nin karesi", expr)
-        expr = re.sub(r'(\w)\^3', r"\1'ün küpü", expr)
-        expr = re.sub(r'(\w)\^(\d+)', r'\1 üzeri \2', expr)
-        expr = re.sub(r'\\int', 'integralini alırsak', expr)
-        expr = re.sub(r'\\sum', 'toplamı', expr)
-        expr = re.sub(r'\\infty', 'sonsuz', expr)
-        expr = re.sub(r'\\pi', 'pi', expr)
-        expr = re.sub(r'\\sqrt\{([^}]+)\}', r'\1 in karekökü', expr)
-        expr = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1 bölü \2', expr)
-        expr = re.sub(r'f\((\w+)\)', r'f \1 fonksiyonu', expr)
-        expr = re.sub(r"f'", 'f türevi', expr)
-        expr = expr.replace('\\left', '')
-        expr = expr.replace('\\right', '')
-        expr = expr.replace('{', '')
-        expr = expr.replace('}', '')
-        expr = expr.replace('\\', '')
-        expr = expr.replace('_', ' alt ')
-        expr = expr.replace('^', ' üzeri ')
-        return expr
+    # Soru metnini hazırla
+    options_text = ""
+    if isinstance(question.options, dict):
+        for key in ["A", "B", "C", "D", "E"]:
+            if key in question.options and question.options[key]:
+                options_text += f"{key}) {question.options[key]}\n"
     
-    text = re.sub(r'\$([^$]+)\$', replace_math, text)
-    # Kalan $ işaretlerini kaldır
-    text = text.replace('$', '')
-    return text.strip()
+    user_prompt = f"""Şu soruyu çöz ve manim-voiceover animasyon kodunu yaz:
 
-async def generate_solution_with_gemini(question: VideoRequest) -> dict:
-    """Gemini ile çözüm üret"""
-    log("Gemini ile çözüm üretiliyor...")
-    
-    # Soru metnini temizle
-    clean_question = clean_latex_for_speech(question.question_text)
-    
-    prompt = f"""Sen deneyimli bir matematik öğretmenisin. Bu soruyu öğrenciye anlatır gibi ADIM ADIM çöz.
+KONU: {question.topic_name or 'Matematik'}
+SINIF: {question.grade}. Sınıf
+DERS: {question.subject_name or 'Matematik'}
 
-SORU: {clean_question}
+SORU:
+{question.question_text}
 
 ŞIKLAR:
-{json.dumps(question.options, ensure_ascii=False)}
+{options_text}
 
 DOĞRU CEVAP: {question.correct_answer}
 
-MUTLAKA UYULMASI GEREKEN KURALLAR:
-
-1. EN AZ 4, EN FAZLA 6 ADIM olsun. Her adım SOMUT ve ANLAMLI olmalı.
-
-2. MATEMATİKSEL İFADELERİ ASLA LaTeX OLARAK YAZMA! Sözel yaz:
-   - "$x^2$" YAZMA → "x'in karesi" YAZ
-   - "$\\int$" YAZMA → "integral" YAZ  
-   - "$f(x)$" YAZMA → "f fonksiyonu" YAZ
-   - "$\\frac{{a}}{{b}}$" YAZMA → "a bölü b" YAZ
-
-3. SESLENDIRME METNİNDE:
-   - Kısa cümleler kur (max 15 kelime)
-   - Duraklamalar için "..." kullan
-   - Vurgular: "dikkat!", "önemli!", "işte burada..."
-   - Motivasyon: "Harika!", "Evet doğru yoldayız!", "Şimdi sonuca ulaştık!"
-
-JSON formatında MUTLAKA şöyle yanıt ver:
-{{
-    "steps": [
-        {{"text": "Birinci adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}},
-        {{"text": "İkinci adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}},
-        {{"text": "Üçüncü adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}},
-        {{"text": "Dördüncü adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}}
-    ],
-    "narrationText": "Tüm çözümün akıcı seslendirme metni... Duraklamalar için üç nokta kullan... Matematiksel ifadeleri sözel anlat... Max 600 karakter.",
-    "finalAnswer": "Doğru cevap {question.correct_answer} şıkkı"
-}}
+{"AÇIKLAMA: " + question.explanation if question.explanation else ""}
 """
+
+    # Eğer önceki denemede hata olduysa, düzeltme iste
+    if error_feedback:
+        user_prompt += f"""
+
+⚠️ ÖNCEKİ KODDA HATA OLUŞTU:
+{error_feedback}
+
+Lütfen hatayı düzelt ve kodu yeniden yaz.
+"""
+
+    system_prompt = MANIM_SYSTEM_PROMPT.replace("{voice_id}", ELEVENLABS_VOICE_ID)
     
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
                 json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.7}
+                    "contents": [
+                        {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 4096
+                    }
                 },
-                timeout=60
+                timeout=90
             )
             
             if response.status_code == 200:
                 data = response.json()
                 text = data["candidates"][0]["content"]["parts"][0]["text"]
-                json_str = text
-                if "```json" in text:
-                    json_str = text.split("```json")[1].split("```")[0]
-                elif "```" in text:
-                    json_str = text.split("```")[1].split("```")[0]
                 
-                result = json.loads(json_str.strip())
-                log(f"Gemini çözüm üretti: {len(result.get('steps', []))} adım")
-                return result
-    except Exception as e:
-        log(f"Gemini hatası: {e}", "ERROR")
-    
-    # Fallback - daha anlamlı varsayılan adımlar
-    clean_exp = clean_latex_for_speech(question.explanation or "")
-    return {
-        "steps": [
-            {"text": "Öncelikle soruyu dikkatli okuyalım ve verilenleri belirleyelim.", "displayText": "Verilenleri belirleyelim"},
-            {"text": "Şimdi bu verileri kullanarak çözüme başlayalım.", "displayText": "Çözüme başlayalım"},
-            {"text": f"{clean_exp or 'İşlemleri adım adım yapalım.'}", "displayText": "İşlemleri yapalım"},
-            {"text": f"Ve sonuç olarak doğru cevap {question.correct_answer} şıkkı!", "displayText": f"Cevap: {question.correct_answer}"}
-        ],
-        "narrationText": f"Bu soruyu birlikte çözelim... Önce verilenlere bakalım... {clean_exp or 'Adım adım ilerleyelim.'}... Ve sonuç olarak doğru cevap {question.correct_answer} şıkkı!",
-        "finalAnswer": f"Doğru cevap: {question.correct_answer}"
-    }
-
-async def generate_audio_with_elevenlabs(text: str, output_path: Path) -> bool:
-    """ElevenLabs ile Türkçe ses üret"""
-    log(f"ElevenLabs ile ses üretiliyor... ({len(text)} karakter)")
-    
-    if not ELEVENLABS_API_KEY:
-        log("ElevenLabs API key yok, ses atlanıyor", "WARN")
-        return False
-    
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
-                headers={
-                    "xi-api-key": ELEVENLABS_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "text": text[:1000],
-                    "model_id": "eleven_multilingual_v2",
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75
-                    }
-                },
-                timeout=120
-            )
-            
-            if response.status_code == 200:
-                with open(output_path, "wb") as f:
-                    f.write(response.content)
-                log(f"Ses dosyası oluşturuldu: {output_path.name} ({len(response.content)} bytes)")
-                return True
+                # Python kodunu ayıkla
+                if "```python" in text:
+                    code = text.split("```python")[1].split("```")[0]
+                elif "```" in text:
+                    code = text.split("```")[1].split("```")[0]
+                else:
+                    code = text
+                
+                log(f"✅ Gemini kod üretti: {len(code)} karakter")
+                return code.strip()
             else:
-                log(f"ElevenLabs hatası: {response.status_code} - {response.text[:200]}", "ERROR")
+                log(f"❌ Gemini API hatası: {response.status_code}", "ERROR")
+                
     except Exception as e:
-        log(f"Ses üretim hatası: {e}", "ERROR")
+        log(f"❌ Gemini hatası: {e}", "ERROR")
     
-    return False
+    # Fallback - basit bir kod döndür
+    return generate_fallback_manim_code(question)
 
-def _ffmpeg_escape_path_for_filter(path: Path) -> str:
-    # drawtext textfile yolu için ':' kaçır (ör: /tmp/a:b.txt -> /tmp/a\:b.txt)
-    return str(path).replace("\\", "\\\\").replace(":", "\\:")
 
-def _pick_fontfile() -> Optional[str]:
-    candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-    ]
-    for p in candidates:
-        if Path(p).exists():
-            return p
-    return None
+def generate_fallback_manim_code(question: VideoRequest) -> str:
+    """Gemini başarısız olursa fallback kod"""
+    q_text = (question.question_text or "").replace('"', '\\"')[:150]
+    topic = (question.topic_name or "Soru Çözümü").replace('"', '\\"')
+    answer = question.correct_answer
+    
+    return f'''from manim import *
+from manim_voiceover import VoiceoverScene
+from manim_voiceover.services.elevenlabs import ElevenLabsService
 
-def _build_question_overlay_text(question: VideoRequest) -> str:
-    # LaTeX temizle
-    q = clean_latex_for_display(question.question_text or "")
-    q = q.strip().replace("\r", " ")
-    q = " ".join(q.split())
-    q_wrapped = textwrap.fill(q, width=44)
-
-    options_lines = []
-    if isinstance(question.options, dict):
-        for key in ["A", "B", "C", "D", "E"]:
-            if key in question.options and question.options.get(key):
-                opt = clean_latex_for_display(str(question.options.get(key)))
-                opt = opt.strip().replace("\r", " ")
-                opt = " ".join(opt.split())
-                opt_wrapped = textwrap.fill(opt, width=42, subsequent_indent="   ")
-                options_lines.append(f"{key}) {opt_wrapped}")
-
-    parts = [
-        "SORU:",
-        q_wrapped,
-        "",
-    ]
-    if options_lines:
-        parts.append("ŞIKLAR:")
-        parts.extend(options_lines)
-        parts.append("")
-    parts.append(f"Doğru cevap: {question.correct_answer}")
-    return "\n".join(parts).strip()
-
-def _download_question_image(url: str, dest: Path) -> Optional[Path]:
-    if not url:
-        return None
-    try:
-        r = httpx.get(url, timeout=20)
-        if r.status_code == 200 and r.content:
-            dest.write_bytes(r.content)
-            return dest
-    except Exception:
-        return None
-    return None
-
-def _audio_duration_seconds(audio_path: Path) -> Optional[float]:
-    try:
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
-            capture_output=True, text=True
+class SoruCozum(VoiceoverScene):
+    def construct(self):
+        self.camera.background_color = "#1E1B4B"
+        self.set_speech_service(
+            ElevenLabsService(
+                voice_id="{ELEVENLABS_VOICE_ID}",
+                model="eleven_multilingual_v2"
+            )
         )
-        if probe.returncode == 0:
-            return float(probe.stdout.strip())
-    except Exception:
-        return None
-    return None
+        
+        # Logo
+        logo = Text("Teknokul.com.tr", font_size=24, color="#8B5CF6")
+        logo.to_edge(DOWN, buff=0.3)
+        self.add(logo)
+        
+        # Başlık
+        with self.voiceover(text="Merhaba arkadaşlar, bu soruyu birlikte çözelim.") as tracker:
+            baslik = Text("{topic}", font_size=48, color=WHITE)
+            self.play(Write(baslik), run_time=tracker.duration)
+        
+        # Soru
+        with self.voiceover(text="Öncelikle sorumuza bakalım.") as tracker:
+            self.play(FadeOut(baslik))
+            soru = Text("{q_text[:80]}...", font_size=28, color=WHITE)
+            soru.scale_to_fit_width(12)
+            self.play(FadeIn(soru), run_time=tracker.duration)
+        
+        # Çözüm
+        with self.voiceover(text="Şimdi adım adım çözelim.") as tracker:
+            self.play(soru.animate.shift(UP * 2))
+            cozum = Text("Çözüm adımları...", font_size=32, color=YELLOW)
+            self.play(Write(cozum), run_time=tracker.duration)
+        
+        # Sonuç
+        with self.voiceover(text="Ve sonuç olarak doğru cevap {answer} şıkkıdır. Görüşmek üzere!") as tracker:
+            self.play(FadeOut(soru), FadeOut(cozum))
+            sonuc = Text("CEVAP: {answer}", font_size=64, color=GREEN)
+            cerceve = SurroundingRectangle(sonuc, color=GREEN, buff=0.3)
+            self.play(Write(sonuc), Create(cerceve), run_time=tracker.duration)
+'''
 
-def _slow_down_audio(input_audio: Path, output_audio: Path, speed: float = 0.90) -> bool:
-    # speed<1 => yavaşlat. atempo faktörü 0.5-2.0 aralığında olmalı.
+
+# ============================================================
+# MANIM RENDER MOTORU (Self-Healing ile)
+# ============================================================
+
+def run_manim_render(code: str, output_dir: Path, max_retries: int = 3) -> Tuple[bool, Optional[Path], Optional[str]]:
+    """
+    Manim kodunu çalıştır ve video render et.
+    Hata olursa hata mesajını döndür (self-healing için).
+    """
+    scene_file = output_dir / "scene.py"
+    
+    # Kodu dosyaya yaz
+    scene_file.write_text(code, encoding="utf-8")
+    log(f"📝 Scene dosyası yazıldı: {scene_file}")
+    
+    # Manim komutunu çalıştır
+    # -ql: low quality (hızlı), -qm: medium, -qh: high, -qk: 4k
+    cmd = [
+        "manim",
+        "-ql",  # Low quality (hızlı render için)
+        "--disable_caching",
+        "-o", "output.mp4",
+        str(scene_file),
+        "SoruCozum"
+    ]
+    
+    log(f"🎬 Manim render başlıyor: {' '.join(cmd)}")
+    
     try:
         result = subprocess.run(
-            ["ffmpeg", "-y", "-i", str(input_audio), "-filter:a", f"atempo={speed}", str(output_audio)],
-            capture_output=True, text=True, timeout=60
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 dakika timeout
+            cwd=str(output_dir),
+            env={
+                **os.environ,
+                "ELEVENLABS_API_KEY": ELEVENLABS_API_KEY
+            }
         )
-        return result.returncode == 0 and output_audio.exists()
-    except Exception:
-        return False
+        
+        if result.returncode == 0:
+            # Video dosyasını bul
+            video_paths = list(output_dir.rglob("*.mp4"))
+            if video_paths:
+                video_path = video_paths[0]
+                log(f"✅ Render başarılı: {video_path}")
+                return True, video_path, None
+            else:
+                return False, None, "Video dosyası bulunamadı"
+        else:
+            error_msg = result.stderr[-1500:] if result.stderr else "Bilinmeyen hata"
+            log(f"❌ Manim hatası: {error_msg[:200]}", "ERROR")
+            return False, None, error_msg
+            
+    except subprocess.TimeoutExpired:
+        return False, None, "Render timeout (5 dakika aşıldı)"
+    except Exception as e:
+        return False, None, str(e)
 
-def create_thumbnail(question: VideoRequest, output_path: Path, image_path: Optional[Path] = None) -> bool:
+
+async def render_with_self_healing(question: VideoRequest, output_dir: Path) -> Tuple[bool, Optional[Path]]:
+    """
+    Self-healing ile render: Hata olursa Gemini'ye geri dön ve düzelt.
+    """
+    max_attempts = 3
+    error_feedback = None
+    
+    for attempt in range(1, max_attempts + 1):
+        log(f"🔄 Render denemesi {attempt}/{max_attempts}")
+        
+        # 1. Manim kodu üret
+        code = await generate_manim_code_with_gemini(question, error_feedback)
+        
+        # 2. Render et
+        success, video_path, error = run_manim_render(code, output_dir)
+        
+        if success and video_path:
+            return True, video_path
+        
+        # 3. Hata varsa bir sonraki deneme için feedback hazırla
+        if error:
+            error_feedback = f"Deneme {attempt} hatası:\n{error}"
+            log(f"⚠️ Self-healing: Hata alındı, Gemini'ye geri dönülüyor...", "WARN")
+        
+        if attempt < max_attempts:
+            time.sleep(2)  # Rate limiting için bekle
+    
+    log(f"❌ {max_attempts} deneme sonunda render başarısız", "ERROR")
+    return False, None
+
+
+# ============================================================
+# THUMBNAIL OLUŞTURMA (FFmpeg ile)
+# ============================================================
+
+def create_thumbnail(question: VideoRequest, output_path: Path) -> bool:
     """FFmpeg ile thumbnail üret"""
     try:
-        fontfile = _pick_fontfile()
-        topic = (question.topic_name or "Soru Çözümü").strip()
-        grade = question.grade or 8
-        subject = (question.subject_name or "Matematik").strip()
-        q_short = (question.question_text or "").strip().replace("\n", " ")
-        q_short = " ".join(q_short.split())[:120]
-
-        textfile = output_path.with_suffix(".txt")
-        textfile.write_text(textwrap.fill(q_short, width=34), encoding="utf-8")
-        tf = _ffmpeg_escape_path_for_filter(textfile)
-
-        inputs = ["-f", "lavfi", "-i", "color=c=0x1E1B4B:s=1280x720:d=1"]
-        filter_parts = ["[0:v]"]
-
-        if image_path and image_path.exists():
-            inputs += ["-i", str(image_path)]
-            filter_parts.append(
-                "[1:v]scale=560:-1:force_original_aspect_ratio=decrease[img];"
-                "[0:v][img]overlay=60:180:format=auto[bg];"
-                "[bg]"
-            )
-
-        draw = []
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:text='{grade}. Sınıf {subject}':fontsize=44:fontcolor=white:x=60:y=60")
-            draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=52:fontcolor=0xF97316:x=60:y=120")
-            draw.append("drawbox=x=640:y=210:w=580:h=300:color=black@0.35:t=fill")
-            draw.append(f"drawtext=fontfile={fontfile}:textfile='{tf}':reload=0:fontsize=30:fontcolor=white:x=660:y=230:line_spacing=10")
-            draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-        else:
-            draw.append(f"drawtext=text='{grade}. Sınıf {subject}':fontsize=44:fontcolor=white:x=60:y=60")
-            draw.append(f"drawtext=text='{topic}':fontsize=52:fontcolor=0xF97316:x=60:y=120")
-            draw.append("drawbox=x=640:y=210:w=580:h=300:color=black@0.35:t=fill")
-            draw.append(f"drawtext=textfile='{tf}':reload=0:fontsize=30:fontcolor=white:x=660:y=230:line_spacing=10")
-            draw.append("drawtext=text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-
-        vf = ",".join(draw)
-        cmd = ["ffmpeg", "-y", *inputs, "-frames:v", "1", "-vf", vf, str(output_path)]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        textfile.unlink(missing_ok=True)
-        return res.returncode == 0 and output_path.exists()
-    except Exception:
-        return False
-
-# ============================================================
-# MANIM VIDEO OLUŞTURMA
-# ============================================================
-
-def create_manim_video(question: VideoRequest, solution: dict, output_path: Path, audio_path: Optional[Path] = None) -> bool:
-    """Manim ile 3Blue1Brown tarzı video oluştur"""
-    log("🎬 Manim ile video oluşturuluyor...")
-    
-    try:
-        temp_dir = output_path.parent
-        video_clips = []
-        
-        # Soru ve seçenekleri temizle
-        clean_question = clean_latex_for_display(question.question_text or "")
-        clean_options = {}
-        if isinstance(question.options, dict):
-            for key, val in question.options.items():
-                clean_options[key] = clean_latex_for_display(str(val)) if val else ""
-        
-        topic = (question.topic_name or "Soru Çözümü").strip()
+        topic = (question.topic_name or "Soru Çözümü").strip()[:40]
         grade = question.grade or 8
         subject = (question.subject_name or "Matematik").strip()
         
-        # 1. INTRO SCENE
-        log("  → Intro scene render ediliyor...")
-        intro_scene = IntroScene(topic_name=topic, grade=grade, subject=subject)
-        intro_scene.render()
-        intro_video = Path(intro_scene.renderer.file_writer.movie_file_path)
-        if intro_video.exists():
-            video_clips.append(intro_video)
-            log(f"  ✅ Intro: {intro_video.name}")
-        
-        # 2. QUESTION SCENE
-        log("  → Question scene render ediliyor...")
-        question_scene = QuestionScene(
-            question_text=clean_question,
-            options=clean_options,
-            topic_name=topic,
-            image_path=str(question.question_image_url) if question.question_image_url else None
-        )
-        question_scene.render()
-        question_video = Path(question_scene.renderer.file_writer.movie_file_path)
-        if question_video.exists():
-            video_clips.append(question_video)
-            log(f"  ✅ Question: {question_video.name}")
-        
-        # 3. SOLUTION STEP SCENES
-        steps = solution.get("steps", [])
-        log(f"  → {len(steps)} adım render ediliyor...")
-        
-        for i, step in enumerate(steps[:5], 1):  # Max 5 adım
-            if isinstance(step, dict):
-                step_text = step.get("text", "")
-                display_text = step.get("displayText", step_text)
-            else:
-                step_text = str(step)
-                display_text = step_text
-            
-            # Temizle
-            display_text = clean_latex_for_display(display_text)
-            
-            step_scene = SolutionStepScene(
-                step_num=i,
-                step_text=step_text,
-                display_text=display_text,
-                topic_name=topic
-            )
-            step_scene.render()
-            step_video = Path(step_scene.renderer.file_writer.movie_file_path)
-            if step_video.exists():
-                video_clips.append(step_video)
-                log(f"  ✅ Step {i}: {step_video.name}")
-        
-        # 4. RESULT SCENE
-        log("  → Result scene render ediliyor...")
-        final_answer = solution.get("finalAnswer", f"Doğru cevap: {question.correct_answer}")
-        result_scene = ResultScene(
-            correct_answer=question.correct_answer,
-            final_text=clean_latex_for_display(final_answer)
-        )
-        result_scene.render()
-        result_video = Path(result_scene.renderer.file_writer.movie_file_path)
-        if result_video.exists():
-            video_clips.append(result_video)
-            log(f"  ✅ Result: {result_video.name}")
-        
-        if not video_clips:
-            log("❌ Hiç video clip oluşturulamadı", "ERROR")
-            return False
-        
-        # 5. KLİPLERİ BİRLEŞTİR
-        log(f"  → {len(video_clips)} klip birleştiriliyor...")
-        concat_list = temp_dir / "manim_concat.txt"
-        with open(concat_list, "w") as f:
-            for clip in video_clips:
-                f.write(f"file '{clip}'\n")
-        
-        concat_video = temp_dir / "manim_concat.mp4"
-        concat_cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", str(concat_list),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            str(concat_video)
-        ]
-        result = subprocess.run(concat_cmd, capture_output=True, text=True, timeout=180)
-        
-        if result.returncode != 0 or not concat_video.exists():
-            log(f"❌ Concat hatası: {result.stderr[:200]}", "ERROR")
-            return False
-        
-        # 6. SES EKLE (varsa)
-        if audio_path and audio_path.exists():
-            log("  → Ses ekleniyor...")
-            
-            # Sesi yavaşlat
-            slow_audio = temp_dir / "narration_slow.mp3"
-            if _slow_down_audio(audio_path, slow_audio, speed=0.90):
-                audio_to_use = slow_audio
-            else:
-                audio_to_use = audio_path
-            
-            # Intro süresi (yaklaşık 2.5 saniye)
-            intro_delay = 2500  # ms
-            
-            merge_cmd = [
-                "ffmpeg", "-y",
-                "-i", str(concat_video),
-                "-i", str(audio_to_use),
-                "-filter_complex", f"[1:a]adelay={intro_delay}|{intro_delay}[a]",
-                "-map", "0:v:0", "-map", "[a]",
-                "-c:v", "copy", "-c:a", "aac",
-                "-shortest",
-                str(output_path)
-            ]
-            result = subprocess.run(merge_cmd, capture_output=True, text=True, timeout=120)
-            
-            if result.returncode != 0:
-                log(f"⚠️ Ses ekleme hatası, sessiz video kullanılıyor: {result.stderr[:100]}", "WARN")
-                import shutil
-                shutil.copy(concat_video, output_path)
-        else:
-            import shutil
-            shutil.copy(concat_video, output_path)
-        
-        # Cleanup
-        try:
-            concat_list.unlink(missing_ok=True)
-            concat_video.unlink(missing_ok=True)
-        except:
-            pass
-        
-        if output_path.exists():
-            file_size = output_path.stat().st_size / 1024
-            log(f"🎬 Manim video oluşturuldu: {output_path.name} ({file_size:.1f} KB)")
-            return True
-        
-    except Exception as e:
-        log(f"❌ Manim video hatası: {e}", "ERROR")
-        import traceback
-        log(traceback.format_exc(), "ERROR")
-    
-    return False
-
-
-# ============================================================
-# FFmpeg FALLBACK FONKSİYONLARI
-# ============================================================
-
-def _create_step_clip(step_num: int, step_text: str, duration: float, output_path: Path, fontfile: Optional[str], topic: str) -> bool:
-    """Tek bir adım için video klip oluştur"""
-    try:
-        # Adım metnini temizle ve wrap et
-        clean_text = step_text.replace("'", "").replace('"', '').replace('\n', ' ')
-        wrapped = textwrap.fill(clean_text, width=50)
-        
-        textfile = output_path.with_suffix(f".step{step_num}.txt")
-        textfile.write_text(wrapped, encoding="utf-8")
-        tf = _ffmpeg_escape_path_for_filter(textfile)
-        
-        draw = []
-        # Başlık
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=42:fontcolor=white:x=(w-text_w)/2:y=40")
-            draw.append(f"drawtext=fontfile={fontfile}:text='Adım {step_num}':fontsize=56:fontcolor=0xF97316:x=(w-text_w)/2:y=120")
-        else:
-            draw.append(f"drawtext=text='{topic}':fontsize=42:fontcolor=white:x=(w-text_w)/2:y=40")
-            draw.append(f"drawtext=text='Adım {step_num}':fontsize=56:fontcolor=0xF97316:x=(w-text_w)/2:y=120")
-        
-        # İçerik kutusu
-        draw.append("drawbox=x=80:y=200:w=1120:h=400:color=black@0.4:t=fill")
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:textfile='{tf}':reload=0:fontsize=36:fontcolor=white:x=120:y=250:line_spacing=16")
-        else:
-            draw.append(f"drawtext=textfile='{tf}':reload=0:fontsize=36:fontcolor=white:x=120:y=250:line_spacing=16")
-        
-        # Footer
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50")
-        else:
-            draw.append("drawtext=text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50")
-        
+        # Basit FFmpeg thumbnail
         cmd = [
             "ffmpeg", "-y",
-            "-f", "lavfi", "-i", f"color=c=0x1E1B4B:s=1280x720:d={duration}",
-            "-vf", ",".join(draw),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-f", "lavfi", "-i", "color=c=0x1E1B4B:s=1280x720:d=1",
+            "-vf", f"drawtext=text='{grade}. Sınıf {subject}':fontsize=44:fontcolor=white:x=60:y=60,"
+                   f"drawtext=text='{topic}':fontsize=52:fontcolor=0xF97316:x=60:y=130,"
+                   f"drawtext=text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60",
+            "-frames:v", "1",
             str(output_path)
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        textfile.unlink(missing_ok=True)
-        return res.returncode == 0 and output_path.exists()
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return result.returncode == 0 and output_path.exists()
     except Exception as e:
-        log(f"Adım {step_num} klip hatası: {e}", "ERROR")
+        log(f"Thumbnail hatası: {e}", "ERROR")
         return False
 
-def create_simple_video(question: VideoRequest, solution: dict, output_path: Path, audio_path: Optional[Path] = None) -> bool:
-    """FFmpeg ile video oluştur (intro + soru + adımlar + sonuç)"""
-    log("FFmpeg ile video oluşturuluyor...")
 
-    try:
-        # --- Audio işle ---
-        intro_seconds = 2.5
-        question_seconds = 6.0
-        final_audio: Optional[Path] = None
-        total_audio_duration = 30.0
-
-        if audio_path and audio_path.exists():
-            slow_audio = audio_path.with_name("narration_slow.mp3")
-            if _slow_down_audio(audio_path, slow_audio, speed=0.92):
-                final_audio = slow_audio
-            else:
-                final_audio = audio_path
-
-            aud_dur = _audio_duration_seconds(final_audio)
-            if aud_dur:
-                total_audio_duration = aud_dur + 2.0
-
-        # --- Görsel indir ---
-        img_path: Optional[Path] = None
-        if question.question_image_url:
-            log(f"Görsel indiriliyor: {question.question_image_url[:50]}...")
-            img_path = _download_question_image(question.question_image_url, output_path.with_suffix(".qimg"))
-            if img_path and img_path.exists():
-                log(f"✅ Görsel indirildi: {img_path.stat().st_size} bytes")
-            else:
-                log("⚠️ Görsel indirilemedi", "WARN")
-
-        fontfile = _pick_fontfile()
-        topic = (question.topic_name or "Soru Çözümü").strip().replace("'", "").replace('"', '')
-        
-        clips_to_concat = []
-        temp_files = []
-
-        # --- 1. INTRO KLİP ---
-        intro_path = output_path.with_suffix(".intro.mp4")
-        intro_draw = []
-        if fontfile:
-            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul':fontsize=84:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-50")
-            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Video Soru Çözümü':fontsize=44:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+50")
-            intro_draw.append(f"drawtext=fontfile={fontfile}:text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-        else:
-            intro_draw.append("drawtext=text='Teknokul':fontsize=84:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-50")
-            intro_draw.append("drawtext=text='Video Soru Çözümü':fontsize=44:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+50")
-            intro_draw.append("drawtext=text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-
-        intro_cmd = [
-            "ffmpeg", "-y", "-f", "lavfi",
-            "-i", f"color=c=0x1E1B4B:s=1280x720:d={intro_seconds}",
-            "-vf", ",".join(intro_draw),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            str(intro_path)
-        ]
-        subprocess.run(intro_cmd, capture_output=True, text=True, timeout=60)
-        clips_to_concat.append(intro_path)
-        temp_files.append(intro_path)
-
-        # --- 2. SORU KLİP ---
-        question_path = output_path.with_suffix(".question.mp4")
-        q_text = _build_question_overlay_text(question)
-        q_textfile = output_path.with_suffix(".qtxt")
-        q_textfile.write_text(q_text, encoding="utf-8")
-        temp_files.append(q_textfile)
-        qtf = _ffmpeg_escape_path_for_filter(q_textfile)
-
-        if img_path and img_path.exists():
-            # Görsel + metin
-            q_draw = []
-            if fontfile:
-                q_draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
-            else:
-                q_draw.append(f"drawtext=text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
-            q_draw.append("drawbox=x=640:y=100:w=600:h=520:color=black@0.35:t=fill")
-            if fontfile:
-                q_draw.append(f"drawtext=fontfile={fontfile}:textfile='{qtf}':reload=0:fontsize=24:fontcolor=white:x=660:y=120:line_spacing=6")
-                q_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
-            else:
-                q_draw.append(f"drawtext=textfile='{qtf}':reload=0:fontsize=24:fontcolor=white:x=660:y=120:line_spacing=6")
-                q_draw.append("drawtext=text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
-            
-            q_vf = (
-                "[1:v]scale=580:-1:force_original_aspect_ratio=decrease[img];"
-                f"[0:v][img]overlay=30:120:format=auto,{','.join(q_draw)}[v]"
-            )
-            q_cmd = [
-                "ffmpeg", "-y",
-                "-f", "lavfi", "-i", f"color=c=0x1E1B4B:s=1280x720:d={question_seconds}",
-                "-i", str(img_path),
-                "-filter_complex", q_vf,
-                "-map", "[v]",
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                str(question_path)
-            ]
-        else:
-            # Sadece metin
-            q_draw = []
-            if fontfile:
-                q_draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
-            else:
-                q_draw.append(f"drawtext=text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
-            q_draw.append("drawbox=x=60:y=100:w=1160:h=520:color=black@0.35:t=fill")
-            if fontfile:
-                q_draw.append(f"drawtext=fontfile={fontfile}:textfile='{qtf}':reload=0:fontsize=28:fontcolor=white:x=100:y=130:line_spacing=8")
-                q_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
-            else:
-                q_draw.append(f"drawtext=textfile='{qtf}':reload=0:fontsize=28:fontcolor=white:x=100:y=130:line_spacing=8")
-                q_draw.append("drawtext=text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
-            
-            q_cmd = [
-                "ffmpeg", "-y", "-f", "lavfi",
-                "-i", f"color=c=0x1E1B4B:s=1280x720:d={question_seconds}",
-                "-vf", ",".join(q_draw),
-                "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                str(question_path)
-            ]
-        
-        subprocess.run(q_cmd, capture_output=True, text=True, timeout=60)
-        clips_to_concat.append(question_path)
-        temp_files.append(question_path)
-
-        # --- 3. ADIM KLİPLERİ ---
-        steps = solution.get("steps", [])
-        num_steps = len(steps) if steps else 1
-        
-        # Her adıma düşen süre (intro + soru hariç kalan süre)
-        remaining_time = max(10.0, total_audio_duration - intro_seconds - question_seconds - 3.0)
-        step_duration = remaining_time / max(num_steps, 1)
-        step_duration = max(3.0, min(8.0, step_duration))  # 3-8 saniye arası
-        
-        for i, step in enumerate(steps[:5], 1):  # Max 5 adım
-            step_path = output_path.with_suffix(f".step{i}.mp4")
-            
-            # Step text'i al
-            if isinstance(step, dict):
-                step_text = step.get("displayText") or step.get("text") or str(step)
-            else:
-                step_text = str(step)
-            
-            if _create_step_clip(i, step_text, step_duration, step_path, fontfile, topic):
-                clips_to_concat.append(step_path)
-                temp_files.append(step_path)
-
-        # --- 4. SONUÇ KLİP ---
-        result_path = output_path.with_suffix(".result.mp4")
-        result_duration = 3.0
-        final_answer = solution.get("finalAnswer", f"Doğru cevap: {question.correct_answer}")
-        
-        result_draw = []
-        if fontfile:
-            result_draw.append(f"drawtext=fontfile={fontfile}:text='SONUÇ':fontsize=64:fontcolor=0x22C55E:x=(w-text_w)/2:y=200")
-            # Doğru cevap - kısa tut
-            answer_short = final_answer[:80].replace("'", "").replace('"', '')
-            result_draw.append(f"drawtext=fontfile={fontfile}:text='{answer_short}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=320")
-            result_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-        else:
-            result_draw.append("drawtext=text='SONUÇ':fontsize=64:fontcolor=0x22C55E:x=(w-text_w)/2:y=200")
-            answer_short = final_answer[:80].replace("'", "").replace('"', '')
-            result_draw.append(f"drawtext=text='{answer_short}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=320")
-            result_draw.append("drawtext=text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-        
-        result_cmd = [
-            "ffmpeg", "-y", "-f", "lavfi",
-            "-i", f"color=c=0x1E1B4B:s=1280x720:d={result_duration}",
-            "-vf", ",".join(result_draw),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            str(result_path)
-        ]
-        subprocess.run(result_cmd, capture_output=True, text=True, timeout=60)
-        clips_to_concat.append(result_path)
-        temp_files.append(result_path)
-
-        # --- 5. KLİPLERİ BİRLEŞTİR ---
-        concat_list_path = output_path.with_suffix(".concat.txt")
-        with open(concat_list_path, "w") as f:
-            for clip in clips_to_concat:
-                f.write(f"file '{clip}'\n")
-        temp_files.append(concat_list_path)
-        
-        concat_video_path = output_path.with_suffix(".concat.mp4")
-        concat_cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", str(concat_list_path),
-            "-c:v", "libx264", "-pix_fmt", "yuv420p",
-            str(concat_video_path)
-        ]
-        subprocess.run(concat_cmd, capture_output=True, text=True, timeout=120)
-        temp_files.append(concat_video_path)
-
-        # --- 6. SES EKLE ---
-        if final_audio and final_audio.exists():
-            merge_cmd = [
-                "ffmpeg", "-y",
-                "-i", str(concat_video_path),
-                "-i", str(final_audio),
-                "-filter_complex", f"[1:a]adelay={int(intro_seconds*1000)}|{int(intro_seconds*1000)}[a]",
-                "-map", "0:v:0", "-map", "[a]",
-                "-c:v", "copy", "-c:a", "aac",
-                "-shortest",
-                str(output_path)
-            ]
-            subprocess.run(merge_cmd, capture_output=True, text=True, timeout=120)
-        else:
-            import shutil
-            shutil.copy(concat_video_path, output_path)
-
-        # --- Cleanup ---
-        for f in temp_files:
-            try:
-                Path(f).unlink(missing_ok=True)
-            except:
-                pass
-        if img_path:
-            try:
-                img_path.unlink(missing_ok=True)
-            except:
-                pass
-
-        if output_path.exists():
-            log(f"Video oluşturuldu: {output_path.name}")
-            return True
-    except Exception as e:
-        log(f"Video oluşturma hatası: {e}", "ERROR")
-    return False
+# ============================================================
+# YOUTUBE UPLOAD
+# ============================================================
 
 async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optional[str]:
     """Videoyu YouTube'a yükle (Teknokul API üzerinden)"""
-    log("YouTube'a yükleniyor...")
+    log("📤 YouTube'a yükleniyor...")
     
     try:
         # Thumbnail üret
         thumb_path = video_path.with_suffix(".thumb.png")
-        img_path: Optional[Path] = None
-        if question.question_image_url:
-            img_path = _download_question_image(question.question_image_url, video_path.with_suffix(".thumb_img"))
-        create_thumbnail(question, thumb_path, image_path=img_path)
-
+        create_thumbnail(question, thumb_path)
+        
         with open(video_path, "rb") as f:
             video_bytes = f.read()
         
         video_base64 = base64.b64encode(video_bytes).decode()
         video_size_kb = len(video_bytes) / 1024
-
-        thumbnail_base64: Optional[str] = None
+        
+        thumbnail_base64 = None
         if thumb_path.exists():
             thumbnail_base64 = base64.b64encode(thumb_path.read_bytes()).decode()
         
-        log(f"Video boyutu: {video_size_kb:.1f} KB, YouTube'a gönderiliyor...")
+        log(f"📦 Video boyutu: {video_size_kb:.1f} KB")
         
         async with httpx.AsyncClient() as client:
             response = await client.post(
@@ -1050,52 +431,22 @@ async def upload_to_youtube(video_path: Path, question: VideoRequest) -> Optiona
                 data = response.json()
                 video_url = data.get("videoUrl")
                 log(f"✅ YouTube'a yüklendi: {video_url}")
-                try:
-                    thumb_path.unlink(missing_ok=True)
-                    if img_path:
-                        img_path.unlink(missing_ok=True)
-                except Exception:
-                    pass
                 return video_url
             else:
-                error_msg = response.text[:500]
-                log(f"YouTube upload hatası: {response.status_code} - {error_msg}", "ERROR")
-                return None
+                log(f"❌ YouTube upload hatası: {response.status_code}", "ERROR")
                 
     except Exception as e:
-        log(f"YouTube upload hatası: {e}", "ERROR")
+        log(f"❌ YouTube upload hatası: {e}", "ERROR")
     
     return None
 
-@app.get("/", response_model=HealthResponse)
-@app.get("/health", response_model=HealthResponse)
-async def health():
-    return HealthResponse(
-        status="healthy",
-        timestamp=datetime.now().isoformat(),
-        version="3.0.0"
-    )
 
-@app.post("/generate")
-async def generate_video(
-    request: VideoRequest,
-    background_tasks: BackgroundTasks,
-    authorization: str = Header(None)
-):
-    if API_SECRET and authorization != f"Bearer {API_SECRET}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
-    log(f"Video üretim isteği: {request.question_id}")
-    background_tasks.add_task(process_video, request)
-    
-    return JSONResponse({
-        "success": True,
-        "message": "Video üretimi başlatıldı",
-        "questionId": request.question_id
-    })
+# ============================================================
+# ANA VİDEO İŞLEM FONKSİYONU
+# ============================================================
 
 async def process_video(request: VideoRequest):
-    """Video üretim işlemi"""
+    """Video üretim işlemi - Video Fabrikası ana akışı"""
     start_time = time.time()
     result = {
         "questionId": request.question_id,
@@ -1104,50 +455,25 @@ async def process_video(request: VideoRequest):
         "error": None
     }
     
-    # Debug log
+    log("=" * 50)
+    log(f"🎬 VIDEO FABRİKASI BAŞLADI")
     log(f"📋 Soru: {request.question_text[:100]}...")
-    log(f"🖼️ Görsel URL: {request.question_image_url or 'YOK'}")
     log(f"📚 Konu: {request.topic_name}, Ders: {request.subject_name}, Sınıf: {request.grade}")
+    log("=" * 50)
     
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             
-            # 1. Gemini ile çözüm üret
-            solution = await generate_solution_with_gemini(request)
-            log(f"📝 Gemini adımlar: {len(solution.get('steps', []))}")
+            # 1. Manim ile video render et (self-healing ile)
+            log("🎬 Adım 1: Manim render başlıyor...")
+            success, video_path = await render_with_self_healing(request, temp_path)
             
-            # 2. ElevenLabs ile ses üret
-            audio_path = temp_path / "narration.mp3"
-            narration = solution.get("narrationText", "Bu soruyu birlikte çözelim.")
-            audio_success = await generate_audio_with_elevenlabs(narration, audio_path)
+            if not success or not video_path:
+                raise Exception("Video render başarısız (3 deneme sonunda)")
             
-            # 3. Video oluştur (önce Manim dene, başarısız olursa FFmpeg fallback)
-            video_path = temp_path / f"solution_{request.question_id[:8]}.mp4"
-            
-            # Manim ile dene
-            log("🎬 Manim ile video üretimi deneniyor...")
-            video_success = create_manim_video(
-                request, 
-                solution, 
-                video_path, 
-                audio_path if audio_success else None
-            )
-            
-            # Manim başarısız olursa FFmpeg fallback
-            if not video_success:
-                log("⚠️ Manim başarısız, FFmpeg fallback kullanılıyor...", "WARN")
-                video_success = create_simple_video(
-                    request, 
-                    solution, 
-                    video_path, 
-                    audio_path if audio_success else None
-                )
-            
-            if not video_success or not video_path.exists():
-                raise Exception("Video oluşturulamadı")
-            
-            # 4. YouTube'a yükle
+            # 2. YouTube'a yükle
+            log("📤 Adım 2: YouTube'a yükleme...")
             video_url = await upload_to_youtube(video_path, request)
             
             if video_url:
@@ -1162,7 +488,9 @@ async def process_video(request: VideoRequest):
         log(f"❌ Video hatası: {e}", "ERROR")
     
     result["duration"] = time.time() - start_time
+    log(f"⏱️ Toplam süre: {result['duration']:.1f} saniye")
     
+    # Callback
     if request.callback_url:
         try:
             async with httpx.AsyncClient() as client:
@@ -1172,6 +500,38 @@ async def process_video(request: VideoRequest):
     
     return result
 
+
+# ============================================================
+# API ENDPOINTS
+# ============================================================
+
+@app.get("/", response_model=HealthResponse)
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    return HealthResponse(
+        status="healthy",
+        timestamp=datetime.now().isoformat(),
+        version="4.0.0"
+    )
+
+@app.post("/generate")
+async def generate_video(
+    request: VideoRequest,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(None)
+):
+    if API_SECRET and authorization != f"Bearer {API_SECRET}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    log(f"📥 Video üretim isteği: {request.question_id}")
+    background_tasks.add_task(process_video, request)
+    
+    return JSONResponse({
+        "success": True,
+        "message": "Video üretimi başlatıldı (Video Fabrikası v4.0)",
+        "questionId": request.question_id
+    })
+
 @app.post("/generate-sync")
 async def generate_video_sync(
     request: VideoRequest,
@@ -1180,13 +540,14 @@ async def generate_video_sync(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    log(f"Senkron video üretim isteği: {request.question_id}")
+    log(f"📥 Senkron video üretim isteği: {request.question_id}")
     result = await process_video(request)
     
     if result.get("success"):
         return JSONResponse(result)
     else:
         raise HTTPException(status_code=500, detail=result.get("error", "Video üretilemedi"))
+
 
 if __name__ == "__main__":
     import uvicorn
