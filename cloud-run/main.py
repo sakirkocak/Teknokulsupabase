@@ -22,7 +22,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="Teknokul Video Generator",
     description="AI-powered video solution generator",
-    version="1.0.2"
+    version="2.2.0"
 )
 
 # Environment variables
@@ -52,27 +52,115 @@ def log(message: str, level: str = "INFO"):
     timestamp = datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] [{level}] {message}")
 
+def clean_latex_for_display(text: str) -> str:
+    """LaTeX ifadelerini ekran için temizle"""
+    import re
+    if not text:
+        return ""
+    # $ işaretlerini kaldır
+    text = re.sub(r'\$([^$]+)\$', r'\1', text)
+    # Bazı LaTeX komutlarını temizle
+    text = text.replace('\\int', '∫')
+    text = text.replace('\\sum', 'Σ')
+    text = text.replace('\\infty', '∞')
+    text = text.replace('\\pi', 'π')
+    text = text.replace('\\sqrt', '√')
+    text = text.replace('\\frac', '')
+    text = text.replace('\\left', '')
+    text = text.replace('\\right', '')
+    text = text.replace('\\cdot', '·')
+    text = text.replace('\\times', '×')
+    text = text.replace('\\div', '÷')
+    text = text.replace('\\leq', '≤')
+    text = text.replace('\\geq', '≥')
+    text = text.replace('\\neq', '≠')
+    text = text.replace('\\pm', '±')
+    text = text.replace('{', '')
+    text = text.replace('}', '')
+    text = text.replace('^', '')
+    text = text.replace('_', '')
+    text = text.replace('\\', '')
+    return text.strip()
+
+def clean_latex_for_speech(text: str) -> str:
+    """LaTeX ifadelerini konuşma için temizle"""
+    import re
+    if not text:
+        return ""
+    
+    # $...$ içindeki ifadeleri sözelleştir
+    def replace_math(match):
+        expr = match.group(1)
+        # Temel dönüşümler
+        expr = re.sub(r'(\w)\^2', r"\1'nin karesi", expr)
+        expr = re.sub(r'(\w)\^3', r"\1'ün küpü", expr)
+        expr = re.sub(r'(\w)\^(\d+)', r'\1 üzeri \2', expr)
+        expr = re.sub(r'\\int', 'integralini alırsak', expr)
+        expr = re.sub(r'\\sum', 'toplamı', expr)
+        expr = re.sub(r'\\infty', 'sonsuz', expr)
+        expr = re.sub(r'\\pi', 'pi', expr)
+        expr = re.sub(r'\\sqrt\{([^}]+)\}', r'\1 in karekökü', expr)
+        expr = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', r'\1 bölü \2', expr)
+        expr = re.sub(r'f\((\w+)\)', r'f \1 fonksiyonu', expr)
+        expr = re.sub(r"f'", 'f türevi', expr)
+        expr = expr.replace('\\left', '')
+        expr = expr.replace('\\right', '')
+        expr = expr.replace('{', '')
+        expr = expr.replace('}', '')
+        expr = expr.replace('\\', '')
+        expr = expr.replace('_', ' alt ')
+        expr = expr.replace('^', ' üzeri ')
+        return expr
+    
+    text = re.sub(r'\$([^$]+)\$', replace_math, text)
+    # Kalan $ işaretlerini kaldır
+    text = text.replace('$', '')
+    return text.strip()
+
 async def generate_solution_with_gemini(question: VideoRequest) -> dict:
     """Gemini ile çözüm üret"""
     log("Gemini ile çözüm üretiliyor...")
     
-    prompt = f"""
-    Aşağıdaki soruyu Türkçe olarak adım adım çöz.
+    # Soru metnini temizle
+    clean_question = clean_latex_for_speech(question.question_text)
     
-    SORU: {question.question_text}
-    
-    ŞIKLAR:
-    {json.dumps(question.options, ensure_ascii=False)}
-    
-    DOĞRU CEVAP: {question.correct_answer}
-    
-    Yanıtını şu JSON formatında ver:
-    {{
-        "steps": ["Adım 1: ...", "Adım 2: ...", ...],
-        "narrationText": "Video için okunacak tam metin (yavaş ve anlaşılır; kısa cümleler; bol noktalama ve duraklama; maksimum 500 karakter)",
-        "finalAnswer": "Doğru cevap açıklaması"
-    }}
-    """
+    prompt = f"""Sen deneyimli bir matematik öğretmenisin. Bu soruyu öğrenciye anlatır gibi ADIM ADIM çöz.
+
+SORU: {clean_question}
+
+ŞIKLAR:
+{json.dumps(question.options, ensure_ascii=False)}
+
+DOĞRU CEVAP: {question.correct_answer}
+
+MUTLAKA UYULMASI GEREKEN KURALLAR:
+
+1. EN AZ 4, EN FAZLA 6 ADIM olsun. Her adım SOMUT ve ANLAMLI olmalı.
+
+2. MATEMATİKSEL İFADELERİ ASLA LaTeX OLARAK YAZMA! Sözel yaz:
+   - "$x^2$" YAZMA → "x'in karesi" YAZ
+   - "$\\int$" YAZMA → "integral" YAZ  
+   - "$f(x)$" YAZMA → "f fonksiyonu" YAZ
+   - "$\\frac{{a}}{{b}}$" YAZMA → "a bölü b" YAZ
+
+3. SESLENDIRME METNİNDE:
+   - Kısa cümleler kur (max 15 kelime)
+   - Duraklamalar için "..." kullan
+   - Vurgular: "dikkat!", "önemli!", "işte burada..."
+   - Motivasyon: "Harika!", "Evet doğru yoldayız!", "Şimdi sonuca ulaştık!"
+
+JSON formatında MUTLAKA şöyle yanıt ver:
+{{
+    "steps": [
+        {{"text": "Birinci adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}},
+        {{"text": "İkinci adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}},
+        {{"text": "Üçüncü adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}},
+        {{"text": "Dördüncü adımın seslendirme metni", "displayText": "Ekranda gösterilecek kısa metin"}}
+    ],
+    "narrationText": "Tüm çözümün akıcı seslendirme metni... Duraklamalar için üç nokta kullan... Matematiksel ifadeleri sözel anlat... Max 600 karakter.",
+    "finalAnswer": "Doğru cevap {question.correct_answer} şıkkı"
+}}
+"""
     
     try:
         async with httpx.AsyncClient() as client:
@@ -100,9 +188,16 @@ async def generate_solution_with_gemini(question: VideoRequest) -> dict:
     except Exception as e:
         log(f"Gemini hatası: {e}", "ERROR")
     
+    # Fallback - daha anlamlı varsayılan adımlar
+    clean_exp = clean_latex_for_speech(question.explanation or "")
     return {
-        "steps": ["Soruyu analiz edelim", "Çözüm adımları", "Sonuç"],
-        "narrationText": f"Bu soruyu birlikte çözelim. {question.explanation or 'Adım adım ilerleyelim.'}",
+        "steps": [
+            {"text": "Öncelikle soruyu dikkatli okuyalım ve verilenleri belirleyelim.", "displayText": "Verilenleri belirleyelim"},
+            {"text": "Şimdi bu verileri kullanarak çözüme başlayalım.", "displayText": "Çözüme başlayalım"},
+            {"text": f"{clean_exp or 'İşlemleri adım adım yapalım.'}", "displayText": "İşlemleri yapalım"},
+            {"text": f"Ve sonuç olarak doğru cevap {question.correct_answer} şıkkı!", "displayText": f"Cevap: {question.correct_answer}"}
+        ],
+        "narrationText": f"Bu soruyu birlikte çözelim... Önce verilenlere bakalım... {clean_exp or 'Adım adım ilerleyelim.'}... Ve sonuç olarak doğru cevap {question.correct_answer} şıkkı!",
         "finalAnswer": f"Doğru cevap: {question.correct_answer}"
     }
 
@@ -161,7 +256,9 @@ def _pick_fontfile() -> Optional[str]:
     return None
 
 def _build_question_overlay_text(question: VideoRequest) -> str:
-    q = (question.question_text or "").strip().replace("\r", " ")
+    # LaTeX temizle
+    q = clean_latex_for_display(question.question_text or "")
+    q = q.strip().replace("\r", " ")
     q = " ".join(q.split())
     q_wrapped = textwrap.fill(q, width=44)
 
@@ -169,7 +266,8 @@ def _build_question_overlay_text(question: VideoRequest) -> str:
     if isinstance(question.options, dict):
         for key in ["A", "B", "C", "D", "E"]:
             if key in question.options and question.options.get(key):
-                opt = str(question.options.get(key)).strip().replace("\r", " ")
+                opt = clean_latex_for_display(str(question.options.get(key)))
+                opt = opt.strip().replace("\r", " ")
                 opt = " ".join(opt.split())
                 opt_wrapped = textwrap.fill(opt, width=42, subsequent_indent="   ")
                 options_lines.append(f"{key}) {opt_wrapped}")
@@ -269,164 +367,274 @@ def create_thumbnail(question: VideoRequest, output_path: Path, image_path: Opti
     except Exception:
         return False
 
+def _create_step_clip(step_num: int, step_text: str, duration: float, output_path: Path, fontfile: Optional[str], topic: str) -> bool:
+    """Tek bir adım için video klip oluştur"""
+    try:
+        # Adım metnini temizle ve wrap et
+        clean_text = step_text.replace("'", "").replace('"', '').replace('\n', ' ')
+        wrapped = textwrap.fill(clean_text, width=50)
+        
+        textfile = output_path.with_suffix(f".step{step_num}.txt")
+        textfile.write_text(wrapped, encoding="utf-8")
+        tf = _ffmpeg_escape_path_for_filter(textfile)
+        
+        draw = []
+        # Başlık
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=42:fontcolor=white:x=(w-text_w)/2:y=40")
+            draw.append(f"drawtext=fontfile={fontfile}:text='Adım {step_num}':fontsize=56:fontcolor=0xF97316:x=(w-text_w)/2:y=120")
+        else:
+            draw.append(f"drawtext=text='{topic}':fontsize=42:fontcolor=white:x=(w-text_w)/2:y=40")
+            draw.append(f"drawtext=text='Adım {step_num}':fontsize=56:fontcolor=0xF97316:x=(w-text_w)/2:y=120")
+        
+        # İçerik kutusu
+        draw.append("drawbox=x=80:y=200:w=1120:h=400:color=black@0.4:t=fill")
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:textfile='{tf}':reload=0:fontsize=36:fontcolor=white:x=120:y=250:line_spacing=16")
+        else:
+            draw.append(f"drawtext=textfile='{tf}':reload=0:fontsize=36:fontcolor=white:x=120:y=250:line_spacing=16")
+        
+        # Footer
+        if fontfile:
+            draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50")
+        else:
+            draw.append("drawtext=text='Teknokul.com.tr':fontsize=24:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-50")
+        
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"color=c=0x1E1B4B:s=1280x720:d={duration}",
+            "-vf", ",".join(draw),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(output_path)
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        textfile.unlink(missing_ok=True)
+        return res.returncode == 0 and output_path.exists()
+    except Exception as e:
+        log(f"Adım {step_num} klip hatası: {e}", "ERROR")
+        return False
+
 def create_simple_video(question: VideoRequest, solution: dict, output_path: Path, audio_path: Optional[Path] = None) -> bool:
-    """FFmpeg ile video oluştur (intro + soru metni + varsa görsel)"""
+    """FFmpeg ile video oluştur (intro + soru + adımlar + sonuç)"""
     log("FFmpeg ile video oluşturuluyor...")
 
     try:
-        # --- Audio (yavaşlat) ---
-        intro_seconds = 2.0
+        # --- Audio işle ---
+        intro_seconds = 2.5
+        question_seconds = 6.0
         final_audio: Optional[Path] = None
-        duration = 14.0
+        total_audio_duration = 30.0
 
         if audio_path and audio_path.exists():
             slow_audio = audio_path.with_name("narration_slow.mp3")
-            if _slow_down_audio(audio_path, slow_audio, speed=0.90):
+            if _slow_down_audio(audio_path, slow_audio, speed=0.92):
                 final_audio = slow_audio
             else:
                 final_audio = audio_path
 
             aud_dur = _audio_duration_seconds(final_audio)
             if aud_dur:
-                duration = aud_dur + intro_seconds + 1.0
+                total_audio_duration = aud_dur + 2.0
 
-        # --- Optional image download ---
+        # --- Görsel indir ---
         img_path: Optional[Path] = None
         if question.question_image_url:
-            img_path = _download_question_image(question.question_image_url, output_path.with_suffix(".img"))
+            log(f"Görsel indiriliyor: {question.question_image_url[:50]}...")
+            img_path = _download_question_image(question.question_image_url, output_path.with_suffix(".qimg"))
+            if img_path and img_path.exists():
+                log(f"✅ Görsel indirildi: {img_path.stat().st_size} bytes")
+            else:
+                log("⚠️ Görsel indirilemedi", "WARN")
 
         fontfile = _pick_fontfile()
         topic = (question.topic_name or "Soru Çözümü").strip().replace("'", "").replace('"', '')
+        
+        clips_to_concat = []
+        temp_files = []
 
-        # --- Main text file for drawtext ---
-        overlay_text = _build_question_overlay_text(question)
-        textfile = output_path.with_suffix(".txt")
-        textfile.write_text(overlay_text, encoding="utf-8")
-        tf = _ffmpeg_escape_path_for_filter(textfile)
-
-        # --- Intro clip ---
+        # --- 1. INTRO KLİP ---
         intro_path = output_path.with_suffix(".intro.mp4")
         intro_draw = []
         if fontfile:
-            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul':fontsize=78:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40")
-            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Video Soru Çözümü':fontsize=42:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+40")
-            intro_draw.append(f"drawtext=fontfile={fontfile}:text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-70")
+            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul':fontsize=84:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-50")
+            intro_draw.append(f"drawtext=fontfile={fontfile}:text='Video Soru Çözümü':fontsize=44:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+50")
+            intro_draw.append(f"drawtext=fontfile={fontfile}:text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
         else:
-            intro_draw.append("drawtext=text='Teknokul':fontsize=78:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-40")
-            intro_draw.append("drawtext=text='Video Soru Çözümü':fontsize=42:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+40")
-            intro_draw.append("drawtext=text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-70")
+            intro_draw.append("drawtext=text='Teknokul':fontsize=84:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-50")
+            intro_draw.append("drawtext=text='Video Soru Çözümü':fontsize=44:fontcolor=0xF97316:x=(w-text_w)/2:y=(h-text_h)/2+50")
+            intro_draw.append("drawtext=text='teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
 
         intro_cmd = [
-            "ffmpeg", "-y",
-            "-f", "lavfi",
+            "ffmpeg", "-y", "-f", "lavfi",
             "-i", f"color=c=0x1E1B4B:s=1280x720:d={intro_seconds}",
             "-vf", ",".join(intro_draw),
-            "-c:v", "libx264",
-            "-t", str(intro_seconds),
-            "-pix_fmt", "yuv420p",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
             str(intro_path)
         ]
         subprocess.run(intro_cmd, capture_output=True, text=True, timeout=60)
+        clips_to_concat.append(intro_path)
+        temp_files.append(intro_path)
 
-        # --- Main clip ---
-        main_seconds = max(8.0, duration - intro_seconds)
-        main_path = output_path.with_suffix(".main.mp4")
-
-        inputs = ["-f", "lavfi", "-i", f"color=c=0x1E1B4B:s=1280x720:d={main_seconds}"]
-        use_filter_complex = False
+        # --- 2. SORU KLİP ---
+        question_path = output_path.with_suffix(".question.mp4")
+        q_text = _build_question_overlay_text(question)
+        q_textfile = output_path.with_suffix(".qtxt")
+        q_textfile.write_text(q_text, encoding="utf-8")
+        temp_files.append(q_textfile)
+        qtf = _ffmpeg_escape_path_for_filter(q_textfile)
 
         if img_path and img_path.exists():
-            inputs += ["-i", str(img_path)]
-            text_x = 660
-            box_x = 640
-            box_w = 580
-            use_filter_complex = True
-        else:
-            text_x = 120
-            box_x = 80
-            box_w = 1120
-
-        draw = []
-        # Başlık
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=50")
-        else:
-            draw.append(f"drawtext=text='{topic}':fontsize=54:fontcolor=white:x=(w-text_w)/2:y=50")
-
-        # Metin kutusu
-        draw.append(f"drawbox=x={box_x}:y=160:w={box_w}:h=470:color=black@0.35:t=fill")
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:textfile='{tf}':reload=0:fontsize=28:fontcolor=white:x={text_x}:y=180:line_spacing=8")
-        else:
-            draw.append(f"drawtext=textfile='{tf}':reload=0:fontsize=28:fontcolor=white:x={text_x}:y=180:line_spacing=8")
-
-        # Footer
-        if fontfile:
-            draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=26:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-        else:
-            draw.append("drawtext=text='Teknokul.com.tr':fontsize=26:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
-
-        if use_filter_complex:
-            # Görsel + text overlay
-            vf = (
-                "[1:v]scale=560:-1:force_original_aspect_ratio=decrease[img];"
-                f"[0:v][img]overlay=60:180:format=auto,{','.join(draw)}[v]"
+            # Görsel + metin
+            q_draw = []
+            if fontfile:
+                q_draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
+            else:
+                q_draw.append(f"drawtext=text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
+            q_draw.append("drawbox=x=640:y=100:w=600:h=520:color=black@0.35:t=fill")
+            if fontfile:
+                q_draw.append(f"drawtext=fontfile={fontfile}:textfile='{qtf}':reload=0:fontsize=24:fontcolor=white:x=660:y=120:line_spacing=6")
+                q_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
+            else:
+                q_draw.append(f"drawtext=textfile='{qtf}':reload=0:fontsize=24:fontcolor=white:x=660:y=120:line_spacing=6")
+                q_draw.append("drawtext=text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
+            
+            q_vf = (
+                "[1:v]scale=580:-1:force_original_aspect_ratio=decrease[img];"
+                f"[0:v][img]overlay=30:120:format=auto,{','.join(q_draw)}[v]"
             )
-            cmd = [
+            q_cmd = [
                 "ffmpeg", "-y",
-                *inputs,
-                "-filter_complex", vf,
+                "-f", "lavfi", "-i", f"color=c=0x1E1B4B:s=1280x720:d={question_seconds}",
+                "-i", str(img_path),
+                "-filter_complex", q_vf,
                 "-map", "[v]",
-                "-c:v", "libx264",
-                "-t", str(main_seconds),
-                "-pix_fmt", "yuv420p",
-                str(main_path)
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                str(question_path)
             ]
         else:
-            vf = ",".join(draw)
-            cmd = ["ffmpeg", "-y", *inputs, "-vf", vf, "-c:v", "libx264",
-                   "-t", str(main_seconds), "-pix_fmt", "yuv420p", str(main_path)]
-        subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            # Sadece metin
+            q_draw = []
+            if fontfile:
+                q_draw.append(f"drawtext=fontfile={fontfile}:text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
+            else:
+                q_draw.append(f"drawtext=text='{topic}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=40")
+            q_draw.append("drawbox=x=60:y=100:w=1160:h=520:color=black@0.35:t=fill")
+            if fontfile:
+                q_draw.append(f"drawtext=fontfile={fontfile}:textfile='{qtf}':reload=0:fontsize=28:fontcolor=white:x=100:y=130:line_spacing=8")
+                q_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
+            else:
+                q_draw.append(f"drawtext=textfile='{qtf}':reload=0:fontsize=28:fontcolor=white:x=100:y=130:line_spacing=8")
+                q_draw.append("drawtext=text='Teknokul.com.tr':fontsize=22:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-40")
+            
+            q_cmd = [
+                "ffmpeg", "-y", "-f", "lavfi",
+                "-i", f"color=c=0x1E1B4B:s=1280x720:d={question_seconds}",
+                "-vf", ",".join(q_draw),
+                "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                str(question_path)
+            ]
+        
+        subprocess.run(q_cmd, capture_output=True, text=True, timeout=60)
+        clips_to_concat.append(question_path)
+        temp_files.append(question_path)
 
-        # --- Concat intro + main ---
-        concat_path = output_path.with_suffix(".concat.mp4")
+        # --- 3. ADIM KLİPLERİ ---
+        steps = solution.get("steps", [])
+        num_steps = len(steps) if steps else 1
+        
+        # Her adıma düşen süre (intro + soru hariç kalan süre)
+        remaining_time = max(10.0, total_audio_duration - intro_seconds - question_seconds - 3.0)
+        step_duration = remaining_time / max(num_steps, 1)
+        step_duration = max(3.0, min(8.0, step_duration))  # 3-8 saniye arası
+        
+        for i, step in enumerate(steps[:5], 1):  # Max 5 adım
+            step_path = output_path.with_suffix(f".step{i}.mp4")
+            
+            # Step text'i al
+            if isinstance(step, dict):
+                step_text = step.get("displayText") or step.get("text") or str(step)
+            else:
+                step_text = str(step)
+            
+            if _create_step_clip(i, step_text, step_duration, step_path, fontfile, topic):
+                clips_to_concat.append(step_path)
+                temp_files.append(step_path)
+
+        # --- 4. SONUÇ KLİP ---
+        result_path = output_path.with_suffix(".result.mp4")
+        result_duration = 3.0
+        final_answer = solution.get("finalAnswer", f"Doğru cevap: {question.correct_answer}")
+        
+        result_draw = []
+        if fontfile:
+            result_draw.append(f"drawtext=fontfile={fontfile}:text='SONUÇ':fontsize=64:fontcolor=0x22C55E:x=(w-text_w)/2:y=200")
+            # Doğru cevap - kısa tut
+            answer_short = final_answer[:80].replace("'", "").replace('"', '')
+            result_draw.append(f"drawtext=fontfile={fontfile}:text='{answer_short}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=320")
+            result_draw.append(f"drawtext=fontfile={fontfile}:text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
+        else:
+            result_draw.append("drawtext=text='SONUÇ':fontsize=64:fontcolor=0x22C55E:x=(w-text_w)/2:y=200")
+            answer_short = final_answer[:80].replace("'", "").replace('"', '')
+            result_draw.append(f"drawtext=text='{answer_short}':fontsize=48:fontcolor=white:x=(w-text_w)/2:y=320")
+            result_draw.append("drawtext=text='Teknokul.com.tr':fontsize=28:fontcolor=0x8B5CF6:x=(w-text_w)/2:y=h-60")
+        
+        result_cmd = [
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", f"color=c=0x1E1B4B:s=1280x720:d={result_duration}",
+            "-vf", ",".join(result_draw),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(result_path)
+        ]
+        subprocess.run(result_cmd, capture_output=True, text=True, timeout=60)
+        clips_to_concat.append(result_path)
+        temp_files.append(result_path)
+
+        # --- 5. KLİPLERİ BİRLEŞTİR ---
+        concat_list_path = output_path.with_suffix(".concat.txt")
+        with open(concat_list_path, "w") as f:
+            for clip in clips_to_concat:
+                f.write(f"file '{clip}'\n")
+        temp_files.append(concat_list_path)
+        
+        concat_video_path = output_path.with_suffix(".concat.mp4")
         concat_cmd = [
             "ffmpeg", "-y",
-            "-i", str(intro_path),
-            "-i", str(main_path),
-            "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]",
-            "-map", "[v]",
-            "-c:v", "libx264",
-            "-pix_fmt", "yuv420p",
-            str(concat_path)
+            "-f", "concat", "-safe", "0",
+            "-i", str(concat_list_path),
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            str(concat_video_path)
         ]
         subprocess.run(concat_cmd, capture_output=True, text=True, timeout=120)
+        temp_files.append(concat_video_path)
 
-        # --- Merge audio (intro kadar geciktir) ---
+        # --- 6. SES EKLE ---
         if final_audio and final_audio.exists():
             merge_cmd = [
                 "ffmpeg", "-y",
-                "-i", str(concat_path),
+                "-i", str(concat_video_path),
                 "-i", str(final_audio),
                 "-filter_complex", f"[1:a]adelay={int(intro_seconds*1000)}|{int(intro_seconds*1000)}[a]",
-                "-map", "0:v:0",
-                "-map", "[a]",
-                "-c:v", "copy",
-                "-c:a", "aac",
+                "-map", "0:v:0", "-map", "[a]",
+                "-c:v", "copy", "-c:a", "aac",
                 "-shortest",
                 str(output_path)
             ]
             subprocess.run(merge_cmd, capture_output=True, text=True, timeout=120)
         else:
-            concat_path.replace(output_path)
+            import shutil
+            shutil.copy(concat_video_path, output_path)
 
-        # Cleanup
-        textfile.unlink(missing_ok=True)
-        if img_path and img_path.exists():
-            img_path.unlink(missing_ok=True)
-        intro_path.unlink(missing_ok=True)
-        main_path.unlink(missing_ok=True)
-        concat_path.unlink(missing_ok=True)
+        # --- Cleanup ---
+        for f in temp_files:
+            try:
+                Path(f).unlink(missing_ok=True)
+            except:
+                pass
+        if img_path:
+            try:
+                img_path.unlink(missing_ok=True)
+            except:
+                pass
 
         if output_path.exists():
             log(f"Video oluşturuldu: {output_path.name}")
@@ -504,7 +712,7 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="1.0.2"
+        version="2.2.0"
     )
 
 @app.post("/generate")
@@ -535,12 +743,18 @@ async def process_video(request: VideoRequest):
         "error": None
     }
     
+    # Debug log
+    log(f"📋 Soru: {request.question_text[:100]}...")
+    log(f"🖼️ Görsel URL: {request.question_image_url or 'YOK'}")
+    log(f"📚 Konu: {request.topic_name}, Ders: {request.subject_name}, Sınıf: {request.grade}")
+    
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             
             # 1. Gemini ile çözüm üret
             solution = await generate_solution_with_gemini(request)
+            log(f"📝 Gemini adımlar: {len(solution.get('steps', []))}")
             
             # 2. ElevenLabs ile ses üret
             audio_path = temp_path / "narration.mp3"
