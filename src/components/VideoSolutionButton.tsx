@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Play, Loader2, Video, ExternalLink } from 'lucide-react'
+import { Play, Loader2, Video, ExternalLink, X, Youtube } from 'lucide-react'
 
 interface VideoSolutionButtonProps {
   questionId: string
-  videoUrl?: string | null
+  videoUrl?: string | null           // YouTube URL
+  videoStorageUrl?: string | null    // Supabase Storage URL (öncelikli)
   videoStatus?: 'none' | 'pending' | 'processing' | 'completed' | 'failed'
   onVideoGenerated?: (url: string) => void
   className?: string
@@ -15,15 +16,21 @@ interface VideoSolutionButtonProps {
 export default function VideoSolutionButton({
   questionId,
   videoUrl,
+  videoStorageUrl,
   videoStatus = 'none',
   onVideoGenerated,
   className = '',
   compact = false
 }: VideoSolutionButtonProps) {
   const [status, setStatus] = useState(videoStatus)
-  const [url, setUrl] = useState(videoUrl)
+  const [storageUrl, setStorageUrl] = useState(videoStorageUrl)
+  const [youtubeUrl, setYoutubeUrl] = useState(videoUrl)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPlayer, setShowPlayer] = useState(false)
+
+  // En iyi URL'i seç (Supabase öncelikli)
+  const bestVideoUrl = storageUrl || youtubeUrl
 
   const handleGenerateVideo = async () => {
     if (loading || status === 'processing' || status === 'pending') return
@@ -44,13 +51,13 @@ export default function VideoSolutionButton({
         throw new Error(data.error || 'Video üretilemedi')
       }
       
-      if (data.status === 'already_exists' && data.videoUrl) {
-        setUrl(data.videoUrl)
+      if (data.status === 'already_exists') {
+        if (data.storageUrl) setStorageUrl(data.storageUrl)
+        if (data.videoUrl) setYoutubeUrl(data.videoUrl)
         setStatus('completed')
-        onVideoGenerated?.(data.videoUrl)
+        onVideoGenerated?.(data.storageUrl || data.videoUrl)
       } else if (data.status === 'queued') {
         setStatus('pending')
-        // Polling başlat
         pollVideoStatus()
       }
       
@@ -63,7 +70,7 @@ export default function VideoSolutionButton({
   }
 
   const pollVideoStatus = async () => {
-    const maxAttempts = 60 // 5 dakika (5 saniye aralıklarla)
+    const maxAttempts = 120 // 10 dakika (5 saniye aralıklarla)
     let attempts = 0
     
     const checkStatus = async () => {
@@ -71,10 +78,11 @@ export default function VideoSolutionButton({
         const response = await fetch(`/api/video/generate?questionId=${questionId}`)
         const data = await response.json()
         
-        if (data.status === 'completed' && data.videoUrl) {
-          setUrl(data.videoUrl)
+        if (data.status === 'completed') {
+          if (data.storageUrl) setStorageUrl(data.storageUrl)
+          if (data.videoUrl) setYoutubeUrl(data.videoUrl)
           setStatus('completed')
-          onVideoGenerated?.(data.videoUrl)
+          onVideoGenerated?.(data.storageUrl || data.videoUrl)
           return
         }
         
@@ -87,7 +95,7 @@ export default function VideoSolutionButton({
         attempts++
         if (attempts < maxAttempts && (data.status === 'pending' || data.status === 'processing')) {
           setStatus(data.status)
-          setTimeout(checkStatus, 5000) // 5 saniye sonra tekrar kontrol
+          setTimeout(checkStatus, 5000)
         }
         
       } catch (err) {
@@ -98,22 +106,69 @@ export default function VideoSolutionButton({
     setTimeout(checkStatus, 3000)
   }
 
-  const openVideo = () => {
-    if (url) {
-      window.open(url, '_blank')
+  const handlePlayVideo = () => {
+    if (storageUrl) {
+      // Supabase video - inline player göster
+      setShowPlayer(true)
+    } else if (youtubeUrl) {
+      // YouTube - yeni sekmede aç
+      window.open(youtubeUrl, '_blank')
     }
   }
 
+  // Video Player Modal
+  if (showPlayer && storageUrl) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="relative w-full max-w-md">
+          {/* Kapatma butonu */}
+          <button
+            onClick={() => setShowPlayer(false)}
+            className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+          >
+            <X className="w-8 h-8" />
+          </button>
+          
+          {/* Video Player - 9:16 dikey format */}
+          <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '9/16' }}>
+            <video
+              src={storageUrl}
+              controls
+              autoPlay
+              playsInline
+              className="w-full h-full object-contain"
+            >
+              Tarayıcınız video oynatmayı desteklemiyor.
+            </video>
+          </div>
+          
+          {/* YouTube linki (varsa) */}
+          {youtubeUrl && (
+            <a
+              href={youtubeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center justify-center gap-2 text-white hover:text-red-400 transition-colors text-sm"
+            >
+              <Youtube className="w-4 h-4" />
+              <span>YouTube'da İzle</span>
+            </a>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   // Video hazır
-  if (status === 'completed' && url) {
+  if (status === 'completed' && bestVideoUrl) {
     return (
       <button
-        onClick={openVideo}
+        onClick={handlePlayVideo}
         className={`inline-flex items-center gap-2 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium rounded-lg transition-colors ${className}`}
       >
         <Play className="w-4 h-4" />
         {!compact && <span>Video Çözüm İzle</span>}
-        <ExternalLink className="w-3 h-3" />
+        {!storageUrl && youtubeUrl && <ExternalLink className="w-3 h-3" />}
       </button>
     )
   }

@@ -74,7 +74,7 @@ JSON formatında yanıt ver:
 /**
  * Cloud Run'a video üretim isteği gönder
  */
-async function sendToCloudRun(question: any, topic: any): Promise<{ success: boolean; videoUrl?: string; error?: string }> {
+async function sendToCloudRun(question: any, topic: any): Promise<{ success: boolean; storageUrl?: string; videoUrl?: string; error?: string }> {
   if (!VIDEO_GENERATOR_URL) {
     return { success: false, error: 'VIDEO_GENERATOR_URL tanımlı değil' }
   }
@@ -103,8 +103,12 @@ async function sendToCloudRun(question: any, topic: any): Promise<{ success: boo
     
     if (response.ok) {
       const data = await response.json()
-      console.log(`✅ [CLOUD RUN] Başarılı: ${data.videoUrl}`)
-      return { success: true, videoUrl: data.videoUrl }
+      console.log(`✅ [CLOUD RUN] Başarılı - Storage: ${data.storageUrl}, YouTube: ${data.youtubeUrl}`)
+      return { 
+        success: true, 
+        storageUrl: data.storageUrl,   // Supabase Storage URL (öncelikli)
+        videoUrl: data.youtubeUrl      // YouTube URL
+      }
     } else {
       const errorText = await response.text()
       console.error(`❌ [CLOUD RUN] Hata: ${response.status} - ${errorText}`)
@@ -144,6 +148,7 @@ export async function POST(request: NextRequest) {
         explanation,
         video_status,
         video_solution_url,
+        video_storage_url,
         topic:topics(main_topic, grade, subject:subjects(name))
       `)
       .eq('id', questionId)
@@ -153,12 +158,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Soru bulunamadı' }, { status: 404 })
     }
     
-    // Video zaten varsa
-    if (question.video_status === 'completed' && question.video_solution_url) {
+    // Video zaten varsa (Supabase Storage veya YouTube)
+    if (question.video_status === 'completed' && (question.video_storage_url || question.video_solution_url)) {
       return NextResponse.json({
         success: true,
         status: 'already_exists',
-        videoUrl: question.video_solution_url
+        storageUrl: question.video_storage_url,  // Supabase Storage (öncelikli)
+        videoUrl: question.video_solution_url     // YouTube URL
       })
     }
     
@@ -195,14 +201,15 @@ export async function POST(request: NextRequest) {
     if (processImmediately && VIDEO_GENERATOR_URL) {
       const result = await sendToCloudRun(question, question.topic)
       
-      if (result.success && result.videoUrl) {
+      if (result.success && (result.storageUrl || result.videoUrl)) {
         // Başarılı - güncelle
+        const updateData: any = { video_status: 'completed' }
+        if (result.storageUrl) updateData.video_storage_url = result.storageUrl
+        if (result.videoUrl) updateData.video_solution_url = result.videoUrl
+        
         await supabase
           .from('questions')
-          .update({
-            video_status: 'completed',
-            video_solution_url: result.videoUrl
-          })
+          .update(updateData)
           .eq('id', questionId)
         
         await supabase
@@ -219,7 +226,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           status: 'completed',
-          videoUrl: result.videoUrl,
+          storageUrl: result.storageUrl,  // Supabase Storage (öncelikli)
+          videoUrl: result.videoUrl,       // YouTube URL
           duration
         })
       } else {
@@ -276,13 +284,14 @@ export async function GET(request: NextRequest) {
   
   const { data: question } = await supabase
     .from('questions')
-    .select('video_status, video_solution_url')
+    .select('video_status, video_solution_url, video_storage_url')
     .eq('id', questionId)
     .single()
   
   return NextResponse.json({
     success: true,
     status: question?.video_status || 'none',
-    videoUrl: question?.video_solution_url
+    storageUrl: question?.video_storage_url,  // Supabase Storage (öncelikli)
+    videoUrl: question?.video_solution_url     // YouTube URL
   })
 }
