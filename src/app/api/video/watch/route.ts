@@ -97,13 +97,17 @@ export async function POST(request: NextRequest) {
         })
     }
     
-    // İzleme kaydı tut
-    await supabase.from('video_watch_logs').insert({
-      user_id: user.id,
-      question_id: questionId,
-      credits_used: 1,
-      is_premium: false
-    }).catch(() => {}) // Hata olursa sessizce geç
+    // İzleme kaydı tut (hata olursa sessizce geç)
+    try {
+      await supabase.from('video_watch_logs').insert({
+        user_id: user.id,
+        question_id: questionId,
+        credits_used: 1,
+        is_premium: false
+      })
+    } catch {
+      // Sessizce geç
+    }
     
     return NextResponse.json({
       success: true,
