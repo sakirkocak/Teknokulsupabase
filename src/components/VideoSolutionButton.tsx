@@ -46,6 +46,31 @@ export default function VideoSolutionButton({
   const bestVideoUrl = storageUrl || youtubeUrl
   const hasVideo = status === 'completed' && bestVideoUrl
 
+  // Sayfa açılınca güncel video durumunu kontrol et (cache sorunu için)
+  useEffect(() => {
+    const checkVideoStatus = async () => {
+      try {
+        const response = await fetch(`/api/video/generate?questionId=${questionId}`)
+        const data = await response.json()
+        
+        if (data.status === 'completed') {
+          if (data.storageUrl) setStorageUrl(data.storageUrl)
+          if (data.videoUrl) setYoutubeUrl(data.videoUrl)
+          setStatus('completed')
+        } else if (data.status && data.status !== 'none') {
+          setStatus(data.status)
+        }
+      } catch (err) {
+        console.error('Video status kontrolü hatası:', err)
+      }
+    }
+    
+    // Sadece video yoksa veya pending/processing ise kontrol et
+    if (!bestVideoUrl || status === 'pending' || status === 'processing') {
+      checkVideoStatus()
+    }
+  }, [questionId])
+
   // Kredi durumunu kontrol et
   useEffect(() => {
     const checkCredits = async () => {

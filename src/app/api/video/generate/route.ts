@@ -220,6 +220,19 @@ export async function POST(request: NextRequest) {
           })
           .eq('question_id', questionId)
         
+        // 🔔 Kullanıcıya bildirim gönder
+        const topicName = (question.topic as any)?.main_topic || 'Soru'
+        const subjectName = (question.topic as any)?.subject?.name || 'Matematik'
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: user.id,
+            title: '🎬 Video Çözüm Hazır!',
+            message: `${subjectName} - ${topicName} sorusunun video çözümü hazır. Hemen izleyebilirsin!`,
+            type: 'success',
+            link: `/sorular/${subjectName.toLowerCase().replace(/\s+/g, '_')}/${(question.topic as any)?.grade || 8}-sinif/${questionId}`
+          })
+        
         const duration = Date.now() - startTime
         console.log(`✅ [VIDEO] Tamamlandı: ${questionId} (${duration}ms)`)
         

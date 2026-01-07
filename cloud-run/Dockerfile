@@ -8,7 +8,12 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     sox \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    fonts-noto \
+    fonts-noto-color-emoji \
+    fonts-dejavu \
+    fontconfig \
+    && rm -rf /var/lib/apt/lists/* \
+    && fc-cache -fv
 
 # Çalışma dizini
 WORKDIR /app

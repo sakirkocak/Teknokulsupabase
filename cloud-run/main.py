@@ -237,6 +237,9 @@ config.pixel_height = 1920
 config.frame_rate = 30
 config.background_color = "#1a1a2e"
 
+# Font ayarı
+Text.set_default(font="Noto Sans")
+
 PURPLE = "#8B5CF6"
 ORANGE = "#F97316"
 
@@ -248,7 +251,7 @@ class VideoScene(Scene):
         self.add(logo)
         
         # HOOK
-        warning = Text("DİKKAT", font_size=72, color=RED, weight=BOLD)
+        warning = Text("DIKKAT", font_size=72, color=RED, weight=BOLD)
         self.play(FadeIn(warning, scale=1.5), run_time=0.5)
         self.wait({hook_dur - 1.0})
         self.play(FadeOut(warning), run_time=0.5)
