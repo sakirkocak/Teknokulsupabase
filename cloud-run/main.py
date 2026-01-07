@@ -25,7 +25,7 @@ from pydantic import BaseModel
 app = FastAPI(
     title="Teknokul Video Fabrikası",
     description="3Blue1Brown tarzı senkronize animasyonlu video üretimi",
-    version="4.0.1"
+    version="4.0.2"
 )
 
 # Environment variables
@@ -174,7 +174,7 @@ Lütfen hatayı düzelt ve kodu yeniden yaz.
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-flash:generateContent?key={GEMINI_API_KEY}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={GEMINI_API_KEY}",
                 json={
                     "contents": [
                         {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}
@@ -511,7 +511,7 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="4.0.1"
+        version="4.0.2"
     )
 
 @app.post("/generate")
