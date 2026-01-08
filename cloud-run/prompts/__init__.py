@@ -6,6 +6,19 @@ Her ders için özelleştirilmiş AI prompt'ları
 # Super prompt sistemini import et
 from .super_prompt import get_full_prompt, SUPER_MANIM_PROMPT, create_user_prompt, get_subject_hints
 
+# Varyasyon sistemini import et
+from .variations import (
+    get_random_hook,
+    get_random_tip,
+    get_random_closing,
+    get_random_human_touch,
+    get_random_transition,
+    add_variations_to_text,
+    get_step_count_variation,
+    should_add_emoji,
+    get_varied_system_prompt,
+)
+
 # Matematik Prompt
 MATEMATIK_PROMPT = """Sen Teknokul'un enerjik matematik öğretmenisin. 3Blue1Brown tarzında görsel açıklamalar yapıyorsun.
 
@@ -148,19 +161,28 @@ JSON:
 }"""
 
 
-def get_prompt_for_subject(subject_name: str) -> str:
-    """Derse göre uygun Gemini prompt'unu döndür"""
+def get_prompt_for_subject(subject_name: str, with_variations: bool = True) -> str:
+    """
+    Derse göre uygun Gemini prompt'unu döndür
+    🎨 with_variations=True ise AI pattern önleme varyasyonları eklenir
+    """
     subject = (subject_name or "").lower().strip()
     
     if any(s in subject for s in ['matematik', 'math']):
-        return MATEMATIK_PROMPT
+        base_prompt = MATEMATIK_PROMPT
     elif any(s in subject for s in ['fizik', 'physics']):
-        return FIZIK_PROMPT
+        base_prompt = FIZIK_PROMPT
     elif any(s in subject for s in ['kimya', 'chemistry']):
-        return KIMYA_PROMPT
+        base_prompt = KIMYA_PROMPT
     elif any(s in subject for s in ['biyoloji', 'biology', 'fen']):
-        return BIYOLOJI_PROMPT
+        base_prompt = BIYOLOJI_PROMPT
     elif any(s in subject for s in ['türkçe', 'edebiyat', 'dil']):
-        return TURKCE_PROMPT
+        base_prompt = TURKCE_PROMPT
     else:
-        return GENEL_PROMPT
+        base_prompt = GENEL_PROMPT
+    
+    # 🎨 Varyasyon ekle
+    if with_variations:
+        return get_varied_system_prompt(base_prompt, subject_name)
+    
+    return base_prompt

@@ -419,3 +419,241 @@ export function QuestionListSchema({
   )
 }
 
+/**
+ * LearningResource Schema - Eğitim İçeriği için
+ * Google'a bu sayfanın bir eğitim kaynağı olduğunu söyler
+ * SEO için çok önemli - E-E-A-T sinyalleri güçlendirir
+ */
+export function LearningResourceSchema({
+  name,
+  description,
+  url,
+  subject,
+  grade,
+  educationalLevel,
+  learningResourceType,
+  keywords,
+  datePublished,
+  dateModified,
+  hasSolution,
+  hasVideo,
+}: {
+  name: string
+  description: string
+  url: string
+  subject: string
+  grade: number
+  educationalLevel?: string
+  learningResourceType?: string
+  keywords?: string[]
+  datePublished?: string
+  dateModified?: string
+  hasSolution?: boolean
+  hasVideo?: boolean
+}) {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  // Eğitim seviyesi belirleme
+  const getEducationalLevel = (g: number) => {
+    if (g <= 4) return 'İlkokul'
+    if (g <= 8) return 'Ortaokul'
+    return 'Lise'
+  }
+  
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'LearningResource',
+    name: name,
+    description: description,
+    url: url,
+    inLanguage: 'tr',
+    isAccessibleForFree: true,
+    
+    // Eğitim bilgileri
+    educationalLevel: educationalLevel || `${getEducationalLevel(grade)} - ${grade}. Sınıf`,
+    learningResourceType: learningResourceType || 'Problem/Soru',
+    teaches: subject,
+    
+    // Konu/Ders bilgisi
+    about: {
+      '@type': 'Thing',
+      name: subject,
+    },
+    
+    // Eğitim uyumu
+    educationalAlignment: [
+      {
+        '@type': 'AlignmentObject',
+        alignmentType: 'educationalSubject',
+        targetName: subject,
+      },
+      {
+        '@type': 'AlignmentObject',
+        alignmentType: 'educationalLevel',
+        targetName: `${grade}. Sınıf`,
+      },
+    ],
+    
+    // Sağlayıcı
+    provider: {
+      '@type': 'Organization',
+      name: 'Teknokul',
+      url: baseUrl,
+    },
+    
+    // Tarihler
+    ...(datePublished && { datePublished }),
+    ...(dateModified && { dateModified }),
+    
+    // Anahtar kelimeler
+    ...(keywords && keywords.length > 0 && { keywords: keywords.join(', ') }),
+    
+    // Çözüm/Video bilgisi
+    ...(hasSolution && {
+      hasPart: {
+        '@type': 'Answer',
+        name: 'Çözüm Açıklaması',
+      },
+    }),
+    
+    // Video varsa
+    ...(hasVideo && {
+      video: {
+        '@type': 'VideoObject',
+        name: `${name} - Video Çözüm`,
+        description: `${subject} ${grade}. sınıf soru çözümü`,
+        uploadDate: dateModified || datePublished || new Date().toISOString(),
+        contentUrl: `${url}#video`,
+        embedUrl: `${url}#video`,
+        publisher: {
+          '@type': 'Organization',
+          name: 'Teknokul',
+        },
+      },
+    }),
+    
+    // Ücretsiz
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'TRY',
+      availability: 'https://schema.org/InStock',
+    },
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(schema),
+      }}
+    />
+  )
+}
+
+/**
+ * EducationalQuestion Schema - Soru İçeriği için
+ * Bu, soruların Google'da daha iyi anlaşılmasını sağlar
+ */
+export function EducationalQuestionSchema({
+  questionText,
+  subject,
+  grade,
+  topic,
+  difficulty,
+  options,
+  correctAnswer,
+  explanation,
+  url,
+  hasVideo,
+  solveCount,
+}: {
+  questionText: string
+  subject: string
+  grade: number
+  topic: string
+  difficulty: string
+  options: { key: string; value: string }[]
+  correctAnswer: string
+  explanation?: string
+  url: string
+  hasVideo?: boolean
+  solveCount?: number
+}) {
+  const baseUrl = 'https://www.teknokul.com.tr'
+  
+  const difficultyMap: Record<string, string> = {
+    'easy': 'Kolay',
+    'medium': 'Orta',
+    'hard': 'Zor',
+    'legendary': 'Çok Zor',
+  }
+  
+  const schema = {
+    '@context': 'https://schema.org',
+    '@type': 'Question',
+    name: questionText.substring(0, 100) + (questionText.length > 100 ? '...' : ''),
+    text: questionText,
+    url: url,
+    
+    // Soru detayları
+    answerCount: 1,
+    
+    // Doğru cevap
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: options.find(o => o.key === correctAnswer)?.value || correctAnswer,
+      ...(explanation && { description: explanation }),
+      upvoteCount: solveCount || 0,
+    },
+    
+    // Yanlış cevaplar
+    suggestedAnswer: options
+      .filter(o => o.key !== correctAnswer)
+      .map(o => ({
+        '@type': 'Answer',
+        text: o.value,
+      })),
+    
+    // Eğitim bilgileri
+    about: [
+      {
+        '@type': 'Thing',
+        name: subject,
+      },
+      {
+        '@type': 'Thing',
+        name: topic,
+      },
+    ],
+    
+    // Zorluk seviyesi
+    educationalLevel: `${grade}. Sınıf - ${difficultyMap[difficulty] || 'Orta'}`,
+    
+    // Sağlayıcı
+    author: {
+      '@type': 'Organization',
+      name: 'Teknokul',
+      url: baseUrl,
+    },
+    
+    // Video varsa
+    ...(hasVideo && {
+      video: {
+        '@type': 'VideoObject',
+        name: `${topic} - Soru Çözümü`,
+        description: `${subject} ${grade}. sınıf ${topic} video çözüm`,
+      },
+    }),
+  }
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(schema),
+      }}
+    />
+  )
+}
+

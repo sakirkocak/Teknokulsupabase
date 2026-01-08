@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
-import { BreadcrumbSchema, QuizSchema } from '@/components/JsonLdSchema'
+import { BreadcrumbSchema, QuizSchema, LearningResourceSchema, EducationalQuestionSchema } from '@/components/JsonLdSchema'
 import MathRenderer from '@/components/MathRenderer'
 import VideoSolutionButton from '@/components/VideoSolutionButton'
 import { 
@@ -70,8 +70,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { subject, grade, id } = await params
   const supabase = createPublicClient()
   
-  const { data } = await supabase.rpc('get_question_detail', { p_question_id: id })
-  const question = data?.[0]
+  // Soru detayı + SEO bilgilerini al
+  const [questionResult, seoResult] = await Promise.all([
+    supabase.rpc('get_question_detail', { p_question_id: id }),
+    supabase
+      .from('questions')
+      .select('is_indexed, index_score, seo_title, seo_description')
+      .eq('id', id)
+      .single()
+  ])
+  
+  const question = questionResult.data?.[0]
+  const seoData = seoResult.data
   
   if (!question) {
     return { title: 'Soru Bulunamadı' }
@@ -80,9 +90,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const gradeNum = grade.replace('-sinif', '')
   const questionPreview = question.question_text.substring(0, 100) + '...'
   
+  // 🚪 SEO KAPISI: is_indexed false ise noindex
+  // Varsayılan: noindex (güvenli taraf)
+  const isIndexed = seoData?.is_indexed === true
+  
+  // Özel SEO başlık/açıklama varsa kullan
+  const seoTitle = seoData?.seo_title || `${gradeNum}. Sınıf ${question.subject_name} Sorusu - ${question.main_topic} | Teknokul`
+  const seoDescription = seoData?.seo_description || `${questionPreview} MEB müfredatına uygun ${question.subject_name} sorusu. Çözümlü ve açıklamalı.`
+  
   return {
-    title: `${gradeNum}. Sınıf ${question.subject_name} Sorusu - ${question.main_topic} | Teknokul`,
-    description: `${questionPreview} MEB müfredatına uygun ${question.subject_name} sorusu. Çözümlü ve açıklamalı.`,
+    title: seoTitle,
+    description: seoDescription,
     keywords: [
       `${gradeNum}. sınıf ${question.subject_name.toLowerCase()} soruları`,
       `${question.main_topic} soruları`,
@@ -90,6 +108,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       'çözümlü sorular',
       'MEB müfredat',
     ].filter(Boolean),
+    // 🚪 NOINDEX KAPISI - Kritik!
+    robots: {
+      index: isIndexed,
+      follow: true, // Her zaman follow (link keşfi için)
+      googleBot: {
+        index: isIndexed,
+        follow: true,
+      },
+    },
     openGraph: {
       title: `${gradeNum}. Sınıf ${question.subject_name} Sorusu | Teknokul`,
       description: questionPreview,
@@ -202,6 +229,40 @@ export default async function SingleQuestionPage({ params }: Props) {
           options: optionKeys.map(k => options[k]).filter((v): v is string => Boolean(v)),
           correctAnswer: options[question.correct_answer as keyof typeof options] || '',
         }]}
+      />
+      
+      {/* LearningResource Schema - Eğitim kaynağı olarak işaretle */}
+      <LearningResourceSchema
+        name={`${gradeNum}. Sınıf ${subjectName} Sorusu - ${question.main_topic}`}
+        description={`${question.question_text.substring(0, 150)}... MEB müfredatına uygun ${subjectName} sorusu.`}
+        url={`${baseUrl}/sorular/${subject}/${grade}/${id}`}
+        subject={subjectName}
+        grade={gradeNum}
+        learningResourceType="Çözümlü Soru"
+        keywords={[
+          `${gradeNum}. sınıf ${subjectName.toLowerCase()}`,
+          question.main_topic,
+          question.sub_topic || '',
+          'çözümlü sorular',
+          'MEB müfredat',
+        ].filter(Boolean)}
+        hasSolution={!!question.explanation}
+        hasVideo={!!(question.video_storage_url || question.video_solution_url)}
+      />
+      
+      {/* EducationalQuestion Schema - Detaylı soru bilgisi */}
+      <EducationalQuestionSchema
+        questionText={question.question_text}
+        subject={subjectName}
+        grade={gradeNum}
+        topic={question.main_topic}
+        difficulty={question.difficulty}
+        options={optionKeys.map(k => ({ key: k, value: options[k] }))}
+        correctAnswer={question.correct_answer}
+        explanation={question.explanation}
+        url={`${baseUrl}/sorular/${subject}/${grade}/${id}`}
+        hasVideo={!!(question.video_storage_url || question.video_solution_url)}
+        solveCount={question.solve_count}
       />
       
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">

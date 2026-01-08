@@ -1,7 +1,16 @@
 """
-Teknokul Video Fabrikası - Süper Prompt Sistemi v1.0
+Teknokul Video Fabrikası - Süper Prompt Sistemi v1.1
 🎬 Gemini 3 Pro için optimize edilmiş, tüm dersler için tek akıllı prompt
+🎨 Varyasyon sistemi entegre - AI pattern önleme
 """
+
+from .variations import (
+    get_random_hook,
+    get_random_closing,
+    get_varied_system_prompt,
+    should_add_emoji,
+    SUBJECT_SPECIFIC_PHRASES
+)
 
 # =============================================================================
 # ANA MANIM KODU ÜRETME PROMPTU
@@ -359,15 +368,24 @@ def get_full_prompt(question_text: str, options: dict, correct_answer: str,
                     explanation: str = None) -> tuple:
     """
     Tam prompt döndür: (system_prompt, user_prompt)
+    🎨 Her çağrıda farklı varyasyonlar uygulanır
     """
     
     # Sistem promptu
     system_prompt = SUPER_MANIM_PROMPT
     
+    # 🎨 Varyasyon: Sistem promptuna ton/format varyasyonu ekle
+    system_prompt = get_varied_system_prompt(system_prompt, subject_name)
+    
     # Ders ipuçları ekle
     hints = get_subject_hints(subject_name)
     if hints:
         system_prompt += f"\n\n📚 {subject_name.upper()} İÇİN EK İPUÇLARI:\n{hints}"
+    
+    # 🎨 Varyasyon: Hook ve kapanış cümleleri
+    hook_text = get_random_hook(subject=subject_name)
+    closing_text = get_random_closing()
+    use_emoji = should_add_emoji()
     
     # Kullanıcı promptu
     user_prompt = create_user_prompt(
@@ -375,4 +393,32 @@ def get_full_prompt(question_text: str, options: dict, correct_answer: str,
         subject_name, topic_name, grade, explanation
     )
     
+    # 🎨 Varyasyon direktifleri ekle
+    variation_block = f"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎨 BU VİDEO İÇİN ÖZEL DİREKTİFLER:
+- Hook cümlesi: "{hook_text}"
+- Kapanış cümlesi: "{closing_text}"
+- Emoji kullan: {"Evet" if use_emoji else "Az kullan"}
+
+⚠️ ÇEŞİTLİLİK: Her videoda farklı açılış ve kapanış kullan!
+Her adımda farklı ifadeler tercih et. Monotonluktan kaçın.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+    
+    user_prompt = user_prompt + variation_block
+    
     return system_prompt, user_prompt
+
+
+# =============================================================================
+# EXPORT
+# =============================================================================
+
+__all__ = [
+    'SUPER_MANIM_PROMPT',
+    'create_user_prompt',
+    'get_subject_hints',
+    'get_full_prompt',
+    'SUBJECT_HINTS'
+]

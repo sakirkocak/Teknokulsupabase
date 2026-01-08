@@ -1,4 +1,13 @@
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
+import {
+  getRandomTone,
+  getRandomDifficultyDescription,
+  getRandomDistractorRule,
+  getRandomExplanationFormat,
+  getRandomQuestionStyle,
+  getRandomContextExample,
+  getRandomSpecialTip,
+} from './question-variations'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
@@ -320,6 +329,10 @@ export async function generateQuestions(
 
   const selectedTypes = questionTypes.map(t => typeDescriptions[t]).join(', ')
   
+  // 🎨 Varyasyon değerlerini seç
+  const selectedTone = getRandomTone()
+  const selectedDistractorRule = getRandomDistractorRule()
+  
   const difficultyPrompt = difficulty === 'auto' 
     ? 'Zorluk seviyesini sen belirle (easy, medium, hard)' 
     : `Zorluk seviyesi: ${difficulty}`
@@ -328,6 +341,9 @@ export async function generateQuestions(
 
 Soru tipleri: ${selectedTypes}
 ${difficultyPrompt}
+
+🎨 ÜSLUP: ${selectedTone}
+🎯 ÇELDİRİCİ: ${selectedDistractorRule}
 
 SADECE aşağıdaki JSON formatında yanıt ver. Başka hiçbir metin ekleme:
 
@@ -343,7 +359,12 @@ Kurallar:
 - Diğer tipler için options null olmalı
 - JSON syntax hatası yapma, trailing comma kullanma
 - Tüm string değerleri çift tırnak içinde olmalı
-- explanation her zaman doğru cevabı içermeli`
+- explanation her zaman doğru cevabı içermeli
+
+🎭 ÇEŞİTLİLİK (AI Pattern Önleme):
+- Her soruda FARKLI soru kalıpları kullan
+- Doğru cevap rastgele dağılsın (A, B, C, D eşit olasılıkla)
+- Monoton ifadelerden kaçın`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -405,6 +426,9 @@ export async function generateStudyPlan(
   hoursPerDay: number,
   weeks: number
 ): Promise<string> {
+  // 🎨 Varyasyon: Her plan için farklı ton
+  const selectedTone = getRandomTone()
+  
   // Sınıf seviyesine göre sınav ve müfredat bilgisi
   const gradeNum = parseInt(gradeLevel) || 8
   const examInfo = gradeNum === 8 ? {
@@ -490,10 +514,12 @@ Her hafta değerlendirilecek maddeler
 
 ═══════════════════════════════════════════════════════
 
-Planı Türkçe, samimi ama profesyonel bir dilde yaz. 
+Planı Türkçe, ${selectedTone.toLowerCase().replace('.', '')} bir dilde yaz. 
 ${studentName}'e direkt hitap et.
 Gerçekçi ve uygulanabilir hedefler koy.
-Motivasyon verici ama abartısız ol.`
+Motivasyon verici ama abartısız ol.
+
+🎭 FARKLILIK: Her planda farklı açılış cümleleri ve farklı yapı kullan. Kalıplaşmış ifadelerden kaçın.`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -530,6 +556,9 @@ export async function generateStudentReport(
     }[]
   }
 ): Promise<string> {
+  // 🎨 Varyasyon: Her rapor için farklı ton
+  const selectedTone = getRandomTone()
+  
   // Sınıf bilgisi çıkarımı
   const gradeNum = parseInt(gradeLevel) || 8
   const examContext = gradeNum === 8 ? 'LGS' : gradeNum >= 11 ? 'YKS (TYT/AYT)' : gradeNum >= 9 ? 'TYT Hazırlık' : 'Okul Sınavları'
@@ -635,10 +664,12 @@ Pozitif bir dil kullan ama gerçekçi ol.
 
 ═══════════════════════════════════════════════════════
 
-Raporu Türkçe, profesyonel ve motive edici bir dilde yaz.
+Raporu Türkçe, ${selectedTone.toLowerCase().replace('.', '')} bir dilde yaz.
 Emoji kullan ama abartma.
 ${studentName}'e güven ver ama gerçekçi ol.
-Somut ve uygulanabilir öneriler sun.`
+Somut ve uygulanabilir öneriler sun.
+
+🎭 FARKLILIK: Her raporda farklı açılış ve kapanış cümleleri kullan. Kalıplaşmış ifadelerden kaçın.`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -658,6 +689,9 @@ export async function generateAIRecommendation(
   grade?: number,
   subject?: string
 ): Promise<string> {
+  // 🎨 Varyasyon: Her öneri için farklı ton
+  const selectedTone = getRandomTone()
+  
   const gradeContext = grade 
     ? grade === 8 ? 'LGS hazırlığında' : grade >= 11 ? 'YKS hazırlığında' : `${grade}. sınıfta`
     : ''
@@ -686,13 +720,18 @@ ${subjectTip ? `• Ders İpucu: ${subjectTip}` : ''}
 • Maksimum 3-4 cümle
 • ${studentName}'e direkt hitap et (Senli)
 • Somut ve uygulanabilir öneri
-• Pozitif ve motive edici dil
+• ${selectedTone}
 • Emoji kullanabilirsin (1-2 tane)
+
+🎭 ÇEŞİTLİLİK:
+• Her öneride farklı açılış cümlesi kullan
+• Bazen doğrudan konuya gir, bazen motive edici başla
+• Kalıplaşmış ifadelerden kaçın
 
 Örnek format:
 "${studentName}, [konu] konusunda zorlanıyorsun. [Somut öneri]. [Motive edici kapanış]."
 
-ŞİMDİ ÖNERİNİ YAZ:`
+ŞİMDİ FARKLI VE KİŞİSEL ÖNERİNİ YAZ:`
 
   try {
     const result = await geminiModel.generateContent(prompt)
@@ -1119,6 +1158,15 @@ export async function generateCurriculumQuestions(
     ? { easy: ['bilgi', 'kavrama'], medium: ['kavrama', 'uygulama', 'analiz'], hard: ['analiz', 'sentez'], legendary: ['sentez', 'değerlendirme'] }
     : { easy: ['kavrama', 'uygulama'], medium: ['uygulama', 'analiz'], hard: ['analiz', 'sentez'], legendary: ['sentez', 'değerlendirme'] }
 
+  // 🎨 Varyasyon değerlerini her soru seti için yeniden seç
+  const selectedTone = getRandomTone()
+  const selectedDifficultyDesc = getRandomDifficultyDescription(difficulty)
+  const selectedDistractorRule = getRandomDistractorRule()
+  const selectedExplanationFormat = getRandomExplanationFormat()
+  const selectedQuestionStyle = getRandomQuestionStyle(subject)
+  const selectedContextExample = getRandomContextExample(subject)
+  const selectedSpecialTip = getRandomSpecialTip(subject)
+  
   // 🌍 QUESTLY GLOBAL: Dile göre prompt oluştur
   const prompt = lang === 'en' 
     ? generateEnglishPrompt(grade, subject, topic, learningOutcome, difficulty, count, optionCount, isHighSchool, bloomPriority)
@@ -1134,9 +1182,19 @@ export async function generateCurriculumQuestions(
 │ Ders: ${subject}                                          
 │ Konu: ${topic}                                            
 │ Kazanım: "${learningOutcome}"                              
-│ Zorluk: ${difficulty.toUpperCase()} - ${difficultyDetails[difficulty]}
+│ Zorluk: ${difficulty.toUpperCase()} - ${selectedDifficultyDesc}
 │ Format: ${examContext.format}                             
 │ Üretilecek: ${count} soru                                 
+└─────────────────────────────────────────────────────────┘
+
+🎨 BU SORU SETİ İÇİN ÖZEL DİREKTİFLER:
+┌─────────────────────────────────────────────────────────┐
+│ Üslup: ${selectedTone}
+│ Soru Stili: ${selectedQuestionStyle}
+│ Bağlam: ${selectedContextExample}
+│ Çeldirici Kuralı: ${selectedDistractorRule}
+│ Açıklama Formatı: ${selectedExplanationFormat}
+│ Özel İpucu: ${selectedSpecialTip}
 └─────────────────────────────────────────────────────────┘
 
 📋 ${examContext.examType.toUpperCase()} FORMATI:
@@ -1219,7 +1277,15 @@ ${getVisualInstructions(visualType, subject)}
 • bloom_level: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme
 • Türkçe karakterler: ş, ğ, ü, ö, ı, ç, Ş, Ğ, Ü, Ö, İ, Ç
 
-ŞİMDİ ${count} ADET MÜKEMMEL ${subject.toUpperCase()} SORUSU ÜRET:`
+🎭 ÇEŞİTLİLİK DİREKTİFLERİ (AI Pattern Önleme):
+• Her soruda FARKLI soru kalıpları kullan ("Hangisi doğrudur?", "Nedir?", "Ne olur?", "Hangisi yanlıştır?" vb.)
+• Soru köklerini monoton yapma, çeşitlendir
+• Açıklamalarda farklı başlangıç cümleleri kullan
+• Bazen "Buna göre...", bazen "Verilen bilgiye göre...", bazen direkt soru sor
+• Şıkların uzunlukları benzer olsun ama cümle yapıları farklı olsun
+• Doğru cevap her soruda rastgele dağılsın (A, B, C, D${isHighSchool ? ', E' : ''} eşit olasılıkla)
+
+ŞİMDİ ${count} ADET MÜKEMMEL VE ÇEŞİTLİ ${subject.toUpperCase()} SORUSU ÜRET:`
 
   // 🚀 Retry mekanizması ile soru üretimi
   return await withRetry(async () => {
