@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Teknokul Typesense Collections",
+  "description": "Typesense Cloud koleksiyon şemaları - Cursor AI için context",
+  "connection": {
+    "host": "kc8bx4n1ldm30q6fp-1.a1.typesense.net",
+    "port": 443,
+    "protocol": "https",
+    "searchKey": "xXO8BzyZ2Vj6ZuMoL6KB596JUsn2ZCuc"
+  },
+  "collections": {
+    "questions": {
+      "description": "31,362+ soru - Arama ve filtreleme için ana koleksiyon",
+      "defaultSortingField": "created_at",
+      "fields": {
+        "question_id": { "type": "string", "description": "UUID - Supabase questions.id" },
+        "topic_id": { "type": "string", "facet": true, "optional": true, "description": "Konu ID'si (topics tablosu FK)" },
+        "question_text": { "type": "string", "description": "Soru metni - ARAMA İÇİN query_by kullan" },
+        "difficulty": { "type": "string", "facet": true, "values": ["easy", "medium", "hard"], "description": "Zorluk seviyesi" },
+        "subject_code": { "type": "string", "facet": true, "description": "Ders kodu (matematik, turkce, fizik, kimya...)" },
+        "subject_name": { "type": "string", "facet": true, "description": "Ders adı (Matematik, Türkçe...)" },
+        "main_topic": { "type": "string", "facet": true, "description": "Ana konu (Türev, Denklemler...)" },
+        "sub_topic": { "type": "string", "facet": true, "optional": true, "description": "Alt konu" },
+        "grade": { "type": "int32", "facet": true, "values": [5, 6, 7, 8, 9, 10, 11, 12], "description": "Sınıf seviyesi" },
+        "has_image": { "type": "bool", "facet": true, "optional": true, "description": "Görselli soru mu?" },
+        "lang": { "type": "string", "facet": true, "optional": true, "values": ["tr", "en"], "description": "Dil" },
+        "is_new_generation": { "type": "bool", "facet": true, "optional": true, "description": "Yeni nesil soru mu?" },
+        "visual_type": { "type": "string", "facet": true, "optional": true, "values": ["table", "chart", "flowchart", "pie", "diagram"], "description": "Görsel tipi" },
+        "times_answered": { "type": "int32", "facet": true, "description": "Kaç kez çözüldü" },
+        "times_correct": { "type": "int32", "description": "Kaç kez doğru çözüldü" },
+        "success_rate": { "type": "float", "optional": true, "description": "Başarı oranı (0-100)" },
+        "created_at": { "type": "int64", "description": "Unix timestamp" }
+      },
+      "exampleQueries": [
+        {
+          "description": "9. sınıf Matematik sorularını ara",
+          "query": "q=türev&query_by=question_text&filter_by=grade:=9 && subject_code:=matematik"
+        },
+        {
+          "description": "Zor fizik soruları",
+          "query": "q=*&filter_by=difficulty:=hard && subject_code:=fizik&sort_by=times_answered:desc"
+        },
+        {
+          "description": "Yeni nesil tablolu sorular",
+          "query": "q=*&filter_by=is_new_generation:=true && visual_type:=table"
+        }
+      ]
+    },
+    "leaderboard": {
+      "description": "Öğrenci sıralaması - Liderlik tablosu",
+      "defaultSortingField": "total_points",
+      "fields": {
+        "student_id": { "type": "string", "description": "Öğrenci UUID" },
+        "user_id": { "type": "string", "optional": true, "description": "Auth user UUID" },
+        "full_name": { "type": "string", "description": "Öğrenci adı - ARAMA İÇİN query_by" },
+        "avatar_url": { "type": "string", "optional": true },
+        "total_points": { "type": "int32", "sort": true, "description": "Toplam puan" },
+        "total_questions": { "type": "int32", "description": "Çözülen toplam soru" },
+        "total_correct": { "type": "int32", "description": "Doğru sayısı" },
+        "total_wrong": { "type": "int32", "description": "Yanlış sayısı" },
+        "max_streak": { "type": "int32", "description": "En uzun seri" },
+        "current_streak": { "type": "int32", "description": "Mevcut seri" },
+        "today_questions": { "type": "int32", "optional": true, "description": "Bugün çözülen" },
+        "today_correct": { "type": "int32", "optional": true },
+        "today_date": { "type": "string", "optional": true, "format": "YYYY-MM-DD" },
+        "grade": { "type": "int32", "facet": true, "description": "Sınıf" },
+        "city_id": { "type": "string", "facet": true, "optional": true },
+        "city_name": { "type": "string", "facet": true, "optional": true },
+        "district_id": { "type": "string", "facet": true, "optional": true },
+        "district_name": { "type": "string", "facet": true, "optional": true },
+        "school_id": { "type": "string", "facet": true, "optional": true },
+        "school_name": { "type": "string", "facet": true, "optional": true },
+        "country_code": { "type": "string", "facet": true, "optional": true, "description": "Ülke kodu (TR, IN, PK...)" },
+        "matematik_points": { "type": "int32", "optional": true },
+        "turkce_points": { "type": "int32", "optional": true },
+        "fen_points": { "type": "int32", "optional": true },
+        "fizik_points": { "type": "int32", "optional": true },
+        "kimya_points": { "type": "int32", "optional": true },
+        "biyoloji_points": { "type": "int32", "optional": true },
+        "last_activity_at": { "type": "int64" }
+      },
+      "exampleQueries": [
+        {
+          "description": "İstanbul 8. sınıf liderlik tablosu",
+          "query": "q=*&filter_by=grade:=8 && city_name:=Istanbul&sort_by=total_points:desc&per_page=100"
+        },
+        {
+          "description": "Matematik en iyi öğrenciler",
+          "query": "q=*&sort_by=matematik_points:desc&per_page=50"
+        }
+      ]
+    },
+    "topics": {
+      "description": "Konu listesi - /sorular sayfaları için",
+      "fields": {
+        "topic_id": { "type": "string" },
+        "subject_code": { "type": "string", "facet": true },
+        "subject_name": { "type": "string", "facet": true },
+        "grade": { "type": "int32", "facet": true },
+        "main_topic": { "type": "string", "facet": true },
+        "sub_topic": { "type": "string", "facet": true, "optional": true },
+        "question_count": { "type": "int32", "description": "Bu konudaki soru sayısı" }
+      }
+    },
+    "student_stats": {
+      "description": "Öğrenci istatistikleri - Detaylı performans",
+      "defaultSortingField": "total_points",
+      "fields": {
+        "student_id": { "type": "string" },
+        "student_name": { "type": "string" },
+        "grade": { "type": "int32", "facet": true },
+        "total_questions": { "type": "int32" },
+        "total_correct": { "type": "int32" },
+        "total_wrong": { "type": "int32" },
+        "overall_success_rate": { "type": "float", "description": "Genel başarı oranı (0-100)" },
+        "total_points": { "type": "int32", "sort": true },
+        "current_streak": { "type": "int32" },
+        "max_streak": { "type": "int32" },
+        "weak_topics": { "type": "string[]", "facet": true, "optional": true, "description": "Zayıf konular" },
+        "strong_topics": { "type": "string[]", "facet": true, "optional": true, "description": "Güçlü konular" },
+        "last_activity_at": { "type": "int64" }
+      }
+    },
+    "student_topic_progress": {
+      "description": "Öğrenci konu bazlı ilerleme - Adaptive learning",
+      "defaultSortingField": "last_practiced_at",
+      "fields": {
+        "progress_id": { "type": "string", "description": "student_id_topic_id formatında" },
+        "student_id": { "type": "string", "facet": true },
+        "topic_id": { "type": "string", "facet": true },
+        "subject_code": { "type": "string", "facet": true },
+        "subject_name": { "type": "string" },
+        "main_topic": { "type": "string", "facet": true },
+        "grade": { "type": "int32", "facet": true },
+        "total_attempted": { "type": "int32" },
+        "total_correct": { "type": "int32" },
+        "success_rate": { "type": "float", "sort": true },
+        "mastery_level": { "type": "string", "facet": true, "values": ["beginner", "learning", "proficient", "master"] },
+        "current_difficulty": { "type": "string", "facet": true, "values": ["easy", "medium", "hard"] },
+        "consecutive_correct": { "type": "int32" },
+        "last_practiced_at": { "type": "int64" },
+        "next_review_at": { "type": "int64", "optional": true, "description": "Spaced repetition için" }
+      },
+      "exampleQueries": [
+        {
+          "description": "Öğrencinin zayıf konularını bul (başarı oranı < 50%)",
+          "query": "q=*&filter_by=student_id:=UUID && success_rate:<50&sort_by=success_rate:asc"
+        },
+        {
+          "description": "Master seviyesine ulaşmış konular",
+          "query": "q=*&filter_by=student_id:=UUID && mastery_level:=master"
+        }
+      ]
+    },
+    "question_activity": {
+      "description": "Soru çözüm aktiviteleri - Günlük/haftalık istatistikler",
+      "defaultSortingField": "created_at",
+      "fields": {
+        "activity_id": { "type": "string" },
+        "student_id": { "type": "string", "facet": true },
+        "question_id": { "type": "string", "facet": true, "optional": true },
+        "is_correct": { "type": "bool", "facet": true },
+        "points": { "type": "int32" },
+        "source": { "type": "string", "facet": true, "values": ["question", "duel", "challenge"] },
+        "date": { "type": "string", "facet": true, "format": "YYYY-MM-DD" },
+        "week": { "type": "string", "facet": true, "optional": true, "format": "YYYY-Www" },
+        "month": { "type": "string", "facet": true, "optional": true, "format": "YYYY-MM" },
+        "subject_code": { "type": "string", "facet": true, "optional": true },
+        "grade": { "type": "int32", "facet": true, "optional": true },
+        "created_at": { "type": "int64", "sort": true }
+      },
+      "exampleQueries": [
+        {
+          "description": "Öğrencinin bugünkü aktiviteleri",
+          "query": "q=*&filter_by=student_id:=UUID && date:=2026-01-08&sort_by=created_at:desc"
+        },
+        {
+          "description": "Bu haftaki düello aktiviteleri",
+          "query": "q=*&filter_by=source:=duel && week:=2026-W02"
+        }
+      ]
+    },
+    "locations": {
+      "description": "İl ve ilçe verileri",
+      "fields": {
+        "location_id": { "type": "string" },
+        "name": { "type": "string", "description": "İl/ilçe adı - ARAMA" },
+        "type": { "type": "string", "facet": true, "values": ["city", "district"] },
+        "parent_id": { "type": "string", "facet": true, "optional": true, "description": "İlçeler için city_id" },
+        "parent_name": { "type": "string", "optional": true },
+        "plate_code": { "type": "int32", "optional": true, "description": "Plaka kodu (sadece iller)" }
+      }
+    },
+    "schools": {
+      "description": "Okul veritabanı",
+      "fields": {
+        "school_id": { "type": "string" },
+        "name": { "type": "string", "description": "Okul adı - ARAMA" },
+        "city_id": { "type": "string", "facet": true },
+        "city_name": { "type": "string", "facet": true },
+        "district_id": { "type": "string", "facet": true },
+        "district_name": { "type": "string", "facet": true },
+        "school_type": { "type": "string", "facet": true, "optional": true },
+        "ownership_type": { "type": "string", "facet": true, "optional": true }
+      }
+    }
+  },
+  "commonQueryPatterns": {
+    "search": {
+      "description": "Metin araması",
+      "syntax": "q=ARAMA_METNİ&query_by=alan1,alan2",
+      "example": "q=türev integral&query_by=question_text"
+    },
+    "filter": {
+      "description": "Filtreleme",
+      "syntax": "filter_by=alan:=değer && alan2:>değer",
+      "operators": [":=", ":!=", ":>", ":<", ":>=", ":<=", ":[]"],
+      "example": "filter_by=grade:=9 && difficulty:=hard && subject_code:=[matematik,fizik]"
+    },
+    "sort": {
+      "description": "Sıralama",
+      "syntax": "sort_by=alan:asc|desc",
+      "example": "sort_by=total_points:desc,created_at:desc"
+    },
+    "facet": {
+      "description": "Facet sayımları",
+      "syntax": "facet_by=alan1,alan2&max_facet_values=10",
+      "example": "facet_by=subject_code,difficulty,grade"
+    },
+    "pagination": {
+      "description": "Sayfalama",
+      "syntax": "page=1&per_page=20",
+      "note": "Maksimum per_page: 250"
+    },
+    "group": {
+      "description": "Gruplama",
+      "syntax": "group_by=alan&group_limit=3",
+      "example": "group_by=subject_code&group_limit=5"
+    }
+  },
+  "tips": [
+    "filter_by'da string değerler için backtick kullan: subject_name:=`Matematik`",
+    "Birden fazla değer için array syntax: grade:=[8,9,10]",
+    "Negatif filtre: difficulty:!=easy",
+    "Range: times_answered:>100 && times_answered:<1000",
+    "Boolean: is_new_generation:=true",
+    "Facet count almak için: facet_by=difficulty&max_facet_values=5",
+    "Highlight için: highlight_fields=question_text&highlight_start_tag=<mark>&highlight_end_tag=</mark>"
+  ]
+}
