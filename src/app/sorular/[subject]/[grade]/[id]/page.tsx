@@ -257,7 +257,7 @@ export default async function SingleQuestionPage({ params }: Props) {
         grade={gradeNum}
         topic={question.main_topic}
         difficulty={question.difficulty}
-        options={optionKeys.map(k => ({ key: k, value: options[k] }))}
+        options={optionKeys.filter(k => options[k]).map(k => ({ key: k, value: options[k]! }))}
         correctAnswer={question.correct_answer}
         explanation={question.explanation}
         url={`${baseUrl}/sorular/${subject}/${grade}/${id}`}
