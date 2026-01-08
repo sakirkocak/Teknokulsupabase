@@ -38,7 +38,7 @@ app = FastAPI(
 
 # Model tanımları
 GEMINI_MODEL_PRO = "gemini-3-pro-preview"   # Manim kodu için (güçlü)
-GEMINI_MODEL_FLASH = "gemini-2.0-flash"      # Senaryo için (hızlı)
+GEMINI_MODEL_FLASH = "gemini-3-flash-preview"  # Senaryo için (hızlı)
 
 # Environment variables
 API_SECRET = os.getenv("API_SECRET", "")
