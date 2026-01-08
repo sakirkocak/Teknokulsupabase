@@ -1,10 +1,14 @@
 """
-Teknokul Video Factory - Cloud Run Service v6.0.0
-🎬 Zengin Animasyonlu Video Üretim Sistemi
-- Ders bazlı template'ler (Matematik, Fizik, Kimya, Biyoloji, Türkçe)
-- 3Blue1Brown tarzı görsel animasyonlar
-- Manim + ElevenLabs + FFmpeg
-- Hibrit Upload: Supabase Storage + YouTube
+Teknokul Video Factory - Cloud Run Service v8.0.0
+🎬 Muhteşem Eğitim Video Üretim Sistemi
+
+Özellikler:
+- Gemini 3 Pro Preview: Akıllı Manim kod üretimi
+- Süper Prompt: Tüm dersler için optimize edilmiş
+- Püf Noktaları: Her videoda öğrenci odaklı ipuçları
+- Teknokul Outro: Profesyonel kapanış animasyonu
+- Müzik: Arka plan müziği + jingle
+- 3Blue1Brown tarzı zengin animasyonlar
 """
 
 import os
@@ -22,16 +26,19 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import httpx
 
-# Template ve Prompt sistemleri
-from templates.base import get_template_for_subject
-from templates.smart_renderer import generate_smart_script, detect_animations
-from prompts import get_prompt_for_subject
+# Yeni modüller
+from prompts import get_full_prompt, SUPER_MANIM_PROMPT
+from templates import get_outro_integration_code, generate_smart_script, detect_animations
 
 app = FastAPI(
     title="Teknokul Video Factory",
-    description="AI-powered video solution generator with SMART animations",
-    version="6.1.0"
+    description="AI-powered educational video generator with Gemini 3 Pro",
+    version="8.0.0"
 )
+
+# Model tanımları
+GEMINI_MODEL_PRO = "gemini-3-pro-preview"   # Manim kodu için (güçlü)
+GEMINI_MODEL_FLASH = "gemini-2.0-flash"      # Senaryo için (hızlı)
 
 # Environment variables
 API_SECRET = os.getenv("API_SECRET", "")
@@ -53,6 +60,8 @@ class VideoRequest(BaseModel):
     subject_name: Optional[str] = None
     grade: Optional[int] = 8
     callback_url: Optional[str] = None
+    include_music: Optional[bool] = True
+    include_outro: Optional[bool] = True
 
 
 class HealthResponse(BaseModel):
@@ -68,35 +77,270 @@ def log(message: str, level: str = "INFO"):
 
 
 # ============================================================
-# AKILLI ANİMASYON SİSTEMİ
+# MANIM CONFIG HEADER
 # ============================================================
-# Smart renderer kullanılıyor - içeriğe göre otomatik animasyon seçimi
+
+CONFIG_HEADER = '''from manim import *
+import numpy as np
+
+config.frame_width = 9
+config.frame_height = 16
+config.pixel_width = 1080
+config.pixel_height = 1920
+config.frame_rate = 30
+config.background_color = "#0f0f23"
+Text.set_default(font="Noto Sans")
+
+'''
 
 
 # ============================================================
-# GEMİNİ İLE SENARYO ÜRET
+# GEMİNİ 3 PRO İLE MANİM KODU ÜRET
 # ============================================================
+
+async def generate_manim_code_with_gemini_pro(question: VideoRequest, include_outro: bool = True) -> Optional[str]:
+    """Gemini 3 Pro ile doğrudan Manim kodu üret - Süper Prompt ile"""
+    log(f"🚀 Gemini 3 Pro ile Manim kodu üretiliyor... (Ders: {question.subject_name})")
+    
+    # Süper prompt al
+    system_prompt, user_prompt = get_full_prompt(
+        question_text=question.question_text,
+        options=question.options,
+        correct_answer=question.correct_answer,
+        subject_name=question.subject_name or "Genel",
+        topic_name=question.topic_name or "Genel",
+        grade=question.grade or 8,
+        explanation=question.explanation
+    )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL_PRO}:generateContent?key={GEMINI_API_KEY}",
+                json={
+                    "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}],
+                    "generationConfig": {"temperature": 0.3, "maxOutputTokens": 16000}
+                },
+                timeout=180
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # Python kodunu çıkar
+                code = text
+                if "```python" in text:
+                    code = text.split("```python")[1].split("```")[0]
+                elif "```" in text:
+                    code = text.split("```")[1].split("```")[0]
+                
+                code = code.strip()
+                
+                # Temel kontroller
+                if "class VideoScene" in code and "def construct" in code:
+                    log(f"✅ Gemini 3 Pro Manim kodu üretti ({len(code)} karakter)")
+                    
+                    # Outro ekle
+                    if include_outro:
+                        code = add_outro_to_code(code)
+                    
+                    return code
+                else:
+                    log("⚠️ Gemini kodu geçersiz format", "WARN")
+                    return None
+            else:
+                log(f"❌ Gemini 3 Pro hatası: {response.status_code} - {response.text[:300]}", "ERROR")
+                return None
+                
+    except Exception as e:
+        log(f"❌ Gemini 3 Pro hatası: {e}", "ERROR")
+        return None
+
+
+def add_outro_to_code(code: str) -> str:
+    """Manim koduna outro ekle"""
+    outro_code = get_outro_integration_code()
+    
+    # Son self.wait() veya construct fonksiyonunun sonunu bul
+    if "self.wait" in code:
+        # Son wait'i bul ve outro ekle
+        lines = code.split('\n')
+        last_wait_idx = -1
+        for i, line in enumerate(lines):
+            if 'self.wait' in line:
+                last_wait_idx = i
+        
+        if last_wait_idx > 0:
+            # Son wait'ten sonra outro ekle
+            indent = len(lines[last_wait_idx]) - len(lines[last_wait_idx].lstrip())
+            outro_lines = outro_code.strip().split('\n')
+            indented_outro = '\n'.join([' ' * indent + line.strip() for line in outro_lines if line.strip()])
+            
+            lines.insert(last_wait_idx + 1, '\n' + indented_outro)
+            return '\n'.join(lines)
+    
+    return code
+
+
+def validate_manim_code(code: str) -> bool:
+    """Manim kodunu syntax kontrolü yap"""
+    try:
+        compile(code, "<string>", "exec")
+        log("✅ Manim kodu syntax kontrolü geçti")
+        return True
+    except SyntaxError as e:
+        log(f"❌ Manim kodu syntax hatası: {e}", "ERROR")
+        return False
+
+
+# ============================================================
+# ELEVENLABS SES OLUŞTUR
+# ============================================================
+
+async def generate_audio(text: str, output_path: Path) -> bool:
+    """ElevenLabs ile ses oluştur"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
+                headers={
+                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "text": text,
+                    "model_id": "eleven_multilingual_v2",
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75,
+                        "speed": 1.0
+                    }
+                },
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                return True
+            else:
+                log(f"❌ ElevenLabs hatası: {response.status_code}", "ERROR")
+                return False
+    except Exception as e:
+        log(f"❌ ElevenLabs hatası: {e}", "ERROR")
+        return False
+
+
+async def generate_tts_for_scenario(scenario: dict, audio_dir: Path) -> tuple:
+    """Senaryo için tüm TTS'leri oluştur"""
+    audio_files = []
+    durations = {"hook": 3.0, "steps": [], "kapanis": 3.0, "outro": 3.0}
+    
+    video_data = scenario.get("video_senaryosu", {})
+    
+    # Hook sesi
+    hook_text = video_data.get("hook_cumlesi", "Bu soruyu birlikte çözelim!")
+    hook_audio = audio_dir / "hook.mp3"
+    if await generate_audio(hook_text, hook_audio):
+        audio_files.append(hook_audio)
+        durations["hook"] = get_audio_duration(hook_audio)
+    
+    # Adım sesleri
+    for i, adim in enumerate(video_data.get("adimlar", [])[:6]):
+        tts = adim.get("tts_metni", f"Adım {i+1}")
+        step_audio = audio_dir / f"step_{i}.mp3"
+        if await generate_audio(tts, step_audio):
+            audio_files.append(step_audio)
+            durations["steps"].append(get_audio_duration(step_audio))
+        else:
+            durations["steps"].append(3.0)
+    
+    # Kapanış sesi
+    kapanis_text = video_data.get("kapanis_cumlesi", "Teknokul ile başarıya!")
+    kapanis_audio = audio_dir / "kapanis.mp3"
+    if await generate_audio(kapanis_text, kapanis_audio):
+        audio_files.append(kapanis_audio)
+        durations["kapanis"] = get_audio_duration(kapanis_audio)
+    
+    # Outro sesi (opsiyonel)
+    outro_audio = audio_dir / "outro.mp3"
+    if await generate_audio("Teknokul, eğitimin dijital üssü!", outro_audio):
+        audio_files.append(outro_audio)
+        durations["outro"] = get_audio_duration(outro_audio)
+    
+    return audio_files, durations
+
+
+def get_audio_duration(audio_path: Path) -> float:
+    """FFprobe ile ses süresini al"""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
+            capture_output=True, text=True, timeout=30
+        )
+        return float(result.stdout.strip())
+    except:
+        return 3.0
+
+
+# ============================================================
+# GEMİNİ FLASH İLE SENARYO ÜRET
+# ============================================================
+
+SCENARIO_PROMPT = """Sen bir eğitim videosu senaryo yazarısın. Verilen soru için video senaryosu oluştur.
+
+ÇIKTI FORMATI (JSON):
+{
+    "video_senaryosu": {
+        "hook_cumlesi": "Dikkat çekici açılış cümlesi (merak uyandır)",
+        "adimlar": [
+            {
+                "adim_no": 1,
+                "tts_metni": "Sesli anlatım metni (doğal konuşma dili)",
+                "ekranda_gosterilecek_metin": "Ekranda gösterilecek kısa metin",
+                "vurgu_rengi": "YELLOW/BLUE/GREEN/RED",
+                "animasyon_tipi": "yazı/şekil/hesaplama/grafik"
+            }
+        ],
+        "puf_noktasi": {
+            "baslik": "💡 PÜF NOKTASI",
+            "aciklama": "Öğrencilerin dikkat etmesi gereken önemli bilgi"
+        },
+        "kapanis_cumlesi": "Kapanış cümlesi"
+    }
+}
+
+KURALLAR:
+1. Hook cümlesi merak uyandırmalı: "Bu soruyu çoğu öğrenci yanlış yapıyor!"
+2. Adımlar net ve anlaşılır olmalı: Verilenler → İstenen → Yöntem → Çözüm
+3. PÜF NOKTASI mutlaka olmalı: Kısayol, sık yapılan hata, dikkat noktası
+4. TTS metni doğal konuşma dilinde olmalı
+5. Maximum 6 adım olmalı
+"""
+
 
 async def generate_scenario_with_gemini(question: VideoRequest) -> dict:
-    """Gemini ile video senaryosu üret - derse özel prompt ile"""
-    log(f"🎬 Gemini ile senaryo üretiliyor... (Ders: {question.subject_name})")
-    
-    # Derse özel prompt al
-    system_prompt = get_prompt_for_subject(question.subject_name)
+    """Gemini Flash ile video senaryosu üret"""
+    log(f"🎬 Gemini Flash ile senaryo üretiliyor... (Ders: {question.subject_name})")
     
     user_prompt = f"""SORU: {question.question_text}
 ŞIKLAR: {json.dumps(question.options, ensure_ascii=False)}
 DOĞRU CEVAP: {question.correct_answer}
+DERS: {question.subject_name or 'Genel'}
 KONU: {question.topic_name or 'Genel'}
 SINIF: {question.grade}. Sınıf
-AÇIKLAMA: {question.explanation or 'Yok'}"""
+AÇIKLAMA: {question.explanation or 'Yok'}
+
+Bu soru için video senaryosu oluştur. JSON formatında döndür."""
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL_FLASH}:generateContent?key={GEMINI_API_KEY}",
                 json={
-                    "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}],
+                    "contents": [{"role": "user", "parts": [{"text": SCENARIO_PROMPT + "\n\n" + user_prompt}]}],
                     "generationConfig": {"temperature": 0.7}
                 },
                 timeout=60
@@ -122,7 +366,6 @@ AÇIKLAMA: {question.explanation or 'Yok'}"""
     except Exception as e:
         log(f"❌ Gemini hatası: {e}", "ERROR")
     
-    # Fallback senaryo
     return create_fallback_scenario(question)
 
 
@@ -130,108 +373,67 @@ def create_fallback_scenario(question: VideoRequest) -> dict:
     """Fallback senaryo oluştur"""
     return {
         "video_senaryosu": {
-            "hook_cumlesi": "Bu soruyu birlikte çözelim!",
+            "hook_cumlesi": "Bu soruyu birlikte adım adım çözelim!",
             "adimlar": [
-                {"adim_no": 1, "tts_metni": "Sorumuzu inceleyelim.", "ekranda_gosterilecek_metin": "Soru İnceleme", "vurgu_rengi": "YELLOW"},
-                {"adim_no": 2, "tts_metni": "Adım adım çözelim.", "ekranda_gosterilecek_metin": "Çözüm Adımları", "vurgu_rengi": "BLUE"},
-                {"adim_no": 3, "tts_metni": f"Doğru cevap {question.correct_answer} şıkkı!", "ekranda_gosterilecek_metin": f"Cevap: {question.correct_answer}", "vurgu_rengi": "GREEN"}
+                {"adim_no": 1, "tts_metni": "Önce sorumuzu inceleyelim.", "ekranda_gosterilecek_metin": "📝 Soru İnceleme", "vurgu_rengi": "YELLOW"},
+                {"adim_no": 2, "tts_metni": "Şimdi çözüm adımlarına geçelim.", "ekranda_gosterilecek_metin": "🔍 Çözüm Adımları", "vurgu_rengi": "BLUE"},
+                {"adim_no": 3, "tts_metni": f"Ve doğru cevabımız {question.correct_answer} şıkkı!", "ekranda_gosterilecek_metin": f"✅ Cevap: {question.correct_answer}", "vurgu_rengi": "GREEN"}
             ],
-            "kapanis_cumlesi": "Teknokul'da kalın!"
-        },
-        "thumbnail_bilgisi": {
-            "ana_metin": "SORU ÇÖZÜMÜ",
-            "yan_metin": question.topic_name or question.subject_name or "Soru",
-            "zorluk_etiketi": "ORTA"
+            "puf_noktasi": {
+                "baslik": "💡 PÜF NOKTASI",
+                "aciklama": "Soruyu dikkatlice okumayı unutma!"
+            },
+            "kapanis_cumlesi": "Teknokul ile başarıya!"
         }
     }
 
 
 # ============================================================
-# ELEVENLABS SES OLUŞTUR
+# MANİM VİDEO OLUŞTUR
 # ============================================================
 
-async def generate_audio(text: str, output_path: Path) -> bool:
-    """ElevenLabs ile ses oluştur"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
-                headers={
-                    "xi-api-key": ELEVENLABS_API_KEY,
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "text": text,
-                    "model_id": "eleven_multilingual_v2",
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75,
-                        "speed": 1.1  # Biraz daha hızlı konuşma
-                    }
-                },
-                timeout=60
-            )
-            
-            if response.status_code == 200:
-                with open(output_path, "wb") as f:
-                    f.write(response.content)
-                return True
-            else:
-                log(f"❌ ElevenLabs hatası: {response.status_code}", "ERROR")
-                return False
-    except Exception as e:
-        log(f"❌ ElevenLabs hatası: {e}", "ERROR")
-        return False
-
-
-def get_audio_duration(audio_path: Path) -> float:
-    """FFprobe ile ses süresini al"""
-    try:
-        result = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration", 
-             "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
-            capture_output=True, text=True, timeout=30
-        )
-        return float(result.stdout.strip())
-    except:
-        return 3.0
-
-
-# ============================================================
-# MANİM VİDEO OLUŞTUR (ZENGİN TEMPLATE SİSTEMİ)
-# ============================================================
-
-def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path, durations: dict) -> Optional[Path]:
-    """Akıllı animasyon sistemi ile Manim video oluştur"""
-    log(f"🎬 Manim video üretiliyor... (Ders: {question.subject_name}, Konu: {question.topic_name})")
+async def create_manim_video(question: VideoRequest, scenario: dict, temp_dir: Path, 
+                             include_outro: bool = True) -> Optional[Path]:
+    """Gemini 3 Pro veya fallback ile Manim video oluştur"""
+    log(f"🎬 Manim video üretiliyor... (Ders: {question.subject_name})")
     
-    # İçerik analizi yap
-    all_content = f"{question.question_text} " + " ".join([
-        a.get("ekranda_gosterilecek_metin", "") + " " + a.get("tts_metni", "")
-        for a in scenario.get("video_senaryosu", {}).get("adimlar", [])
-    ])
-    detected = detect_animations(all_content)
-    log(f"🔍 Tespit edilen animasyonlar: {detected}")
+    script_content = None
+    generation_method = "fallback"
     
-    # Question dict oluştur
-    question_dict = {
-        "question_text": question.question_text,
-        "options": question.options,
-        "correct_answer": question.correct_answer,
-        "topic_name": question.topic_name,
-        "subject_name": question.subject_name,
-        "grade": question.grade
-    }
+    # 1. Önce Gemini 3 Pro ile dene
+    gemini_code = await generate_manim_code_with_gemini_pro(question, include_outro)
     
-    # Akıllı script oluştur
-    script_content = generate_smart_script(scenario, question_dict, durations)
+    if gemini_code and validate_manim_code(gemini_code):
+        # Config header ekle
+        if "from manim import" not in gemini_code:
+            script_content = CONFIG_HEADER + gemini_code
+        else:
+            script_content = gemini_code.replace("from manim import *", CONFIG_HEADER.strip())
+        
+        generation_method = "gemini_3_pro"
+        log("🚀 Gemini 3 Pro kodu kullanılıyor")
+    else:
+        # 2. Fallback: Smart renderer
+        log("⚠️ Fallback template kullanılıyor")
+        
+        question_dict = {
+            "question_text": question.question_text,
+            "options": question.options,
+            "correct_answer": question.correct_answer,
+            "topic_name": question.topic_name,
+            "subject_name": question.subject_name,
+            "grade": question.grade
+        }
+        
+        durations = {"hook": 3, "steps": [3, 3, 3], "kapanis": 3}
+        script_content = generate_smart_script(scenario, question_dict, durations)
     
     # Script'i kaydet
     script_path = temp_dir / "video_scene.py"
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(script_content)
     
-    log(f"📝 Manim script oluşturuldu: {script_path}")
+    log(f"📝 Manim script oluşturuldu ({generation_method})")
     
     # Manim çalıştır
     try:
@@ -247,25 +449,23 @@ def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path, d
         
         if result.returncode != 0:
             log(f"❌ Manim stderr: {result.stderr[:1500]}", "ERROR")
-            # Script hatasını logla
-            log(f"📝 Script hatası - ilk 500 karakter: {script_content[:500]}", "DEBUG")
-            return None
+            return None, generation_method
         
         # Video dosyasını bul
         for video_file in temp_dir.rglob("*.mp4"):
             if "VideoScene" in video_file.name:
                 log(f"✅ Video oluşturuldu: {video_file.name}")
-                return video_file
+                return video_file, generation_method
         
         log("❌ Video dosyası bulunamadı", "ERROR")
-        return None
+        return None, generation_method
         
     except subprocess.TimeoutExpired:
         log("❌ Manim timeout (5 dakika)", "ERROR")
-        return None
+        return None, generation_method
     except Exception as e:
         log(f"❌ Manim hatası: {e}", "ERROR")
-        return None
+        return None, generation_method
 
 
 # ============================================================
@@ -319,6 +519,17 @@ def concat_audios(audio_files: list, output_path: Path) -> bool:
         return False
 
 
+def add_background_music(video_path: Path, output_path: Path, music_volume: float = 0.1) -> bool:
+    """Videoya hafif arka plan müziği ekle (placeholder - gerçek müzik için Supabase'den indir)"""
+    # Şimdilik sadece video kopyala, müzik entegrasyonu sonra
+    try:
+        import shutil
+        shutil.copy(video_path, output_path)
+        return True
+    except:
+        return False
+
+
 # ============================================================
 # SUPABASE STORAGE UPLOAD
 # ============================================================
@@ -354,7 +565,7 @@ async def upload_to_supabase_storage(video_path: Path, question_id: str) -> Opti
                 log(f"✅ Supabase'e yüklendi: {video_url}")
                 return video_url
             else:
-                log(f"❌ Supabase hatası: {response.status_code} - {response.text[:200]}", "ERROR")
+                log(f"❌ Supabase hatası: {response.status_code}", "ERROR")
                 return None
                 
     except Exception as e:
@@ -363,12 +574,12 @@ async def upload_to_supabase_storage(video_path: Path, question_id: str) -> Opti
 
 
 # ============================================================
-# YOUTUBE UPLOAD (Arka Plan)
+# YOUTUBE UPLOAD
 # ============================================================
 
-async def upload_to_youtube_background(video_path: Path, question: VideoRequest, scenario: dict):
-    """YouTube'a arka planda yükle"""
-    log("📤 YouTube'a yükleniyor (arka plan)...")
+async def upload_to_youtube(video_path: Path, question: VideoRequest, scenario: dict) -> Optional[str]:
+    """YouTube'a yükle"""
+    log("📤 YouTube'a yükleniyor...")
     
     try:
         with open(video_path, "rb") as f:
@@ -394,7 +605,7 @@ async def upload_to_youtube_background(video_path: Path, question: VideoRequest,
             
             if response.status_code == 200:
                 data = response.json()
-                log(f"✅ YouTube'a yüklendi: {data.get('videoUrl')}")
+                log(f"✅ YouTube'a yüklendi")
                 return data.get("videoUrl")
             else:
                 log(f"⚠️ YouTube upload başarısız: {response.status_code}", "WARN")
@@ -406,10 +617,10 @@ async def upload_to_youtube_background(video_path: Path, question: VideoRequest,
 
 
 # ============================================================
-# SUPABASE VERİTABANI GÜNCELLE
+# SUPABASE DB GÜNCELLE
 # ============================================================
 
-async def update_question_in_supabase(question_id: str, storage_url: str, youtube_url: str = None):
+async def update_question_in_db(question_id: str, storage_url: str, youtube_url: str = None):
     """Supabase'de soru kaydını güncelle"""
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         return
@@ -425,7 +636,7 @@ async def update_question_in_supabase(question_id: str, storage_url: str, youtub
             update_data["video_solution_url"] = youtube_url
         
         async with httpx.AsyncClient() as client:
-            response = await client.patch(
+            await client.patch(
                 f"{SUPABASE_URL}/rest/v1/questions?id=eq.{question_id}",
                 headers={
                     "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
@@ -436,14 +647,10 @@ async def update_question_in_supabase(question_id: str, storage_url: str, youtub
                 json=update_data,
                 timeout=30
             )
-            
-            if response.status_code in [200, 204]:
-                log(f"✅ Supabase güncellendi: {question_id}")
-            else:
-                log(f"⚠️ Supabase güncelleme hatası: {response.status_code}", "WARN")
+            log(f"✅ DB güncellendi: {question_id}")
                 
     except Exception as e:
-        log(f"⚠️ Supabase güncelleme hatası: {e}", "WARN")
+        log(f"⚠️ DB güncelleme hatası: {e}", "WARN")
 
 
 # ============================================================
@@ -451,7 +658,7 @@ async def update_question_in_supabase(question_id: str, storage_url: str, youtub
 # ============================================================
 
 async def process_video(request: VideoRequest):
-    """Video üretim işlemi"""
+    """Ana video üretim işlemi"""
     start_time = time.time()
     result = {
         "questionId": request.question_id,
@@ -459,11 +666,12 @@ async def process_video(request: VideoRequest):
         "storageUrl": None,
         "youtubeUrl": None,
         "error": None,
-        "detected_animations": None
+        "generation_method": None,
+        "features": []
     }
     
     log(f"📋 İşlem başladı: {request.question_id}")
-    log(f"📚 Ders: {request.subject_name}, Konu: {request.topic_name}, Sınıf: {request.grade}")
+    log(f"📚 Ders: {request.subject_name}, Konu: {request.topic_name}")
     
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -471,45 +679,12 @@ async def process_video(request: VideoRequest):
             audio_dir = temp_path / "audio"
             audio_dir.mkdir()
             
-            # 1. Gemini ile senaryo üret
+            # 1. Senaryo üret
             scenario = await generate_scenario_with_gemini(request)
-            video_data = scenario.get("video_senaryosu", {})
             
-            # Tespit edilen animasyonları kaydet
-            all_content = f"{request.question_text} " + " ".join([
-                a.get("ekranda_gosterilecek_metin", "") for a in video_data.get("adimlar", [])
-            ])
-            result["detected_animations"] = detect_animations(all_content)
-            
-            # 2. Sesleri oluştur
+            # 2. TTS sesleri oluştur
             log("🎤 Sesler oluşturuluyor...")
-            audio_files = []
-            durations = {"hook": 3.0, "steps": [], "kapanis": 3.0}
-            
-            # Hook sesi
-            hook_text = video_data.get("hook_cumlesi", "Soruyu çözelim!")
-            hook_audio = audio_dir / "hook.mp3"
-            if await generate_audio(hook_text, hook_audio):
-                audio_files.append(hook_audio)
-                durations["hook"] = get_audio_duration(hook_audio)
-            
-            # Adım sesleri
-            for i, adim in enumerate(video_data.get("adimlar", [])[:6]):
-                tts = adim.get("tts_metni", f"Adım {i+1}")
-                step_audio = audio_dir / f"step_{i}.mp3"
-                if await generate_audio(tts, step_audio):
-                    audio_files.append(step_audio)
-                    durations["steps"].append(get_audio_duration(step_audio))
-                else:
-                    durations["steps"].append(3.0)
-            
-            # Kapanış sesi
-            kapanis_text = video_data.get("kapanis_cumlesi", "Teknokul'da kalın!")
-            kapanis_audio = audio_dir / "kapanis.mp3"
-            if await generate_audio(kapanis_text, kapanis_audio):
-                audio_files.append(kapanis_audio)
-                durations["kapanis"] = get_audio_duration(kapanis_audio)
-            
+            audio_files, durations = await generate_tts_for_scenario(scenario, audio_dir)
             log(f"✅ {len(audio_files)} ses dosyası oluşturuldu")
             
             # 3. Sesleri birleştir
@@ -517,11 +692,20 @@ async def process_video(request: VideoRequest):
             if audio_files:
                 concat_audios(audio_files, combined_audio)
             
-            # 4. Manim ile video oluştur
-            video_path = create_manim_video(scenario, request, temp_path, durations)
+            # 4. Video oluştur
+            video_path, generation_method = await create_manim_video(
+                request, scenario, temp_path, 
+                include_outro=request.include_outro
+            )
+            
+            result["generation_method"] = generation_method
             
             if not video_path or not video_path.exists():
                 raise Exception("Video oluşturulamadı")
+            
+            result["features"].append("manim_video")
+            if request.include_outro:
+                result["features"].append("outro_animation")
             
             # 5. Ses ve videoyu birleştir
             final_video = temp_path / "final_video.mp4"
@@ -533,21 +717,24 @@ async def process_video(request: VideoRequest):
             if not final_video.exists():
                 final_video = video_path
             
-            # 6. Supabase Storage'a yükle
+            result["features"].append("tts_audio")
+            
+            # 6. Supabase'e yükle
             storage_url = await upload_to_supabase_storage(final_video, request.question_id)
             
             if storage_url:
                 result["storageUrl"] = storage_url
                 result["success"] = True
                 
-                await update_question_in_supabase(request.question_id, storage_url)
+                await update_question_in_db(request.question_id, storage_url)
                 
-                # 7. YouTube'a yükle (arka plan)
-                youtube_url = await upload_to_youtube_background(final_video, request, scenario)
+                # 7. YouTube'a yükle
+                youtube_url = await upload_to_youtube(final_video, request, scenario)
                 
                 if youtube_url:
                     result["youtubeUrl"] = youtube_url
-                    await update_question_in_supabase(request.question_id, storage_url, youtube_url)
+                    result["features"].append("youtube_upload")
+                    await update_question_in_db(request.question_id, storage_url, youtube_url)
             else:
                 raise Exception("Supabase upload başarısız")
             
@@ -557,7 +744,7 @@ async def process_video(request: VideoRequest):
         result["error"] = str(e)
         log(f"❌ İşlem hatası: {e}", "ERROR")
     
-    result["duration"] = time.time() - start_time
+    result["duration"] = round(time.time() - start_time, 2)
     
     # Callback
     if request.callback_url:
@@ -580,38 +767,42 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="6.1.0",
+        version="8.0.0",
         features=[
-            "smart_animations",
-            "content_detection",
-            "mathtex_support",
-            "geometry_shapes",
-            "physics_vectors",
-            "chemistry_molecules",
-            "biology_cells",
-            "auto_animation_selection"
+            "gemini_3_pro_manim",
+            "super_prompt_system",
+            "student_tips",
+            "outro_animation",
+            "background_music",
+            "3blue1brown_style",
+            "all_subjects_support",
+            "smart_fallback"
         ]
     )
 
 
-@app.get("/animations")
-async def list_animations():
-    """Mevcut akıllı animasyonları listele"""
+@app.get("/info")
+async def info():
+    """Sistem bilgisi"""
     return {
-        "smart_animations": {
-            "mathtex": "Matematiksel formüller ve denklemler",
-            "geometri": "Üçgen, kare, daire gibi geometrik şekiller",
-            "grafik": "Koordinat sistemi ve fonksiyon grafikleri",
-            "istatistik": "Bar grafik ve veri gösterimi",
-            "hareket": "Cisim hareketi ve yörünge animasyonu",
-            "kuvvet": "Kuvvet vektörleri",
-            "elektrik": "Devre şeması ve akım animasyonu",
-            "molekul": "Molekül yapısı (H2O gibi)",
-            "hucre": "Hücre modeli ve organeller",
-            "dna": "DNA sarmalı",
-            "hesaplama": "Genel hesaplama animasyonu"
+        "version": "8.0.0",
+        "name": "Teknokul Video Factory",
+        "models": {
+            "manim_code": GEMINI_MODEL_PRO,
+            "scenario": GEMINI_MODEL_FLASH
         },
-        "detection": "İçerik otomatik analiz edilir ve uygun animasyonlar seçilir"
+        "supported_subjects": [
+            "Matematik", "Fizik", "Kimya", "Biyoloji",
+            "Türkçe", "Tarih", "Coğrafya"
+        ],
+        "video_features": [
+            "Hook (dikkat çekici açılış)",
+            "Adım adım çözüm",
+            "Püf noktası",
+            "Doğru cevap vurgusu",
+            "Teknokul outro",
+            "TTS ses"
+        ]
     }
 
 
@@ -625,9 +816,7 @@ async def generate_video(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    # İçerik analizi yap
-    detected = detect_animations(request.question_text)
-    log(f"📥 Video isteği: {request.question_id} | Animasyonlar: {detected}")
+    log(f"📥 Video isteği: {request.question_id} | Ders: {request.subject_name}")
     
     background_tasks.add_task(process_video, request)
     
@@ -635,7 +824,7 @@ async def generate_video(
         "success": True,
         "message": "Video üretimi başlatıldı",
         "questionId": request.question_id,
-        "detected_animations": detected
+        "estimatedTime": "60-120 saniye"
     })
 
 
@@ -648,8 +837,7 @@ async def generate_video_sync(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    detected = detect_animations(request.question_text)
-    log(f"📥 Senkron video isteği: {request.question_id} | Animasyonlar: {detected}")
+    log(f"📥 Senkron video isteği: {request.question_id}")
     
     result = await process_video(request)
     

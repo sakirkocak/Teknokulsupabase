@@ -3,6 +3,9 @@ Teknokul Video Factory - Gemini Prompt'ları
 Her ders için özelleştirilmiş AI prompt'ları
 """
 
+# Super prompt sistemini import et
+from .super_prompt import get_full_prompt, SUPER_MANIM_PROMPT, create_user_prompt, get_subject_hints
+
 # Matematik Prompt
 MATEMATIK_PROMPT = """Sen Teknokul'un enerjik matematik öğretmenisin. 3Blue1Brown tarzında görsel açıklamalar yapıyorsun.
 
