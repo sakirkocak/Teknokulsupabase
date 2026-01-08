@@ -24,23 +24,13 @@ import httpx
 
 # Template ve Prompt sistemleri
 from templates.base import get_template_for_subject
-from templates.matematik.cebir import generate_cebir_script
-from templates.matematik.geometri import generate_geometri_script
-from templates.matematik.fonksiyon import generate_fonksiyon_script
-from templates.matematik.istatistik import generate_istatistik_script
-from templates.fizik.mekanik import generate_mekanik_script
-from templates.fizik.elektrik import generate_elektrik_script
-from templates.fizik.genel import generate_fizik_genel_script
-from templates.kimya.genel import generate_kimya_genel_script
-from templates.biyoloji.genel import generate_biyoloji_genel_script
-from templates.dil.turkce import generate_turkce_genel_script
-from templates.genel import generate_genel_script
+from templates.smart_renderer import generate_smart_script, detect_animations
 from prompts import get_prompt_for_subject
 
 app = FastAPI(
     title="Teknokul Video Factory",
-    description="AI-powered video solution generator with rich animations",
-    version="6.0.0"
+    description="AI-powered video solution generator with SMART animations",
+    version="6.1.0"
 )
 
 # Environment variables
@@ -78,43 +68,9 @@ def log(message: str, level: str = "INFO"):
 
 
 # ============================================================
-# TEMPLATE SEÇİCİ
+# AKILLI ANİMASYON SİSTEMİ
 # ============================================================
-
-def get_script_generator(template_type: str):
-    """Template tipine göre script generator fonksiyonunu döndür"""
-    generators = {
-        # Matematik
-        'matematik_cebir': generate_cebir_script,
-        'matematik_geometri': generate_geometri_script,
-        'matematik_fonksiyon': generate_fonksiyon_script,
-        'matematik_istatistik': generate_istatistik_script,
-        # Fizik
-        'fizik_mekanik': generate_mekanik_script,
-        'fizik_elektrik': generate_elektrik_script,
-        'fizik_dalga': generate_fizik_genel_script,
-        'fizik_genel': generate_fizik_genel_script,
-        # Kimya
-        'kimya_atom': generate_kimya_genel_script,
-        'kimya_molekul': generate_kimya_genel_script,
-        'kimya_reaksiyon': generate_kimya_genel_script,
-        'kimya_genel': generate_kimya_genel_script,
-        # Biyoloji
-        'biyoloji_hucre': generate_biyoloji_genel_script,
-        'biyoloji_genetik': generate_biyoloji_genel_script,
-        'biyoloji_sistem': generate_biyoloji_genel_script,
-        'biyoloji_genel': generate_biyoloji_genel_script,
-        # Türkçe
-        'turkce_cumle': generate_turkce_genel_script,
-        'turkce_paragraf': generate_turkce_genel_script,
-        'turkce_anlam': generate_turkce_genel_script,
-        'turkce_genel': generate_turkce_genel_script,
-        # Diğer
-        'fen_genel': generate_biyoloji_genel_script,
-        'sosyal_genel': generate_genel_script,
-        'genel': generate_genel_script,
-    }
-    return generators.get(template_type, generate_genel_script)
+# Smart renderer kullanılıyor - içeriğe göre otomatik animasyon seçimi
 
 
 # ============================================================
@@ -246,15 +202,16 @@ def get_audio_duration(audio_path: Path) -> float:
 # ============================================================
 
 def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path, durations: dict) -> Optional[Path]:
-    """Template sistemini kullanarak Manim video oluştur"""
+    """Akıllı animasyon sistemi ile Manim video oluştur"""
     log(f"🎬 Manim video üretiliyor... (Ders: {question.subject_name}, Konu: {question.topic_name})")
     
-    # Template seç
-    template_type = get_template_for_subject(question.subject_name, question.topic_name)
-    log(f"📝 Template: {template_type}")
-    
-    # Script generator al
-    generator = get_script_generator(template_type)
+    # İçerik analizi yap
+    all_content = f"{question.question_text} " + " ".join([
+        a.get("ekranda_gosterilecek_metin", "") + " " + a.get("tts_metni", "")
+        for a in scenario.get("video_senaryosu", {}).get("adimlar", [])
+    ])
+    detected = detect_animations(all_content)
+    log(f"🔍 Tespit edilen animasyonlar: {detected}")
     
     # Question dict oluştur
     question_dict = {
@@ -266,8 +223,8 @@ def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path, d
         "grade": question.grade
     }
     
-    # Script oluştur
-    script_content = generator(scenario, question_dict, durations)
+    # Akıllı script oluştur
+    script_content = generate_smart_script(scenario, question_dict, durations)
     
     # Script'i kaydet
     script_path = temp_dir / "video_scene.py"
@@ -502,7 +459,7 @@ async def process_video(request: VideoRequest):
         "storageUrl": None,
         "youtubeUrl": None,
         "error": None,
-        "template": None
+        "detected_animations": None
     }
     
     log(f"📋 İşlem başladı: {request.question_id}")
@@ -518,9 +475,11 @@ async def process_video(request: VideoRequest):
             scenario = await generate_scenario_with_gemini(request)
             video_data = scenario.get("video_senaryosu", {})
             
-            # Template tipini kaydet
-            template_type = get_template_for_subject(request.subject_name, request.topic_name)
-            result["template"] = template_type
+            # Tespit edilen animasyonları kaydet
+            all_content = f"{request.question_text} " + " ".join([
+                a.get("ekranda_gosterilecek_metin", "") for a in video_data.get("adimlar", [])
+            ])
+            result["detected_animations"] = detect_animations(all_content)
             
             # 2. Sesleri oluştur
             log("🎤 Sesler oluşturuluyor...")
@@ -621,31 +580,38 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="6.0.0",
+        version="6.1.0",
         features=[
-            "matematik_templates",
-            "fizik_templates", 
-            "kimya_templates",
-            "biyoloji_templates",
-            "turkce_templates",
-            "rich_animations",
-            "subject_prompts"
+            "smart_animations",
+            "content_detection",
+            "mathtex_support",
+            "geometry_shapes",
+            "physics_vectors",
+            "chemistry_molecules",
+            "biology_cells",
+            "auto_animation_selection"
         ]
     )
 
 
-@app.get("/templates")
-async def list_templates():
-    """Mevcut template'leri listele"""
+@app.get("/animations")
+async def list_animations():
+    """Mevcut akıllı animasyonları listele"""
     return {
-        "templates": {
-            "matematik": ["cebir", "geometri", "fonksiyon", "istatistik"],
-            "fizik": ["mekanik", "elektrik", "dalga", "genel"],
-            "kimya": ["atom", "molekul", "reaksiyon", "genel"],
-            "biyoloji": ["hucre", "genetik", "sistem", "genel"],
-            "turkce": ["cumle", "paragraf", "anlam", "genel"],
-            "genel": ["default"]
-        }
+        "smart_animations": {
+            "mathtex": "Matematiksel formüller ve denklemler",
+            "geometri": "Üçgen, kare, daire gibi geometrik şekiller",
+            "grafik": "Koordinat sistemi ve fonksiyon grafikleri",
+            "istatistik": "Bar grafik ve veri gösterimi",
+            "hareket": "Cisim hareketi ve yörünge animasyonu",
+            "kuvvet": "Kuvvet vektörleri",
+            "elektrik": "Devre şeması ve akım animasyonu",
+            "molekul": "Molekül yapısı (H2O gibi)",
+            "hucre": "Hücre modeli ve organeller",
+            "dna": "DNA sarmalı",
+            "hesaplama": "Genel hesaplama animasyonu"
+        },
+        "detection": "İçerik otomatik analiz edilir ve uygun animasyonlar seçilir"
     }
 
 
@@ -659,9 +625,9 @@ async def generate_video(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    # Template seç ve logla
-    template_type = get_template_for_subject(request.subject_name, request.topic_name)
-    log(f"📥 Video isteği: {request.question_id} | Template: {template_type}")
+    # İçerik analizi yap
+    detected = detect_animations(request.question_text)
+    log(f"📥 Video isteği: {request.question_id} | Animasyonlar: {detected}")
     
     background_tasks.add_task(process_video, request)
     
@@ -669,7 +635,7 @@ async def generate_video(
         "success": True,
         "message": "Video üretimi başlatıldı",
         "questionId": request.question_id,
-        "template": template_type
+        "detected_animations": detected
     })
 
 
@@ -682,8 +648,8 @@ async def generate_video_sync(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    template_type = get_template_for_subject(request.subject_name, request.topic_name)
-    log(f"📥 Senkron video isteği: {request.question_id} | Template: {template_type}")
+    detected = detect_animations(request.question_text)
+    log(f"📥 Senkron video isteği: {request.question_id} | Animasyonlar: {detected}")
     
     result = await process_video(request)
     
