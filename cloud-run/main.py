@@ -1,7 +1,10 @@
 """
-Teknokul Video Factory - Cloud Run Service v5.1.0
-Basit ve stabil: Manim + ElevenLabs (ayrı) + FFmpeg birleştirme
-Hibrit Upload: Supabase Storage (hızlı) + YouTube (SEO)
+Teknokul Video Factory - Cloud Run Service v6.0.0
+🎬 Zengin Animasyonlu Video Üretim Sistemi
+- Ders bazlı template'ler (Matematik, Fizik, Kimya, Biyoloji, Türkçe)
+- 3Blue1Brown tarzı görsel animasyonlar
+- Manim + ElevenLabs + FFmpeg
+- Hibrit Upload: Supabase Storage + YouTube
 """
 
 import os
@@ -19,10 +22,25 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import httpx
 
+# Template ve Prompt sistemleri
+from templates.base import get_template_for_subject
+from templates.matematik.cebir import generate_cebir_script
+from templates.matematik.geometri import generate_geometri_script
+from templates.matematik.fonksiyon import generate_fonksiyon_script
+from templates.matematik.istatistik import generate_istatistik_script
+from templates.fizik.mekanik import generate_mekanik_script
+from templates.fizik.elektrik import generate_elektrik_script
+from templates.fizik.genel import generate_fizik_genel_script
+from templates.kimya.genel import generate_kimya_genel_script
+from templates.biyoloji.genel import generate_biyoloji_genel_script
+from templates.dil.turkce import generate_turkce_genel_script
+from templates.genel import generate_genel_script
+from prompts import get_prompt_for_subject
+
 app = FastAPI(
     title="Teknokul Video Factory",
-    description="AI-powered video solution generator",
-    version="5.1.0"
+    description="AI-powered video solution generator with rich animations",
+    version="6.0.0"
 )
 
 # Environment variables
@@ -32,38 +50,6 @@ ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
-
-# Gemini System Prompt
-GEMINI_SYSTEM_PROMPT = """Sen Teknokul'un enerjik matematik öğretmenisin.
-
-KURALLAR:
-- SADECE JSON formatında cevap ver, başka bir şey yazma
-- Direkt "Selam!" veya "Merhaba!" diye başla, kendini tanıtma
-- SES METNİNDE MATEMATİK İFADELERİNİ TÜRKÇE OKU:
-  * "f(x)" yerine "f x fonksiyonu" de
-  * "f(5)" yerine "f beş" de
-  * "2x" yerine "iki çarpı x" de
-  * "+" yerine "artı" de
-  * "=" yerine "eşittir" de
-  * ASLA İNGİLİZCE OKUMA!
-- Kapanış kısa olsun (max 10 kelime)
-- 3-5 adım olsun
-
-JSON:
-{
-  "video_senaryosu": {
-    "hook_cumlesi": "Dikkat çekici giriş - max 15 kelime",
-    "adimlar": [
-      {"adim_no": 1, "tts_metni": "Türkçe ses metni", "ekranda_gosterilecek_metin": "Ekran metni", "vurgu_rengi": "YELLOW"}
-    ],
-    "kapanis_cumlesi": "Kısa kapanış"
-  },
-  "thumbnail_bilgisi": {
-    "ana_metin": "VURUCU BAŞLIK",
-    "yan_metin": "Konu",
-    "zorluk_etiketi": "ORTA"
-  }
-}"""
 
 
 class VideoRequest(BaseModel):
@@ -83,6 +69,7 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: str
     version: str
+    features: list
 
 
 def log(message: str, level: str = "INFO"):
@@ -91,25 +78,69 @@ def log(message: str, level: str = "INFO"):
 
 
 # ============================================================
+# TEMPLATE SEÇİCİ
+# ============================================================
+
+def get_script_generator(template_type: str):
+    """Template tipine göre script generator fonksiyonunu döndür"""
+    generators = {
+        # Matematik
+        'matematik_cebir': generate_cebir_script,
+        'matematik_geometri': generate_geometri_script,
+        'matematik_fonksiyon': generate_fonksiyon_script,
+        'matematik_istatistik': generate_istatistik_script,
+        # Fizik
+        'fizik_mekanik': generate_mekanik_script,
+        'fizik_elektrik': generate_elektrik_script,
+        'fizik_dalga': generate_fizik_genel_script,
+        'fizik_genel': generate_fizik_genel_script,
+        # Kimya
+        'kimya_atom': generate_kimya_genel_script,
+        'kimya_molekul': generate_kimya_genel_script,
+        'kimya_reaksiyon': generate_kimya_genel_script,
+        'kimya_genel': generate_kimya_genel_script,
+        # Biyoloji
+        'biyoloji_hucre': generate_biyoloji_genel_script,
+        'biyoloji_genetik': generate_biyoloji_genel_script,
+        'biyoloji_sistem': generate_biyoloji_genel_script,
+        'biyoloji_genel': generate_biyoloji_genel_script,
+        # Türkçe
+        'turkce_cumle': generate_turkce_genel_script,
+        'turkce_paragraf': generate_turkce_genel_script,
+        'turkce_anlam': generate_turkce_genel_script,
+        'turkce_genel': generate_turkce_genel_script,
+        # Diğer
+        'fen_genel': generate_biyoloji_genel_script,
+        'sosyal_genel': generate_genel_script,
+        'genel': generate_genel_script,
+    }
+    return generators.get(template_type, generate_genel_script)
+
+
+# ============================================================
 # GEMİNİ İLE SENARYO ÜRET
 # ============================================================
 
 async def generate_scenario_with_gemini(question: VideoRequest) -> dict:
-    """Gemini ile video senaryosu üret"""
-    log("🎬 Gemini ile senaryo üretiliyor...")
+    """Gemini ile video senaryosu üret - derse özel prompt ile"""
+    log(f"🎬 Gemini ile senaryo üretiliyor... (Ders: {question.subject_name})")
+    
+    # Derse özel prompt al
+    system_prompt = get_prompt_for_subject(question.subject_name)
     
     user_prompt = f"""SORU: {question.question_text}
 ŞIKLAR: {json.dumps(question.options, ensure_ascii=False)}
 DOĞRU CEVAP: {question.correct_answer}
-KONU: {question.topic_name or 'Matematik'}
-SINIF: {question.grade}. Sınıf"""
+KONU: {question.topic_name or 'Genel'}
+SINIF: {question.grade}. Sınıf
+AÇIKLAMA: {question.explanation or 'Yok'}"""
 
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
                 json={
-                    "contents": [{"role": "user", "parts": [{"text": GEMINI_SYSTEM_PROMPT + "\n\n" + user_prompt}]}],
+                    "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}],
                     "generationConfig": {"temperature": 0.7}
                 },
                 timeout=60
@@ -136,19 +167,24 @@ SINIF: {question.grade}. Sınıf"""
         log(f"❌ Gemini hatası: {e}", "ERROR")
     
     # Fallback senaryo
+    return create_fallback_scenario(question)
+
+
+def create_fallback_scenario(question: VideoRequest) -> dict:
+    """Fallback senaryo oluştur"""
     return {
         "video_senaryosu": {
             "hook_cumlesi": "Bu soruyu birlikte çözelim!",
             "adimlar": [
-                {"adim_no": 1, "tts_metni": f"Sorumuzu inceleyelim.", "ekranda_gosterilecek_metin": "Soru", "vurgu_rengi": "YELLOW"},
-                {"adim_no": 2, "tts_metni": "Adım adım çözelim.", "ekranda_gosterilecek_metin": "Çözüm", "vurgu_rengi": "GREEN"},
+                {"adim_no": 1, "tts_metni": "Sorumuzu inceleyelim.", "ekranda_gosterilecek_metin": "Soru İnceleme", "vurgu_rengi": "YELLOW"},
+                {"adim_no": 2, "tts_metni": "Adım adım çözelim.", "ekranda_gosterilecek_metin": "Çözüm Adımları", "vurgu_rengi": "BLUE"},
                 {"adim_no": 3, "tts_metni": f"Doğru cevap {question.correct_answer} şıkkı!", "ekranda_gosterilecek_metin": f"Cevap: {question.correct_answer}", "vurgu_rengi": "GREEN"}
             ],
             "kapanis_cumlesi": "Teknokul'da kalın!"
         },
         "thumbnail_bilgisi": {
             "ana_metin": "SORU ÇÖZÜMÜ",
-            "yan_metin": question.topic_name or "Matematik",
+            "yan_metin": question.topic_name or question.subject_name or "Soru",
             "zorluk_etiketi": "ORTA"
         }
     }
@@ -173,7 +209,8 @@ async def generate_audio(text: str, output_path: Path) -> bool:
                     "model_id": "eleven_multilingual_v2",
                     "voice_settings": {
                         "stability": 0.5,
-                        "similarity_boost": 0.75
+                        "similarity_boost": 0.75,
+                        "speed": 1.1  # Biraz daha hızlı konuşma
                     }
                 },
                 timeout=60
@@ -201,106 +238,36 @@ def get_audio_duration(audio_path: Path) -> float:
         )
         return float(result.stdout.strip())
     except:
-        return 3.0  # Fallback
+        return 3.0
 
 
 # ============================================================
-# MANİM VİDEO OLUŞTUR (BASİT VERSİYON)
+# MANİM VİDEO OLUŞTUR (ZENGİN TEMPLATE SİSTEMİ)
 # ============================================================
 
 def create_manim_video(scenario: dict, question: VideoRequest, temp_dir: Path, durations: dict) -> Optional[Path]:
-    """Basit Manim ile video oluştur (ses yok, sadece görsel)"""
-    log("🎬 Manim ile video üretiliyor...")
+    """Template sistemini kullanarak Manim video oluştur"""
+    log(f"🎬 Manim video üretiliyor... (Ders: {question.subject_name}, Konu: {question.topic_name})")
     
-    video_data = scenario.get("video_senaryosu", {})
-    hook = video_data.get("hook_cumlesi", "Soruyu çözelim!")
-    adimlar = video_data.get("adimlar", [])[:5]
-    kapanis = video_data.get("kapanis_cumlesi", "Teknokul'da kalın!")
+    # Template seç
+    template_type = get_template_for_subject(question.subject_name, question.topic_name)
+    log(f"📝 Template: {template_type}")
     
-    # Süreleri al
-    hook_dur = durations.get("hook", 3.0)
-    step_durs = durations.get("steps", [3.0] * len(adimlar))
-    kapanis_dur = durations.get("kapanis", 3.0)
+    # Script generator al
+    generator = get_script_generator(template_type)
     
-    # Python string escape
-    def escape(s):
-        return s.replace('\\', '\\\\').replace('"', '\\"').replace("'", "\\'").replace('\n', ' ')
+    # Question dict oluştur
+    question_dict = {
+        "question_text": question.question_text,
+        "options": question.options,
+        "correct_answer": question.correct_answer,
+        "topic_name": question.topic_name,
+        "subject_name": question.subject_name,
+        "grade": question.grade
+    }
     
-    # Manim script oluştur
-    script_content = f'''
-from manim import *
-
-config.frame_width = 9
-config.frame_height = 16
-config.pixel_width = 1080
-config.pixel_height = 1920
-config.frame_rate = 30
-config.background_color = "#1a1a2e"
-
-# Font ayarı
-Text.set_default(font="Noto Sans")
-
-PURPLE = "#8B5CF6"
-ORANGE = "#F97316"
-
-class VideoScene(Scene):
-    def construct(self):
-        # Logo (sabit)
-        logo = Text("teknokul.com.tr", font_size=28, color=PURPLE)
-        logo.to_edge(DOWN, buff=0.3)
-        self.add(logo)
-        
-        # HOOK
-        warning = Text("DIKKAT", font_size=72, color=RED, weight=BOLD)
-        self.play(FadeIn(warning, scale=1.5), run_time=0.5)
-        self.wait({hook_dur - 1.0})
-        self.play(FadeOut(warning), run_time=0.5)
-'''
-    
-    # Adımları ekle
-    for i, adim in enumerate(adimlar):
-        display = escape(adim.get("ekranda_gosterilecek_metin", f"Adım {i+1}"))
-        color = adim.get("vurgu_rengi", "WHITE")
-        dur = step_durs[i] if i < len(step_durs) else 3.0
-        
-        script_content += f'''
-        # Adım {i+1}
-        badge = Circle(radius=0.6, color=ORANGE, fill_opacity=1)
-        badge_num = Text("{i+1}", font_size=48, color=WHITE, weight=BOLD)
-        badge_num.move_to(badge.get_center())
-        badge_grp = VGroup(badge, badge_num).to_edge(UP, buff=1.5)
-        
-        box = RoundedRectangle(width=8, height=4, corner_radius=0.3, fill_color="#16213e", fill_opacity=0.9, stroke_color={color}, stroke_width=3)
-        box.move_to(DOWN * 0.5)
-        
-        content = Text("{display}", font_size=36, color={color}, weight=BOLD)
-        content.move_to(box.get_center())
-        if content.width > 7:
-            content.scale_to_fit_width(7)
-        
-        self.play(FadeIn(badge_grp), GrowFromCenter(box), run_time=0.4)
-        self.play(Write(content), run_time=0.6)
-        self.wait({max(0.1, dur - 1.5)})
-        self.play(FadeOut(badge_grp, box, content), run_time=0.5)
-'''
-    
-    # Kapanış
-    script_content += f'''
-        # Kapanış
-        result = Text("SONUÇ", font_size=64, color=GREEN, weight=BOLD)
-        result.to_edge(UP, buff=2)
-        
-        big_logo = Text("Teknokul", font_size=72, color=ORANGE, weight=BOLD)
-        big_logo.move_to(ORIGIN)
-        
-        slogan = Text("Eğitimin Dijital Üssü", font_size=32, color=WHITE)
-        slogan.next_to(big_logo, DOWN, buff=0.4)
-        
-        self.play(FadeIn(result, shift=DOWN), run_time=0.4)
-        self.wait(0.5)
-        self.play(FadeIn(big_logo, scale=1.2), FadeIn(slogan), run_time=0.6)
-        self.wait({max(0.5, kapanis_dur - 1.5)})
-'''
+    # Script oluştur
+    script_content = generator(scenario, question_dict, durations)
     
     # Script'i kaydet
     script_path = temp_dir / "video_scene.py"
@@ -322,7 +289,9 @@ class VideoScene(Scene):
         log(f"📊 Manim exit code: {result.returncode}")
         
         if result.returncode != 0:
-            log(f"❌ Manim stderr: {result.stderr[:1000]}", "ERROR")
+            log(f"❌ Manim stderr: {result.stderr[:1500]}", "ERROR")
+            # Script hatasını logla
+            log(f"📝 Script hatası - ilk 500 karakter: {script_content[:500]}", "DEBUG")
             return None
         
         # Video dosyasını bul
@@ -375,7 +344,6 @@ def merge_audio_video(video_path: Path, audio_path: Path, output_path: Path) -> 
 def concat_audios(audio_files: list, output_path: Path) -> bool:
     """Ses dosyalarını birleştir"""
     try:
-        # Concat file oluştur
         concat_file = output_path.parent / "concat.txt"
         with open(concat_file, "w") as f:
             for audio in audio_files:
@@ -533,11 +501,12 @@ async def process_video(request: VideoRequest):
         "success": False,
         "storageUrl": None,
         "youtubeUrl": None,
-        "error": None
+        "error": None,
+        "template": None
     }
     
     log(f"📋 İşlem başladı: {request.question_id}")
-    log(f"📚 Konu: {request.topic_name}, Ders: {request.subject_name}, Sınıf: {request.grade}")
+    log(f"📚 Ders: {request.subject_name}, Konu: {request.topic_name}, Sınıf: {request.grade}")
     
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -548,6 +517,10 @@ async def process_video(request: VideoRequest):
             # 1. Gemini ile senaryo üret
             scenario = await generate_scenario_with_gemini(request)
             video_data = scenario.get("video_senaryosu", {})
+            
+            # Template tipini kaydet
+            template_type = get_template_for_subject(request.subject_name, request.topic_name)
+            result["template"] = template_type
             
             # 2. Sesleri oluştur
             log("🎤 Sesler oluşturuluyor...")
@@ -562,7 +535,7 @@ async def process_video(request: VideoRequest):
                 durations["hook"] = get_audio_duration(hook_audio)
             
             # Adım sesleri
-            for i, adim in enumerate(video_data.get("adimlar", [])[:5]):
+            for i, adim in enumerate(video_data.get("adimlar", [])[:6]):
                 tts = adim.get("tts_metni", f"Adım {i+1}")
                 step_audio = audio_dir / f"step_{i}.mp3"
                 if await generate_audio(tts, step_audio):
@@ -648,8 +621,32 @@ async def health():
     return HealthResponse(
         status="healthy",
         timestamp=datetime.now().isoformat(),
-        version="5.1.0"
+        version="6.0.0",
+        features=[
+            "matematik_templates",
+            "fizik_templates", 
+            "kimya_templates",
+            "biyoloji_templates",
+            "turkce_templates",
+            "rich_animations",
+            "subject_prompts"
+        ]
     )
+
+
+@app.get("/templates")
+async def list_templates():
+    """Mevcut template'leri listele"""
+    return {
+        "templates": {
+            "matematik": ["cebir", "geometri", "fonksiyon", "istatistik"],
+            "fizik": ["mekanik", "elektrik", "dalga", "genel"],
+            "kimya": ["atom", "molekul", "reaksiyon", "genel"],
+            "biyoloji": ["hucre", "genetik", "sistem", "genel"],
+            "turkce": ["cumle", "paragraf", "anlam", "genel"],
+            "genel": ["default"]
+        }
+    }
 
 
 @app.post("/generate")
@@ -662,13 +659,17 @@ async def generate_video(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    log(f"📥 Video isteği: {request.question_id}")
+    # Template seç ve logla
+    template_type = get_template_for_subject(request.subject_name, request.topic_name)
+    log(f"📥 Video isteği: {request.question_id} | Template: {template_type}")
+    
     background_tasks.add_task(process_video, request)
     
     return JSONResponse({
         "success": True,
         "message": "Video üretimi başlatıldı",
-        "questionId": request.question_id
+        "questionId": request.question_id,
+        "template": template_type
     })
 
 
@@ -681,7 +682,9 @@ async def generate_video_sync(
     if API_SECRET and authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    log(f"📥 Senkron video isteği: {request.question_id}")
+    template_type = get_template_for_subject(request.subject_name, request.topic_name)
+    log(f"📥 Senkron video isteği: {request.question_id} | Template: {template_type}")
+    
     result = await process_video(request)
     
     if result.get("success"):
