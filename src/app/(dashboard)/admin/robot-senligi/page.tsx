@@ -34,6 +34,7 @@ interface Robot {
 
 interface Evaluation {
   id: string
+  robot_id: string
   teacher_name: string
   category: string
   created_at: string
@@ -72,6 +73,8 @@ export default function RobotSenligiPage() {
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [loadingEvaluations, setLoadingEvaluations] = useState(false)
+  const [allEvaluations, setAllEvaluations] = useState<(Evaluation & { robot_number: number })[]>([])
+  const [showAllEvaluations, setShowAllEvaluations] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -103,7 +106,7 @@ export default function RobotSenligiPage() {
     setLoadingEvaluations(false)
   }
 
-  async function deleteEvaluation(evalId: string) {
+  async function deleteEvaluation(evalId: string, robotId?: string) {
     if (!confirm('Bu değerlendirmeyi silmek istediğinize emin misiniz?')) return
 
     const { error } = await supabase
@@ -113,20 +116,68 @@ export default function RobotSenligiPage() {
 
     if (error) {
       console.error('❌ Değerlendirme silinirken hata:', error)
-      alert('Değerlendirme silinirken hata oluştu')
+      alert('Değerlendirme silinirken hata oluştu: ' + error.message)
       return
     }
 
     setEvaluations(evaluations.filter(e => e.id !== evalId))
+    setAllEvaluations(allEvaluations.filter(e => e.id !== evalId))
+    
     // Robot'un değerlendirme sayısını güncelle
-    if (selectedRobot) {
+    const targetRobotId = robotId || selectedRobot?.id
+    if (targetRobotId) {
       setRobots(robots.map(r => 
-        r.id === selectedRobot.id 
-          ? { ...r, evaluation_count: (r.evaluation_count || 1) - 1 }
+        r.id === targetRobotId 
+          ? { ...r, evaluation_count: Math.max(0, (r.evaluation_count || 1) - 1) }
           : r
       ))
-      setSelectedRobot({ ...selectedRobot, evaluation_count: (selectedRobot.evaluation_count || 1) - 1 })
+      if (selectedRobot?.id === targetRobotId) {
+        setSelectedRobot({ ...selectedRobot, evaluation_count: Math.max(0, (selectedRobot.evaluation_count || 1) - 1) })
+      }
     }
+  }
+
+  async function loadAllEvaluations() {
+    const { data, error } = await supabase
+      .from('robot_evaluations')
+      .select(`
+        *,
+        robots!inner(robot_number)
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ Tüm değerlendirmeler yüklenirken hata:', error)
+      return
+    }
+
+    const formatted = (data || []).map((e: any) => ({
+      ...e,
+      robot_number: e.robots.robot_number
+    }))
+    setAllEvaluations(formatted)
+  }
+
+  async function deleteAllEvaluations() {
+    if (!confirm(`Tüm ${allEvaluations.length} değerlendirmeyi silmek istediğinize emin misiniz?`)) return
+    if (!confirm('GERÇEKTEN EMİN MİSİNİZ? Bu işlem geri alınamaz!')) return
+
+    const { error } = await supabase
+      .from('robot_evaluations')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+
+    if (error) {
+      console.error('❌ Değerlendirmeler silinirken hata:', error)
+      alert('Değerlendirmeler silinirken hata oluştu')
+      return
+    }
+
+    setAllEvaluations([])
+    setEvaluations([])
+    // Robot değerlendirme sayılarını sıfırla
+    setRobots(robots.map(r => ({ ...r, evaluation_count: 0 })))
+    alert('Tüm değerlendirmeler silindi!')
   }
 
   async function loadRobots() {
@@ -472,11 +523,17 @@ export default function RobotSenligiPage() {
           </div>
           <div className="text-sm text-surface-500">Fotoğraflı</div>
         </div>
-        <div className="card p-4 text-center">
+        <div 
+          className="card p-4 text-center cursor-pointer hover:bg-blue-50 transition-colors"
+          onClick={() => {
+            setShowAllEvaluations(!showAllEvaluations)
+            if (!showAllEvaluations) loadAllEvaluations()
+          }}
+        >
           <div className="text-3xl font-bold text-blue-600">
             {robots.reduce((sum, r) => sum + (r.evaluation_count || 0), 0)}
           </div>
-          <div className="text-sm text-surface-500">Toplam Değerlendirme</div>
+          <div className="text-sm text-surface-500">Toplam Değerlendirme ▼</div>
         </div>
         <div className="card p-4 text-center">
           <div className="text-3xl font-bold text-amber-600">
@@ -485,6 +542,79 @@ export default function RobotSenligiPage() {
           <div className="text-sm text-surface-500">Değerlendirilmiş</div>
         </div>
       </div>
+
+      {/* All Evaluations List */}
+      <AnimatePresence>
+        {showAllEvaluations && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="card overflow-hidden"
+          >
+            <div className="p-4 border-b border-surface-100 flex items-center justify-between">
+              <h3 className="font-bold text-surface-900">
+                Tüm Değerlendirmeler ({allEvaluations.length})
+              </h3>
+              <div className="flex gap-2">
+                {allEvaluations.length > 0 && (
+                  <button
+                    onClick={deleteAllEvaluations}
+                    className="text-sm px-3 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"
+                  >
+                    Tümünü Sil
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowAllEvaluations(false)}
+                  className="text-sm px-3 py-1 bg-surface-100 text-surface-600 rounded-lg hover:bg-surface-200"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              {allEvaluations.length === 0 ? (
+                <div className="p-8 text-center text-surface-400">
+                  Henüz değerlendirme yok
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-surface-50 sticky top-0">
+                    <tr>
+                      <th className="text-left p-3 text-sm font-medium text-surface-600">Robot</th>
+                      <th className="text-left p-3 text-sm font-medium text-surface-600">Değerlendiren</th>
+                      <th className="text-left p-3 text-sm font-medium text-surface-600">Kategori</th>
+                      <th className="text-left p-3 text-sm font-medium text-surface-600">Tarih</th>
+                      <th className="text-center p-3 text-sm font-medium text-surface-600">Sil</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allEvaluations.map((evaluation) => (
+                      <tr key={evaluation.id} className="border-t border-surface-100 hover:bg-surface-50">
+                        <td className="p-3 font-bold text-surface-900">#{evaluation.robot_number}</td>
+                        <td className="p-3 text-surface-700">{evaluation.teacher_name}</td>
+                        <td className="p-3 text-surface-600 text-sm">{getCategoryLabel(evaluation.category)}</td>
+                        <td className="p-3 text-surface-500 text-sm">
+                          {new Date(evaluation.created_at).toLocaleDateString('tr-TR')}
+                        </td>
+                        <td className="p-3 text-center">
+                          <button
+                            onClick={() => deleteEvaluation(evaluation.id, evaluation.robot_id)}
+                            className="p-1 text-red-500 hover:bg-red-50 rounded"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Robot Grid */}
       {robots.length === 0 ? (
