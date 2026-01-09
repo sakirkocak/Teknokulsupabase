@@ -87,8 +87,9 @@ import {
   ChevronDown, ChevronUp, Star, Zap, Crown, Sparkles,
   AlertCircle, ChevronLeft, ChevronRight, RefreshCw,
   GraduationCap, Layers, BarChart3, Clock, Plus, ImageIcon,
-  FlaskConical, Video, Youtube, Loader2, ExternalLink
+  FlaskConical, Video, Youtube, Loader2, ExternalLink, Play
 } from 'lucide-react'
+import InteractiveSolutionButton from '@/components/InteractiveSolutionButton'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 
@@ -130,6 +131,9 @@ interface Question {
   video_status?: string | null
   video_solution_url?: string | null
   video_youtube_id?: string | null
+  // ✨ İnteraktif Çözüm alanları
+  interactive_solution_status?: string | null
+  interactive_solution_id?: string | null
 }
 
 const difficultyConfig = {
@@ -377,6 +381,8 @@ export default function AdminSoruYonetimiPage() {
               video_status,
               video_solution_url,
               video_youtube_id,
+              interactive_solution_status,
+              interactive_solution_id,
               topic:topics(
                 id,
                 subject_id,
@@ -497,6 +503,8 @@ export default function AdminSoruYonetimiPage() {
         video_status,
         video_solution_url,
         video_youtube_id,
+        interactive_solution_status,
+        interactive_solution_id,
         topic:topics(
           id, subject_id, grade, main_topic, sub_topic, learning_outcome,
           subject:subjects(id, name, code, icon)
@@ -987,6 +995,13 @@ export default function AdminSoruYonetimiPage() {
                             İşleniyor
                           </span>
                         )}
+                        {/* ✨ İnteraktif Çözüm durumu badge */}
+                        {question.interactive_solution_status === 'completed' && (
+                          <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" />
+                            İnteraktif
+                          </span>
+                        )}
                       </div>
                       
                       {/* Soru Görseli (varsa) */}
@@ -1104,6 +1119,18 @@ export default function AdminSoruYonetimiPage() {
                           )}
                         </button>
                       )}
+                      {/* ✨ İnteraktif Çözüm */}
+                      <InteractiveSolutionButton
+                        questionId={question.id || ''}
+                        questionText={question.question_text || ''}
+                        subjectName={(question.topic?.subject as any)?.name || 'Matematik'}
+                        questionImageUrl={question.question_image_url}
+                        visualContent={question.visual_content}
+                        options={question.options}
+                        correctAnswer={question.correct_answer}
+                        explanation={question.explanation}
+                        className="!p-2 !px-2 !text-xs !rounded-lg"
+                      />
                       <button
                         onClick={() => setPreviewQuestion(question)}
                         className="p-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"

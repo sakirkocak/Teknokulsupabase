@@ -1209,6 +1209,9 @@ export interface AdminQuestionResult {
   times_answered?: number  // Optimize schema'da yok
   times_correct?: number  // Optimize schema'da yok
   created_at: number
+  // 🎬 Video ve İnteraktif Çözüm durumu
+  has_video?: boolean
+  has_interactive?: boolean
 }
 
 export interface AdminQuestionFilters {
@@ -1218,6 +1221,8 @@ export interface AdminQuestionFilters {
   topicId?: string
   hasImage?: boolean
   isNewGeneration?: boolean  // 🆕 Yeni nesil soru filtresi
+  hasVideo?: boolean         // 🎬 Video çözümü var mı?
+  hasInteractive?: boolean   // ✨ İnteraktif çözümü var mı?
   searchQuery?: string
   page?: number
   pageSize?: number
@@ -1252,6 +1257,8 @@ export async function searchQuestionsForAdmin(
     topicId,
     hasImage,
     isNewGeneration,
+    hasVideo,
+    hasInteractive,
     searchQuery,
     page = 1,
     pageSize = 20
@@ -1265,6 +1272,8 @@ export async function searchQuestionsForAdmin(
   if (topicId) filterParts.push(`topic_id:=${topicId}`)
   if (hasImage) filterParts.push(`has_image:=true`)
   if (isNewGeneration) filterParts.push(`is_new_generation:=true`)
+  if (hasVideo) filterParts.push(`has_video:=true`)
+  if (hasInteractive) filterParts.push(`has_interactive:=true`)
 
   try {
     const result = await client
@@ -1305,7 +1314,10 @@ export async function searchQuestionsForAdmin(
         sub_topic: doc.sub_topic || null,
         times_answered: 0,  // Supabase'den çekilecek
         times_correct: 0,
-        created_at: doc.created_at || 0
+        created_at: doc.created_at || 0,
+        // 🎬 Video ve İnteraktif Çözüm durumu
+        has_video: doc.has_video || false,
+        has_interactive: doc.has_interactive || false
       }
     })
 

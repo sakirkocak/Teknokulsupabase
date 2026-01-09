@@ -60,7 +60,11 @@ export async function POST(req: NextRequest) {
         is_active,
         times_answered,
         times_correct,
-        created_at
+        created_at,
+        visual_type,
+        visual_content,
+        video_status,
+        interactive_solution_status
       `)
       .eq('id', questionId)
       .single()
@@ -151,6 +155,13 @@ export async function POST(req: NextRequest) {
       grade: topicData.grade || 0,
       has_image: !!question.question_image_url,
       image_url: question.question_image_url || '',
+      // 🆕 Yeni Nesil Soru
+      is_new_generation: !!(question as any).visual_content,
+      visual_type: (question as any).visual_type || '',
+      // 🎬 Video ve İnteraktif Çözüm durumu
+      has_video: (question as any).video_status === 'completed',
+      has_interactive: (question as any).interactive_solution_status === 'completed',
+      // İstatistikler
       times_answered: question.times_answered || 0,
       times_correct: question.times_correct || 0,
       success_rate: question.times_answered > 0 

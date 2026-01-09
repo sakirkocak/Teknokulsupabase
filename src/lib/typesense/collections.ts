@@ -96,6 +96,10 @@ export const questionsSchema: CollectionCreateSchema = {
     { name: 'is_new_generation', type: 'bool', facet: true, optional: true },  // Yeni nesil mi?
     { name: 'visual_type', type: 'string', facet: true, optional: true },      // table, chart, flowchart, pie, diagram
     
+    // 🎬 VIDEO ve İNTERAKTİF ÇÖZÜM durumu
+    { name: 'has_video', type: 'bool', facet: true, optional: true },           // Video çözümü var mı?
+    { name: 'has_interactive', type: 'bool', facet: true, optional: true },     // İnteraktif çözümü var mı?
+    
     // 📊 İSTATİSTİKLER - Popüler sorular sayfaları için
     { name: 'times_answered', type: 'int32', facet: true },
     { name: 'times_correct', type: 'int32' },
@@ -309,6 +313,9 @@ export interface QuestionDocument {
   // 🆕 Yeni Nesil Soru alanları
   is_new_generation?: boolean
   visual_type?: string  // 'table' | 'chart' | 'flowchart' | 'pie' | 'diagram'
+  // 🎬 Video ve İnteraktif Çözüm durumu
+  has_video?: boolean      // Video çözümü var mı?
+  has_interactive?: boolean  // İnteraktif çözümü var mı?
   // İstatistikler
   times_answered: number
   times_correct: number

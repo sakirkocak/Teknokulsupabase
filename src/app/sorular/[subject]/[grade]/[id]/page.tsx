@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { BreadcrumbSchema, QuizSchema, LearningResourceSchema, EducationalQuestionSchema } from '@/components/JsonLdSchema'
 import MathRenderer from '@/components/MathRenderer'
 import VideoSolutionButton from '@/components/VideoSolutionButton'
+import InteractiveSolutionButton from '@/components/InteractiveSolutionButton'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
@@ -420,6 +421,26 @@ export default async function SingleQuestionPage({ params }: Props) {
                   videoUrl={question.video_solution_url}
                   videoStorageUrl={question.video_storage_url}
                   videoStatus={question.video_status || 'none'}
+                />
+              </div>
+            </div>
+
+            {/* İnteraktif Çözüm */}
+            <div className="p-6 bg-gradient-to-r from-indigo-50 to-cyan-50 border-t border-indigo-100">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="text-sm font-semibold text-indigo-800 mb-1 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    İnteraktif Çözüm
+                  </h3>
+                  <p className="text-xs text-indigo-600">
+                    Adım adım, sesli ve animasyonlu çözüm. Quiz ile kendini test et!
+                  </p>
+                </div>
+                <InteractiveSolutionButton
+                  questionId={question.id}
+                  questionText={question.question_text}
+                  subjectName={subjectName}
                 />
               </div>
             </div>

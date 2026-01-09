@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { processLatexInSolution, validateAnimationData } from '@/lib/latex-processor'
 
 // Supabase client
 const supabase = createClient(
@@ -46,21 +47,31 @@ const SOLUTION_SCHEMA = `{
   "common_mistakes": ["Sık yapılan hata 1"]
 }`
 
-const SYSTEM_PROMPT = `Sen bir matematik ve fen bilimleri öğretmenisin. Verilen soruyu analiz edip, 
-öğrencinin interaktif olarak çözeceği adımları JSON formatında üreteceksin.
+const SYSTEM_PROMPT = `Sen deneyimli bir matematik ve fen bilimleri öğretmenisin. Verilen soruyu analiz edip,
+öğrencinin interaktif olarak çözeceği GÖRSEL ZENGİN adımları JSON formatında üreteceksin.
+
+🎯 ANA HEDEF: Her adımda mutlaka bir animasyon olmalı! Öğrenci sadece metin okumak yerine, görsel animasyonlarla öğrenmeli.
 
 KURALLAR:
-1. Her çözüm 4-8 adım içermeli
-2. En az 1-2 "quiz" tipi adım olmalı (öğrenci tahmin etsin)
-3. TTS metinleri doğal konuşma dili olmalı (robotik değil)
-4. Animation template'leri akıllıca seç:
-   - Denklemler → equation_balance
-   - Kesirler → pie_chart  
-   - Grafikler → coordinate_plane
-   - Geometri → geometry_shape
-   - Sayı doğrusu → number_line
-5. Quiz soruları çözümün kritik noktalarında olmalı
-6. Türkçe ve anlaşılır ol
+1. Her çözüm 5-8 adım içermeli
+2. En az 2-3 "quiz" tipi adım olmalı (öğrenci tahmin etsin, oyunlaştırma!)
+3. HER ADIMDA BİR ANİMASYON OLMALI - "none" kullanma!
+4. TTS metinleri doğal, samimi ve motive edici olmalı
+5. Çözümü adım adım görselleştir - soyut bırakma
+
+ANİMASYON SEÇİM REHBERİ (Soruya göre en uygununu seç):
+- Denklem çözme → equation_balance (terazi animasyonu)
+- Kesir/yüzde → pie_chart (pasta grafik)
+- Sayı karşılaştırma → number_line (sayı doğrusu)
+- Fonksiyon/grafik → coordinate_plane (koordinat düzlemi)
+- Geometri (üçgen, kare, daire) → geometry_shape
+- Adım adım işlem → step_by_step (liste animasyonu)
+- Sonuç/özet → text_reveal (metin animasyonu)
+
+ÖNEMLİ: Soru ne olursa olsun, her adımda görsel bir animasyon kullan!
+- Metin açıklaması için bile text_reveal kullan
+- İşlem adımları için step_by_step kullan
+- Sonuç için equation_balance veya text_reveal kullan
 
 ANIMATION DATA ÖRNEKLERİ:
 
@@ -112,6 +123,36 @@ geometry_shape için:
   "measurements": {"side_a": 5, "angle_A": 60}
 }
 
+step_by_step için (adım adım işlemler):
+{
+  "steps": [
+    {"text": "Verilen: 2x + 5 = 13", "highlight": true},
+    {"text": "Her iki taraftan 5 çıkar", "highlight": false},
+    {"text": "2x = 8", "highlight": true},
+    {"text": "Her iki tarafı 2'ye böl", "highlight": false},
+    {"text": "x = 4 ✓", "highlight": true}
+  ],
+  "current_step": 0
+}
+
+text_reveal için (metin animasyonu):
+{
+  "text": "Cevap: x = 4",
+  "style": "success|info|warning|celebration",
+  "icon": "🎉|✅|💡|🔥"
+}
+
+bar_chart için (çubuk grafik):
+{
+  "bars": [
+    {"label": "Ocak", "value": 45, "color": "#3b82f6"},
+    {"label": "Şubat", "value": 62, "color": "#22c55e"},
+    {"label": "Mart", "value": 38, "color": "#f59e0b"}
+  ],
+  "max_value": 100,
+  "highlight_bar": 1
+}
+
 JSON ŞEMASI:
 ${SOLUTION_SCHEMA}
 
@@ -125,8 +166,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'question_text gerekli' }, { status: 400 })
     }
 
-    // Önce mevcut çözüm var mı kontrol et
+    // ✅ CACHE: Önce mevcut çözüm var mı kontrol et
     if (question_id && !force_regenerate) {
+      // 1. questions tablosundan kontrol et (daha hızlı)
+      const { data: questionData } = await supabase
+        .from('questions')
+        .select('interactive_solution_id, interactive_solution_status')
+        .eq('id', question_id)
+        .single()
+
+      if (questionData?.interactive_solution_status === 'completed' && questionData?.interactive_solution_id) {
+        // 2. interactive_solutions'dan çözümü çek
+        const { data: existing } = await supabase
+          .from('interactive_solutions')
+          .select('*')
+          .eq('id', questionData.interactive_solution_id)
+          .single()
+
+        if (existing) {
+          console.log(`✅ Cache hit: ${question_id}`)
+          return NextResponse.json({
+            success: true,
+            source: 'cache',
+            solution: existing
+          })
+        }
+      }
+
+      // 3. Belki question_id ile doğrudan kayıtlı
       const { data: existing } = await supabase
         .from('interactive_solutions')
         .select('*')
@@ -134,6 +201,16 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (existing) {
+        // questions tablosunu güncelle
+        await supabase
+          .from('questions')
+          .update({ 
+            interactive_solution_id: existing.id,
+            interactive_solution_status: 'completed'
+          })
+          .eq('id', question_id)
+
+        console.log(`✅ Cache hit (fixed): ${question_id}`)
         return NextResponse.json({
           success: true,
           source: 'cache',
@@ -142,12 +219,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Gemini ile çözüm üret
+    console.log(`🔄 Generating new solution for: ${question_id || 'demo'}`)
+
+    // Gemini ile çözüm üret (Pro model - daha kaliteli çıktı)
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-3-pro-preview',
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
       }
     })
 
@@ -172,46 +251,86 @@ Bu soruyu interaktif adımlarla çöz ve JSON formatında döndür.`
     let solutionData
     try {
       solutionData = JSON.parse(jsonStr)
+      
+      // 🔧 POST-PROCESS: LaTeX ve animasyon düzeltmeleri
+      solutionData = processLatexInSolution(solutionData)
+      
+      // Her adımın animasyon datasını validate et
+      if (solutionData.steps && Array.isArray(solutionData.steps)) {
+        solutionData.steps = solutionData.steps.map((step: any) => ({
+          ...step,
+          animation_data: validateAnimationData(step.animation_template, step.animation_data)
+        }))
+      }
+      
+      console.log('✅ Solution post-processed successfully')
     } catch (parseError) {
       console.error('JSON parse hatası:', parseError)
+      
+      // questions tablosunu failed olarak işaretle
+      if (question_id) {
+        await supabase
+          .from('questions')
+          .update({ interactive_solution_status: 'failed' })
+          .eq('id', question_id)
+      }
+      
       return NextResponse.json({ 
         error: 'Gemini geçersiz JSON döndürdü',
         raw_response: responseText.substring(0, 500)
       }, { status: 500 })
     }
 
-    // Veritabanına kaydet
-    const solutionRecord = {
-      question_id: question_id || null,
-      question_text: question_text,
-      subject_name: subject_name || null,
-      solution_data: solutionData,
-      version: 1,
-      is_active: true,
-      created_at: new Date().toISOString()
-    }
-
+    // ✅ Veritabanına kaydet
     const { data: savedSolution, error: saveError } = await supabase
       .from('interactive_solutions')
-      .upsert(solutionRecord, { 
-        onConflict: 'question_id',
-        ignoreDuplicates: false 
+      .insert({
+        question_id: question_id || null,
+        question_text: question_text,
+        subject_name: subject_name || null,
+        solution_data: solutionData,
+        version: 1,
+        created_at: new Date().toISOString()
       })
       .select()
       .single()
 
     if (saveError) {
       console.error('Kayıt hatası:', saveError)
-      // Kayıt başarısız olsa bile çözümü döndür
       return NextResponse.json({
         success: true,
         source: 'generated',
         saved: false,
         solution: {
-          ...solutionRecord,
+          question_id,
           solution_data: solutionData
         }
       })
+    }
+
+    // ✅ questions tablosunu güncelle
+    if (question_id && savedSolution) {
+      await supabase
+        .from('questions')
+        .update({ 
+          interactive_solution_id: savedSolution.id,
+          interactive_solution_status: 'completed'
+        })
+        .eq('id', question_id)
+      
+      console.log(`✅ Solution saved and linked: ${question_id}`)
+
+      // 🔄 Typesense'i güncelle (arka planda)
+      try {
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/admin/questions/sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questionId: question_id, action: 'upsert' })
+        }).catch(() => {}) // Fire and forget
+        console.log(`🔄 Typesense sync triggered: ${question_id}`)
+      } catch {
+        // Typesense sync hatası kritik değil
+      }
     }
 
     return NextResponse.json({
