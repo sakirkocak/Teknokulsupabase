@@ -266,6 +266,39 @@ function sanitizeLatex(latex: string): string {
  * - LaTeX sanitization
  * - Düz metin alternatifi
  */
+// Düz metindeki LaTeX komutlarını sembollere çevir ($ dışındakiler için)
+function convertPlainTextLatex(text: string): string {
+  return text
+    // Oklar
+    .replace(/\\?rightarrow/gi, '→')
+    .replace(/\\?leftarrow/gi, '←')
+    .replace(/\\?Rightarrow/g, '⇒')
+    .replace(/\\?Leftarrow/g, '⇐')
+    .replace(/\s*->\s*/g, ' → ')
+    // Operatörler
+    .replace(/\\?times/gi, '×')
+    .replace(/\\?div\b/gi, '÷')
+    .replace(/\\?pm/gi, '±')
+    .replace(/\\?cdot/gi, '·')
+    .replace(/\\?leq/gi, '≤')
+    .replace(/\\?geq/gi, '≥')
+    .replace(/\\?neq/gi, '≠')
+    .replace(/\\?approx/gi, '≈')
+    // Semboller
+    .replace(/\\?infty/gi, '∞')
+    .replace(/\\?sqrt/gi, '√')
+    // Yunan harfleri
+    .replace(/\\?alpha/gi, 'α')
+    .replace(/\\?beta/gi, 'β')
+    .replace(/\\?gamma/gi, 'γ')
+    .replace(/\\?delta/gi, 'δ')
+    .replace(/\\?theta/gi, 'θ')
+    .replace(/\\?lambda/gi, 'λ')
+    .replace(/\\?pi/gi, 'π')
+    .replace(/\\?sigma/gi, 'σ')
+    .replace(/\\?omega/gi, 'ω')
+}
+
 export default function MathRenderer({ text, content, className = '' }: MathRendererProps) {
   const inputText = text || content || ''
   
@@ -276,7 +309,8 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     }
     
     try {
-      let result = inputText
+      // Önce düz metindeki LaTeX komutlarını sembollere çevir
+      let result = convertPlainTextLatex(inputText)
       
       // 🛡️ KaTeX render fonksiyonu - hata yönetimi ile
       const renderMath = (math: string, displayMode: boolean): string => {

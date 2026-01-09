@@ -5,12 +5,15 @@
 
 // Backslash'sız LaTeX komutlarını düzelt
 const LATEX_FIXES: [RegExp, string][] = [
-  // Oklar - EN ÖNEMLİ
-  [/\brightarrow\b/gi, '→'],
-  [/\bleftarrow\b/gi, '←'],
-  [/\bRightarrow\b/g, '⇒'],
-  [/\bLeftarrow\b/g, '⇐'],
+  // Oklar - EN ÖNEMLİ (tüm varyasyonlar)
+  [/\\?rightarrow/gi, '→'],
+  [/\\?leftarrow/gi, '←'],
+  [/\\?Rightarrow/g, '⇒'],
+  [/\\?Leftarrow/g, '⇐'],
+  [/\\?longrightarrow/gi, '⟶'],
+  [/\\?longleftarrow/gi, '⟵'],
   [/\bto\b(?=\s*\d|\s*[a-z])/gi, '→'],  // "to 5" -> "→ 5"
+  [/\s*->\s*/g, ' → '],  // -> işaretini de düzelt
   
   // Karşılaştırma operatörleri
   [/\bleq\b/gi, '≤'],
