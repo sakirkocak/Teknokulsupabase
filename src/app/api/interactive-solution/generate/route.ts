@@ -52,12 +52,19 @@ const SYSTEM_PROMPT = `Sen deneyimli bir matematik ve fen bilimleri öğretmenis
 
 🎯 ANA HEDEF: Her adımda mutlaka bir animasyon olmalı! Öğrenci sadece metin okumak yerine, görsel animasyonlarla öğrenmeli.
 
+⚠️ ÇOK ÖNEMLİ - DOĞRU CEVAP:
+- Sana verilen "correct_answer" ve "options" bilgilerini MUTLAKA kullan!
+- Son adımda DOĞRU ŞIKKI açıkça belirt (örn: "Doğru cevap: B şıkkı")
+- Çözüm sonunda doğru cevabın NEDEN doğru olduğunu açıkla
+- Yanlış şıkların neden yanlış olduğuna da değin
+
 KURALLAR:
 1. Her çözüm 5-8 adım içermeli
 2. En az 2-3 "quiz" tipi adım olmalı (öğrenci tahmin etsin, oyunlaştırma!)
 3. HER ADIMDA BİR ANİMASYON OLMALI - "none" kullanma!
 4. TTS metinleri doğal, samimi ve motive edici olmalı
 5. Çözümü adım adım görselleştir - soyut bırakma
+6. SON ADIMDA: "Doğru cevap X şıkkı: [şık metni]" şeklinde AÇIKÇA yaz!
 
 ANİMASYON SEÇİM REHBERİ (Soruya göre en uygununu seç):
 - Denklem çözme → equation_balance (terazi animasyonu)
@@ -221,6 +228,10 @@ export async function POST(request: NextRequest) {
 
     console.log(`🔄 Generating new solution for: ${question_id || 'demo'}`)
 
+    // Şıkları ve doğru cevabı al
+    const options = body.options || {}
+    const correct_answer = body.correct_answer || ''
+
     // Gemini ile çözüm üret (Pro model - daha kaliteli çıktı)
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-3-pro-preview',
@@ -230,10 +241,25 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    const prompt = `SORU: ${question_text}
-${subject_name ? `DERS: ${subject_name}` : ''}
+    // Şıkları formatla
+    let optionsText = ''
+    if (Object.keys(options).length > 0) {
+      optionsText = '\n\nŞIKLAR:\n'
+      for (const [key, value] of Object.entries(options)) {
+        if (value) optionsText += `${key}) ${value}\n`
+      }
+    }
 
-Bu soruyu interaktif adımlarla çöz ve JSON formatında döndür.`
+    // Doğru cevap bilgisi
+    const correctAnswerText = correct_answer 
+      ? `\n\n⭐ DOĞRU CEVAP: ${correct_answer} şıkkı ${options[correct_answer as keyof typeof options] ? `(${options[correct_answer as keyof typeof options]})` : ''}`
+      : ''
+
+    const prompt = `SORU: ${question_text}
+${subject_name ? `DERS: ${subject_name}` : ''}${optionsText}${correctAnswerText}
+
+Bu soruyu interaktif adımlarla çöz ve JSON formatında döndür. 
+SON ADIMDA DOĞRU CEVABI (${correct_answer} şıkkı) MUTLAKA belirt!`
 
     const result = await model.generateContent([
       { text: SYSTEM_PROMPT },

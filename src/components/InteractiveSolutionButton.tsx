@@ -39,11 +39,13 @@ export default function InteractiveSolutionButton({
     setIsLoading(true)
     setError(null)
 
-    // Basit string değerler
+    // Tüm soru bilgilerini gönder - doğru cevap dahil!
     const payload = {
       question_id: String(questionId || ''),
       question_text: String(questionText || ''),
       subject_name: String(subjectName || ''),
+      options: options || {},
+      correct_answer: correctAnswer || '',
       force_regenerate: forceRegenerate
     }
 
@@ -144,8 +146,8 @@ export default function InteractiveSolutionButton({
 
             {/* Main Content - Split Layout */}
             <div className="h-full pt-14 flex flex-col lg:flex-row">
-              {/* Sol Panel - Soru Detayları */}
-              <div className="lg:w-2/5 xl:w-1/3 bg-gray-800 overflow-y-auto border-r border-gray-700">
+              {/* Sol Panel - Soru Detayları (Dar) */}
+              <div className="lg:w-1/4 xl:w-1/5 bg-gray-800 overflow-y-auto border-r border-gray-700 hidden lg:block">
                 <div className="p-4 lg:p-6 space-y-4">
                   {/* Ders Etiketi */}
                   <div className="flex items-center gap-2">

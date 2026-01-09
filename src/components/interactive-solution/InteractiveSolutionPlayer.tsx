@@ -195,8 +195,8 @@ export default function InteractiveSolutionPlayer({
               )}
             </div>
 
-            {/* Animasyon Alanı - BÜYÜK */}
-            <div className="mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 min-h-[280px]">
+            {/* Animasyon Alanı - TAM EKRAN */}
+            <div className="mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800" style={{ minHeight: '400px' }}>
               <AnimationRenderer 
                 template={currentStep.animation_template || 'text_reveal'} 
                 data={currentStep.animation_data || { text: currentStep.content, style: 'info' }} 
