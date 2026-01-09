@@ -1,10 +1,17 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, X, Loader2, RefreshCw, Image as ImageIcon } from 'lucide-react'
+import { Sparkles, X, Loader2, RefreshCw, Image as ImageIcon, Video, Monitor } from 'lucide-react'
 import InteractiveSolutionPlayer from './interactive-solution/InteractiveSolutionPlayer'
 import MathRenderer from './MathRenderer'
+
+// Remotion Player - client-side only
+const RemotionPlayer = dynamic(
+  () => import('./interactive-solution/RemotionPlayer'),
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" /></div> }
+)
 
 interface Props {
   questionId: string
@@ -34,6 +41,7 @@ export default function InteractiveSolutionButton({
   const [solution, setSolution] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [source, setSource] = useState<string>('')
+  const [playerMode, setPlayerMode] = useState<'classic' | 'remotion'>('remotion')
 
   async function loadSolution(forceRegenerate = false) {
     setIsLoading(true)
@@ -129,6 +137,29 @@ export default function InteractiveSolutionButton({
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {/* Mode Toggle */}
+                <div className="flex items-center bg-gray-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setPlayerMode('remotion')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-colors ${
+                      playerMode === 'remotion' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                    title="Video Player"
+                  >
+                    <Video className="w-4 h-4" />
+                    Video
+                  </button>
+                  <button
+                    onClick={() => setPlayerMode('classic')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-colors ${
+                      playerMode === 'classic' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                    title="Klasik Player"
+                  >
+                    <Monitor className="w-4 h-4" />
+                    Klasik
+                  </button>
+                </div>
                 <button
                   onClick={() => { setIsOpen(false); setSolution(null); loadSolution(true) }}
                   className="p-2 hover:bg-white/10 rounded-lg transition-colors text-orange-400 hover:text-orange-300"
@@ -236,13 +267,24 @@ export default function InteractiveSolutionButton({
               </div>
 
               {/* Sağ Panel - İnteraktif Çözüm */}
-              <div className="flex-1 bg-gradient-to-br from-slate-50 to-indigo-50 overflow-hidden flex flex-col">
-                <InteractiveSolutionPlayer
-                  solution={solution}
-                  questionText={String(questionText || '')}
-                  onComplete={() => {}}
-                  voice={voice as 'erdem' | 'mehmet' | 'gamze'}
-                />
+              <div className="flex-1 overflow-hidden flex flex-col p-4">
+                {playerMode === 'remotion' ? (
+                  <RemotionPlayer
+                    questionText={String(questionText || '')}
+                    subjectName={String(subjectName || '')}
+                    steps={solution.steps || []}
+                    correctAnswer={String(correctAnswer || '')}
+                  />
+                ) : (
+                  <div className="h-full bg-gradient-to-br from-slate-50 to-indigo-50 rounded-2xl overflow-hidden">
+                    <InteractiveSolutionPlayer
+                      solution={solution}
+                      questionText={String(questionText || '')}
+                      onComplete={() => {}}
+                      voice={voice as 'erdem' | 'mehmet' | 'gamze'}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
