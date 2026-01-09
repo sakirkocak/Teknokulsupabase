@@ -1,0 +1,6 @@
+export { RemotionRoot } from './Root'
+export { SolutionVideo } from './compositions/SolutionVideo'
+export { SolutionShort } from './compositions/SolutionShort'
+export * from './types'
+export * from './templates/common'
+export * from './templates/math'
