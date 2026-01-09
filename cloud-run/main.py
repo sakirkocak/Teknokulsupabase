@@ -29,6 +29,12 @@ import httpx
 # Yeni modüller
 from prompts import get_full_prompt, SUPER_MANIM_PROMPT
 from templates import get_outro_integration_code, generate_smart_script, detect_animations
+from audio.music_manager import (
+    download_music, 
+    get_music_type_for_subject, 
+    create_full_audio_mix,
+    MUSIC_CONFIG
+)
 
 app = FastAPI(
     title="Teknokul Video Factory",
@@ -519,14 +525,57 @@ def concat_audios(audio_files: list, output_path: Path) -> bool:
         return False
 
 
-def add_background_music(video_path: Path, output_path: Path, music_volume: float = 0.1) -> bool:
-    """Videoya hafif arka plan müziği ekle (placeholder - gerçek müzik için Supabase'den indir)"""
-    # Şimdilik sadece video kopyala, müzik entegrasyonu sonra
+async def add_background_music_full(video_path: Path, output_path: Path, 
+                                     subject_name: str, temp_dir: Path) -> bool:
+    """Videoya arka plan müziği ve jingle ekle"""
+    log("🎵 Arka plan müziği ekleniyor...")
+    
     try:
+        # 1. Ders için uygun müzik türünü belirle
+        music_type = get_music_type_for_subject(subject_name or "Genel")
+        log(f"🎶 Müzik türü: {music_type}")
+        
+        # 2. Müzik dosyalarını indir
+        music_path = temp_dir / "background_music.mp3"
+        jingle_path = temp_dir / "outro_jingle.mp3"
+        
+        music_downloaded = await download_music(music_type, music_path)
+        jingle_downloaded = await download_music("outro_jingle", jingle_path)
+        
+        if not music_downloaded:
+            log("⚠️ Arka plan müziği indirilemedi, müziksiz devam ediliyor")
+            music_path = None
+        
+        if not jingle_downloaded:
+            log("⚠️ Jingle indirilemedi")
+            jingle_path = None
+        
+        # 3. Tüm sesleri mixle
+        if music_path or jingle_path:
+            success = create_full_audio_mix(
+                video_path=video_path,
+                tts_audio_path=None,  # TTS zaten video içinde
+                music_path=music_path if music_path and music_path.exists() else None,
+                jingle_path=jingle_path if jingle_path and jingle_path.exists() else None,
+                output_path=output_path,
+                music_volume=0.12  # TTS duyulsun diye düşük volume
+            )
+            
+            if success:
+                log("✅ Müzik başarıyla eklendi")
+                return True
+            else:
+                log("⚠️ Müzik ekleme başarısız, orijinal video kullanılıyor")
+        
+        # Fallback: Müzik yoksa videoyu kopyala
         import shutil
         shutil.copy(video_path, output_path)
-        return True
-    except:
+        return False
+        
+    except Exception as e:
+        log(f"⚠️ Müzik ekleme hatası: {e}", "WARN")
+        import shutil
+        shutil.copy(video_path, output_path)
         return False
 
 
@@ -708,18 +757,37 @@ async def process_video(request: VideoRequest):
                 result["features"].append("outro_animation")
             
             # 5. Ses ve videoyu birleştir
-            final_video = temp_path / "final_video.mp4"
+            video_with_tts = temp_path / "video_with_tts.mp4"
             if combined_audio.exists():
-                merge_audio_video(video_path, combined_audio, final_video)
+                merge_audio_video(video_path, combined_audio, video_with_tts)
             else:
-                final_video = video_path
+                video_with_tts = video_path
             
-            if not final_video.exists():
-                final_video = video_path
+            if not video_with_tts.exists():
+                video_with_tts = video_path
             
             result["features"].append("tts_audio")
             
-            # 6. Supabase'e yükle
+            # 6. Arka plan müziği ekle (opsiyonel)
+            final_video = temp_path / "final_video.mp4"
+            if request.include_music:
+                music_added = await add_background_music_full(
+                    video_path=video_with_tts,
+                    output_path=final_video,
+                    subject_name=request.subject_name,
+                    temp_dir=temp_path
+                )
+                if music_added:
+                    result["features"].append("background_music")
+                    result["features"].append("outro_jingle")
+            else:
+                import shutil
+                shutil.copy(video_with_tts, final_video)
+            
+            if not final_video.exists():
+                final_video = video_with_tts
+            
+            # 8. Supabase'e yükle
             storage_url = await upload_to_supabase_storage(final_video, request.question_id)
             
             if storage_url:
@@ -728,7 +796,7 @@ async def process_video(request: VideoRequest):
                 
                 await update_question_in_db(request.question_id, storage_url)
                 
-                # 7. YouTube'a yükle
+                # 9. YouTube'a yükle
                 youtube_url = await upload_to_youtube(final_video, request, scenario)
                 
                 if youtube_url:
