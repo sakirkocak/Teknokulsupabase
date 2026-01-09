@@ -39,13 +39,14 @@ export default function InteractiveSolutionButton({
     setIsLoading(true)
     setError(null)
 
-    // Tüm soru bilgilerini gönder - doğru cevap dahil!
+    // Tüm soru bilgilerini gönder - explanation dahil!
     const payload = {
       question_id: String(questionId || ''),
       question_text: String(questionText || ''),
       subject_name: String(subjectName || ''),
       options: options || {},
       correct_answer: correctAnswer || '',
+      explanation: explanation || '',
       force_regenerate: forceRegenerate
     }
 

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { processLatexInSolution, validateAnimationData } from '@/lib/latex-processor'
 
 // Supabase client
 const supabase = createClient(
@@ -9,181 +8,260 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Gemini client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+// Gemini client (opsiyonel - başarısız olursa fallback kullanılır)
+let genAI: GoogleGenerativeAI | null = null
+try {
+  if (process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+  }
+} catch (e) {
+  console.warn('Gemini API key bulunamadı, fallback kullanılacak')
+}
 
-// İnteraktif çözüm JSON şeması
-const SOLUTION_SCHEMA = `{
-  "question_summary": "Sorunun kısa özeti",
-  "difficulty": "easy|medium|hard",
-  "estimated_time_seconds": 120,
+// =================================================================
+// FALLBACK: Gemini olmadan çalışan basit çözüm üretici
+// =================================================================
+function generateFallbackSolution(
+  questionText: string,
+  explanation: string,
+  options: Record<string, string>,
+  correctAnswer: string,
+  subjectName: string
+) {
+  const correctOptionText = options[correctAnswer] || correctAnswer
+
+  // Açıklamayı cümlelere böl
+  const sentences = explanation
+    .split(/[.!?]/)
+    .map(s => s.trim())
+    .filter(s => s.length > 10)
+
+  const steps: any[] = []
+  
+  // Adım 1: Soruyu tanıt
+  steps.push({
+    id: 'step_1',
+    type: 'explanation',
+    title: '📖 Soruyu İnceleyelim',
+    content: questionText.substring(0, 200) + (questionText.length > 200 ? '...' : ''),
+    tts_text: 'Öncelikle sorumuzu birlikte inceleyelim.',
+    duration_seconds: 5,
+    animation_template: 'text_reveal',
+    animation_data: { text: 'Soruyu Analiz Ediyoruz...', style: 'info', icon: '🔍' }
+  })
+
+  // Adım 2-4: Açıklama cümlelerini adımlara dönüştür
+  sentences.slice(0, 3).forEach((sentence, i) => {
+    steps.push({
+      id: `step_${i + 2}`,
+      type: 'calculation',
+      title: `📝 Adım ${i + 1}`,
+      content: sentence,
+      tts_text: sentence,
+      duration_seconds: 6,
+      animation_template: 'step_by_step',
+      animation_data: {
+        steps: [{ text: sentence, highlight: true }],
+        current_step: 0
+      }
+    })
+  })
+
+  // Quiz adımı
+  const quizOptions = Object.entries(options).map(([key, value]) => ({
+    id: key.toLowerCase(),
+    text: `${key}) ${value}`,
+    is_correct: key === correctAnswer
+  }))
+
+  if (quizOptions.length > 0) {
+    steps.push({
+      id: `step_quiz`,
+      type: 'quiz',
+      title: '❓ Sıra Sende!',
+      content: 'Şimdi sen tahmin et!',
+      tts_text: 'Şimdi videoyu durdur ve cevabı bulmaya çalış!',
+      duration_seconds: 10,
+      animation_template: 'text_reveal',
+      animation_data: { text: 'Düşün...', style: 'warning', icon: '🤔' },
+      quiz: {
+        question: 'Bu sorunun cevabı hangisi?',
+        options: quizOptions,
+        hint: 'Açıklamayı tekrar oku',
+        explanation_correct: 'Harika! Doğru bildin!',
+        explanation_wrong: `Doğru cevap ${correctAnswer} şıkkıydı.`
+      }
+    })
+  }
+
+  // Son adım: Cevap
+  steps.push({
+    id: 'step_final',
+    type: 'result',
+    title: '✅ Sonuç',
+    content: `Doğru Cevap: ${correctAnswer} şıkkı (${correctOptionText})`,
+    tts_text: `Doğru cevap ${correctAnswer} şıkkı, yani ${correctOptionText}.`,
+    duration_seconds: 5,
+    animation_template: 'text_reveal',
+    animation_data: { 
+      text: `Cevap: ${correctAnswer} ✅`, 
+      style: 'celebration', 
+      icon: '🎉' 
+    }
+  })
+
+  return {
+    question_summary: questionText.substring(0, 100),
+    difficulty: 'medium',
+    estimated_time_seconds: steps.length * 6,
+    steps,
+    summary: `Doğru cevap: ${correctAnswer} şıkkı (${correctOptionText})`,
+    key_concepts: [subjectName],
+    common_mistakes: []
+  }
+}
+
+// =================================================================
+// GEMINİ İLE GELİŞMİŞ ADIM ÜRETME (Var olan explanation'ı kullanır)
+// =================================================================
+const SIMPLE_PROMPT = `Sen bir eğitim içeriği düzenleyicisisin. Sana verilen AÇIKLAMA metnini interaktif adımlara dönüştür.
+
+KURAL: Yeni çözüm ÜRETME! Sadece var olan açıklamayı adımlara BÖL ve animasyon şablonu seç.
+
+ŞABLONLAR:
+- equation_balance: Denklem çözümü için terazi
+- number_line: Sayı karşılaştırma
+- pie_chart: Kesir/yüzde
+- bar_chart: Veri karşılaştırma
+- step_by_step: Adım adım işlem listesi
+- text_reveal: Metin gösterimi
+- coordinate_plane: Grafik/fonksiyon
+- geometry_shape: Geometri şekilleri
+
+JSON FORMATI:
+{
   "steps": [
     {
       "id": "step_1",
-      "type": "explanation|calculation|visualization|quiz|result",
-      "title": "Adım başlığı",
-      "content": "Adım açıklaması (Markdown destekli)",
-      "tts_text": "Sesli anlatım metni (doğal, konuşma dili)",
-      "duration_seconds": 8,
-      "animation_template": "equation_balance|number_line|pie_chart|bar_graph|coordinate_plane|geometry_shape|text_reveal|step_by_step|none",
-      "animation_data": {
-        // Template'e göre değişen veri
-      },
-      "quiz": {
-        // Sadece type: "quiz" için
-        "question": "Soru metni",
-        "options": [
-          {"id": "a", "text": "Seçenek A", "is_correct": false},
-          {"id": "b", "text": "Seçenek B", "is_correct": true}
-        ],
-        "hint": "İpucu metni",
-        "explanation_correct": "Doğru cevap açıklaması",
-        "explanation_wrong": "Yanlış cevap açıklaması"
-      }
+      "type": "explanation|calculation|quiz|result",
+      "title": "Kısa başlık",
+      "content": "Açıklama metni",
+      "tts_text": "Sesli anlatım (doğal, samimi)",
+      "animation_template": "şablon_adı",
+      "animation_data": { /* şablona göre veri */ }
     }
   ],
-  "summary": "Çözüm özeti",
-  "key_concepts": ["Kavram 1", "Kavram 2"],
-  "common_mistakes": ["Sık yapılan hata 1"]
-}`
-
-const SYSTEM_PROMPT = `Sen deneyimli bir matematik ve fen bilimleri öğretmenisin. Verilen soruyu analiz edip,
-öğrencinin interaktif olarak çözeceği GÖRSEL ZENGİN adımları JSON formatında üreteceksin.
-
-🎯 ANA HEDEF: Her adımda mutlaka bir animasyon olmalı! Öğrenci sadece metin okumak yerine, görsel animasyonlarla öğrenmeli.
-
-⚠️ ÇOK ÖNEMLİ - DOĞRU CEVAP:
-- Sana verilen "correct_answer" ve "options" bilgilerini MUTLAKA kullan!
-- Son adımda DOĞRU ŞIKKI açıkça belirt (örn: "Doğru cevap: B şıkkı")
-- Çözüm sonunda doğru cevabın NEDEN doğru olduğunu açıkla
-- Yanlış şıkların neden yanlış olduğuna da değin
-
-KURALLAR:
-1. Her çözüm 5-8 adım içermeli
-2. En az 2-3 "quiz" tipi adım olmalı (öğrenci tahmin etsin, oyunlaştırma!)
-3. HER ADIMDA BİR ANİMASYON OLMALI - "none" kullanma!
-4. TTS metinleri doğal, samimi ve motive edici olmalı
-5. Çözümü adım adım görselleştir - soyut bırakma
-6. SON ADIMDA: "Doğru cevap X şıkkı: [şık metni]" şeklinde AÇIKÇA yaz!
-
-ANİMASYON SEÇİM REHBERİ (Soruya göre en uygununu seç):
-- Denklem çözme → equation_balance (terazi animasyonu)
-- Kesir/yüzde → pie_chart (pasta grafik)
-- Sayı karşılaştırma → number_line (sayı doğrusu)
-- Fonksiyon/grafik → coordinate_plane (koordinat düzlemi)
-- Geometri (üçgen, kare, daire) → geometry_shape
-- Adım adım işlem → step_by_step (liste animasyonu)
-- Sonuç/özet → text_reveal (metin animasyonu)
-
-ÖNEMLİ: Soru ne olursa olsun, her adımda görsel bir animasyon kullan!
-- Metin açıklaması için bile text_reveal kullan
-- İşlem adımları için step_by_step kullan
-- Sonuç için equation_balance veya text_reveal kullan
-
-ANIMATION DATA ÖRNEKLERİ:
-
-equation_balance için:
-{
-  "left_side": "2x + 3",
-  "right_side": "7",
-  "steps": [
-    {"operation": "subtract", "value": "3", "result_left": "2x", "result_right": "4"},
-    {"operation": "divide", "value": "2", "result_left": "x", "result_right": "2"}
-  ]
+  "summary": "Özet ve doğru cevap"
 }
 
-pie_chart için:
-{
-  "total": 100,
-  "segments": [
-    {"label": "Kırmızı", "value": 30, "color": "#ef4444"},
-    {"label": "Mavi", "value": 70, "color": "#3b82f6"}
-  ],
-  "highlight_segment": 0
+ÖNEMLİ:
+- Son adımda DOĞRU CEVABI açıkça yaz!
+- Her adımda animasyon olsun
+- TTS metinleri doğal konuşma dili olsun`
+
+async function generateWithGemini(
+  questionText: string,
+  explanation: string,
+  options: Record<string, string>,
+  correctAnswer: string
+) {
+  if (!genAI) return null
+
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.0-flash-exp',
+      generationConfig: { temperature: 0.5, maxOutputTokens: 4096 }
+    })
+
+    let optionsText = ''
+    for (const [key, value] of Object.entries(options)) {
+      if (value) optionsText += `${key}) ${value}\n`
+    }
+
+    const prompt = `SORU: ${questionText}
+
+AÇIKLAMA (bunu adımlara böl): ${explanation}
+
+ŞIKLAR:
+${optionsText}
+
+DOĞRU CEVAP: ${correctAnswer} şıkkı
+
+Bu açıklamayı 4-6 adıma böl ve JSON döndür.`
+
+    const result = await model.generateContent([
+      { text: SIMPLE_PROMPT },
+      { text: prompt }
+    ])
+
+    const responseText = result.response.text()
+    const jsonStr = responseText
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim()
+
+    const data = JSON.parse(jsonStr)
+    
+    // Eksik alanları doldur
+    if (data.steps) {
+      data.steps = data.steps.map((step: any, i: number) => ({
+        id: step.id || `step_${i + 1}`,
+        type: step.type || 'explanation',
+        title: step.title || `Adım ${i + 1}`,
+        content: step.content || '',
+        tts_text: step.tts_text || step.content || '',
+        duration_seconds: step.duration_seconds || 6,
+        animation_template: step.animation_template || 'text_reveal',
+        animation_data: step.animation_data || { text: step.content, style: 'info' },
+        quiz: step.quiz
+      }))
+    }
+
+    return {
+      question_summary: questionText.substring(0, 100),
+      difficulty: data.difficulty || 'medium',
+      estimated_time_seconds: (data.steps?.length || 5) * 6,
+      steps: data.steps || [],
+      summary: data.summary || `Doğru cevap: ${correctAnswer}`,
+      key_concepts: data.key_concepts || [],
+      common_mistakes: data.common_mistakes || []
+    }
+  } catch (e) {
+    console.error('Gemini hatası:', e)
+    return null
+  }
 }
 
-number_line için:
-{
-  "min": -10,
-  "max": 10,
-  "points": [
-    {"value": 3, "label": "A", "color": "#22c55e"},
-    {"value": -2, "label": "B", "color": "#ef4444"}
-  ],
-  "highlight_range": {"start": -2, "end": 3}
-}
-
-coordinate_plane için:
-{
-  "x_range": [-5, 5],
-  "y_range": [-5, 5],
-  "points": [{"x": 2, "y": 3, "label": "P"}],
-  "lines": [{"equation": "y = 2x + 1", "color": "#3b82f6"}],
-  "shapes": []
-}
-
-geometry_shape için:
-{
-  "shape": "triangle|rectangle|circle|polygon",
-  "vertices": [{"x": 0, "y": 0}, {"x": 4, "y": 0}, {"x": 2, "y": 3}],
-  "labels": {"sides": ["a", "b", "c"], "angles": ["A", "B", "C"]},
-  "measurements": {"side_a": 5, "angle_A": 60}
-}
-
-step_by_step için (adım adım işlemler):
-{
-  "steps": [
-    {"text": "Verilen: 2x + 5 = 13", "highlight": true},
-    {"text": "Her iki taraftan 5 çıkar", "highlight": false},
-    {"text": "2x = 8", "highlight": true},
-    {"text": "Her iki tarafı 2'ye böl", "highlight": false},
-    {"text": "x = 4 ✓", "highlight": true}
-  ],
-  "current_step": 0
-}
-
-text_reveal için (metin animasyonu):
-{
-  "text": "Cevap: x = 4",
-  "style": "success|info|warning|celebration",
-  "icon": "🎉|✅|💡|🔥"
-}
-
-bar_chart için (çubuk grafik):
-{
-  "bars": [
-    {"label": "Ocak", "value": 45, "color": "#3b82f6"},
-    {"label": "Şubat", "value": 62, "color": "#22c55e"},
-    {"label": "Mart", "value": 38, "color": "#f59e0b"}
-  ],
-  "max_value": 100,
-  "highlight_bar": 1
-}
-
-JSON ŞEMASI:
-${SOLUTION_SCHEMA}
-
-SADECE JSON döndür, başka açıklama yazma.`
-
+// =================================================================
+// ANA API ENDPOINT
+// =================================================================
 export async function POST(request: NextRequest) {
   try {
-    const { question_id, question_text, subject_name, force_regenerate } = await request.json()
+    const body = await request.json()
+    const { 
+      question_id, 
+      question_text, 
+      subject_name,
+      options = {},
+      correct_answer = '',
+      explanation = '',
+      force_regenerate = false 
+    } = body
 
     if (!question_text) {
       return NextResponse.json({ error: 'question_text gerekli' }, { status: 400 })
     }
 
-    // ✅ CACHE: Önce mevcut çözüm var mı kontrol et
+    // 1. Cache kontrol (force değilse)
     if (question_id && !force_regenerate) {
-      // 1. questions tablosundan kontrol et (daha hızlı)
+      // Önce questions tablosundan kontrol
       const { data: questionData } = await supabase
         .from('questions')
-        .select('interactive_solution_id, interactive_solution_status')
+        .select('interactive_solution_id, interactive_solution_status, explanation, options, correct_answer')
         .eq('id', question_id)
         .single()
 
       if (questionData?.interactive_solution_status === 'completed' && questionData?.interactive_solution_id) {
-        // 2. interactive_solutions'dan çözümü çek
         const { data: existing } = await supabase
           .from('interactive_solutions')
           .select('*')
@@ -195,205 +273,107 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             success: true,
             source: 'cache',
-            solution: existing
+            solution: existing.solution_data || existing
           })
         }
       }
 
-      // 3. Belki question_id ile doğrudan kayıtlı
-      const { data: existing } = await supabase
+      // Soru bilgilerini al (explanation, options, correct_answer)
+      if (questionData) {
+        // Eğer body'de yoksa veritabanından al
+        if (!explanation && questionData.explanation) {
+          body.explanation = questionData.explanation
+        }
+        if (Object.keys(options).length === 0 && questionData.options) {
+          body.options = questionData.options
+        }
+        if (!correct_answer && questionData.correct_answer) {
+          body.correct_answer = questionData.correct_answer
+        }
+      }
+    }
+
+    // 2. Çözüm üret
+    console.log(`🔄 Generating solution for: ${question_id || 'demo'}`)
+
+    const finalExplanation = body.explanation || explanation || ''
+    const finalOptions = body.options || options || {}
+    const finalCorrectAnswer = body.correct_answer || correct_answer || ''
+
+    let solutionData = null
+
+    // Önce Gemini dene (explanation varsa)
+    if (finalExplanation && genAI) {
+      console.log('📝 Gemini ile explanation adımlara bölünüyor...')
+      solutionData = await generateWithGemini(
+        question_text,
+        finalExplanation,
+        finalOptions,
+        finalCorrectAnswer
+      )
+    }
+
+    // Gemini başarısız olduysa FALLBACK kullan
+    if (!solutionData || !solutionData.steps || solutionData.steps.length === 0) {
+      console.log('⚡ Fallback çözüm kullanılıyor...')
+      solutionData = generateFallbackSolution(
+        question_text,
+        finalExplanation || 'Bu sorunun çözümü için adımları takip edin.',
+        finalOptions,
+        finalCorrectAnswer,
+        subject_name || 'Genel'
+      )
+    }
+
+    // 3. Veritabanına kaydet
+    if (question_id && solutionData) {
+      const { data: saved, error: saveError } = await supabase
         .from('interactive_solutions')
-        .select('*')
-        .eq('question_id', question_id)
+        .upsert({
+          question_id,
+          question_text,
+          subject_name: subject_name || 'Genel',
+          solution_data: solutionData,
+          version: 1,
+          is_active: true
+        }, { onConflict: 'question_id' })
+        .select()
         .single()
 
-      if (existing) {
-        // questions tablosunu güncelle
+      if (saved) {
+        // Questions tablosunu güncelle
         await supabase
           .from('questions')
-          .update({ 
-            interactive_solution_id: existing.id,
+          .update({
+            interactive_solution_id: saved.id,
             interactive_solution_status: 'completed'
           })
           .eq('id', question_id)
 
-        console.log(`✅ Cache hit (fixed): ${question_id}`)
-        return NextResponse.json({
-          success: true,
-          source: 'cache',
-          solution: existing
-        })
-      }
-    }
-
-    console.log(`🔄 Generating new solution for: ${question_id || 'demo'}`)
-
-    // Şıkları ve doğru cevabı al
-    const options = body.options || {}
-    const correct_answer = body.correct_answer || ''
-
-    // Gemini ile çözüm üret (Pro model - daha kaliteli çıktı)
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-3-pro-preview',
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-      }
-    })
-
-    // Şıkları formatla
-    let optionsText = ''
-    if (Object.keys(options).length > 0) {
-      optionsText = '\n\nŞIKLAR:\n'
-      for (const [key, value] of Object.entries(options)) {
-        if (value) optionsText += `${key}) ${value}\n`
-      }
-    }
-
-    // Doğru cevap bilgisi
-    const correctAnswerText = correct_answer 
-      ? `\n\n⭐ DOĞRU CEVAP: ${correct_answer} şıkkı ${options[correct_answer as keyof typeof options] ? `(${options[correct_answer as keyof typeof options]})` : ''}`
-      : ''
-
-    const prompt = `SORU: ${question_text}
-${subject_name ? `DERS: ${subject_name}` : ''}${optionsText}${correctAnswerText}
-
-Bu soruyu interaktif adımlarla çöz ve JSON formatında döndür. 
-SON ADIMDA DOĞRU CEVABI (${correct_answer} şıkkı) MUTLAKA belirt!`
-
-    const result = await model.generateContent([
-      { text: SYSTEM_PROMPT },
-      { text: prompt }
-    ])
-
-    const responseText = result.response.text()
-    
-    // JSON'u parse et (```json bloklarını temizle)
-    let jsonStr = responseText
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim()
-
-    let solutionData
-    try {
-      solutionData = JSON.parse(jsonStr)
-      
-      // 🔧 POST-PROCESS: LaTeX ve animasyon düzeltmeleri
-      solutionData = processLatexInSolution(solutionData)
-      
-      // Her adımın animasyon datasını validate et
-      if (solutionData.steps && Array.isArray(solutionData.steps)) {
-        solutionData.steps = solutionData.steps.map((step: any) => ({
-          ...step,
-          animation_data: validateAnimationData(step.animation_template, step.animation_data)
-        }))
-      }
-      
-      console.log('✅ Solution post-processed successfully')
-    } catch (parseError) {
-      console.error('JSON parse hatası:', parseError)
-      
-      // questions tablosunu failed olarak işaretle
-      if (question_id) {
-        await supabase
-          .from('questions')
-          .update({ interactive_solution_status: 'failed' })
-          .eq('id', question_id)
-      }
-      
-      return NextResponse.json({ 
-        error: 'Gemini geçersiz JSON döndürdü',
-        raw_response: responseText.substring(0, 500)
-      }, { status: 500 })
-    }
-
-    // ✅ Veritabanına kaydet
-    const { data: savedSolution, error: saveError } = await supabase
-      .from('interactive_solutions')
-      .insert({
-        question_id: question_id || null,
-        question_text: question_text,
-        subject_name: subject_name || null,
-        solution_data: solutionData,
-        version: 1,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single()
-
-    if (saveError) {
-      console.error('Kayıt hatası:', saveError)
-      return NextResponse.json({
-        success: true,
-        source: 'generated',
-        saved: false,
-        solution: {
-          question_id,
-          solution_data: solutionData
-        }
-      })
-    }
-
-    // ✅ questions tablosunu güncelle
-    if (question_id && savedSolution) {
-      await supabase
-        .from('questions')
-        .update({ 
-          interactive_solution_id: savedSolution.id,
-          interactive_solution_status: 'completed'
-        })
-        .eq('id', question_id)
-      
-      console.log(`✅ Solution saved and linked: ${question_id}`)
-
-      // 🔄 Typesense'i güncelle (arka planda)
-      try {
-        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/admin/questions/sync`, {
+        // Typesense güncelle (background)
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/admin/questions/sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ questionId: question_id, action: 'upsert' })
-        }).catch(() => {}) // Fire and forget
-        console.log(`🔄 Typesense sync triggered: ${question_id}`)
-      } catch {
-        // Typesense sync hatası kritik değil
+          body: JSON.stringify({ action: 'upsert', questionId: question_id })
+        }).catch(() => {})
+      }
+
+      if (saveError) {
+        console.error('Kayıt hatası:', saveError)
       }
     }
 
     return NextResponse.json({
       success: true,
       source: 'generated',
-      saved: true,
-      solution: savedSolution
+      solution: solutionData
     })
 
   } catch (error) {
-    console.error('Interactive solution hatası:', error)
+    console.error('API Hatası:', error)
     return NextResponse.json({ 
-      error: 'Çözüm üretilemedi',
+      error: 'Sunucu hatası',
       details: error instanceof Error ? error.message : 'Bilinmeyen hata'
     }, { status: 500 })
   }
-}
-
-// GET: Mevcut çözümü getir
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const questionId = searchParams.get('question_id')
-
-  if (!questionId) {
-    return NextResponse.json({ error: 'question_id gerekli' }, { status: 400 })
-  }
-
-  const { data, error } = await supabase
-    .from('interactive_solutions')
-    .select('*')
-    .eq('question_id', questionId)
-    .eq('is_active', true)
-    .single()
-
-  if (error || !data) {
-    return NextResponse.json({ error: 'Çözüm bulunamadı' }, { status: 404 })
-  }
-
-  return NextResponse.json({ success: true, solution: data })
 }
