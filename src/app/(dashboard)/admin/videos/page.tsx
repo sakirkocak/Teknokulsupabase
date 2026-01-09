@@ -40,6 +40,7 @@ interface QueueItem {
   questions: { 
     question_text: string
     video_solution_url: string | null
+    video_storage_url: string | null
     video_youtube_id: string | null
     video_status: string | null
   } | null
@@ -349,31 +350,62 @@ export default function AdminVideosPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {video.questions?.video_solution_url ? (
-                      <div className="flex items-center gap-2">
-                        <a 
-                          href={video.questions.video_solution_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium"
-                        >
-                          <Youtube className="w-3 h-3" />
-                          İzle
-                        </a>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(video.questions?.video_solution_url || '')
-                            alert('Link kopyalandı!')
-                          }}
-                          className="p-1 hover:bg-gray-100 rounded"
-                          title="Linki kopyala"
-                        >
-                          <Copy className="w-3 h-3 text-gray-400" />
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-gray-400">-</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {/* YouTube butonu */}
+                      {video.questions?.video_solution_url && (
+                        <>
+                          <a 
+                            href={video.questions.video_solution_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-xs font-medium"
+                          >
+                            <Youtube className="w-3 h-3" />
+                            İzle
+                          </a>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(video.questions?.video_solution_url || '')
+                              alert('Link kopyalandı!')
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            title="Linki kopyala"
+                          >
+                            <Copy className="w-3 h-3 text-gray-400" />
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Supabase Storage butonu - YouTube yoksa göster */}
+                      {!video.questions?.video_solution_url && video.questions?.video_storage_url && (
+                        <>
+                          <a 
+                            href={video.questions.video_storage_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors text-xs font-medium"
+                          >
+                            <Play className="w-3 h-3" />
+                            İzle
+                          </a>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(video.questions?.video_storage_url || '')
+                              alert('Link kopyalandı!')
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded"
+                            title="Linki kopyala"
+                          >
+                            <Copy className="w-3 h-3 text-gray-400" />
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Hiçbiri yoksa */}
+                      {!video.questions?.video_solution_url && !video.questions?.video_storage_url && (
+                        <span className="text-xs text-gray-400">-</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     ${(video.estimated_cost_usd || 0).toFixed(3)}

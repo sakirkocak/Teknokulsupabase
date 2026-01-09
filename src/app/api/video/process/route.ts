@@ -287,7 +287,7 @@ export async function GET(request: NextRequest) {
       completed_at,
       estimated_cost_usd,
       error_message,
-      questions(question_text, video_solution_url, video_youtube_id, video_status)
+      questions(question_text, video_solution_url, video_storage_url, video_youtube_id, video_status)
     `)
     .order('created_at', { ascending: false })
     .limit(20)
