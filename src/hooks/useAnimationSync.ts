@@ -186,16 +186,18 @@ export function useStepAnimation(totalSteps: number) {
     })
     
     // Bu step'i oynat
-    if (stepsRef.current[stepIndex]) {
-      stepsRef.current[stepIndex].restart()
+    const currentTimeline = stepsRef.current[stepIndex]
+    if (currentTimeline) {
+      currentTimeline.restart()
     }
     
     setCurrentStep(stepIndex)
   }, [])
   
   const pauseCurrentStep = useCallback(() => {
-    if (stepsRef.current[currentStep]) {
-      stepsRef.current[currentStep].pause()
+    const timeline = stepsRef.current[currentStep]
+    if (timeline) {
+      timeline.pause()
     }
   }, [currentStep])
   

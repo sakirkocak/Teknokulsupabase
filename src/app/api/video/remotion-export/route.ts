@@ -31,11 +31,12 @@ export async function POST(request: NextRequest) {
     const totalSeconds = introSeconds + stepsSeconds + outroSeconds
 
     // Resolution config
-    const resolutionConfig = {
+    const resolutionMap: Record<string, { width: number; height: number }> = {
       '720p': { width: 1280, height: 720 },
       '1080p': { width: 1920, height: 1080 },
       '4k': { width: 3840, height: 2160 }
-    }[resolution] || { width: 1920, height: 1080 }
+    }
+    const resolutionConfig = resolutionMap[resolution] || { width: 1920, height: 1080 }
 
     // Remotion render config
     const renderConfig = {
