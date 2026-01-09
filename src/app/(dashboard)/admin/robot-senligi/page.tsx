@@ -385,12 +385,13 @@ export default function RobotSenligiPage() {
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pageWidth = 210
       const pageHeight = 297
-      const qrSize = 30 // 3cm QR kod
-      const margin = 10
+      const qrSize = 32 // 3.2cm QR kod
+      const margin = 8
       const cols = 5
-      const rows = 8
+      const cellHeight = qrSize + 8 // QR + numara
+      const rows = Math.floor((pageHeight - 2 * margin) / (cellHeight + 4))
       const gapX = (pageWidth - 2 * margin - cols * qrSize) / (cols - 1)
-      const gapY = (pageHeight - 2 * margin - rows * (qrSize + 8)) / (rows - 1)
+      const gapY = 4 // Satırlar arası sabit boşluk
 
       let currentCol = 0
       let currentRow = 0
@@ -405,18 +406,18 @@ export default function RobotSenligiPage() {
         }
 
         const x = margin + currentCol * (qrSize + gapX)
-        const y = margin + currentRow * (qrSize + 8 + gapY)
-
-        // Robot numarasını ÜSTE ekle
-        pdf.setFontSize(10)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`#${robot.robot_number}`, x + qrSize / 2, y + 4, { align: 'center' })
+        const y = margin + currentRow * (cellHeight + gapY)
 
         // QR kod oluştur
         const qrDataUrl = await generateQRCodeDataURL(robot.qr_code)
         
-        // QR kodu ekle (numaranın altına)
-        pdf.addImage(qrDataUrl, 'PNG', x, y + 6, qrSize, qrSize)
+        // QR kodu ekle
+        pdf.addImage(qrDataUrl, 'PNG', x, y, qrSize, qrSize)
+        
+        // Robot numarasını QR'ın hemen altına ekle (yakın)
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(`#${robot.robot_number}`, x + qrSize / 2, y + qrSize + 4, { align: 'center' })
 
         currentCol++
         if (currentCol >= cols) {
@@ -494,11 +495,11 @@ export default function RobotSenligiPage() {
           Robot Ekle
         </button>
         <button
-          onClick={() => addMultipleRobots(1, 80)}
+          onClick={() => addMultipleRobots(1, 150)}
           className="btn-secondary flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
-          1-80 Arası Toplu Ekle
+          1-150 Arası Toplu Ekle
         </button>
         {robots.length > 0 && (
           <button
