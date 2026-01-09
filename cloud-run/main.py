@@ -201,26 +201,110 @@ def validate_manim_code(code: str) -> bool:
 
 
 # ============================================================
-# ELEVENLABS SES OLUŞTUR
+# ELEVENLABS SES OLUŞTUR (Türkçe Profesyonel Sesler)
 # ============================================================
+import random
 
-async def generate_audio(text: str, output_path: Path) -> bool:
-    """ElevenLabs ile ses oluştur"""
+# 🇹🇷 Türkçe Profesyonel Sesler (Voice Library'den)
+TURKISH_VOICES = {
+    "erdem": {
+        "id": "spa9IALJDrGWqKYWII2J",
+        "name": "Erdem",
+        "gender": "male",
+        "style": "energetic",
+        "description": "Enerjik, eğitim odaklı genç erkek"
+    },
+    "mehmet": {
+        "id": "RiIWpdXo71aR6kOsLsEw",
+        "name": "Mehmet", 
+        "gender": "male",
+        "style": "natural",
+        "description": "Doğal, genç erkek"
+    },
+    "gamze": {
+        "id": "Hvrobr8BhLPfiaSv2cHi",
+        "name": "Gamze",
+        "gender": "female",
+        "style": "warm",
+        "description": "Sıcak, kadın anlatıcı"
+    }
+}
+
+# Ders bazlı ses eşleştirmesi
+SUBJECT_VOICE_MAP = {
+    "matematik": "erdem",      # Enerjik, heyecanlı
+    "fizik": "erdem",          # Enerjik
+    "kimya": "mehmet",         # Doğal, sakin
+    "biyoloji": "gamze",       # Sıcak, açıklayıcı
+    "türkçe": "gamze",         # Kadın ses, edebiyat için uygun
+    "tarih": "mehmet",         # Hikaye anlatıcı
+    "coğrafya": "mehmet",      # Doğal
+    "ingilizce": "gamze",      # Dil dersleri için
+}
+
+# Varsayılan ses
+DEFAULT_VOICE = "erdem"
+
+
+def get_voice_for_subject(subject_name: str) -> dict:
+    """Derse göre en uygun sesi seç"""
+    if not subject_name:
+        return TURKISH_VOICES[DEFAULT_VOICE]
+    
+    subject_lower = subject_name.lower().strip()
+    
+    # Ders eşleştirmesi
+    for key, voice_key in SUBJECT_VOICE_MAP.items():
+        if key in subject_lower:
+            voice = TURKISH_VOICES.get(voice_key, TURKISH_VOICES[DEFAULT_VOICE])
+            log(f"🎙️ Ses seçildi: {voice['name']} ({subject_name} için)")
+            return voice
+    
+    # Eşleşme yoksa rastgele seç
+    voice_key = random.choice(list(TURKISH_VOICES.keys()))
+    voice = TURKISH_VOICES[voice_key]
+    log(f"🎙️ Ses seçildi: {voice['name']} (rastgele)")
+    return voice
+
+
+def get_random_voice() -> dict:
+    """Rastgele bir ses seç"""
+    voice_key = random.choice(list(TURKISH_VOICES.keys()))
+    return TURKISH_VOICES[voice_key]
+
+async def generate_audio(text: str, output_path: Path, subject_name: str = None, voice_id: str = None) -> bool:
+    """
+    ElevenLabs ile kaliteli Türkçe ses oluştur
+    
+    🎙️ Sesler: Erdem, Mehmet, Gamze (Türkçe profesyonel)
+    🎯 Model: eleven_turbo_v2_5 - Hızlı + kaliteli
+    📚 Ders bazlı ses seçimi otomatik yapılır
+    """
     try:
+        # Ses seçimi: Elle belirtilmişse onu kullan, yoksa derse göre seç
+        if voice_id:
+            selected_voice_id = voice_id
+            voice_name = "Manuel"
+        else:
+            voice = get_voice_for_subject(subject_name)
+            selected_voice_id = voice["id"]
+            voice_name = voice["name"]
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                "https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM",
+                f"https://api.elevenlabs.io/v1/text-to-speech/{selected_voice_id}",
                 headers={
                     "xi-api-key": ELEVENLABS_API_KEY,
                     "Content-Type": "application/json"
                 },
                 json={
                     "text": text,
-                    "model_id": "eleven_multilingual_v2",
+                    "model_id": "eleven_turbo_v2_5",  # Hızlı + kaliteli + Türkçe
                     "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75,
-                        "speed": 1.0
+                        "stability": 0.70,           # Doğal ses için dengeli
+                        "similarity_boost": 0.80,    # Orijinal sese yakın
+                        "style": 0.35,               # Duygu ve ifade ekle
+                        "use_speaker_boost": True    # Net ve temiz ses
                     }
                 },
                 timeout=60
@@ -229,26 +313,73 @@ async def generate_audio(text: str, output_path: Path) -> bool:
             if response.status_code == 200:
                 with open(output_path, "wb") as f:
                     f.write(response.content)
+                log(f"✅ Ses oluşturuldu: {voice_name} | {len(text)} karakter")
                 return True
             else:
-                log(f"❌ ElevenLabs hatası: {response.status_code}", "ERROR")
+                error_detail = response.text[:200] if response.text else "Bilinmeyen hata"
+                log(f"❌ ElevenLabs hatası: {response.status_code} - {error_detail}", "ERROR")
                 return False
     except Exception as e:
         log(f"❌ ElevenLabs hatası: {e}", "ERROR")
         return False
 
 
-async def generate_tts_for_scenario(scenario: dict, audio_dir: Path) -> tuple:
-    """Senaryo için tüm TTS'leri oluştur"""
+async def generate_sound_effect(prompt: str, output_path: Path, duration_seconds: float = 2.0) -> bool:
+    """
+    ElevenLabs ile ses efekti oluştur
+    Örnek: "classroom bell ringing", "applause", "success chime"
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.elevenlabs.io/v1/sound-generation",
+                headers={
+                    "xi-api-key": ELEVENLABS_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "text": prompt,
+                    "duration_seconds": duration_seconds,
+                    "prompt_influence": 0.3  # Yaratıcılık dengesi
+                },
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                log(f"✅ Ses efekti oluşturuldu: {prompt[:30]}...")
+                return True
+            else:
+                log(f"⚠️ Ses efekti hatası: {response.status_code}", "WARN")
+                return False
+    except Exception as e:
+        log(f"⚠️ Ses efekti hatası: {e}", "WARN")
+        return False
+
+
+async def generate_tts_for_scenario(scenario: dict, audio_dir: Path, subject_name: str = None) -> tuple:
+    """
+    Senaryo için tüm sesleri oluştur
+    
+    🎙️ Ders bazlı ses seçimi:
+    - Matematik/Fizik → Erdem (enerjik)
+    - Türkçe/Biyoloji → Gamze (sıcak)
+    - Tarih/Coğrafya → Mehmet (doğal)
+    """
     audio_files = []
     durations = {"hook": 3.0, "steps": [], "kapanis": 3.0, "outro": 3.0}
     
     video_data = scenario.get("video_senaryosu", {})
     
+    # Ses seçimini logla
+    voice = get_voice_for_subject(subject_name)
+    log(f"🎙️ Video sesi: {voice['name']} ({voice['description']})")
+    
     # Hook sesi
     hook_text = video_data.get("hook_cumlesi", "Bu soruyu birlikte çözelim!")
     hook_audio = audio_dir / "hook.mp3"
-    if await generate_audio(hook_text, hook_audio):
+    if await generate_audio(hook_text, hook_audio, subject_name=subject_name):
         audio_files.append(hook_audio)
         durations["hook"] = get_audio_duration(hook_audio)
     
@@ -256,7 +387,7 @@ async def generate_tts_for_scenario(scenario: dict, audio_dir: Path) -> tuple:
     for i, adim in enumerate(video_data.get("adimlar", [])[:6]):
         tts = adim.get("tts_metni", f"Adım {i+1}")
         step_audio = audio_dir / f"step_{i}.mp3"
-        if await generate_audio(tts, step_audio):
+        if await generate_audio(tts, step_audio, subject_name=subject_name):
             audio_files.append(step_audio)
             durations["steps"].append(get_audio_duration(step_audio))
         else:
@@ -265,13 +396,13 @@ async def generate_tts_for_scenario(scenario: dict, audio_dir: Path) -> tuple:
     # Kapanış sesi
     kapanis_text = video_data.get("kapanis_cumlesi", "Teknokul ile başarıya!")
     kapanis_audio = audio_dir / "kapanis.mp3"
-    if await generate_audio(kapanis_text, kapanis_audio):
+    if await generate_audio(kapanis_text, kapanis_audio, subject_name=subject_name):
         audio_files.append(kapanis_audio)
         durations["kapanis"] = get_audio_duration(kapanis_audio)
     
-    # Outro sesi (opsiyonel)
+    # Outro sesi
     outro_audio = audio_dir / "outro.mp3"
-    if await generate_audio("Teknokul, eğitimin dijital üssü!", outro_audio):
+    if await generate_audio("Teknokul, eğitimin dijital üssü!", outro_audio, subject_name=subject_name):
         audio_files.append(outro_audio)
         durations["outro"] = get_audio_duration(outro_audio)
     
@@ -731,9 +862,11 @@ async def process_video(request: VideoRequest):
             # 1. Senaryo üret
             scenario = await generate_scenario_with_gemini(request)
             
-            # 2. TTS sesleri oluştur
-            log("🎤 Sesler oluşturuluyor...")
-            audio_files, durations = await generate_tts_for_scenario(scenario, audio_dir)
+            # 2. TTS sesleri oluştur (Türkçe profesyonel sesler)
+            log(f"🎤 Sesler oluşturuluyor... (Ders: {request.subject_name})")
+            audio_files, durations = await generate_tts_for_scenario(
+                scenario, audio_dir, subject_name=request.subject_name
+            )
             log(f"✅ {len(audio_files)} ses dosyası oluşturuldu")
             
             # 3. Sesleri birleştir
