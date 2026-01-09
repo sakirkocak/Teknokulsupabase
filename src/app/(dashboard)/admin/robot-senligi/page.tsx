@@ -32,7 +32,7 @@ interface Robot {
   evaluation_count?: number
 }
 
-const SITE_URL = typeof window !== 'undefined' ? window.location.origin : 'https://sakirkocak.com'
+const SITE_URL = 'https://sakirkocak.com'
 
 export default function RobotSenligiPage() {
   const [robots, setRobots] = useState<Robot[]>([])
@@ -157,6 +157,25 @@ export default function RobotSenligiPage() {
 
     setRobots(robots.filter(r => r.id !== id))
     setSelectedRobot(null)
+  }
+
+  async function deleteAllRobots() {
+    if (!confirm(`Tüm ${robots.length} robotu silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz ve TÜM değerlendirmeler de silinecek!`)) return
+    if (!confirm('GERÇEKTEN EMİN MİSİNİZ? Bu işlem geri alınamaz!')) return
+
+    const { error } = await supabase
+      .from('robots')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // Tümünü sil
+
+    if (error) {
+      console.error('❌ Robotlar silinirken hata:', error)
+      alert('Robotlar silinirken hata oluştu')
+      return
+    }
+
+    setRobots([])
+    alert('Tüm robotlar silindi!')
   }
 
   async function uploadImage(robotId: string, file: File) {
@@ -335,7 +354,7 @@ export default function RobotSenligiPage() {
       </motion.div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <button
           onClick={() => setShowAddModal(true)}
           className="btn-primary flex items-center gap-2"
@@ -350,6 +369,15 @@ export default function RobotSenligiPage() {
           <Plus className="w-5 h-5" />
           1-80 Arası Toplu Ekle
         </button>
+        {robots.length > 0 && (
+          <button
+            onClick={deleteAllRobots}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors"
+          >
+            <Trash2 className="w-5 h-5" />
+            Tümünü Sil ({robots.length})
+          </button>
+        )}
       </div>
 
       {/* Stats */}
