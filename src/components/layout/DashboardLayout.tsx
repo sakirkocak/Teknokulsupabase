@@ -38,7 +38,8 @@ import {
   ImageIcon,
   Shield,
   Activity,
-  Video
+  Video,
+  QrCode
 } from 'lucide-react'
 
 type NavItem = {
@@ -90,6 +91,7 @@ const navItems: Record<string, NavItem[]> = {
   ],
   admin: [
     { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    { label: 'Robot Şenliği', href: '/admin/robot-senligi', icon: QrCode },
     { label: 'Kullanıcılar', href: '/admin/kullanicilar', icon: Users },
     { label: 'Kullanıcı Aktiviteleri', href: '/admin/kullanici-aktiviteleri', icon: Activity },
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
