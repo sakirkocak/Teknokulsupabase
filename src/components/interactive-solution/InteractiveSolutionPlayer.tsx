@@ -195,12 +195,14 @@ export default function InteractiveSolutionPlayer({
               )}
             </div>
 
-            {/* Animasyon - Kompakt */}
-            {currentStep.animation_template && currentStep.animation_template !== 'none' && (
-              <div className="mb-3 rounded-xl overflow-hidden" style={{ maxHeight: '200px' }}>
-                <AnimationRenderer template={currentStep.animation_template} data={currentStep.animation_data} isPlaying={isPlaying} />
-              </div>
-            )}
+            {/* Animasyon Alanı - BÜYÜK */}
+            <div className="mb-4 rounded-xl overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 min-h-[280px]">
+              <AnimationRenderer 
+                template={currentStep.animation_template || 'text_reveal'} 
+                data={currentStep.animation_data || { text: currentStep.content, style: 'info' }} 
+                isPlaying={isPlaying} 
+              />
+            </div>
 
             {/* İçerik veya Quiz */}
             {currentStep.type === 'quiz' && currentStep.quiz ? (

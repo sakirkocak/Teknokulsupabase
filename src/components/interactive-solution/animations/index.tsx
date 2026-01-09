@@ -51,7 +51,7 @@ export function EquationBalance({ data, isPlaying = true }: EquationBalanceProps
   }
 
   return (
-    <div className="w-full aspect-video flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 rounded-xl overflow-hidden">
+    <div className="w-full h-72 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 rounded-xl overflow-hidden">
       {/* Terazi SVG */}
       <svg viewBox="0 0 400 200" className="w-full max-w-md">
         {/* Taban */}
@@ -186,7 +186,7 @@ export function NumberLine({ data, isPlaying = true }: NumberLineProps) {
   }
 
   return (
-    <div className="w-full aspect-video flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-purple-900 rounded-xl">
+    <div className="w-full h-72 flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-purple-900 rounded-xl">
       <svg viewBox="0 0 400 150" className="w-full max-w-lg">
         {/* Sayı Doğrusu */}
         <line x1="40" y1="75" x2="360" y2="75" stroke="#64748b" strokeWidth="3" />
@@ -315,7 +315,7 @@ export function PieChart({ data, isPlaying = true }: PieChartProps) {
   const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
   return (
-    <div className="w-full aspect-video flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 rounded-xl">
+    <div className="w-full h-72 flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 rounded-xl">
       <div className="flex items-center gap-8">
         <svg viewBox="0 0 300 200" className="w-64 h-48">
           {segments.map((segment, i) => {
@@ -424,7 +424,7 @@ export function TextReveal({ data, isPlaying = true }: TextRevealProps) {
   const showCelebration = data?.celebration || style === 'celebration'
 
   return (
-    <div className={`w-full aspect-video flex flex-col items-center justify-center p-6 bg-gradient-to-br ${bgGradient} rounded-xl relative overflow-hidden`}>
+    <div className={`w-full h-72 flex flex-col items-center justify-center p-6 bg-gradient-to-br ${bgGradient} rounded-xl relative overflow-hidden`}>
       {/* Arka plan efekti */}
       {showCelebration && revealed && (
         <>
@@ -510,9 +510,9 @@ export function BarChart({ data, isPlaying = true }: BarChartProps) {
   }, [isPlaying])
 
   return (
-    <div className="w-full aspect-video flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 rounded-xl">
+    <div className="w-full h-72 flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 rounded-xl">
       <div className="w-full max-w-lg">
-        <div className="flex items-end justify-around h-40 gap-4">
+        <div className="flex items-end justify-around h-48 gap-4">
           {bars.map((bar, i) => {
             const height = (bar.value / maxValue) * 100 * (progress / 100)
             const isHighlighted = data?.highlight_bar === i
@@ -598,7 +598,7 @@ export function StepByStep({ data, isPlaying = true }: StepByStepProps) {
   }, [isPlaying, steps.length])
 
   return (
-    <div className="w-full aspect-video flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-violet-900 rounded-xl">
+    <div className="w-full h-72 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-violet-900 rounded-xl overflow-y-auto">
       <div className="w-full max-w-md space-y-3">
         {steps.map((step, i) => (
           <motion.div
@@ -669,7 +669,7 @@ export function CoordinatePlane({ data, isPlaying = true }: CoordinatePlaneProps
   const getScreenY = (y: number) => 100 - (y / (yRange[1] - yRange[0])) * 150
 
   return (
-    <div className="w-full aspect-video flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900 rounded-xl">
+    <div className="w-full h-72 flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900 rounded-xl">
       <svg viewBox="0 0 300 200" className="w-full max-w-lg">
         {/* Grid */}
         {Array.from({ length: 11 }, (_, i) => {
@@ -756,7 +756,7 @@ export function GeometryShape({ data, isPlaying = true }: GeometryShapeProps) {
   const pathData = vertices.map((v, i) => `${i === 0 ? 'M' : 'L'} ${v.x} ${v.y}`).join(' ') + ' Z'
 
   return (
-    <div className="w-full aspect-video flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-orange-900 rounded-xl">
+    <div className="w-full h-72 flex items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-orange-900 rounded-xl">
       <svg viewBox="0 0 300 200" className="w-full max-w-lg">
         {/* Şekil */}
         <motion.path
@@ -829,16 +829,26 @@ interface AnimationRendererProps {
 }
 
 export default function AnimationRenderer({ template, data, isPlaying = true }: AnimationRendererProps) {
+  // Debug log
+  console.log('🎬 AnimationRenderer:', { template, data })
+  
   // Template yoksa veya none ise default animasyon göster
   if (!template || template === 'none') {
     return (
-      <div className="w-full h-44 flex items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl">
+      <div className="w-full h-72 flex items-center justify-center bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl">
         <motion.div 
-          className="text-6xl"
-          animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          className="text-center"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
         >
-          🎓
+          <motion.div 
+            className="text-8xl mb-4"
+            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            🎓
+          </motion.div>
+          <p className="text-white/70 text-sm">Çözüm anlatılıyor...</p>
         </motion.div>
       </div>
     )
@@ -875,16 +885,17 @@ export default function AnimationRenderer({ template, data, isPlaying = true }: 
     
     default:
       // Bilinmeyen template için genel animasyon
+      console.log('⚠️ Unknown template:', template)
       return (
-        <div className="w-full h-44 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl">
+        <div className="w-full h-72 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl">
           <motion.div 
             className="text-center"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <motion.div 
-              className="text-5xl mb-2"
-              animate={{ y: [0, -10, 0] }}
+              className="text-7xl mb-4"
+              animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}
             >
               📊
