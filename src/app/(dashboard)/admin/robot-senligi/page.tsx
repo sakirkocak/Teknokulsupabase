@@ -32,7 +32,7 @@ interface Robot {
   evaluation_count?: number
 }
 
-const SITE_URL = 'https://sakirkocak.com'
+const SITE_URL = 'https://teknokul.com.tr'
 
 export default function RobotSenligiPage() {
   const [robots, setRobots] = useState<Robot[]>([])
