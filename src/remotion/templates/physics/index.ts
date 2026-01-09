@@ -1,3 +1,3 @@
-// Physics templates - placeholder
-export const ForceVectors = () => null
-export const MotionAnimation = () => null
+export { ForceVectors } from './ForceVectors'
+export { MotionAnimation } from './MotionAnimation'
+export { CircuitDiagram } from './CircuitDiagram'

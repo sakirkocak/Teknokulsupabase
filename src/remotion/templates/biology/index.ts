@@ -1,3 +1,2 @@
-// Biology templates - placeholder  
-export const CellStructure = () => null
-export const DNAHelix = () => null
+export { CellStructure } from './CellStructure'
+export { DNAHelix } from './DNAHelix'

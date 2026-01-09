@@ -1,3 +1,2 @@
-// Chemistry templates - placeholder
-export const AtomModel = () => null
-export const ReactionAnimation = () => null
+export { AtomModel } from './AtomModel'
+export { ReactionAnimation } from './ReactionAnimation'
