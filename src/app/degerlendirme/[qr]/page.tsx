@@ -297,9 +297,20 @@ export default function DegerlendirmePage() {
         )}
       </AnimatePresence>
 
-      {/* Header */}
+      {/* Header with Robot Image */}
       <div className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4">
+          {/* Robot Image - Large */}
+          {robot?.image_url && (
+            <div className="mb-4">
+              <img
+                src={robot.image_url}
+                alt={`Robot ${robot.robot_number}`}
+                className="w-full max-w-xs mx-auto h-48 object-contain rounded-xl bg-surface-50"
+              />
+            </div>
+          )}
+          
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {robot?.image_url ? (
