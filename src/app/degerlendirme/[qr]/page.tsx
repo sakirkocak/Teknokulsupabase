@@ -401,12 +401,12 @@ export default function DegerlendirmePage() {
               ))}
             </div>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between pt-4">
+            {/* Navigation - Mobile friendly, buttons on left side */}
+            <div className="flex items-center gap-3 pt-4">
               <button
                 onClick={() => setCurrentCategoryIndex(i => i - 1)}
                 disabled={currentCategoryIndex === 0}
-                className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+                className="btn-secondary flex items-center gap-2 disabled:opacity-50 disabled:invisible"
               >
                 <ChevronLeft className="w-5 h-5" />
                 Önceki
@@ -432,7 +432,7 @@ export default function DegerlendirmePage() {
                   ) : (
                     <Check className="w-5 h-5" />
                   )}
-                  Değerlendirmeyi Tamamla
+                  Tamamla
                 </button>
               )}
             </div>

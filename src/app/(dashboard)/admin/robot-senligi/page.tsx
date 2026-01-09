@@ -32,7 +32,35 @@ interface Robot {
   evaluation_count?: number
 }
 
+interface Evaluation {
+  id: string
+  teacher_name: string
+  category: string
+  created_at: string
+  malzeme_donusumu?: number
+  cozum_odaklilik?: number
+  ozgunluk?: number
+  robot_kunyesi?: number
+  gorev_tanimi?: number
+  temiz_iscilik?: number
+  denge_durus?: number
+  renk_gorunum?: number
+  mekanizma_kullanimi?: number
+  islevsellik?: number
+}
+
 const SITE_URL = 'https://teknokul.com.tr'
+
+const CATEGORY_LABELS: Record<string, string> = {
+  inovatif_tasarim: 'İnovatif Tasarım',
+  en_iyi_hikaye: 'En İyi Hikaye',
+  estetik_iscilik: 'Estetik ve İşçilik',
+  hareketli_robot: 'Hareketli Robot'
+}
+
+function getCategoryLabel(category: string): string {
+  return CATEGORY_LABELS[category] || category
+}
 
 export default function RobotSenligiPage() {
   const [robots, setRobots] = useState<Robot[]>([])
@@ -42,12 +70,64 @@ export default function RobotSenligiPage() {
   const [selectedRobot, setSelectedRobot] = useState<Robot | null>(null)
   const [newRobotNumber, setNewRobotNumber] = useState('')
   const [downloadingPDF, setDownloadingPDF] = useState(false)
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([])
+  const [loadingEvaluations, setLoadingEvaluations] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
     loadRobots()
   }, [])
+
+  useEffect(() => {
+    if (selectedRobot) {
+      loadEvaluations(selectedRobot.id)
+    } else {
+      setEvaluations([])
+    }
+  }, [selectedRobot])
+
+  async function loadEvaluations(robotId: string) {
+    setLoadingEvaluations(true)
+    const { data, error } = await supabase
+      .from('robot_evaluations')
+      .select('*')
+      .eq('robot_id', robotId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ Değerlendirmeler yüklenirken hata:', error)
+    } else {
+      setEvaluations(data || [])
+    }
+    setLoadingEvaluations(false)
+  }
+
+  async function deleteEvaluation(evalId: string) {
+    if (!confirm('Bu değerlendirmeyi silmek istediğinize emin misiniz?')) return
+
+    const { error } = await supabase
+      .from('robot_evaluations')
+      .delete()
+      .eq('id', evalId)
+
+    if (error) {
+      console.error('❌ Değerlendirme silinirken hata:', error)
+      alert('Değerlendirme silinirken hata oluştu')
+      return
+    }
+
+    setEvaluations(evaluations.filter(e => e.id !== evalId))
+    // Robot'un değerlendirme sayısını güncelle
+    if (selectedRobot) {
+      setRobots(robots.map(r => 
+        r.id === selectedRobot.id 
+          ? { ...r, evaluation_count: (r.evaluation_count || 1) - 1 }
+          : r
+      ))
+      setSelectedRobot({ ...selectedRobot, evaluation_count: (selectedRobot.evaluation_count || 1) - 1 })
+    }
+  }
 
   async function loadRobots() {
     setLoading(true)
@@ -276,16 +356,16 @@ export default function RobotSenligiPage() {
         const x = margin + currentCol * (qrSize + gapX)
         const y = margin + currentRow * (qrSize + 8 + gapY)
 
+        // Robot numarasını ÜSTE ekle
+        pdf.setFontSize(10)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(`#${robot.robot_number}`, x + qrSize / 2, y + 4, { align: 'center' })
+
         // QR kod oluştur
         const qrDataUrl = await generateQRCodeDataURL(robot.qr_code)
         
-        // QR kodu ekle
-        pdf.addImage(qrDataUrl, 'PNG', x, y, qrSize, qrSize)
-        
-        // Robot numarasını ekle
-        pdf.setFontSize(10)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`#${robot.robot_number}`, x + qrSize / 2, y + qrSize + 5, { align: 'center' })
+        // QR kodu ekle (numaranın altına)
+        pdf.addImage(qrDataUrl, 'PNG', x, y + 6, qrSize, qrSize)
 
         currentCol++
         if (currentCol >= cols) {
@@ -547,12 +627,47 @@ export default function RobotSenligiPage() {
                 </button>
               </div>
 
-              {/* Stats */}
-              <div className="mt-4 p-4 bg-surface-50 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-surface-600">Değerlendirme Sayısı</span>
-                  <span className="font-bold text-surface-900">{selectedRobot.evaluation_count || 0}</span>
+              {/* Evaluations List */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-surface-900">
+                    Değerlendirmeler ({evaluations.length})
+                  </h3>
                 </div>
+                
+                {loadingEvaluations ? (
+                  <div className="text-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-surface-400" />
+                  </div>
+                ) : evaluations.length === 0 ? (
+                  <div className="text-center py-4 text-surface-400 bg-surface-50 rounded-xl">
+                    Henüz değerlendirme yok
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {evaluations.map((evaluation) => (
+                      <div
+                        key={evaluation.id}
+                        className="flex items-center justify-between p-3 bg-surface-50 rounded-xl"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-surface-900 truncate">
+                            {evaluation.teacher_name}
+                          </div>
+                          <div className="text-xs text-surface-500">
+                            {getCategoryLabel(evaluation.category)} • {new Date(evaluation.created_at).toLocaleDateString('tr-TR')}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteEvaluation(evaluation.id)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors ml-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
