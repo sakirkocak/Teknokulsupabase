@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, X, Loader2, RefreshCw, Image as ImageIcon, Video, Monitor, Volume2 } from 'lucide-react'
@@ -34,12 +34,20 @@ export default function InteractiveSolutionButton({
   const [source, setSource] = useState<string>('')
   const [playerMode, setPlayerMode] = useState<'classic' | 'remotion'>('remotion')
   const [audioUrls, setAudioUrls] = useState<string[]>([])
-  const [isGeneratingTTS, setIsGeneratingTTS] = useState(false)
+  const [ttsStatus, setTtsStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+
+  // Çözüm yüklendiğinde otomatik TTS oluştur
+  useEffect(() => {
+    if (solution?.steps && playerMode === 'remotion' && ttsStatus === 'idle') {
+      generateTTSForSteps()
+    }
+  }, [solution, playerMode])
 
   async function loadSolution(forceRegenerate = false) {
     setIsLoading(true)
     setError(null)
     setAudioUrls([])
+    setTtsStatus('idle')
 
     const payload = {
       question_id: String(questionId || ''),
@@ -80,8 +88,8 @@ export default function InteractiveSolutionButton({
   }
 
   async function generateTTSForSteps() {
-    if (!solution?.steps || audioUrls.length > 0) return
-    setIsGeneratingTTS(true)
+    if (!solution?.steps || audioUrls.length > 0 || ttsStatus === 'loading') return
+    setTtsStatus('loading')
     try {
       const res = await fetch('/api/tts/generate', {
         method: 'POST',
@@ -95,11 +103,13 @@ export default function InteractiveSolutionButton({
       const data = await res.json()
       if (data.success && data.audio_urls) {
         setAudioUrls(data.audio_urls)
+        setTtsStatus('ready')
+      } else {
+        setTtsStatus('error')
       }
     } catch (e) {
       console.error('TTS error:', e)
-    } finally {
-      setIsGeneratingTTS(false)
+      setTtsStatus('error')
     }
   }
 
@@ -129,6 +139,18 @@ export default function InteractiveSolutionButton({
                     {source === 'cache' ? '⚡ Önbellek' : '✨ Yeni üretildi'}
                   </span>
                 )}
+                {/* TTS Status */}
+                {playerMode === 'remotion' && (
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex items-center gap-1 ${
+                    ttsStatus === 'ready' ? 'bg-green-500/20 text-green-400' :
+                    ttsStatus === 'loading' ? 'bg-orange-500/20 text-orange-400' :
+                    ttsStatus === 'error' ? 'bg-red-500/20 text-red-400' : 'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {ttsStatus === 'loading' && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {ttsStatus === 'ready' && <Volume2 className="w-3 h-3" />}
+                    {ttsStatus === 'ready' ? '🔊 Ses Hazır' : ttsStatus === 'loading' ? 'Ses hazırlanıyor...' : ttsStatus === 'error' ? 'Ses yüklenemedi' : ''}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center bg-gray-800 rounded-lg p-1">
@@ -141,13 +163,6 @@ export default function InteractiveSolutionButton({
                     <Monitor className="w-4 h-4" />Klasik
                   </button>
                 </div>
-                {playerMode === 'remotion' && (
-                  <button onClick={generateTTSForSteps} disabled={isGeneratingTTS || audioUrls.length > 0}
-                    className={`px-3 py-1.5 text-xs font-medium rounded flex items-center gap-1.5 transition-colors ${audioUrls.length > 0 ? 'bg-green-600 text-white' : 'bg-orange-600 hover:bg-orange-500 text-white'}`}>
-                    {isGeneratingTTS ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
-                    {audioUrls.length > 0 ? 'Ses Hazır' : isGeneratingTTS ? 'Oluşturuluyor...' : 'Ses Oluştur'}
-                  </button>
-                )}
                 <button onClick={() => { setIsOpen(false); setSolution(null); loadSolution(true) }}
                   className="p-2 hover:bg-white/10 rounded-lg transition-colors text-orange-400 hover:text-orange-300" title="Yeniden üret">
                   <RefreshCw className="w-5 h-5" />
