@@ -14,6 +14,7 @@ export * from './templates/chemistry'
 export * from './templates/biology'
 export * from './templates/turkish'
 export * from './templates/history'
+export * from './templates/geography'
 
 // Utilities
 export { selectTemplate, getTemplateDuration } from './utils/templateSelector'
