@@ -162,3 +162,13 @@ page=1&per_page=50
 - `perf:` performans iyileştirmeleri
 - `refactor:` kod düzenlemeleri
 - `seo:` SEO iyileştirmeleri
+
+## 🚀 Çalışma Prensibi (ÖNCELİKLİ KURAL)
+- Görev verildiğinde TODO listesi oluştur
+- TÜM TODO'ları tek seferde, onay beklemeden tamamla
+- Her dosya değişikliğinde review sunma, direkt yap
+- Build test et (`npm run build`)
+- Çalışıyorsa COMMIT yap (local) - PUSH YAPMA
+- Kullanıcıya raporla: "Bitti, X dosya değişti, local'de test et"
+- Kullanıcı "push" derse PUSH yap
+- Hata varsa düzelt ve tekrar dene, kullanıcıya sorma
