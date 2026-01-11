@@ -6,6 +6,7 @@ import { BreadcrumbSchema, QuizSchema, LearningResourceSchema, EducationalQuesti
 import MathRenderer from '@/components/MathRenderer'
 import VideoSolutionButton from '@/components/VideoSolutionButton'
 import InteractiveSolutionButton from '@/components/InteractiveSolutionButton'
+import JarvisSolutionButton from '@/components/JarvisSolutionButton'
 import { 
   BookOpen, Calculator, Beaker, Globe, Languages, 
   Atom, FlaskConical, Leaf, History, BookText,
@@ -437,11 +438,22 @@ export default async function SingleQuestionPage({ params }: Props) {
                     Adım adım, sesli ve animasyonlu çözüm. Quiz ile kendini test et!
                   </p>
                 </div>
-                <InteractiveSolutionButton
-                  questionId={question.id}
-                  questionText={question.question_text}
-                  subjectName={subjectName}
-                />
+                <div className="flex flex-wrap gap-2">
+                  <InteractiveSolutionButton
+                    questionId={question.id}
+                    questionText={question.question_text}
+                    subjectName={subjectName}
+                  />
+                  <JarvisSolutionButton
+                    questionId={question.id}
+                    questionText={question.question_text}
+                    subject={subject}
+                    options={options}
+                    correctAnswer={question.correct_answer}
+                    explanation={question.explanation}
+                    grade={gradeNum}
+                  />
+                </div>
               </div>
             </div>
           </article>

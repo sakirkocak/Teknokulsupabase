@@ -9,8 +9,9 @@ const FeedbackWidget = dynamic(() => import('./FeedbackWidget'), {
   loading: () => null
 })
 
-const TeknoTeacherChat = dynamic(
-  () => import('./TeknoTeacher').then(mod => ({ default: mod.TeknoTeacherChat })),
+// 🤖 JARVIS - AI Özel Ders Asistanı (TeknoÖğretmen'in yerine)
+const JarvisChat = dynamic(
+  () => import('./Jarvis').then(mod => ({ default: mod.JarvisChat })),
   {
     ssr: false,
     loading: () => null
@@ -45,7 +46,7 @@ export function LazyWidgets() {
   return (
     <>
       <FeedbackWidget />
-      <TeknoTeacherChat />
+      <JarvisChat />
     </>
   )
 }

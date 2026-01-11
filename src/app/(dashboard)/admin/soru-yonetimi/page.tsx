@@ -90,6 +90,7 @@ import {
   FlaskConical, Video, Youtube, Loader2, ExternalLink, Play
 } from 'lucide-react'
 import InteractiveSolutionButton from '@/components/InteractiveSolutionButton'
+import JarvisSolutionButton from '@/components/JarvisSolutionButton'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 
@@ -1130,6 +1131,17 @@ export default function AdminSoruYonetimiPage() {
                         correctAnswer={question.correct_answer}
                         explanation={question.explanation}
                         className="!p-2 !px-2 !text-xs !rounded-lg"
+                      />
+                      {/* 🤖 Jarvis ile Çöz */}
+                      <JarvisSolutionButton
+                        questionId={question.id || ''}
+                        questionText={question.question_text || ''}
+                        subject={(question.topic?.subject as any)?.slug || 'matematik'}
+                        options={question.options}
+                        correctAnswer={question.correct_answer}
+                        explanation={question.explanation}
+                        questionImageUrl={question.question_image_url}
+                        className="!p-2 !px-3 !text-xs !rounded-lg"
                       />
                       <button
                         onClick={() => setPreviewQuestion(question)}
