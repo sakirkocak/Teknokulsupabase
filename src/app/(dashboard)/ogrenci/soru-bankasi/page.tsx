@@ -11,7 +11,7 @@ import {
   BarChart3, ArrowRight, Clock, Brain, GraduationCap,
   ChevronDown, ChevronUp, Layers, Sparkles, ArrowLeft,
   TrendingUp, Award, Flame, Home, Flag, Medal, Settings,
-  Gift, Timer, Keyboard, ImageIcon
+  Gift, Timer, Keyboard, ImageIcon, Maximize2, Minimize2, Monitor
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
@@ -186,6 +186,10 @@ export default function SoruBankasiPage() {
   const [reportReason, setReportReason] = useState('')
   const [reportSubmitting, setReportSubmitting] = useState(false)
   const [reportSuccess, setReportSuccess] = useState(false)
+  
+  // 🖥️ Fullscreen state
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false) // Uygulama içi tam ekran
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false) // Browser tam ekran
   
   // Gamification state
   const [newBadges, setNewBadges] = useState<Badge[]>([])
@@ -1391,6 +1395,34 @@ export default function SoruBankasiPage() {
     setTopics([])
   }
 
+  // 🖥️ Tam Ekran Fonksiyonları
+  const toggleAppFullscreen = () => {
+    setIsAppFullscreen(prev => !prev)
+  }
+
+  const toggleBrowserFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen()
+        setIsBrowserFullscreen(true)
+      } else {
+        await document.exitFullscreen()
+        setIsBrowserFullscreen(false)
+      }
+    } catch (err) {
+      console.error('Fullscreen hatası:', err)
+    }
+  }
+
+  // Browser fullscreen değişikliğini dinle
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsBrowserFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
   // Oturumu bitir ve özeti göster
   const endSession = () => {
     setShowSessionSummary(true)
@@ -1574,7 +1606,7 @@ export default function SoruBankasiPage() {
           <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl" />
         </div>
 
-        <div className="max-w-4xl mx-auto relative z-10" ref={questionContainerRef}>
+        <div className={`${isAppFullscreen ? 'max-w-6xl' : 'max-w-4xl'} mx-auto relative z-10 transition-all duration-300`} ref={questionContainerRef}>
           {/* Üst Bar - Yenilenmiş */}
           <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 mb-6 border border-white/10">
             {/* Üst Satır - Kontroller ve İstatistikler */}
@@ -1640,6 +1672,35 @@ export default function SoruBankasiPage() {
                   className="hidden sm:flex"
                 />
 
+                {/* 🖥️ Tam Ekran Butonları */}
+                <div className="flex items-center gap-1 bg-white/5 rounded-xl p-1">
+                  {/* Uygulama içi tam ekran */}
+                  <button
+                    onClick={toggleAppFullscreen}
+                    className={`p-2 rounded-lg transition-all ${
+                      isAppFullscreen 
+                        ? 'bg-cyan-500 text-white' 
+                        : 'hover:bg-white/10 text-white/70 hover:text-white'
+                    }`}
+                    title={isAppFullscreen ? "Normal Görünüm" : "Odak Modu"}
+                  >
+                    {isAppFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </button>
+                  
+                  {/* Browser tam ekran */}
+                  <button
+                    onClick={toggleBrowserFullscreen}
+                    className={`p-2 rounded-lg transition-all ${
+                      isBrowserFullscreen 
+                        ? 'bg-purple-500 text-white' 
+                        : 'hover:bg-white/10 text-white/70 hover:text-white'
+                    }`}
+                    title={isBrowserFullscreen ? "Tam Ekrandan Çık (ESC)" : "Tam Ekran (F11)"}
+                  >
+                    <Monitor className="h-4 w-4" />
+                  </button>
+                </div>
+
                 {/* Ayarlar Butonu */}
                 <button
                   onClick={() => setShowSettingsModal(true)}
@@ -1651,45 +1712,49 @@ export default function SoruBankasiPage() {
               </div>
             </div>
 
-            {/* Günlük İlerleme Barı */}
-            <div className="relative">
-              <div className="flex items-center justify-between text-xs text-white/60 mb-1">
-                <span className="flex items-center gap-1">
-                  <Trophy className="h-3 w-3" />
-                  Günlük Hedef: {dailyProgress.solved}/{settings.dailyTarget}
-                </span>
-                <span className="font-medium text-white/80">{dailyProgressPercent}%</span>
+            {/* Günlük İlerleme Barı - App Fullscreen'de gizle */}
+            {!isAppFullscreen && (
+              <div className="relative">
+                <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+                  <span className="flex items-center gap-1">
+                    <Trophy className="h-3 w-3" />
+                    Günlük Hedef: {dailyProgress.solved}/{settings.dailyTarget}
+                  </span>
+                  <span className="font-medium text-white/80">{dailyProgressPercent}%</span>
+                </div>
+                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${dailyProgressPercent}%` }}
+                    transition={{ duration: 0.5 }}
+                    className={`h-full rounded-full ${
+                      dailyProgressPercent >= 100 
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                        : 'bg-gradient-to-r from-indigo-500 to-purple-500'
+                    }`}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${dailyProgressPercent}%` }}
-                  transition={{ duration: 0.5 }}
-                  className={`h-full rounded-full ${
-                    dailyProgressPercent >= 100 
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
-                      : 'bg-gradient-to-r from-indigo-500 to-purple-500'
-                  }`}
-                />
-              </div>
-            </div>
+            )}
 
-            {/* Mobil için İstatistikler */}
-            <div className="flex items-center justify-between mt-3 sm:hidden">
-              <SessionStats
-                correct={sessionStats.correct}
-                wrong={sessionStats.wrong}
-                total={questionIndex}
-              />
-              {settings.timerEnabled && (
-                <QuestionTimer
-                  key={timerKey}
-                  duration={settings.timerDuration}
-                  isRunning={!showResult}
-                  variant="compact"
+            {/* Mobil için İstatistikler - App Fullscreen'de gizle */}
+            {!isAppFullscreen && (
+              <div className="flex items-center justify-between mt-3 sm:hidden">
+                <SessionStats
+                  correct={sessionStats.correct}
+                  wrong={sessionStats.wrong}
+                  total={questionIndex}
                 />
-              )}
-            </div>
+                {settings.timerEnabled && (
+                  <QuestionTimer
+                    key={timerKey}
+                    duration={settings.timerDuration}
+                    isRunning={!showResult}
+                    variant="compact"
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Soru Kartı - Glass Morphism */}
