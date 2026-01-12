@@ -63,6 +63,17 @@ function getCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category] || category
 }
 
+// Görsel optimizasyonu - Supabase Storage Transform
+function getThumbnailUrl(url: string | null, size: number = 200): string | null {
+  if (!url) return null
+  // Supabase storage URL'i ise transform ekle
+  if (url.includes('supabase') && url.includes('/storage/')) {
+    const separator = url.includes('?') ? '&' : '?'
+    return `${url}${separator}width=${size}&height=${size}&resize=cover&quality=70`
+  }
+  return url
+}
+
 export default function RobotSenligiPage() {
   const [robots, setRobots] = useState<Robot[]>([])
   const [loading, setLoading] = useState(true)
@@ -637,13 +648,15 @@ export default function RobotSenligiPage() {
                 selectedRobot?.id === robot.id ? 'ring-2 ring-primary-500' : ''
               }`}
             >
-              {/* Robot Image or Placeholder */}
+              {/* Robot Image or Placeholder - Optimized */}
               <div className="aspect-square rounded-lg bg-surface-100 overflow-hidden mb-2">
                 {robot.image_url ? (
                   <img
-                    src={robot.image_url}
+                    src={getThumbnailUrl(robot.image_url, 200) || robot.image_url}
                     alt={`Robot ${robot.robot_number}`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -691,13 +704,15 @@ export default function RobotSenligiPage() {
                 </button>
               </div>
 
-              {/* Robot Image */}
+              {/* Robot Image - Optimized */}
               <div className="aspect-square rounded-xl bg-surface-100 overflow-hidden mb-4 relative">
                 {selectedRobot.image_url ? (
                   <img
-                    src={selectedRobot.image_url}
+                    src={getThumbnailUrl(selectedRobot.image_url, 400) || selectedRobot.image_url}
                     alt={`Robot ${selectedRobot.robot_number}`}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center">

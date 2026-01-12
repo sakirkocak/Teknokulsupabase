@@ -27,6 +27,7 @@ interface RobotScore {
   category: string
   avg_score: number
   evaluation_count: number
+  bayesian_score?: number  // Adil sıralama için (IMDB yöntemi)
 }
 
 interface CategoryResult {
@@ -188,17 +189,40 @@ export default function SonuclarPage() {
         }
       })
 
-      // Sıralama yap
-      const winners: RobotScore[] = Object.entries(robotScores)
-        .map(([robotId, data]) => ({
-          robot_id: robotId,
-          robot_number: data.robot_number,
-          image_url: data.image_url,
-          category: categoryId,
-          avg_score: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
-          evaluation_count: data.count
-        }))
-        .sort((a, b) => b.avg_score - a.avg_score)
+      // ===== BAYESIAN AVERAGE (IMDB Yöntemi) =====
+      // Formül: WR = (v / (v + m)) * R + (m / (v + m)) * C
+      // v = değerlendirme sayısı, m = minimum eşik, R = ortalama puan, C = genel ortalama
+      
+      const M = 10 // Minimum değerlendirme eşiği
+      
+      // Önce tüm robotların ham ortalamalarını hesapla
+      const allRobots = Object.entries(robotScores).map(([robotId, data]) => ({
+        robot_id: robotId,
+        robot_number: data.robot_number,
+        image_url: data.image_url,
+        category: categoryId,
+        avg_score: data.scores.reduce((a, b) => a + b, 0) / data.scores.length,
+        evaluation_count: data.count
+      }))
+      
+      // Genel ortalamayı hesapla (C değeri)
+      const totalScores = allRobots.reduce((sum, r) => sum + r.avg_score * r.evaluation_count, 0)
+      const totalCount = allRobots.reduce((sum, r) => sum + r.evaluation_count, 0)
+      const C = totalCount > 0 ? totalScores / totalCount : 7.5 // Genel ortalama
+      
+      // Bayesian score hesapla ve sırala
+      const winners: RobotScore[] = allRobots
+        .map(robot => {
+          const v = robot.evaluation_count
+          const R = robot.avg_score
+          // Bayesian Average formülü
+          const bayesianScore = (v / (v + M)) * R + (M / (v + M)) * C
+          return {
+            ...robot,
+            bayesian_score: bayesianScore
+          }
+        })
+        .sort((a, b) => b.bayesian_score - a.bayesian_score) // Bayesian'a göre sırala
         .slice(0, 5) // Top 5
 
       categoryResults.push({
