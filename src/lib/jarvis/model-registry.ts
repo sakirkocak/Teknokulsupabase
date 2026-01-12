@@ -581,7 +581,7 @@ export function selectModelForQuestion(subject: string, questionText: string): M
     'ördek': 'duck', 'kuş': 'parrot',
     'flamingo': 'flamingo', 'papağan': 'parrot', 'leylek': 'stork',
     'at': 'horse', 'koşu': 'horse',
-    'balık': 'fish', 'deniz': 'fish', 'su': 'fish',
+    'balık': 'fish', 'deniz': 'fish', 'akvaryum': 'fish',
     'hayvan': 'fox', 'canlı': 'fox',
     
     // Kimya
@@ -630,7 +630,7 @@ export function selectModelForQuestion(subject: string, questionText: string): M
   }
   
   const norm = subject.toLowerCase().replace(/-/g, '_').replace(/\s+/g, '_')
-  return getModelById(defaults[norm]) || getModelById('brain')
+  return getModelById(defaults[norm]) || getModelById('brain') || null
 }
 
 export const PLACEHOLDER_MODEL: Model3D = {

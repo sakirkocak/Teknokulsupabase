@@ -988,7 +988,6 @@ export default function JarvisSolutionModal({
               </div>
             </div>
           </div>
-        )}
       </div>
 
       {/* Adım bilgisi - Alt */}
