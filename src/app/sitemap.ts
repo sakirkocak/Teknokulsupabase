@@ -26,61 +26,59 @@ function getSupabaseClient() {
 
 // Next.js'e kaç tane sitemap olacağını söyle
 export async function generateSitemaps() {
-  const supabase = getSupabaseClient()
-  
-  // İndeksli soru sayısı
-  const { count: indexedCount } = await supabase
-    .from('questions')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
-    .eq('is_indexed', true)
-  
-  // Keşif (noindex) soru sayısı
-  const { count: discoverCount } = await supabase
-    .from('questions')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
-    .or('is_indexed.eq.false,is_indexed.is.null')
-  
-  const indexedSitemapCount = Math.ceil((indexedCount || 0) / QUESTIONS_PER_SITEMAP)
-  const discoverSitemapCount = Math.ceil((discoverCount || 0) / QUESTIONS_PER_SITEMAP)
-  
-  const sitemaps: { id: number }[] = []
-  
-  // ID 0: Statik sayfalar
-  sitemaps.push({ id: 0 })
-  
-  // ID 1-N: İndeksli sorular
-  for (let i = 1; i <= indexedSitemapCount; i++) {
-    sitemaps.push({ id: i })
+  try {
+    const supabase = getSupabaseClient()
+    
+    // İndeksli soru sayısı
+    const { count: indexedCount, error: indexedError } = await supabase
+      .from('questions')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true)
+      .eq('is_indexed', true)
+    
+    if (indexedError) {
+      console.error('Indexed count error:', indexedError)
+    }
+    
+    // Keşif (noindex) soru sayısı - şimdilik devre dışı
+    // const { count: discoverCount } = await supabase...
+    
+    // Sabit sitemap sayısı - daha güvenilir
+    const sitemaps: { id: number }[] = [
+      { id: 0 },  // Statik sayfalar
+      { id: 1 },  // İndeksli sorular (her zaman var)
+    ]
+    
+    console.log(`📊 Sitemap Stats: ${indexedCount || 0} indexed, 2 sitemaps`)
+    
+    return sitemaps
+  } catch (error) {
+    console.error('generateSitemaps error:', error)
+    // Fallback - en azından statik sitemap
+    return [{ id: 0 }, { id: 1 }]
   }
-  
-  // ID 1000+: Keşif sorular (discover)
-  // 1000 offset ile ayırıyoruz ki karışmasın
-  for (let i = 0; i < discoverSitemapCount; i++) {
-    sitemaps.push({ id: 1000 + i })
-  }
-  
-  console.log(`📊 Sitemap Stats: ${indexedCount} indexed, ${discoverCount} discover, ${sitemaps.length} total sitemaps`)
-  
-  return sitemaps
 }
 
 export default async function sitemap({ id }: { id: number }): Promise<MetadataRoute.Sitemap> {
-  const supabase = getSupabaseClient()
-  
-  // ID 0 = Statik sayfalar ve ders/sınıf sayfaları
-  if (id === 0) {
-    return await getStaticAndDynamicPages(supabase)
+  try {
+    const supabase = getSupabaseClient()
+    
+    // ID 0 = Statik sayfalar ve ders/sınıf sayfaları
+    if (id === 0) {
+      return await getStaticAndDynamicPages(supabase)
+    }
+    
+    // ID 1 = İndeksli soru sayfaları
+    if (id === 1) {
+      return await getIndexedQuestionPages(supabase, id)
+    }
+    
+    // Diğer ID'ler için boş döndür
+    return []
+  } catch (error) {
+    console.error(`Sitemap error (id: ${id}):`, error)
+    return []
   }
-  
-  // ID >= 1000 = Keşif (discover) sitemap
-  if (id >= 1000) {
-    return await getDiscoverQuestionPages(supabase, id - 1000)
-  }
-  
-  // ID 1-999 = İndeksli soru sayfaları
-  return await getIndexedQuestionPages(supabase, id)
 }
 
 // Statik sayfalar ve diğer dinamik içerikler
