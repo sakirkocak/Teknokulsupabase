@@ -166,8 +166,8 @@ Sonucu hem tam değer hem de ondalık yaklaşım olarak ver.`
     console.log(`✅ [JARVIS Execute] Tamamlandı: ${duration}ms, sonuç: ${executionResult.result}`)
     
     return NextResponse.json({
-      success: true,
       ...executionResult,
+      success: true,
       duration
     })
     

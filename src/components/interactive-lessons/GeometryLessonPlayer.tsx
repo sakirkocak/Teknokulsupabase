@@ -441,7 +441,6 @@ export default function GeometryLessonPlayer({
               <HandTrackingOverlay 
                 onGestureAction={handleGestureAction}
                 showInstructions={true}
-                particleMode={true}
               />
             </div>
           )}

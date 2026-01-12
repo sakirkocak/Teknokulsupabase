@@ -1139,8 +1139,8 @@ export default function AdminSoruYonetimiPage() {
                         subject={(question.topic?.subject as any)?.slug || 'matematik'}
                         options={question.options}
                         correctAnswer={question.correct_answer}
-                        explanation={question.explanation}
-                        questionImageUrl={question.question_image_url}
+                        explanation={question.explanation || undefined}
+                        questionImageUrl={question.question_image_url || undefined}
                         className="!p-2 !px-3 !text-xs !rounded-lg"
                       />
                       <button
