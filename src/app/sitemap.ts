@@ -217,45 +217,60 @@ async function getStaticAndDynamicPages(supabase: any): Promise<MetadataRoute.Si
     },
   ]
 
-  // Ders bazlı sayfalar
-  const subjectCodes = [
-    'matematik', 'turkce', 'fen_bilimleri', 'sosyal_bilgiler', 
-    'ingilizce', 'fizik', 'kimya', 'biyoloji', 'inkilap_tarihi', 'din_kulturu'
-  ]
-  const grades = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-  
+  // Ders bazlı sayfalar - SADECE soru olan kombinasyonlar
   let subjectPages: MetadataRoute.Sitemap = []
   let gradePages: MetadataRoute.Sitemap = []
   
   try {
-    const { data: subjects } = await supabase
-      .from('subjects')
-      .select('code')
-      .in('code', subjectCodes)
+    // Soru sayısı olan ders+sınıf kombinasyonlarını bul (RPC veya SQL view)
+    const { data: counts } = await supabase.rpc('get_question_counts_by_subject_grade')
     
-    if (subjects) {
-      // Ders sayfaları
-      subjectPages = subjects.map((subject: any) => ({
-        url: `${baseUrl}/sorular/${subject.code}`,
+    if (counts && Array.isArray(counts)) {
+      const subjectCodes = new Set<string>()
+      
+      counts.forEach((row: any) => {
+        if (row.subject_code && row.grade && row.question_count > 0) {
+          subjectCodes.add(row.subject_code)
+          gradePages.push({
+            url: `${baseUrl}/sorular/${row.subject_code}/${row.grade}-sinif`,
+            lastModified: new Date(),
+            changeFrequency: 'daily' as const,
+            priority: row.grade === 8 || row.grade === 12 ? 0.75 : 0.7,
+          })
+        }
+      })
+      
+      // Ders ana sayfaları
+      subjectPages = Array.from(subjectCodes).map((code) => ({
+        url: `${baseUrl}/sorular/${code}`,
         lastModified: new Date(),
         changeFrequency: 'daily' as const,
         priority: 0.8,
       }))
-      
-      // Ders + Sınıf kombinasyonları
-      subjects.forEach((subject: any) => {
-        grades.forEach((grade) => {
-          gradePages.push({
-            url: `${baseUrl}/sorular/${subject.code}/${grade}-sinif`,
-            lastModified: new Date(),
-            changeFrequency: 'daily' as const,
-            priority: grade === 8 || grade === 12 ? 0.75 : 0.7,
-          })
-        })
-      })
     }
   } catch (error) {
-    console.error('Ders sayfaları sitemap hatası:', error)
+    // Fallback: En popüler dersler
+    console.error('Ders sayfaları sitemap hatası, fallback kullanılıyor:', error)
+    const mainSubjects = ['matematik', 'turkce', 'fen_bilimleri', 'ingilizce']
+    const mainGrades = [5, 6, 7, 8]
+    
+    subjectPages = mainSubjects.map((code) => ({
+      url: `${baseUrl}/sorular/${code}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.8,
+    }))
+    
+    mainSubjects.forEach((code) => {
+      mainGrades.forEach((grade) => {
+        gradePages.push({
+          url: `${baseUrl}/sorular/${code}/${grade}-sinif`,
+          lastModified: new Date(),
+          changeFrequency: 'daily' as const,
+          priority: grade === 8 ? 0.75 : 0.7,
+        })
+      })
+    })
   }
 
   // Koç sayfaları
