@@ -15,6 +15,11 @@
       "source": "/ads.txt",
       "destination": "https://srv.adstxtmanager.com/82067/teknokul.com.tr",
       "permanent": true
+    },
+    {
+      "source": "/robot.txt",
+      "destination": "/robots.txt",
+      "permanent": true
     }
   ]
 }
