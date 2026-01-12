@@ -6,7 +6,7 @@ import { X, Volume2, VolumeX, SkipForward, RotateCcw, Hand, Sparkles, Box, Loade
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, Environment, Html, Line, useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
-import { getModelById, getModelsForSubject, selectModelForQuestion, Model3D } from '@/lib/jarvis/model-registry'
+import { getModelById, getModelsForSubject, selectModelForQuestion, Model3D, getModelUrl } from '@/lib/jarvis/model-registry'
 
 // 🖐️ El takibi için global değişkenler
 declare global {
@@ -332,7 +332,8 @@ function Pro3DModel({
   handControlEnabled?: boolean 
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const { scene, animations } = useGLTF(modelData.path)
+  const modelPath = getModelUrl(modelData.path)
+  const { scene, animations } = useGLTF(modelPath)
   const [mixer, setMixer] = useState<THREE.AnimationMixer | null>(null)
   
   // El takibi state
@@ -494,8 +495,8 @@ export default function JarvisSolutionModal({
     if (model) {
       setSelectedModel(model)
       
-      // Model dosyasının varlığını kontrol et
-      fetch(model.path, { method: 'HEAD' })
+      // Model dosyasının varlığını kontrol et (Supabase Storage)
+      fetch(getModelUrl(model.path), { method: 'HEAD' })
         .then(res => setModelExists(res.ok))
         .catch(() => setModelExists(false))
     } else {

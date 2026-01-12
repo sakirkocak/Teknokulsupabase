@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 import HologramEffect, { HologramGrid, HologramMaterial } from './HologramEffect'
 import ParticleSystem, { SparkleParticles, EnergyRing } from './ParticleSystem'
-import { getModelById, selectModelForQuestion, Model3D } from '@/lib/jarvis/model-registry'
+import { getModelById, selectModelForQuestion, Model3D, getModelUrl } from '@/lib/jarvis/model-registry'
 
 /**
  * 🎬 Jarvis Cinematic Modal
@@ -62,8 +62,9 @@ function Pro3DModel({
   const modelInfo = getModelById(modelId)
   const groupRef = useRef<THREE.Group>(null)
   
-  // Model yükle
-  const { scene } = useGLTF(modelInfo?.path || '/models/brain.glb')
+  // Model yükle (Supabase Storage'dan)
+  const modelPath = modelInfo?.path ? getModelUrl(modelInfo.path) : getModelUrl('/models/biology/brain.glb')
+  const { scene } = useGLTF(modelPath)
   
   // Hover animasyonu
   useFrame((state) => {

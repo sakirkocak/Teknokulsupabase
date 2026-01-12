@@ -4,7 +4,20 @@
  * 
  * Toplam: 33+ model, 135+ MB
  * Kaynaklar: Khronos, Three.js, Custom
+ * 
+ * Modeller Supabase Storage'da: /storage/v1/object/public/models/
  */
+
+// Supabase Storage base URL
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cnawnprwdcfmyswqolsu.supabase.co'
+export const MODELS_BASE_URL = `${SUPABASE_URL}/storage/v1/object/public/models`
+
+// Helper: Local path'i Supabase URL'e çevir
+export function getModelUrl(localPath: string): string {
+  // /models/biology/brain.glb -> https://...supabase.co/storage/v1/object/public/models/biology/brain.glb
+  const cleanPath = localPath.replace(/^\/models\//, '')
+  return `${MODELS_BASE_URL}/${cleanPath}`
+}
 
 export interface Model3D {
   id: string

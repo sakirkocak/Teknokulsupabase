@@ -10,7 +10,7 @@ import { useRef, useState, useEffect, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment, Html, useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
-import { Model3D, getModelById, PLACEHOLDER_MODEL } from '@/lib/jarvis/model-registry'
+import { Model3D, getModelById, PLACEHOLDER_MODEL, getModelUrl } from '@/lib/jarvis/model-registry'
 
 // ============================================
 // GLTF MODEL COMPONENT
@@ -26,7 +26,8 @@ interface ModelProps {
 
 function GLTFModel({ modelData, highlights = [], labels = {}, autoRotate = true, onPartClick }: ModelProps) {
   const groupRef = useRef<THREE.Group>(null)
-  const { scene, animations } = useGLTF(modelData.path)
+  const modelPath = getModelUrl(modelData.path)
+  const { scene, animations } = useGLTF(modelPath)
   const [mixer, setMixer] = useState<THREE.AnimationMixer | null>(null)
   
   // Animasyon mixer'ı kur
@@ -219,8 +220,8 @@ export default function Model3DViewer({
       const data = getModelById(modelId)
       if (data) {
         setModelData(data)
-        // Model dosyasının varlığını kontrol et
-        fetch(data.path, { method: 'HEAD' })
+        // Model dosyasının varlığını kontrol et (Supabase Storage)
+        fetch(getModelUrl(data.path), { method: 'HEAD' })
           .then(res => setModelExists(res.ok))
           .catch(() => setModelExists(false))
       } else {
