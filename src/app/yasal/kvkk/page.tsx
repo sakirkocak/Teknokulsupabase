@@ -24,7 +24,7 @@ export default function KVKK() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">KVKK Aydınlatma Metni</h1>
         
         <div className="bg-white rounded-2xl shadow-sm p-8 space-y-6 text-gray-600">
-          <p className="text-sm text-gray-500">Son güncelleme: 10 Aralık 2024</p>
+          <p className="text-sm text-gray-500">Son güncelleme: 12 Ocak 2026</p>
 
           <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
             <p className="text-orange-800">

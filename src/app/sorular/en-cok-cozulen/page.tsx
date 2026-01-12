@@ -453,7 +453,7 @@ export default async function EnCokCozulenPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <p className="text-gray-600 text-sm">
-              © 2025 Teknokul. Tüm hakları saklıdır.
+              © 2026 Teknokul. Tüm hakları saklıdır.
             </p>
             <div className="flex items-center gap-6">
               <Link href="/" className="text-sm text-gray-600 hover:text-indigo-600 transition-colors">

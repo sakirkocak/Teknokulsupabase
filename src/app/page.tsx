@@ -1111,8 +1111,7 @@ export default function HomePage() {
             <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-surface-900 mb-6 leading-tight">
               <span className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 bg-clip-text text-transparent">ÖĞREN.</span>{' '}
               <span className="bg-gradient-to-r from-purple-500 via-violet-500 to-purple-600 bg-clip-text text-transparent">YARIŞ.</span>{' '}
-              <span className="bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 bg-clip-text text-transparent">KAZAN.</span>{' '}
-              <span className="bg-gradient-to-r from-teal-500 via-cyan-500 to-teal-600 bg-clip-text text-transparent">KOÇ OL.</span>
+              <span className="bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 bg-clip-text text-transparent">KAZAN.</span>
             </h1>
             
             <p className="text-lg sm:text-xl text-surface-600 max-w-3xl mx-auto mb-8">

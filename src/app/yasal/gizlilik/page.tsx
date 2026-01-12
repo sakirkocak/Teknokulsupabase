@@ -24,7 +24,7 @@ export default function GizlilikPolitikasi() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Gizlilik Politikası</h1>
         
         <div className="bg-white rounded-2xl shadow-sm p-8 space-y-6 text-gray-600">
-          <p className="text-sm text-gray-500">Son güncelleme: 22 Aralık 2024</p>
+          <p className="text-sm text-gray-500">Son güncelleme: 12 Ocak 2026</p>
 
           <p>
             Bu gizlilik politikası, Teknokul tarafından sunulan web sitesi ve mobil uygulamanın kullanımına ilişkin olarak

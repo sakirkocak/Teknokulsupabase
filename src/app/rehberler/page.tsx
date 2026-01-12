@@ -440,7 +440,7 @@ export default function RehberlerPage() {
             </nav>
             
             <p className="text-gray-500 text-sm">
-              © 2025 Teknokul. Tüm hakları saklıdır.
+              © 2026 Teknokul. Tüm hakları saklıdır.
             </p>
           </div>
         </div>

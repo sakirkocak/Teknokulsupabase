@@ -559,7 +559,7 @@ export default function KocOlPage() {
               <Link href="/yasal/kvkk" className="hover:text-white transition-colors">KVKK</Link>
             </div>
             <p className="text-sm text-surface-400">
-              © 2024 Teknokul. Tüm hakları saklıdır.
+              © 2026 Teknokul. Tüm hakları saklıdır.
             </p>
           </div>
         </div>

@@ -297,7 +297,7 @@ export default function JarvisLandingPage() {
       {/* Footer */}
       <footer className="py-10 border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
-          <p>© 2024 Teknokul. Tüm hakları saklıdır.</p>
+          <p>© 2026 Teknokul. Tüm hakları saklıdır.</p>
           <p className="mt-2">
             Jarvis, Teknokul'un tescilli markasıdır. El takibi için MediaPipe teknolojisi kullanılmaktadır.
           </p>
