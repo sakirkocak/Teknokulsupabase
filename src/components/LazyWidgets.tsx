@@ -11,7 +11,7 @@ const FeedbackWidget = dynamic(() => import('./FeedbackWidget'), {
 
 // 🤖 JARVIS - AI Özel Ders Asistanı (TeknoÖğretmen'in yerine)
 const JarvisChat = dynamic(
-  () => import('./Jarvis').then(mod => ({ default: mod.JarvisChat })),
+  () => import('./jarvis').then(mod => ({ default: mod.JarvisChat })),
   {
     ssr: false,
     loading: () => null
