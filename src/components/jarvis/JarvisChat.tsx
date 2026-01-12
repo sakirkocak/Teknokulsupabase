@@ -650,10 +650,11 @@ export default function JarvisChat() {
     return (
       <button
         onClick={() => setIsOpen(true)}
+        aria-label="Jarvis sohbetini aç"
         className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-cyan-600 to-blue-600 rounded-full shadow-lg hover:shadow-xl hover:shadow-cyan-500/30 transition-all flex items-center justify-center group z-40"
       >
-        <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-white group-hover:scale-110 transition-transform" />
-        <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-green-500 rounded-full animate-pulse" />
+        <Bot className="w-6 h-6 sm:w-7 sm:h-7 text-white group-hover:scale-110 transition-transform" aria-hidden="true" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-green-500 rounded-full animate-pulse" aria-hidden="true" />
       </button>
     )
   }

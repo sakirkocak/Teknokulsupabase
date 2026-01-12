@@ -913,9 +913,10 @@ export default function HomePage() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Menüyü kapat' : 'Menüyü aç'}
               className="md:hidden p-2 text-surface-600 hover:bg-surface-100 rounded-xl"
             >
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              {mobileMenuOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <Menu className="w-6 h-6" aria-hidden="true" />}
             </button>
           </div>
         </div>
@@ -1093,6 +1094,7 @@ export default function HomePage() {
         )}
       </nav>
 
+      <main>
       {/* Hero - YENİ TASARIM */}
       <section className="pt-28 pb-12 px-4 relative overflow-hidden">
         <FloatingSymbols />
@@ -2151,7 +2153,7 @@ export default function HomePage() {
                       <span className="text-surface-400 mx-2">•</span>
                       <span className="text-surface-500">{testimonials[testimonialIndex].school}</span>
                     </div>
-                    <span className="px-3 py-1 bg-primary-50 text-primary-600 text-sm font-medium rounded-full">
+                    <span className="px-3 py-1 bg-primary-50 text-primary-700 text-sm font-medium rounded-full">
                       {testimonials[testimonialIndex].examType}
                     </span>
                   </div>
@@ -2164,10 +2166,17 @@ export default function HomePage() {
                 <button
                   key={i}
                   onClick={() => setTestimonialIndex(i)}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    i === testimonialIndex ? 'bg-primary-500' : 'bg-surface-200'
-                  }`}
-                />
+                  aria-label={`Yorum ${i + 1}'e git`}
+                  aria-current={i === testimonialIndex ? 'true' : undefined}
+                  className="w-8 h-8 flex items-center justify-center rounded-full"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      i === testimonialIndex ? 'bg-primary-500' : 'bg-surface-200'
+                    }`}
+                  />
+                </button>
               ))}
             </div>
           </div>
@@ -2538,6 +2547,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      </main>
       {/* Footer */}
       <footer className="py-12 px-4 border-t border-surface-100 bg-white">
         <div className="max-w-7xl mx-auto">

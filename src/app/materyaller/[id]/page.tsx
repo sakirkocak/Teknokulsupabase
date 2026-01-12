@@ -224,7 +224,7 @@ export default function MaterialDetailPage() {
               className="card p-6"
             >
               <div className="flex flex-wrap items-center gap-2 mb-4">
-                <span className="px-3 py-1 bg-primary-50 text-primary-600 text-sm font-medium rounded-full">
+                <span className="px-3 py-1 bg-primary-50 text-primary-700 text-sm font-medium rounded-full">
                   {material.category || 'Genel'}
                 </span>
                 <span className="px-3 py-1 bg-surface-100 text-surface-600 text-sm font-medium rounded-full capitalize">

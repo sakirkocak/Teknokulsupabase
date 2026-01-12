@@ -291,7 +291,7 @@ export default function CoachesPage() {
                           {coach.specializations.slice(0, 3).map((spec: string, i: number) => (
                             <span 
                               key={i}
-                              className="px-2 py-0.5 bg-primary-50 text-primary-600 text-xs font-medium rounded-full"
+                              className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs font-medium rounded-full"
                             >
                               {spec}
                             </span>

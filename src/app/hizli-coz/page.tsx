@@ -1234,7 +1234,7 @@ function HizliCozPageContent() {
         </div>
       </nav>
 
-      <div className="relative z-10 max-w-2xl mx-auto px-4 py-8">
+      <main className="relative z-10 max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
           <motion.div
@@ -1260,12 +1260,13 @@ function HizliCozPageContent() {
         >
           {/* Nickname */}
           <div className="mb-6">
-            <label className="block text-white/80 font-medium mb-2">
+            <label htmlFor="guest-nickname" className="block text-white/80 font-medium mb-2">
               Takma Adın
             </label>
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
               <input
+                id="guest-nickname"
                 type="text"
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
@@ -1281,12 +1282,13 @@ function HizliCozPageContent() {
 
           {/* Grade Selection */}
           <div className="mb-6">
-            <label className="block text-white/80 font-medium mb-2">
+            <label htmlFor="guest-grade" className="block text-white/80 font-medium mb-2">
               Sınıfın
             </label>
             <div className="relative">
               <GraduationCap className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
               <select
+                id="guest-grade"
                 value={selectedGrade}
                 onChange={(e) => setSelectedGrade(Number(e.target.value))}
                 className="w-full pl-12 pr-10 py-4 bg-white/10 border border-white/20 rounded-xl text-white appearance-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent cursor-pointer"
@@ -1421,7 +1423,7 @@ function HizliCozPageContent() {
             <ArrowRight className="h-4 w-4" />
           </Link>
         </motion.div>
-      </div>
+      </main>
     </div>
   )
 }

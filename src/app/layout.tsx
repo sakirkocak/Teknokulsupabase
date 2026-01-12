@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import { Suspense } from 'react'
+import { Inter } from 'next/font/google'
 import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import JsonLdSchema from '@/components/JsonLdSchema'
 import { MotionProvider } from '@/components/MotionProvider'
@@ -8,6 +9,12 @@ import { LazyWidgets } from '@/components/LazyWidgets'
 import './globals.css'
 
 const baseUrl = 'https://www.teknokul.com.tr'
+
+const inter = Inter({
+  subsets: ['latin', 'latin-ext'],
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700', '800'],
+})
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -136,7 +143,7 @@ export default function RootLayout({
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
       </head>
-      <body className="font-sans">
+      <body className={`${inter.className} font-sans`}>
         {/* JSON-LD Structured Data */}
         <JsonLdSchema />
         

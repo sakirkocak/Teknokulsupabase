@@ -184,7 +184,7 @@ export default function MaterialsPage() {
                       {/* Content */}
                       <div className="p-4">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="px-2 py-0.5 bg-primary-50 text-primary-600 text-xs font-medium rounded-full">
+                          <span className="px-2 py-0.5 bg-primary-50 text-primary-700 text-xs font-medium rounded-full">
                             {material.category || 'Genel'}
                           </span>
                           <span className="px-2 py-0.5 bg-surface-100 text-surface-600 text-xs font-medium rounded-full capitalize">
