@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { 
   Sparkles,
   RefreshCw, 
@@ -10,283 +10,355 @@ import {
   AlertTriangle,
   X,
   Zap,
-  BarChart3
+  BarChart3,
+  Search,
+  Eye,
+  Play,
+  Pause
 } from 'lucide-react'
+import MathRenderer from '@/components/MathRenderer'
 
-interface ErrorCounts {
-  total_questions: number
-  times_errors: number
-  sqrt_errors: number
-  frac_errors: number
-  total_errors: number
+interface LatexError {
+  id: string
+  question_id: string
+  error_type: string
+  error_sample: string
+  field: string
+  detected_at: string
+  question?: {
+    question_text: string
+    explanation: string | null
+  }
 }
 
-interface FixResult {
-  times: number
-  sqrt: number
-  frac: number
-  total: number
+interface Stats {
+  total_questions: number
+  total_errors: number
+  by_type: {
+    sqrt: number
+    frac: number
+    times: number
+  }
 }
 
 export default function LatexFixPage() {
-  const [errorCounts, setErrorCounts] = useState<ErrorCounts | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [errors, setErrors] = useState<LatexError[]>([])
   const [loading, setLoading] = useState(true)
+  const [scanning, setScanning] = useState(false)
   const [fixing, setFixing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [lastResult, setLastResult] = useState<FixResult | null>(null)
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [fixProgress, setFixProgress] = useState(0)
+  const [fixTotal, setFixTotal] = useState(0)
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [previewError, setPreviewError] = useState<LatexError | null>(null)
+  
+  // Batch processing ref
+  const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Hata sayılarını getir
-  const fetchErrorCounts = async () => {
-    setLoading(true)
-    setError(null)
+  useEffect(() => {
+    fetchStats()
+    fetchErrors()
+  }, [])
+
+  const fetchStats = async () => {
     try {
-      const res = await fetch('/api/admin/latex-fix/smart-fix')
+      const res = await fetch('/api/admin/latex-fix/stats')
       const data = await res.json()
-      
-      if (!res.ok) {
-        throw new Error(data.error || 'Veri çekilemedi')
+      if (data.success) {
+        setStats(data.stats)
       }
-      
-      setErrorCounts(data.data)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (error) {
+      console.error('Stats fetch error:', error)
+    }
+  }
+
+  const fetchErrors = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/admin/latex-fix/errors?limit=20')
+      const data = await res.json()
+      if (data.success) {
+        setErrors(data.data)
+      }
+    } catch (error) {
+      console.error('Errors fetch error:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchErrorCounts()
-  }, [])
-
-  // Akıllı düzeltmeyi çalıştır
-  const handleSmartFix = async () => {
-    if (!confirm('Tüm LaTeX hatalarını otomatik düzeltmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.')) {
-      return
-    }
-    
-    setFixing(true)
-    setError(null)
-    setShowSuccess(false)
-    
+  const handleScan = async () => {
     try {
-      const res = await fetch('/api/admin/latex-fix/smart-fix', {
-        method: 'POST'
+      setScanning(true)
+      const res = await fetch('/api/admin/latex-fix/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 10000 })
       })
       const data = await res.json()
       
-      if (!res.ok) {
-        throw new Error(data.error || 'Düzeltme başarısız')
+      if (data.success) {
+        setMessage({ type: 'success', text: `Tarama tamamlandı: ${data.found_errors} yeni hata bulundu.` })
+        fetchStats()
+        fetchErrors()
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Tarama sırasında hata oluştu.' })
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message })
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  const handleBatchFix = async () => {
+    if (!stats || stats.total_questions === 0) return
+    
+    // Eğer zaten çalışıyorsa durdur
+    if (fixing) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+      setFixing(false)
+      return
+    }
+
+    if (!confirm(`Toplam ${stats.total_questions} soru taranacak ve düzeltilecek. Bu işlem uzun sürebilir. Başlamak istiyor musunuz?`)) {
+      return
+    }
+
+    setFixing(true)
+    setFixProgress(0)
+    setFixTotal(stats.total_questions)
+    setMessage(null)
+    
+    abortControllerRef.current = new AbortController()
+    
+    const batchSize = 1000
+    let processed = 0
+    let totalFixed = 0
+    
+    try {
+      // Loop until all questions are processed
+      while (processed < stats.total_questions) {
+        if (abortControllerRef.current?.signal.aborted) break
+        
+        const res = await fetch('/api/admin/latex-fix/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            limit: batchSize, 
+            offset: processed 
+          }),
+          signal: abortControllerRef.current?.signal
+        })
+        
+        const data = await res.json()
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Batch işlem hatası')
+        }
+        
+        const batchResult = data.data
+        processed += batchResult.processed
+        totalFixed += (batchResult.times_fixed + batchResult.sqrt_fixed + batchResult.frac_fixed)
+        
+        setFixProgress(processed)
+        
+        // Eğer hiç soru işlenmediyse döngüyü kır (sonsuz döngü koruması)
+        if (batchResult.processed === 0) break
       }
       
-      setLastResult(data.fixed)
-      setErrorCounts(data.after)
-      setShowSuccess(true)
+      setMessage({ type: 'success', text: `İşlem tamamlandı! Toplam ${totalFixed} düzeltme yapıldı.` })
+      fetchStats()
+      fetchErrors()
       
-      // 5 saniye sonra başarı mesajını gizle
-      setTimeout(() => setShowSuccess(false), 5000)
-      
-    } catch (err: any) {
-      setError(err.message)
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        setMessage({ type: 'error', text: 'İşlem durduruldu.' })
+      } else {
+        setMessage({ type: 'error', text: `Hata: ${error.message}` })
+      }
     } finally {
       setFixing(false)
+      abortControllerRef.current = null
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-sm p-8 mb-6">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl mb-4">
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Akıllı LaTeX Düzeltici
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-purple-600" />
+              Gelişmiş LaTeX Düzeltici
             </h1>
             <p className="text-gray-500">
-              Tek tuşla tüm LaTeX hatalarını tespit et ve düzelt
+              Toplu hata tarama ve düzeltme sistemi
             </p>
           </div>
-
-          {/* Ana Buton */}
-          <div className="flex justify-center mb-8">
+          
+          <div className="flex gap-3">
             <button
-              onClick={handleSmartFix}
-              disabled={fixing || loading || (errorCounts?.total_errors === 0)}
-              className="group relative px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-lg font-semibold rounded-2xl hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+              onClick={handleScan}
+              disabled={scanning || fixing}
+              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+            >
+              {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              Hataları Tara
+            </button>
+            <button
+              onClick={handleBatchFix}
+              className={`px-4 py-2 rounded-lg text-white font-medium flex items-center gap-2 ${
+                fixing ? 'bg-red-500 hover:bg-red-600' : 'bg-purple-600 hover:bg-purple-700'
+              }`}
             >
               {fixing ? (
-                <span className="flex items-center gap-3">
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Düzeltiliyor...
-                </span>
+                <>
+                  <Pause className="w-4 h-4" /> Durdur
+                </>
               ) : (
-                <span className="flex items-center gap-3">
-                  <Zap className="w-6 h-6" />
-                  Tara ve Düzelt
-                </span>
+                <>
+                  <Play className="w-4 h-4" /> Toplu Düzeltme Başlat
+                </>
               )}
             </button>
           </div>
+        </div>
 
-          {/* Yenile Butonu */}
-          <div className="flex justify-center">
-            <button
-              onClick={fetchErrorCounts}
-              disabled={loading || fixing}
-              className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition"
-            >
+        {/* Status Message */}
+        {message && (
+          <div className={`p-4 rounded-lg flex items-center gap-2 ${
+            message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+            {message.text}
+          </div>
+        )}
+
+        {/* Progress Bar (Only when fixing) */}
+        {fixing && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="font-medium">Düzeltme İlerlemesi</span>
+              <span className="text-gray-500">{Math.round((fixProgress / fixTotal) * 100)}%</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-purple-600 h-full transition-all duration-300 ease-out"
+                style={{ width: `${(fixProgress / fixTotal) * 100}%` }}
+              />
+            </div>
+            <div className="mt-2 text-xs text-center text-gray-500">
+              {fixProgress.toLocaleString()} / {fixTotal.toLocaleString()} soru işlendi
+            </div>
+          </div>
+        )}
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+            <div className="text-gray-500 text-sm mb-1">Toplam Soru</div>
+            <div className="text-2xl font-bold">{stats?.total_questions.toLocaleString() || 0}</div>
+          </div>
+          <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+            <div className="text-red-600 text-sm mb-1">Tespit Edilen Hatalar</div>
+            <div className="text-2xl font-bold text-red-700">{stats?.total_errors.toLocaleString() || 0}</div>
+          </div>
+          <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+            <div className="text-orange-600 text-sm mb-1">Sqrt Hataları</div>
+            <div className="text-2xl font-bold text-orange-700">{stats?.by_type.sqrt.toLocaleString() || 0}</div>
+          </div>
+          <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+            <div className="text-blue-600 text-sm mb-1">Frac Hataları</div>
+            <div className="text-2xl font-bold text-blue-700">{stats?.by_type.frac.toLocaleString() || 0}</div>
+          </div>
+        </div>
+
+        {/* Error List */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 className="font-semibold text-gray-900">Son Tespit Edilen Hatalar</h3>
+            <button onClick={fetchErrors} className="text-gray-500 hover:text-gray-700">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              Yenile
             </button>
           </div>
-        </div>
-
-        {/* Error Alert */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              {error}
-            </div>
-            <button onClick={() => setError(null)}>
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        )}
-
-        {/* Success Alert */}
-        {showSuccess && lastResult && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-6 py-4 rounded-xl mb-6">
-            <div className="flex items-center gap-3 mb-3">
-              <CheckCircle className="w-6 h-6" />
-              <span className="font-semibold text-lg">Düzeltme Tamamlandı!</span>
-            </div>
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div className="bg-white/50 rounded-lg p-3">
-                <div className="text-2xl font-bold text-green-600">{lastResult.times}</div>
-                <div className="text-sm text-green-600/70">times</div>
+          
+          <div className="divide-y divide-gray-100">
+            {errors.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                Hata bulunamadı veya hepsi düzeltildi.
               </div>
-              <div className="bg-white/50 rounded-lg p-3">
-                <div className="text-2xl font-bold text-green-600">{lastResult.sqrt}</div>
-                <div className="text-sm text-green-600/70">sqrt</div>
-              </div>
-              <div className="bg-white/50 rounded-lg p-3">
-                <div className="text-2xl font-bold text-green-600">{lastResult.frac}</div>
-                <div className="text-sm text-green-600/70">frac</div>
-              </div>
-              <div className="bg-white/50 rounded-lg p-3">
-                <div className="text-2xl font-bold text-green-600">{lastResult.total}</div>
-                <div className="text-sm text-green-600/70">Toplam</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* İstatistikler */}
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <BarChart3 className="w-6 h-6 text-purple-500" />
-            <h2 className="text-xl font-semibold text-gray-900">Mevcut Durum</h2>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-            </div>
-          ) : errorCounts ? (
-            <div className="space-y-6">
-              {/* Toplam Sorular */}
-              <div className="text-center p-4 bg-gray-50 rounded-xl">
-                <div className="text-3xl font-bold text-gray-900">
-                  {errorCounts.total_questions.toLocaleString()}
-                </div>
-                <div className="text-gray-500">Toplam Soru</div>
-              </div>
-
-              {/* Hata Detayları */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className={`p-4 rounded-xl text-center ${errorCounts.times_errors > 0 ? 'bg-orange-50' : 'bg-green-50'}`}>
-                  <div className={`text-2xl font-bold ${errorCounts.times_errors > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    {errorCounts.times_errors.toLocaleString()}
-                  </div>
-                  <div className={`text-sm ${errorCounts.times_errors > 0 ? 'text-orange-600/70' : 'text-green-600/70'}`}>
-                    times hatası
-                  </div>
-                </div>
-                
-                <div className={`p-4 rounded-xl text-center ${errorCounts.sqrt_errors > 0 ? 'bg-orange-50' : 'bg-green-50'}`}>
-                  <div className={`text-2xl font-bold ${errorCounts.sqrt_errors > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    {errorCounts.sqrt_errors.toLocaleString()}
-                  </div>
-                  <div className={`text-sm ${errorCounts.sqrt_errors > 0 ? 'text-orange-600/70' : 'text-green-600/70'}`}>
-                    sqrt hatası
-                  </div>
-                </div>
-                
-                <div className={`p-4 rounded-xl text-center ${errorCounts.frac_errors > 0 ? 'bg-orange-50' : 'bg-green-50'}`}>
-                  <div className={`text-2xl font-bold ${errorCounts.frac_errors > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                    {errorCounts.frac_errors.toLocaleString()}
-                  </div>
-                  <div className={`text-sm ${errorCounts.frac_errors > 0 ? 'text-orange-600/70' : 'text-green-600/70'}`}>
-                    frac hatası
-                  </div>
-                </div>
-                
-                <div className={`p-4 rounded-xl text-center ${errorCounts.total_errors > 0 ? 'bg-red-50' : 'bg-green-50'}`}>
-                  <div className={`text-2xl font-bold ${errorCounts.total_errors > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {errorCounts.total_errors.toLocaleString()}
-                  </div>
-                  <div className={`text-sm ${errorCounts.total_errors > 0 ? 'text-red-600/70' : 'text-green-600/70'}`}>
-                    Toplam Hata
-                  </div>
-                </div>
-              </div>
-
-              {/* Durum Mesajı */}
-              {errorCounts.total_errors === 0 ? (
-                <div className="flex items-center justify-center gap-3 p-6 bg-green-50 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-500" />
-                  <div>
-                    <div className="font-semibold text-green-700">Tüm Sorular Temiz!</div>
-                    <div className="text-sm text-green-600">Hiçbir LaTeX hatası bulunamadı.</div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-3 p-6 bg-orange-50 rounded-xl">
-                  <AlertTriangle className="w-8 h-8 text-orange-500" />
-                  <div>
-                    <div className="font-semibold text-orange-700">
-                      {errorCounts.total_errors.toLocaleString()} Hata Bulundu
+            ) : (
+              errors.map((error) => (
+                <div key={error.id} className="p-4 hover:bg-gray-50 transition-colors flex items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        error.error_type.includes('sqrt') ? 'bg-orange-100 text-orange-700' :
+                        error.error_type.includes('frac') ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {error.error_type}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {new Date(error.detected_at).toLocaleString('tr-TR')}
+                      </span>
                     </div>
-                    <div className="text-sm text-orange-600">
-                      "Tara ve Düzelt" butonuna basarak otomatik düzeltebilirsiniz.
+                    <div className="text-sm font-mono bg-gray-50 p-2 rounded border border-gray-200 text-gray-700 break-all">
+                      {error.error_sample}
                     </div>
                   </div>
+                  <button
+                    onClick={() => setPreviewError(error)}
+                    className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                    title="Önizle"
+                  >
+                    <Eye className="w-5 h-5" />
+                  </button>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-gray-500">
-              Veri yüklenemedi
-            </div>
-          )}
-        </div>
-
-        {/* Bilgi Notu */}
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl text-sm text-blue-700">
-          <div className="font-medium mb-1">💡 Nasıl Çalışır?</div>
-          <ul className="list-disc list-inside space-y-1 text-blue-600">
-            <li><code>times</code> → <code>\times</code> (çarpma işareti)</li>
-            <li><code>sqrt</code> → <code>\sqrt</code> (karekök)</li>
-            <li><code>frac</code> → <code>\frac</code> (kesir)</li>
-            <li>Greek harfler: <code>alpha</code>, <code>beta</code>, <code>pi</code> vb.</li>
-          </ul>
+              ))
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Preview Modal */}
+      {previewError && previewError.question && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setPreviewError(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white">
+              <h3 className="font-bold">Hata Önizleme</h3>
+              <button onClick={() => setPreviewError(null)}><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Ham Metin</h4>
+                <div className="bg-gray-50 p-4 rounded-lg font-mono text-sm whitespace-pre-wrap border">
+                  {previewError.field === 'question_text' ? previewError.question.question_text : previewError.question.explanation}
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Render Edilmiş (MathRenderer ile)</h4>
+                <div className="border rounded-lg p-4">
+                  <MathRenderer 
+                    text={previewError.field === 'question_text' ? previewError.question.question_text : (previewError.question.explanation || '')} 
+                  />
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-700">
+                <p>Not: Render edilmiş kısımda hata görünmüyorsa, Frontend düzeltmesi (MathRenderer) çalışıyor demektir.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
