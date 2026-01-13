@@ -51,7 +51,7 @@ async function withRetry<T>(
 
 /**
  * LaTeX ifadelerini normalize eder
- * Gemini'nin tutarsız backslash kullanımını düzeltir
+ * Sadece çoklu backslash'leri düzeltir, kelime bazlı değişiklik yapmaz.
  */
 function normalizeLatex(text: string): string {
   if (!text || typeof text !== 'string') return text
@@ -59,45 +59,11 @@ function normalizeLatex(text: string): string {
   let normalized = text
   
   // 1. Üç veya daha fazla ardışık backslash'i iki backslash'e indir
+  // Bu genellikle JSON parse sonrası oluşan bir durumdur
   normalized = normalized.replace(/\\{3,}/g, '\\\\')
   
-  // 2. Tek backslash + LaTeX komutu -> çift backslash + komut
-  // Ama zaten çift olanları değiştirme
-  const latexCommands = [
-    'frac', 'sqrt', 'times', 'div', 'pm', 'mp', 'cdot', 'ast',
-    'leq', 'geq', 'neq', 'approx', 'equiv', 'sim',
-    'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'theta', 'lambda', 'mu', 'pi', 'sigma', 'omega',
-    'sum', 'prod', 'int', 'oint', 'lim', 'inf', 'sup',
-    'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'ln', 'exp',
-    'text', 'textbf', 'textit', 'mathrm', 'mathbf', 'mathit',
-    'left', 'right', 'big', 'Big', 'bigg', 'Bigg',
-    'begin', 'end', 'array', 'matrix', 'pmatrix', 'bmatrix',
-    'hline', 'cline', 'multicolumn', 'multirow',  // Tablo komutları
-    'rightarrow', 'leftarrow', 'Rightarrow', 'Leftarrow', 'leftrightarrow',
-    'infty', 'partial', 'nabla', 'forall', 'exists',
-    'in', 'notin', 'subset', 'supset', 'cup', 'cap',
-    'ldots', 'cdots', 'vdots', 'ddots',
-    'overline', 'underline', 'hat', 'bar', 'vec', 'tilde',
-    'quad', 'qquad', 'space', 'hspace', 'vspace'
-  ]
-  
-  // Her LaTeX komutu için kontrol et
-  for (const cmd of latexCommands) {
-    // Tek backslash + komut (çift backslash olmayan) -> çift backslash + komut
-    const singleBackslashPattern = new RegExp(`(?<!\\\\)\\\\${cmd}(?![a-zA-Z])`, 'g')
-    normalized = normalized.replace(singleBackslashPattern, `\\\\${cmd}`)
-  }
-  
-  // 3. Sayısal subscript/superscript düzeltmeleri
-  // _{...} ve ^{...} formatlarını koru
-  normalized = normalized.replace(/(?<!\\)\\([_^])/g, '\\\\$1')
-  
-  // 4. Bozuk escape sequence'ları düzelt
-  // \t, \r, \f gibi yanlışlıkla oluşan escape'leri geri al
-  normalized = normalized
-    .replace(/(?<!\\)\t/g, '\\\\t')  // Tab -> \t (literal)
-    .replace(/(?<!\\)\r/g, '\\\\r')  // CR -> \r (literal)
-    .replace(/(?<!\\)\f/g, '\\\\f')  // FF -> \f (literal)
+  // Eski agresif replace'ler kaldırıldı.
+  // AI'ın ürettiği LaTeX koduna güveniyoruz.
   
   return normalized
 }
@@ -119,11 +85,6 @@ function normalizeLatexInJson(jsonStr: string): string {
     
     // Üç+ backslash -> iki backslash (JSON içinde \\\ -> \\)
     normalized = normalized.replace(/\\{4,}/g, '\\\\')
-    
-    // LaTeX komutları için tek backslash'leri kontrol et
-    // JSON'da \\ zaten tek backslash demek, \\\\ ise çift backslash
-    // Gemini bazen \\\ üretiyor (JSON'da 1.5 backslash gibi geçersiz)
-    normalized = normalized.replace(/\\{3}([a-zA-Z])/g, '\\\\$1')
     
     return `"${normalized}"`
   })
@@ -239,60 +200,21 @@ export interface GeneratedQuestion {
 /**
  * JSON parse sonrası bozulan LaTeX escape karakterlerini düzeltir
  * Sorun: JSON.parse() sırasında \t, \r, \f, \n gibi escape sequence'lar
- * gerçek karakterlere dönüşüyor ve LaTeX kodları bozuluyor.
+ * gerçek karakterlere dönüşüyor.
  * 
- * Örnek: "\\times" -> "\times" -> (tab)imes
+ * Bu fonksiyon ARTIK kelime bazlı "tahmin" yapmıyor. Sadece zorunlu temizlik.
  */
 function fixLatexEscapes(obj: any): any {
   if (typeof obj === 'string') {
     let fixed = obj
     
-    // 🛡️ ÖNCELİKLİ: Form Feed ve Tab karakterlerini LaTeX komutuna çevir
-    // Bu karakterler JSON.parse() sırasında \f ve \t escape sequence'larından oluşuyor
-    const FORM_FEED = String.fromCharCode(0x0C) // \f
-    const TAB = String.fromCharCode(0x09) // \t
-    
-    // Form Feed + rac -> \frac (kesir)
-    fixed = fixed.split(FORM_FEED + 'rac').join('\\frac')
-    // Tab + imes -> \times (çarpma)
-    fixed = fixed.split(TAB + 'imes').join('\\times')
-    // Tab + ext -> \text (metin)
-    fixed = fixed.split(TAB + 'ext').join('\\text')
-    
-    // Kalan bozuk escape karakterlerini de temizle
+    // Kalan bozuk escape karakterlerini temizle
     fixed = fixed.replace(/\t/g, ' ')  // Tab -> boşluk
     fixed = fixed.replace(/\r/g, '')   // CR -> sil
     fixed = fixed.replace(/\f/g, '')   // FF -> sil
     
-    // Yaygın bozuk pattern'leri düzelt (backslash olmadan yazılmış LaTeX komutları)
-    // "imes" -> "\times" (çarpma) - ama "times" kelimesi değil
-    fixed = fixed.replace(/([^a-zA-Z\\])imes([^a-zA-Z])/g, '$1\\times$2')
-    // "rac{" -> "\frac{" (kesir)
-    fixed = fixed.replace(/([^a-zA-Z\\])rac\{/g, '$1\\frac{')
-    // "ightarrow" -> "\rightarrow" (ok)
-    fixed = fixed.replace(/ightarrow/g, '\\rightarrow')
-    // "eftarrow" -> "\leftarrow" (ok)
-    fixed = fixed.replace(/eftarrow/g, '\\leftarrow')
-    // "ext{" -> "\text{" (metin)
-    fixed = fixed.replace(/([^a-zA-Z\\])ext\{/g, '$1\\text{')
-    // "sqrt" -> "\sqrt" (karekök)
-    fixed = fixed.replace(/([^a-zA-Z\\])sqrt/g, '$1\\sqrt')
-    // "cdot" -> "\cdot" (nokta çarpım)
-    fixed = fixed.replace(/([^a-zA-Z\\])cdot/g, '$1\\cdot')
-    // "div" -> "\div" (bölme) - sadece boşlukla çevrili olanlar
-    fixed = fixed.replace(/ div /g, ' \\div ')
-    // "pm" -> "\pm" (artı/eksi)
-    fixed = fixed.replace(/ pm /g, ' \\pm ')
-    // "leq" -> "\leq" (küçük eşit)
-    fixed = fixed.replace(/([^a-zA-Z\\])leq/g, '$1\\leq')
-    // "geq" -> "\geq" (büyük eşit)
-    fixed = fixed.replace(/([^a-zA-Z\\])geq/g, '$1\\geq')
-    // "neq" -> "\neq" (eşit değil)
-    fixed = fixed.replace(/([^a-zA-Z\\])neq/g, '$1\\neq')
-    // "approx" -> "\approx" (yaklaşık)
-    fixed = fixed.replace(/([^a-zA-Z\\])approx/g, '$1\\approx')
-    // "infty" -> "\infty" (sonsuz)
-    fixed = fixed.replace(/([^a-zA-Z\\])infty/g, '$1\\infty')
+    // Eski "imes" -> "\times" gibi agresif düzeltmeler KALDIRILDI.
+    // Bu düzeltmeler normal metinleri ("sometimes" -> "some\times") bozuyordu.
     
     return fixed
   }
@@ -1516,39 +1438,39 @@ function createImagePrompt(
   grade: number
 ): string {
   const baseStyle = `Clean, educational diagram style. Simple lines, clear labels in Turkish. 
-White or light gray background. No decorative elements. 
-Suitable for ${grade}. grade students in Turkey.`
+  White or light gray background. No decorative elements. 
+  Suitable for ${grade}. grade students in Turkey.`
 
   const typePrompts: Record<string, string> = {
     graph: `Create a clear ${description}. 
-X and Y axes clearly labeled in Turkish. 
-Grid lines visible. Data points connected with smooth lines.
-Legend if multiple data series. ${baseStyle}`,
+    X and Y axes clearly labeled in Turkish. 
+    Grid lines visible. Data points connected with smooth lines.
+    Legend if multiple data series. ${baseStyle}`,
     
     diagram: `Create a scientific diagram of ${description}. 
-Parts clearly labeled in Turkish with arrows.
-Accurate scientific representation.
-Colors: blue, green, orange for different parts. ${baseStyle}`,
+    Parts clearly labeled in Turkish with arrows.
+    Accurate scientific representation.
+    Colors: blue, green, orange for different parts. ${baseStyle}`,
     
     chart: `Create a data table or chart showing ${description}.
-Rows and columns clearly defined.
-Headers in bold. Numbers clearly readable.
-Use colors to highlight important data. ${baseStyle}`,
+    Rows and columns clearly defined.
+    Headers in bold. Numbers clearly readable.
+    Use colors to highlight important data. ${baseStyle}`,
     
     map: `Create an educational map showing ${description}.
-Geographic features clearly marked.
-Cities/regions labeled in Turkish.
-Compass rose and scale if relevant. ${baseStyle}`,
+    Geographic features clearly marked.
+    Cities/regions labeled in Turkish.
+    Compass rose and scale if relevant. ${baseStyle}`,
     
     scientific: `Create a scientific illustration of ${description}.
-Equipment/setup clearly labeled in Turkish.
-Arrows showing direction of flow/force if applicable.
-Accurate proportions and relationships. ${baseStyle}`,
+    Equipment/setup clearly labeled in Turkish.
+    Arrows showing direction of flow/force if applicable.
+    Accurate proportions and relationships. ${baseStyle}`,
     
     geometry: `Create a geometric diagram showing ${description}.
-Clean lines, accurate angles.
-Measurements and labels in Turkish.
-Use standard geometric notation. ${baseStyle}`
+    Clean lines, accurate angles.
+    Measurements and labels in Turkish.
+    Use standard geometric notation. ${baseStyle}`
   }
 
   return typePrompts[imageType] || `Create an educational image of ${description}. ${baseStyle}`

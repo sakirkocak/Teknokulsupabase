@@ -96,6 +96,7 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'Kullanıcı Aktiviteleri', href: '/admin/kullanici-aktiviteleri', icon: Activity },
     { label: 'Koçluklar', href: '/admin/kocluklar', icon: Target },
     { label: 'Soru Yönetimi', href: '/admin/soru-yonetimi', icon: BookOpen },
+    { label: 'LaTeX Düzeltici', href: '/admin/latex-fix', icon: Wand2 },
     { label: 'AI Soru Üretici', href: '/admin/ai-soru-uretici', icon: Wand2 },
     { label: 'Görüntülü Soru Üretici', href: '/admin/goruntulu-soru-uretici', icon: ImageIcon },
     { label: 'Video Çözümler', href: '/admin/videos', icon: Video },
