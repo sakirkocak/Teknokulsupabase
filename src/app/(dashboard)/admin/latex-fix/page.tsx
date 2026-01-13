@@ -55,33 +55,52 @@ export default function LatexFixPage() {
   // Batch processing ref
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  useEffect(() => {
-    fetchStats()
-    fetchErrors()
-  }, [])
+  // Helper for fetch with retry
+  const fetchWithRetry = async (url: string, options: any = {}, retries = 3, delay = 1000): Promise<any> => {
+    try {
+      const res = await fetch(url, options)
+      
+      if (res.status === 429) {
+        if (retries > 0) {
+          console.log(`Rate limit hit for ${url}, retrying in ${delay}ms...`)
+          await new Promise(resolve => setTimeout(resolve, delay))
+          return fetchWithRetry(url, options, retries - 1, delay * 2)
+        }
+        throw new Error('Rate limit aşıldı, lütfen biraz bekleyin.')
+      }
+      
+      return await res.json()
+    } catch (error) {
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay))
+        return fetchWithRetry(url, options, retries - 1, delay * 2)
+      }
+      throw error
+    }
+  }
 
   const fetchStats = async () => {
     try {
-      const res = await fetch('/api/admin/latex-fix/stats')
-      const data = await res.json()
+      const data = await fetchWithRetry('/api/admin/latex-fix/stats')
       if (data.success) {
         setStats(data.stats)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Stats fetch error:', error)
+      setMessage({ type: 'error', text: 'İstatistikler yüklenirken hata: ' + error.message })
     }
   }
 
   const fetchErrors = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/admin/latex-fix/errors?limit=20')
-      const data = await res.json()
+      const data = await fetchWithRetry('/api/admin/latex-fix/errors?limit=20')
       if (data.success) {
         setErrors(data.data)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Errors fetch error:', error)
+      // Hata olsa bile sessizce geçiştir, dashboard kilitlenmesin
     } finally {
       setLoading(false)
     }

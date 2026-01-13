@@ -70,6 +70,32 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     processed = processed.replace(/(?<!\\)left\{/g, '\\left{')
     processed = processed.replace(/(?<!\\)right\}/g, '\\right}')
 
+    // 7. Spesifik bozuk komut düzeltmeleri (ightarrow, ext, rac vb.)
+    // ightarrow -> \rightarrow
+    processed = processed.replace(/ightarrow/g, '\\rightarrow')
+    // ext -> \text
+    processed = processed.replace(/(\d)\s*ext/g, '$1 \\text')
+    processed = processed.replace(/\s+ext/g, ' \\text')
+    // rac -> \frac (Genellikle racp veya rac1 gibi görünüyor)
+    processed = processed.replace(/rac/g, '\\frac')
+    // imes -> \times
+    processed = processed.replace(/imes/g, '\\times')
+    // div -> \div
+    processed = processed.replace(/div(\d)/g, '\\div $1')
+    
+    // Yeni eklenenler (Delta, circ, approx, mu, lambda)
+    processed = processed.replace(/Delta/g, '\\Delta')
+    processed = processed.replace(/circ/g, '^\\circ')
+    processed = processed.replace(/approx/g, '\\approx')
+    processed = processed.replace(/\bmu\b/g, '\\mu') // mu kelimesini korumak için sınır kontrolü
+    processed = processed.replace(/lambda/g, '\\lambda')
+    processed = processed.replace(/sigma/g, '\\sigma')
+    processed = processed.replace(/alpha/g, '\\alpha')
+    processed = processed.replace(/beta/g, '\\beta')
+    processed = processed.replace(/theta/g, '\\theta')
+    processed = processed.replace(/pi/g, '\\pi')
+    processed = processed.replace(/omega/g, '\\omega')
+
     return processed
   }, [rawContent])
 
