@@ -96,6 +96,15 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     processed = processed.replace(/pi/g, '\\pi')
     processed = processed.replace(/omega/g, '\\omega')
 
+    // 8. Gereksiz backslash temizliği (\f -> f, \t -> t, \n -> n)
+    // Sadece tek harfli ve arkasında boşluk/rakam olanları hedefliyoruz
+    // frac, text, times gibi komutları bozmamalıyız
+    processed = processed.replace(/\\f(\W)/g, 'f$1')
+    processed = processed.replace(/\\t(\W)/g, 't$1')
+    processed = processed.replace(/\\n(\W)/g, 'n$1') // \n (newline) ile karışabilir, dikkatli olalım.
+    // Newline (\n) genelde string içinde gerçek newline'dır, LaTeX komutu değildir.
+    // Ancak formül içinde \n varsa n olarak düzeltelim.
+
     return processed
   }, [rawContent])
 
