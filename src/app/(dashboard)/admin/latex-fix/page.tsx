@@ -135,7 +135,7 @@ export default function LatexFixPage() {
     
     abortControllerRef.current = new AbortController()
     
-    const batchSize = 1000
+    const batchSize = 500 // Batch boyutunu düşürdük
     let processed = 0
     let totalFixed = 0
     
@@ -154,6 +154,13 @@ export default function LatexFixPage() {
           signal: abortControllerRef.current?.signal
         })
         
+        // Rate limit (429) durumunda bekle ve tekrar dene
+        if (res.status === 429) {
+          console.log('Rate limit hit, waiting...')
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          continue // Aynı offset ile tekrar dene
+        }
+
         const data = await res.json()
         
         if (!data.success) {
@@ -162,9 +169,12 @@ export default function LatexFixPage() {
         
         const batchResult = data.data
         processed += batchResult.processed
-        totalFixed += (batchResult.times_fixed + batchResult.sqrt_fixed + batchResult.frac_fixed)
+        totalFixed += (batchResult.times_fixed + batchResult.sqrt_fixed + batchResult.frac_fixed + (batchResult.env_fixed || 0))
         
         setFixProgress(processed)
+        
+        // Her istekten sonra kısa bir bekleme ekle (Throttle)
+        await new Promise(resolve => setTimeout(resolve, 300))
         
         // Eğer hiç soru işlenmediyse döngüyü kır (sonsuz döngü koruması)
         if (batchResult.processed === 0) break
