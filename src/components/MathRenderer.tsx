@@ -63,6 +63,13 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     // Örnek: frac29 -> \frac{2}{9} (sadece tek haneli sayılar için güvenli)
     processed = processed.replace(/(?<!\\)frac\s*(\d)\s*(\d)(?!\d)/g, '\\frac{$1}{$2}')
 
+    // 6. Environment düzeltmeleri (begin, end, cases, text vb.)
+    processed = processed.replace(/(?<!\\)begin\{/g, '\\begin{')
+    processed = processed.replace(/(?<!\\)end\{/g, '\\end{')
+    processed = processed.replace(/(?<!\\)text\{/g, '\\text{')
+    processed = processed.replace(/(?<!\\)left\{/g, '\\left{')
+    processed = processed.replace(/(?<!\\)right\}/g, '\\right}')
+
     return processed
   }, [rawContent])
 
