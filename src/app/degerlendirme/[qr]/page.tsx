@@ -227,10 +227,6 @@ export default function DegerlendirmePage() {
             Robot #{robot?.robot_number} için değerlendirmeniz kaydedildi.
           </p>
           <div className="flex gap-3 justify-center">
-            <Link href="/robot-senligi/sonuclar" className="btn-primary flex items-center gap-2">
-              <Trophy className="w-5 h-5" />
-              Sonuçları Gör
-            </Link>
             <button
               onClick={() => window.location.reload()}
               className="btn-secondary"

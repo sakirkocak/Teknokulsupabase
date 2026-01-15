@@ -158,6 +158,29 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // Admin-only rotalar (linki bilen bile erişemez)
+  // Not: 404 döndürerek sayfanın varlığını da gizler.
+  const adminOnlyPaths = ['/robot-senligi/sonuclar']
+  const isAdminOnlyPath = adminOnlyPaths.some(path => pathname.startsWith(path))
+
+  if (isAdminOnlyPath) {
+    if (!user) {
+      return new NextResponse('Not Found', { status: 404 })
+    }
+
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (adminProfile?.role !== 'admin') {
+      return new NextResponse('Not Found', { status: 404 })
+    }
+
+    return response
+  }
+
   // Public rotalar (korumasız)
   const publicPaths = ['/koclar', '/materyaller', '/koc-ol', '/sinav-takvimi']
   const isPublicPath = publicPaths.some(path => pathname.startsWith(path))
