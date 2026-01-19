@@ -4,12 +4,8 @@
 User-agent: *
 Allow: /
 
-# Sitemap'ler - Next.js dinamik sitemap yapısı
-# Statik sayfalar + Ders/Sınıf sayfaları + Koçlar + PDF Bankalar
-Sitemap: https://www.teknokul.com.tr/sitemap/0.xml
-
-# İndeksli sorular (5,219 kaliteli soru)
-Sitemap: https://www.teknokul.com.tr/sitemap/1.xml
+# Sitemap Index - tüm sitemapleri içerir
+Sitemap: https://www.teknokul.com.tr/sitemap.xml
 
 # Admin ve API sayfalarını engelle
 Disallow: /admin/
