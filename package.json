@@ -16,6 +16,9 @@
     "remotion:shorts": "remotion render src/remotion/Root.tsx SolutionShort out/short.mp4"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@elevenlabs/elevenlabs-js": "^2.30.0",
     "@google/genai": "^1.34.0",
     "@google/generative-ai": "^0.24.1",
