@@ -93,36 +93,33 @@ export default function GamificationPanel({ studentId, grade }: GamificationPane
 
     setBadgeCount(count || 0)
 
-    // Sıralamaları al
+    // Sıralamaları API endpoint'inden al
     const rankData: RankInfo = {}
 
-    const { data: turkeyRank } = await supabase
-      .from('leaderboard_turkey')
-      .select('turkey_rank')
-      .eq('student_id', studentId)
-      .single()
-    if (turkeyRank) rankData.turkey_rank = turkeyRank.turkey_rank
+    try {
+      const turkeyRes = await fetch(`/api/leaderboard?scope=turkey&limit=1000`)
+      if (turkeyRes.ok) {
+        const turkeyData = await turkeyRes.json()
+        const turkeyEntry = turkeyData.data?.find((e: any) => e.student_id === studentId)
+        if (turkeyEntry) rankData.turkey_rank = turkeyEntry.rank
+      }
 
-    const { data: cityRank } = await supabase
-      .from('leaderboard_by_city')
-      .select('city_rank')
-      .eq('student_id', studentId)
-      .single()
-    if (cityRank) rankData.city_rank = cityRank.city_rank
+      const cityRes = await fetch(`/api/leaderboard?scope=city&cityId=${encodeURIComponent(studentId)}&limit=1000`)
+      if (cityRes.ok) {
+        const cityData = await cityRes.json()
+        const cityEntry = cityData.data?.find((e: any) => e.student_id === studentId)
+        if (cityEntry) rankData.city_rank = cityEntry.rank
+      }
 
-    const { data: schoolRank } = await supabase
-      .from('leaderboard_by_school')
-      .select('school_rank')
-      .eq('student_id', studentId)
-      .single()
-    if (schoolRank) rankData.school_rank = schoolRank.school_rank
-
-    const { data: classRank } = await supabase
-      .from('leaderboard_by_classroom')
-      .select('class_rank')
-      .eq('student_id', studentId)
-      .single()
-    if (classRank) rankData.class_rank = classRank.class_rank
+      const schoolRes = await fetch(`/api/leaderboard?scope=school&schoolId=${encodeURIComponent(studentId)}&limit=1000`)
+      if (schoolRes.ok) {
+        const schoolData = await schoolRes.json()
+        const schoolEntry = schoolData.data?.find((e: any) => e.student_id === studentId)
+        if (schoolEntry) rankData.school_rank = schoolEntry.rank
+      }
+    } catch (e) {
+      console.error('Rank fetch error:', e)
+    }
 
     setRanks(rankData)
     setLoading(false)

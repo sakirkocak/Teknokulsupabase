@@ -91,7 +91,22 @@ export function useTTS(options: UseTTSOptions = {}): UseTTSReturn {
       }
 
       setIsLoading(false)
-      await audio.play()
+
+      // Browser autoplay policy için try-catch
+      try {
+        await audio.play()
+      } catch (playError: any) {
+        // Autoplay engellenirse kullanıcıya bildir
+        if (playError.name === 'NotAllowedError') {
+          console.warn('🔇 Autoplay engellendi. Kullanıcı etkileşimi gerekli.')
+          const err = new Error('Ses için tıklayın')
+          setError(err)
+          setIsPlaying(false)
+          onError?.(err)
+        } else {
+          throw playError
+        }
+      }
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         // Request iptal edildi, hata değil

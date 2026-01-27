@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/seo-index",
       "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/cron/reset-leaderboard",
+      "schedule": "0 21 * * 0"
     }
   ],
   "redirects": [

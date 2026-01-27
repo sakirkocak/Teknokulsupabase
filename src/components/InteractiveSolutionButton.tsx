@@ -108,7 +108,7 @@ export default function InteractiveSolutionButton({
             </div>
 
             <div className="h-full pt-14 flex flex-col lg:flex-row">
-              <div className="lg:w-1/4 xl:w-1/5 bg-gray-800 overflow-y-auto border-r border-gray-700 hidden lg:block">
+              <div className="lg:w-[280px] xl:w-[300px] flex-shrink-0 bg-gray-800 overflow-y-auto border-r border-gray-700 hidden lg:block">
                 <div className="p-4 lg:p-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 rounded-full text-sm font-medium">{subjectName}</span>
@@ -161,7 +161,27 @@ export default function InteractiveSolutionButton({
                   <GuidedDiscoveryPlayer
                     solution={solution}
                     questionText={String(questionText || '')}
-                    onComplete={() => {}}
+                    onComplete={async (results: { isCorrect: boolean; xp: number }[]) => {
+                      for (const result of results) {
+                        try {
+                          await fetch('/api/gamification/add-xp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              userId: '',
+                              xp: result.xp,
+                              isCorrect: result.isCorrect,
+                              source: 'guided_discovery',
+                              questionId,
+                              questionShownAt: Date.now(),
+                              subjectCode: subjectName?.toLowerCase().replace(/\s+/g, '_') || ''
+                            })
+                          })
+                        } catch (e) {
+                          console.error('Guided discovery XP error:', e)
+                        }
+                      }
+                    }}
                     voice={voice as 'erdem' | 'mehmet' | 'gamze'}
                   />
                 </div>

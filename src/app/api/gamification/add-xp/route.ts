@@ -164,17 +164,16 @@ export async function POST(req: NextRequest) {
     // Yeni streak hesapla
     let newStreak = currentPoints?.current_streak || 0
     let maxStreak = currentPoints?.max_streak || 0
-    
-    // XP verilecekse streak güncelle
-    if (!skipXpGrant) {
-      if (isCorrect) {
-        newStreak += 1
-        if (newStreak > maxStreak) {
-          maxStreak = newStreak
-        }
-      } else {
-        newStreak = 0
+
+    // Streak HER ZAMAN güncellenir (XP verilmese bile yanlış cevapta sıfırlanır)
+    if (isCorrect && !skipXpGrant) {
+      newStreak += 1
+      if (newStreak > maxStreak) {
+        maxStreak = newStreak
       }
+    } else if (!isCorrect) {
+      // Yanlış cevaplarda streak HER ZAMAN sıfırlanır (bot koruması)
+      newStreak = 0
     }
 
     // Upsert student_points (sadece XP verilecekse)
@@ -189,8 +188,8 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    // Sadece XP verilecekse DB'yi güncelle
     if (!skipXpGrant) {
+      // XP verilecekse: tüm alanları güncelle
       const { error: upsertError } = await supabase
         .from('student_points')
         .upsert(updatedPoints, { onConflict: 'student_id' })
@@ -199,7 +198,7 @@ export async function POST(req: NextRequest) {
         console.error('Error upserting student_points:', upsertError)
       }
 
-      // 2. point_history tablosuna kaydet (güvenlik logları ile)
+      // point_history tablosuna kaydet (güvenlik logları ile)
       await supabase.from('point_history').insert({
         student_id: userId,
         points: xp,
@@ -212,7 +211,12 @@ export async function POST(req: NextRequest) {
           answerTimeMs: questionShownAt ? Date.now() - questionShownAt : null
         }
       })
-
+    } else if (!isCorrect && currentPoints) {
+      // XP verilmese bile yanlış cevapta streak sıfırlanmalı (bot koruması)
+      await supabase
+        .from('student_points')
+        .update({ current_streak: 0, updated_at: new Date().toISOString() })
+        .eq('student_id', userId)
     }
     
     // 3. ✅ Typesense question_activity'ye HER ZAMAN kaydet (XP verilmese bile!)

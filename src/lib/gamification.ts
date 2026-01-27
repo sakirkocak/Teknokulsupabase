@@ -292,19 +292,19 @@ export function checkEarnableBadges(stats: UserStats, earnedBadgeIds: string[]):
         break
         
       case 'subject_matematik':
-        earned = (stats.subject_points?.['Matematik'] || 0) >= badge.requirement_value
+        earned = (stats.subject_points?.['matematik'] || 0) >= badge.requirement_value
         break
-        
+
       case 'subject_turkce':
-        earned = (stats.subject_points?.['Türkçe'] || 0) >= badge.requirement_value
+        earned = (stats.subject_points?.['turkce'] || 0) >= badge.requirement_value
         break
-        
+
       case 'subject_fen':
-        earned = (stats.subject_points?.['Fen Bilimleri'] || stats.subject_points?.['Fen'] || 0) >= badge.requirement_value
+        earned = (stats.subject_points?.['fen'] || 0) >= badge.requirement_value
         break
-        
+
       case 'subject_sosyal':
-        earned = (stats.subject_points?.['Sosyal Bilgiler'] || stats.subject_points?.['Sosyal'] || 0) >= badge.requirement_value
+        earned = (stats.subject_points?.['sosyal'] || 0) >= badge.requirement_value
         break
     }
     
@@ -335,9 +335,13 @@ export function getBadgeProgress(badge: Badge, stats: UserStats): { current: num
     case 'correct_rate_70':
     case 'correct_rate_80':
     case 'correct_rate_90':
-    case 'correct_rate_95':
-      current = stats.total_questions
+    case 'correct_rate_95': {
+      const successRate = stats.total_questions > 0
+        ? stats.total_correct / stats.total_questions
+        : 0
+      current = Math.round(successRate * 100)
       break
+    }
       
     case 'leaderboard_rank':
       current = stats.leaderboard_rank !== undefined && stats.leaderboard_rank > 0 
@@ -346,19 +350,19 @@ export function getBadgeProgress(badge: Badge, stats: UserStats): { current: num
       break
       
     case 'subject_matematik':
-      current = stats.subject_points?.['Matematik'] || 0
+      current = stats.subject_points?.['matematik'] || 0
       break
-      
+
     case 'subject_turkce':
-      current = stats.subject_points?.['Türkçe'] || 0
+      current = stats.subject_points?.['turkce'] || 0
       break
-      
+
     case 'subject_fen':
-      current = stats.subject_points?.['Fen Bilimleri'] || stats.subject_points?.['Fen'] || 0
+      current = stats.subject_points?.['fen'] || 0
       break
-      
+
     case 'subject_sosyal':
-      current = stats.subject_points?.['Sosyal Bilgiler'] || stats.subject_points?.['Sosyal'] || 0
+      current = stats.subject_points?.['sosyal'] || 0
       break
   }
   
@@ -463,7 +467,7 @@ export const DAILY_CHALLENGE_TEMPLATES: Omit<DailyChallenge, 'id'>[] = [
  * Günlük 5 görev seç
  */
 export function generateDailyChallenges(): DailyChallenge[] {
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
   const seed = today.split('-').reduce((acc, n) => acc + parseInt(n), 0)
   
   // Deterministik seçim için basit shuffle
@@ -775,7 +779,7 @@ export function saveSettings(settings: Partial<TeknokulSettings>): void {
  * Günlük ilerlemeyi localStorage'dan al
  */
 export function getDailyProgress(): DailyProgress {
-  const today = new Date().toISOString().split('T')[0]
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' })
   
   if (typeof window === 'undefined') {
     return {

@@ -195,7 +195,21 @@ async function getLeaderboardFromTypesense(params: {
       'fen_bilimleri': 'fen_points',
       'inkilap_tarihi': 'inkilap_points',
       'din_kulturu': 'din_points',
-      'ingilizce': 'ingilizce_points'
+      'ingilizce': 'ingilizce_points',
+      'sosyal_bilgiler': 'sosyal_points',
+      'hayat_bilgisi': 'hayat_points',
+      'edebiyat': 'edebiyat_points',
+      'fizik': 'fizik_points',
+      'kimya': 'kimya_points',
+      'biyoloji': 'biyoloji_points',
+      'tarih': 'tarih_points',
+      'cografya': 'cografya_points',
+      'felsefe': 'felsefe_points',
+      'gorsel_sanatlar': 'gorsel_points',
+      'muzik': 'muzik_points',
+      'beden_egitimi': 'beden_points',
+      'bilisim': 'bilisim_points',
+      'teknoloji_tasarim': 'teknoloji_points'
     }
     const pointsField = subjectMap[subject]
     if (pointsField) {
@@ -214,7 +228,12 @@ async function getLeaderboardFromTypesense(params: {
       'max_streak', 'current_streak', 'grade',
       'city_name', 'district_name', 'school_name',
       'matematik_points', 'turkce_points', 'fen_points',
-      'inkilap_points', 'din_points', 'ingilizce_points'
+      'inkilap_points', 'din_points', 'ingilizce_points',
+      'sosyal_points', 'hayat_points', 'edebiyat_points',
+      'fizik_points', 'kimya_points', 'biyoloji_points',
+      'tarih_points', 'cografya_points', 'felsefe_points',
+      'gorsel_points', 'muzik_points', 'beden_points',
+      'bilisim_points', 'teknoloji_points'
     ].join(',')
   }
   

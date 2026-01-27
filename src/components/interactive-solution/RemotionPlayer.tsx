@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { Player, PlayerRef } from '@remotion/player'
 import { SolutionVideo } from '@/remotion/compositions/SolutionVideo'
 import { VideoProps, SolutionStep } from '@/remotion/types'
@@ -25,9 +25,13 @@ export const RemotionPlayer: React.FC<RemotionPlayerProps> = ({
   audioUrls = []
 }) => {
   const playerRef = React.useRef<PlayerRef>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const lastSpokenStepRef = useRef<number>(-1)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [currentFrame, setCurrentFrame] = useState(0)
+  const [quizAnswered, setQuizAnswered] = useState<Record<number, boolean>>({})
+  const [selectedAnswer, setSelectedAnswer] = useState<Record<number, string>>({})
 
   const fps = 30
   const introFrames = 4 * fps
@@ -116,6 +120,101 @@ export const RemotionPlayer: React.FC<RemotionPlayerProps> = ({
   // Progress percentage
   const progress = (currentFrame / totalFrames) * 100
 
+  // TTS: Step değiştiğinde ilgili sesi çal
+  useEffect(() => {
+    if (isMuted || !isPlaying) return
+    if (currentStep < 0 || currentStep >= steps.length) return
+    if (lastSpokenStepRef.current === currentStep) return
+
+    // Önceki sesi durdur
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+
+    lastSpokenStepRef.current = currentStep
+
+    // audioUrls varsa kullan
+    if (audioUrls.length > currentStep && audioUrls[currentStep]) {
+      const audio = new Audio(audioUrls[currentStep])
+      audioRef.current = audio
+      audio.play().catch(() => {
+        // Autoplay engellendi, fallback: Web Speech API
+        speakWithWebSpeech(steps[currentStep].tts_text || steps[currentStep].content || '')
+      })
+      return
+    }
+
+    // audioUrls yoksa /api/tts endpoint'i ile çal
+    const step = steps[currentStep]
+    const ttsText = step.tts_text || step.content || ''
+    if (!ttsText) return
+
+    fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: ttsText, voice: 'erdem' })
+    })
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        audioRef.current = audio
+        audio.onended = () => URL.revokeObjectURL(url)
+        audio.play().catch(() => {
+          speakWithWebSpeech(ttsText)
+        })
+      })
+      .catch(() => {
+        speakWithWebSpeech(ttsText)
+      })
+  }, [currentStep, isPlaying, isMuted, audioUrls, steps])
+
+  // Mute değiştiğinde sesi durdur
+  useEffect(() => {
+    if (isMuted && audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    if (isMuted) {
+      window.speechSynthesis?.cancel()
+    }
+  }, [isMuted])
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+      window.speechSynthesis?.cancel()
+    }
+  }, [])
+
+  // Fallback: Web Speech API
+  function speakWithWebSpeech(text: string) {
+    if (!window.speechSynthesis) return
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'tr-TR'
+    utterance.rate = 0.9
+    window.speechSynthesis.speak(utterance)
+  }
+
+  // Quiz adımında videoyu otomatik durdur
+  React.useEffect(() => {
+    if (currentStep >= 0 && currentStep < steps.length) {
+      const step = steps[currentStep]
+      if (step.type === 'quiz' && step.quiz && !quizAnswered[currentStep] && isPlaying) {
+        // Quiz'e gelince video durdur
+        if (playerRef.current) {
+          playerRef.current.pause()
+          setIsPlaying(false)
+        }
+      }
+    }
+  }, [currentStep, steps, quizAnswered, isPlaying])
+
   return (
     <div className="flex flex-col h-full bg-gray-900 rounded-2xl overflow-hidden">
       {/* Video Area */}
@@ -147,6 +246,66 @@ export const RemotionPlayer: React.FC<RemotionPlayerProps> = ({
             )}
           </button>
         </div>
+
+        {/* Quiz Interactive Overlay */}
+        {currentStep >= 0 && currentStep < steps.length && steps[currentStep].type === 'quiz' && steps[currentStep].quiz && !quizAnswered[currentStep] && (
+          <div className="absolute inset-0 bg-gradient-to-br from-pink-600/95 to-rose-600/95 flex flex-col items-center justify-center p-8 animate-in fade-in duration-300">
+            <div className="max-w-3xl w-full space-y-6">
+              <div className="text-center">
+                <div className="text-7xl mb-4">❓</div>
+                <h3 className="text-3xl font-bold text-white mb-2">{steps[currentStep].quiz!.question}</h3>
+                <p className="text-white/80 text-lg">Cevabını seç ve devam et!</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {steps[currentStep].quiz!.options.map((option) => {
+                  const isSelected = selectedAnswer[currentStep] === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => {
+                        setSelectedAnswer(prev => ({ ...prev, [currentStep]: option.id }))
+                        setTimeout(() => {
+                          setQuizAnswered(prev => ({ ...prev, [currentStep]: true }))
+                          // Video devam ettir
+                          if (playerRef.current) {
+                            playerRef.current.play()
+                            setIsPlaying(true)
+                          }
+                        }, 1000)
+                      }}
+                      className={`p-6 rounded-2xl text-left text-lg font-medium transition-all transform hover:scale-105 ${
+                        isSelected
+                          ? option.is_correct
+                            ? 'bg-green-500 text-white ring-4 ring-green-300'
+                            : 'bg-red-500 text-white ring-4 ring-red-300'
+                          : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-sm'
+                      }`}
+                      disabled={!!selectedAnswer[currentStep]}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{option.text}</span>
+                        {isSelected && (option.is_correct ? <span className="text-3xl">✓</span> : <span className="text-3xl">✗</span>)}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {selectedAnswer[currentStep] && (
+                <div className={`p-4 rounded-xl text-center text-white font-medium ${
+                  steps[currentStep].quiz!.options.find(o => o.id === selectedAnswer[currentStep])?.is_correct
+                    ? 'bg-green-500/30'
+                    : 'bg-red-500/30'
+                }`}>
+                  {steps[currentStep].quiz!.options.find(o => o.id === selectedAnswer[currentStep])?.is_correct
+                    ? steps[currentStep].quiz!.explanation_correct
+                    : steps[currentStep].quiz!.explanation_wrong}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Progress Bar */}
