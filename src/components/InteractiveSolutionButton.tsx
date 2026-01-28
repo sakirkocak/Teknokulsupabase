@@ -161,25 +161,42 @@ export default function InteractiveSolutionButton({
                   <GuidedDiscoveryPlayer
                     solution={solution}
                     questionText={String(questionText || '')}
-                    onComplete={async (results: { isCorrect: boolean; xp: number }[]) => {
-                      for (const result of results) {
-                        try {
+                    onComplete={async (stats) => {
+                      try {
+                        // Doğru cevaplar için XP
+                        if (stats.correctAnswers > 0) {
                           await fetch('/api/gamification/add-xp', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                               userId: '',
-                              xp: result.xp,
-                              isCorrect: result.isCorrect,
+                              xp: stats.xp,
+                              isCorrect: true,
                               source: 'guided_discovery',
                               questionId,
                               questionShownAt: Date.now(),
                               subjectCode: subjectName?.toLowerCase().replace(/\s+/g, '_') || ''
                             })
                           })
-                        } catch (e) {
-                          console.error('Guided discovery XP error:', e)
                         }
+                        // Yanlış cevaplar için katılım puanı
+                        if (stats.wrongAnswers > 0) {
+                          await fetch('/api/gamification/add-xp', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              userId: '',
+                              xp: stats.wrongAnswers * 2,
+                              isCorrect: false,
+                              source: 'guided_discovery',
+                              questionId,
+                              questionShownAt: Date.now(),
+                              subjectCode: subjectName?.toLowerCase().replace(/\s+/g, '_') || ''
+                            })
+                          })
+                        }
+                      } catch (e) {
+                        console.error('Guided discovery XP error:', e)
                       }
                     }}
                     voice={voice as 'erdem' | 'mehmet' | 'gamze'}
