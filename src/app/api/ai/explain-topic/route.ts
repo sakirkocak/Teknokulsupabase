@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { withAIProtection, getCachedResponse, setCachedResponse, makeAICacheKey } from '@/lib/ai-middleware'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth + Rate limit
+    const protection = await withAIProtection(request, 'explain-topic')
+    if (!protection.allowed) return protection.response!
+
     const body = await request.json()
     const { topic } = body
 
     if (!topic) {
-      return NextResponse.json(
-        { error: 'Konu gerekli' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Konu gerekli' }, { status: 400 })
     }
+
+    // Cache kontrol
+    const cacheKey = makeAICacheKey('explain-topic', topic.toLowerCase().trim())
+    const cached = getCachedResponse(cacheKey)
+    if (cached) return NextResponse.json(cached)
 
     const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
@@ -46,8 +53,12 @@ Türkçe yanıt ver ve öğrenci seviyesine uygun açıkla.`
     const result = await model.generateContent(prompt)
     const response = await result.response
     const explanation = response.text()
+    const responseData = { explanation }
 
-    return NextResponse.json({ explanation })
+    // Cache'le (60 dk)
+    setCachedResponse(cacheKey, responseData, 60 * 60 * 1000)
+
+    return NextResponse.json(responseData)
   } catch (error: any) {
     console.error('Konu anlatım hatası:', error)
     return NextResponse.json(
@@ -56,4 +67,3 @@ Türkçe yanıt ver ve öğrenci seviyesine uygun açıkla.`
     )
   }
 }
-

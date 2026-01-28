@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateQuestions, QuestionType, Difficulty } from '@/lib/gemini'
+import { withAIProtection } from '@/lib/ai-middleware'
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth + Rate limit
+    const protection = await withAIProtection(request, 'generate-questions')
+    if (!protection.allowed) return protection.response!
+
     const body = await request.json()
     const { subject, topic, questionTypes, difficulty, count } = body
 
@@ -13,12 +18,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Count siniri (max 20)
+    const safeCount = Math.min(Math.max(1, count || 5), 20)
+
     const questions = await generateQuestions(
       subject,
       topic,
       questionTypes as QuestionType[],
       difficulty as Difficulty,
-      count || 5
+      safeCount
     )
 
     return NextResponse.json({ questions })
@@ -30,8 +38,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-
-
-
-

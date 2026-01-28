@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { withAIProtection, getCachedResponse, setCachedResponse, makeAICacheKey, validateExternalURL, safeFetch } from '@/lib/ai-middleware'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth + Rate limit
+    const protection = await withAIProtection(request, 'analyze-exam')
+    if (!protection.allowed) return protection.response!
+
     const body = await request.json()
     const { imageUrl, examType, studentName } = body
 
     if (!imageUrl) {
-      return NextResponse.json(
-        { error: 'Görsel URL gerekli' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Görsel URL gerekli' }, { status: 400 })
     }
 
-    // Görseli fetch et ve base64'e çevir
-    const imageResponse = await fetch(imageUrl)
+    // SSRF korumasi
+    const urlCheck = validateExternalURL(imageUrl)
+    if (!urlCheck.safe) {
+      return NextResponse.json({ error: urlCheck.error }, { status: 400 })
+    }
+
+    // Cache kontrol
+    const cacheKey = makeAICacheKey('analyze-exam', imageUrl)
+    const cached = getCachedResponse(cacheKey)
+    if (cached) return NextResponse.json(cached)
+
+    // Gorseli guvenli fetch et (10s timeout, 10MB limit)
+    const imageResponse = await safeFetch(imageUrl)
     const imageBuffer = await imageResponse.arrayBuffer()
     const base64Image = Buffer.from(imageBuffer).toString('base64')
     const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg'
@@ -106,24 +119,25 @@ JSON formatı:
     let text = response.text()
 
     // JSON'u parse et
-    // Markdown code block'larını temizle
     text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    
+
     let analysisData
     try {
       analysisData = JSON.parse(text)
     } catch (parseError) {
-      console.error('JSON parse error:', parseError, 'Text:', text)
+      console.error('JSON parse error:', parseError)
       return NextResponse.json(
         { error: 'Analiz sonucu işlenemedi. Lütfen daha net bir görsel yükleyin.' },
         { status: 400 }
       )
     }
 
-    return NextResponse.json({ 
-      success: true,
-      analysis: analysisData 
-    })
+    const responseData = { success: true, analysis: analysisData }
+
+    // Cache'le (30 dk)
+    setCachedResponse(cacheKey, responseData, 30 * 60 * 1000)
+
+    return NextResponse.json(responseData)
 
   } catch (error: any) {
     console.error('Exam analysis error:', error)
@@ -133,4 +147,3 @@ JSON formatı:
     )
   }
 }
-

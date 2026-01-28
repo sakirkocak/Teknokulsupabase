@@ -1,22 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { withAIProtection, getCachedResponse, setCachedResponse, makeAICacheKey } from '@/lib/ai-middleware'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '')
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth + Rate limit
+    const protection = await withAIProtection(request, 'solve-question')
+    if (!protection.allowed) return protection.response!
+
     const body = await request.json()
     const { image, mimeType } = body
 
     if (!image) {
-      return NextResponse.json(
-        { error: 'Görsel gerekli' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Görsel gerekli' }, { status: 400 })
     }
 
     // Base64'ten veriyi ayır
     const base64Data = image.includes(',') ? image.split(',')[1] : image
+
+    // Cache kontrol (ilk 1000 karakter hash)
+    const cacheKey = makeAICacheKey('solve-question', base64Data.substring(0, 1000))
+    const cached = getCachedResponse(cacheKey)
+    if (cached) return NextResponse.json(cached)
 
     const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
 
@@ -82,8 +89,12 @@ Türkçe yanıt ver.`
 
     const response = await result.response
     const solution = response.text()
+    const responseData = { solution }
 
-    return NextResponse.json({ solution })
+    // Cache'le (30 dk)
+    setCachedResponse(cacheKey, responseData, 30 * 60 * 1000)
+
+    return NextResponse.json(responseData)
   } catch (error: any) {
     console.error('Soru çözme hatası:', error)
     return NextResponse.json(

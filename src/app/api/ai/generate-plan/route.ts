@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateStudyPlan } from '@/lib/gemini'
+import { withAIProtection } from '@/lib/ai-middleware'
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth + Rate limit
+    const protection = await withAIProtection(request, 'generate-plan')
+    if (!protection.allowed) return protection.response!
+
     const body = await request.json()
     const { studentName, gradeLevel, targetExam, weakSubjects, strongSubjects, hoursPerDay, weeks } = body
 
@@ -19,8 +24,8 @@ export async function POST(request: NextRequest) {
       targetExam,
       weakSubjects || [],
       strongSubjects || [],
-      hoursPerDay || 4,
-      weeks || 4
+      Math.min(hoursPerDay || 4, 16),
+      Math.min(weeks || 4, 52)
     )
 
     return NextResponse.json({ plan })
@@ -32,8 +37,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-
-
-
-
