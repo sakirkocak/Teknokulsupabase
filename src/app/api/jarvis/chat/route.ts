@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { geminiModel } from '@/lib/gemini'
-import { checkAndUseCredit, getCreditStatus, getJarvisSystemPrompt, JARVIS_IDENTITY } from '@/lib/jarvis'
+import { checkAndUseCredit, getCreditStatus, getJarvisSystemPrompt, buildEnrichedJarvisContext, JARVIS_IDENTITY } from '@/lib/jarvis'
+import { getRelevantMemories, summarizeConversation } from '@/lib/jarvis/memory'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -100,7 +101,15 @@ export async function POST(request: NextRequest) {
     
     const studentName = providedName || profile?.full_name || 'Öğrenci'
     const grade = providedGrade || profile?.grade || 8
-    
+
+    // Zenginleştirilmiş context al (hafıza, saat, zayıf konular dahil)
+    let enrichedContext: any = null
+    try {
+      enrichedContext = await buildEnrichedJarvisContext(user.id)
+    } catch (e) {
+      // Context alınamazsa basit devam et
+    }
+
     // Görsel içerik talimatı
     const visualInstructions = withVisuals ? `
 
@@ -125,11 +134,22 @@ Adım adım işlem (örn: $2 \\times 2 = 4$, sonra $4 \\times 2 = 8$)
 
 ÖNEMLİ: Her matematik ifadesini $ işaretleri arasına al. Görsel tagları yanıt metninin SONUNA ekle.` : ''
 
-    // Sistem talimatı - Jarvis kimliği ile
-    const systemPrompt = getJarvisSystemPrompt(studentName, grade) + visualInstructions
+    // Sistem talimatı - Iron Man Jarvis kimliği ile zengin context
+    const systemPrompt = getJarvisSystemPrompt(studentName, grade, enrichedContext ? {
+      currentHour: enrichedContext.currentHour,
+      weekday: enrichedContext.weekday,
+      memories: enrichedContext.memories,
+      weaknesses: enrichedContext.weaknesses,
+      streak: 0, // TODO: streak verisi eklenecek
+      todayQuestions: enrichedContext.todayQuestions,
+      dailyGoalDone: enrichedContext.dailyGoalDone,
+      averageScore: enrichedContext.recent_performance?.average_score,
+      strongestSubject: enrichedContext.recent_performance?.strongest_subject,
+      weakestSubject: enrichedContext.recent_performance?.weakest_subject
+    } : undefined) + visualInstructions
 
-    // Konuşma geçmişini hazırla
-    const historyText = conversationHistory.slice(-4).map(msg => 
+    // Konuşma geçmişini hazırla (4'ten 10'a çıkarıldı)
+    const historyText = conversationHistory.slice(-10).map(msg =>
       `${msg.role === 'user' ? studentName : 'Jarvis'}: ${msg.content}`
     ).join('\n')
     
@@ -196,11 +216,27 @@ Adım adım işlem (örn: $2 \\times 2 = 4$, sonra $4 \\times 2 = 8$)
     
     // Fallback
     if (!cleanText) {
-      cleanText = `${studentName}, şu an bir teknik sorun yaşıyoruz ama yine de sana yardımcı olabilirim!`
+      cleanText = `Efendim, sistemlerde kısa bir kesinti yaşadık ama Jarvis hâlâ burada. Tekrar deneyelim mi?`
     }
-    
+
     const duration = Date.now() - startTime
-    
+
+    // Her 5 mesajda bir konuşma özetini kaydet (arka planda)
+    const allMessages = [...conversationHistory, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: cleanText }]
+    if (allMessages.length >= 5 && allMessages.length % 5 === 0) {
+      summarizeConversation(user.id, allMessages, topic).catch(e =>
+        console.error('❌ [JARVIS] Memory kayıt hatası:', e.message)
+      )
+    }
+
+    // "Görüşürüz" gibi veda mesajlarında da özet kaydet
+    const isGoodbye = /görüşürüz|hoşça kal|bye|güle güle|iyi geceler|kapanış/i.test(message)
+    if (isGoodbye && allMessages.length >= 4) {
+      summarizeConversation(user.id, allMessages, topic).catch(e =>
+        console.error('❌ [JARVIS] Veda memory hatası:', e.message)
+      )
+    }
+
     // Güncel kredi durumunu al
     const updatedCredits = await getCreditStatus(user.id)
     

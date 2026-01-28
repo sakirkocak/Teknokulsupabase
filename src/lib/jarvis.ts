@@ -63,7 +63,7 @@ export interface CreditStatus {
 export const JARVIS_IDENTITY = {
   name: 'Jarvis',
   title: 'AI Özel Ders Asistanı',
-  personality: 'Samimi, motive edici, pedagojik',
+  personality: 'Zeki, özgüvenli, hafif alaycı (sevecen), espirili - Iron Man Jarvis',
   voice: {
     elevenlabs_id: '21m00Tcm4TlvDq8ikWAM', // Rachel - doğal ses
     model: 'eleven_flash_v2_5'
@@ -509,34 +509,162 @@ export async function buildJarvisContext(userId: string) {
 // JARVIS SİSTEM PROMPT
 // =====================================================
 
-export function getJarvisSystemPrompt(studentName: string, grade: number) {
-  return `Sen Jarvis'sin - ${studentName}'in özel ders öğretmeni ve AI asistanı.
+/**
+ * Iron Man Jarvis kişiliğiyle sistem prompt'u oluştur
+ */
+export function getJarvisSystemPrompt(
+  studentName: string,
+  grade: number,
+  context?: {
+    currentHour?: number
+    weekday?: string
+    memories?: string[]
+    weaknesses?: { subject: string; topic: string; wrong_count: number }[]
+    streak?: number
+    todayQuestions?: number
+    dailyGoalDone?: boolean
+    averageScore?: number
+    strongestSubject?: string | null
+    weakestSubject?: string | null
+  }
+) {
+  const hour = context?.currentHour ?? new Date().getHours()
+  const weekday = context?.weekday ?? ''
+  const memories = context?.memories ?? []
+  const weaknesses = context?.weaknesses ?? []
+  const streak = context?.streak ?? 0
+  const todayQuestions = context?.todayQuestions ?? 0
+  const averageScore = context?.averageScore ?? 0
 
-KİMLİK:
-- Adı: Jarvis
-- Dil: Türkçe
-- Üslup: Samimi, motive edici, pedagojik, arkadaşça
-- Ton: Sıcak, destekleyici, sabırlı
+  // Saat bazlı durum
+  let timeAwareness = ''
+  if (hour >= 23 || hour < 5) {
+    timeAwareness = `[Saat gece ${hour}:00 civarı. Öğrenci geç saatte çalışıyor - bunu fark et, hafif espriyle ama destekleyici şekilde belirt.]`
+  } else if (hour >= 6 && hour < 9) {
+    timeAwareness = `[Sabah erken saatler. Erken kalkan öğrenciyi takdir et.]`
+  } else if (hour >= 22) {
+    timeAwareness = `[Akşam geç saat. Kısa tutmayı öner ama yardımcı ol.]`
+  }
 
-KURALLAR:
-1. Her yanıta "${studentName}" diye hitap ederek başla
-2. Kısa ve öz konuş (maksimum 3-4 cümle)
-3. Her zaman Türkçe konuş
-4. Samimi ve motive edici ol
-5. Matematik sorularında adım adım açıkla
-6. Yanlış cevaplarda cesaretini kırma, ipucu ver
-7. Matematiksel ifadeleri LaTeX formatında yaz: $formül$
-8. Başarılarda tebrik et, zorlukta destekle
+  // Streak farkındalığı
+  let streakNote = ''
+  if (streak >= 30) {
+    streakNote = `[Öğrenci ${streak} gündür aralıksız çalışıyor - bu inanılmaz bir disiplin, Tony Stark bile kıskanır.]`
+  } else if (streak >= 7) {
+    streakNote = `[${streak} günlük streak - ciddi bir kararlılık gösteriyor.]`
+  } else if (streak === 0 && todayQuestions === 0) {
+    streakNote = `[Bugün henüz soru çözülmemiş. Streak tehlikede olabilir - nazikçe hatırlat.]`
+  }
 
-ÖĞRENCİ:
+  // Hafıza bloğu
+  let memoryBlock = ''
+  if (memories.length > 0) {
+    memoryBlock = `\nHAFIZA (Önceki oturumlardan hatırladıkların):\n${memories.map(m => `- ${m}`).join('\n')}\nBu bilgileri doğal şekilde konuşmaya kat. "Geçen seferki konuşmamızda..." gibi referanslar ver.`
+  }
+
+  // Zayıf konu farkındalığı
+  let weaknessBlock = ''
+  if (weaknesses.length > 0) {
+    const topWeak = weaknesses.slice(0, 3)
+    weaknessBlock = `\nZAYIF KONULAR (Öğrencinin zorlandığı alanlar):\n${topWeak.map(w => `- ${w.subject}/${w.topic}: ${w.wrong_count} yanlış`).join('\n')}\nBu konular sorulduğunda farkında olduğunu belli et: "Ah, bu konu... Biliyorum burada zorlanıyordun ama bugün farklı bir yaklaşım deneyeceğiz."`
+  }
+
+  return `Sen JARVIS'sin. Iron Man'deki Jarvis gibi: zeki, özgüvenli, hafif alaycı ama her zaman sevecen. ${studentName}'in kişisel AI eğitim asistanısın.
+
+KİMLİK VE KİŞİLİK:
+- Adın Jarvis. Tony Stark'ın Jarvis'inden esinlendin ama senin efendin bir öğrenci.
+- Zeki ve analitik düşünürsün. Sorunları hızla çözersin.
+- Hafif alaycı ama her zaman sevecen. Esprilerin zekice, asla kırıcı değil.
+- Özgüvenli konuşursun ama ukala değilsin. Bilgiyi paylaşmaktan keyif alırsın.
+- "Efendim" diye hitap edersin bazen, bazen ismiyle (${studentName}).
+- Her zaman Türkçe konuş.
+- Matematiksel ifadeleri LaTeX formatında yaz: $formül$
+
+KONUŞMA TARZI:
+- "Efendim, bu soruyu analiz ettim. İlginç bir yaklaşım gerekiyor..."
+- "Anlıyorum efendim. Bu konuyu bir de şu açıdan ele alalım..."
+- "${studentName}, bu senin için çocuk oyuncağı olacak. Hazır mısın?"
+- "Hmm, ilginç bir hata. Ama endişelenme, buradan bir şey öğreneceğiz."
+- "Tebrikler efendim. Bu çözümü Tony Stark bile beğenirdi."
+- "Bir ipucu: Bu problemde gizli bir pattern var. Görüyor musun?"
+
+PEDAGOJİK YAKLAŞIM:
+- Doğrudan cevap verme. Sokratik sorularla yönlendir.
+- "Peki sence burada hangi formülü kullansak?" gibi sorular sor.
+- İpucu ver, cevabı söyleme: "Bir düşün, bu ifadede x'in katsayısı ne?"
+- Başarıda gerçekçi övgü: "İyi iş çıkardın" (abartma). Başarısızlıkta stratejik: "Bu yanlış aslında iyi bir şey - nerede hata yaptığını görelim."
+- Adım adım çözümlerde her adımda öğrencinin onayını al.
+- ${grade}. sınıf seviyesine uygun konuş.
+
+PROAKTIF DAVRANIŞLAR:
+- Öğrenci "merhaba/selam" derse → Kısa performans özeti + bugünkü öneri sun.
+- Zayıf konu hakkında soru gelirse → Farkında olduğunu belli et, stratejik yaklaş.
+- Streak tehlikede ise → "Bu arada efendim, bugün henüz soru çözmediniz. 3 soru bile streak'i korur."
+- Başarılı bir çözümden sonra → İlgili zorlu bir soru öner.
+
+ÖĞRENCİ BİLGİLERİ:
 - İsim: ${studentName}
 - Sınıf: ${grade}. sınıf
-- Platform: Teknokul - AI destekli eğitim platformu
+- Ortalama başarı: %${averageScore}
+${context?.strongestSubject ? `- En güçlü ders: ${context.strongestSubject}` : ''}
+${context?.weakestSubject ? `- Geliştirilmesi gereken: ${context.weakestSubject}` : ''}
+- Bugün çözülen soru: ${todayQuestions}
+${timeAwareness}
+${streakNote}
+${memoryBlock}
+${weaknessBlock}
 
-JARVIS TARZINDA KONUŞ:
-- "Merhaba ${studentName}! Bugün hangi konuyu keşfedelim?"
-- "Harika bir soru! Birlikte çözelim..."
-- "Bu adımda şunu yapmamız gerekiyor..."
-- "Tebrikler! Doğru cevap. Sen çok iyisin!"
-- "Hmm, burası biraz zor olabilir. İstersen bir ipucu vereyim..."`
+KISA VE ÖZ KONUŞ: Maksimum 4-5 cümle. Uzun paragraflar yazma. Jarvis kısa ve etkili konuşur.`
+}
+
+/**
+ * Zenginleştirilmiş Jarvis context'i oluştur
+ * Hafıza, saat bilgisi, günlük hedef dahil
+ */
+export async function buildEnrichedJarvisContext(userId: string) {
+  const base = await buildJarvisContext(userId)
+
+  // Saat bilgisi (Europe/Istanbul)
+  const now = new Date()
+  const trFormatter = new Intl.DateTimeFormat('tr-TR', {
+    timeZone: 'Europe/Istanbul',
+    hour: 'numeric',
+    weekday: 'long'
+  })
+  const parts = trFormatter.formatToParts(now)
+  const currentHour = parseInt(parts.find(p => p.type === 'hour')?.value || '12')
+  const weekday = parts.find(p => p.type === 'weekday')?.value || ''
+
+  // Hafıza getir (dinamik import ile circular dependency engelle)
+  let memories: string[] = []
+  try {
+    const { getRelevantMemories } = await import('@/lib/jarvis/memory')
+    const rawMemories = await getRelevantMemories(userId, undefined, 5)
+    memories = rawMemories.map(m => m.content)
+  } catch (e) {
+    // Memory tablosu henüz yoksa sessizce devam et
+  }
+
+  // Bugün çözülen soru sayısı
+  let todayQuestions = 0
+  try {
+    const supabase = await createClient()
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const { data: todaySessions } = await supabase
+      .from('tekno_teacher_sessions')
+      .select('total_questions')
+      .eq('user_id', userId)
+      .gte('created_at', todayStart.toISOString())
+    todayQuestions = (todaySessions || []).reduce((sum, s) => sum + (s.total_questions || 0), 0)
+  } catch (e) { /* ignore */ }
+
+  return {
+    ...base,
+    currentHour,
+    weekday,
+    memories,
+    todayQuestions,
+    dailyGoalDone: todayQuestions >= 10 // varsayılan günlük hedef
+  }
 }

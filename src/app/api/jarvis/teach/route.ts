@@ -8,7 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { getJarvisSystemPrompt, JARVIS_IDENTITY } from '@/lib/jarvis'
+import { getJarvisSystemPrompt, buildEnrichedJarvisContext, JARVIS_IDENTITY } from '@/lib/jarvis'
+import { getRelevantMemories } from '@/lib/jarvis/memory'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -188,9 +189,29 @@ export async function POST(request: NextRequest) {
     
     const studentName = profile?.full_name || 'Öğrenci'
     const studentGrade = profile?.grade || grade
-    
+
+    // Hafızadan önceki performans bilgilerini al
+    let memoryContext = ''
+    try {
+      const memories = await getRelevantMemories(user.id, subject, 3)
+      if (memories.length > 0) {
+        memoryContext = `\n\nÖNCEKİ OTURUMLARDAN NOTLAR:\n${memories.map(m => `- ${m.content}`).join('\n')}`
+      }
+    } catch (e) { /* memory tablosu yoksa devam */ }
+
+    // Enriched context ile derinlik ayarla
+    let enrichedDepthNote = ''
+    try {
+      const ctx = await buildEnrichedJarvisContext(user.id)
+      if (ctx.recent_performance?.average_score > 80) {
+        enrichedDepthNote = '\n[Öğrenci güçlü performans gösteriyor - ileri seviye detaylar eklenebilir.]'
+      } else if (ctx.recent_performance?.average_score < 50) {
+        enrichedDepthNote = '\n[Öğrenci zorlanıyor - temelden başla, adım adım ilerle, ekstra örnekler ver.]'
+      }
+    } catch (e) { /* ignore */ }
+
     console.log(`📚 [JARVIS Teach] User: ${user.id.slice(0, 8)}... Konu: ${topic}`)
-    
+
     // Hologramları belirle
     const holograms = getHologramsForTopic(topic)
     
@@ -223,7 +244,7 @@ export async function POST(request: NextRequest) {
       // Müfredat tablosu yoksa devam et
     }
     
-    const teachPrompt = `Sen Jarvis'sin - ${studentName}'in özel ders öğretmeni.
+    const teachPrompt = `Sen JARVIS'sin. Iron Man'deki Jarvis gibi: zeki, özgüvenli, hafif alaycı ama sevecen. ${studentName}'in kişisel AI eğitim asistanısın.
 
 KONU: ${topic}
 SINIF: ${studentGrade}. sınıf
@@ -231,23 +252,27 @@ DERS: ${subject}
 DERİNLİK: ${depth}
 HOLOGRAMLAR: ${holograms.join(', ')}
 ${curriculumContext}
+${memoryContext}
+${enrichedDepthNote}
 
-Bu konuyu öğretmek için kapsamlı bir ders planı oluştur. Her bölümde:
-1. Öğrenciye doğrudan hitap eden samimi bir anlatım
-2. Hologramlarla senkronize görsel açıklamalar
-3. Anahtar noktalar ve formüller
-4. Tahmini süre (saniye)
+Bu konuyu Jarvis tarzında öğret. Kurallar:
+- voiceScript'lerde Iron Man Jarvis gibi konuş: "Efendim, şimdi ${topic} konusunu keşfedeceğiz. Hazır mısınız?"
+- Espirili benzetmeler yap: "Bitkiler aslında küçük fabrikalar...", "Atomu bir güneş sistemi gibi düşünün..."
+- Sokratik sorular sor: "Peki sence burada ne olur?"
+- Bazen "efendim", bazen "${studentName}" diye hitap et.
+- Gerçek hayattan örnekler ver.
+- Başarı için motive et: "Bu konuyu çözdüğünüzde, bu alandaki soruların %80'ini halledebilirsiniz."
 
 JSON formatında yanıt ver:
 {
   "title": "Dersin başlığı",
-  "introduction": "${studentName}'e hitap eden giriş cümlesi",
+  "introduction": "Jarvis tarzı giriş - efendim/isim ile hitap, espirili",
   "sections": [
     {
       "order": 1,
       "title": "Bölüm başlığı",
       "content": "Detaylı açıklama (3-4 paragraf)",
-      "voiceScript": "Jarvis'in söyleyeceği doğal konuşma metni (TTS için)",
+      "voiceScript": "Jarvis'in söyleyeceği doğal, espirili, zeki konuşma metni (TTS için). Efendim/isim hitabı. Benzetmeler. Sokratik sorular.",
       "hologramScene": {
         "id": "hologram-1",
         "name": "${holograms[0] || 'default'}",
@@ -258,7 +283,7 @@ JSON formatında yanıt ver:
       "duration": 60
     }
   ],
-  "summary": "Konu özeti (2-3 cümle)",
+  "summary": "Jarvis tarzı özet (2-3 cümle, efendim hitabıyla)",
   "quiz": [
     {
       "question": "Test sorusu",
@@ -270,7 +295,7 @@ JSON formatında yanıt ver:
 
 ÖNEMLİ:
 - Her section'da farklı bir hologram kullan
-- voiceScript doğal ve samimi olsun (${studentName} diye hitap et)
+- voiceScript JARVIS kişiliğinde olsun: zeki, espirili, özgüvenli, sevecen
 - Matematiksel ifadeleri $ arasında LaTeX formatında yaz
 - Quiz soruları konuyla ilgili ve seviyeye uygun olsun
 - Toplam 4-6 section olsun`
