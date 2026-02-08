@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
     
     let query = supabase
       .from('questions')
-      .select('id, question_text, difficulty, topic_id, options, correct_answer, explanation, question_image_url, topic:topics(id, main_topic, grade, subject:subjects(id, name, code))')
+      .select('id, question_text, difficulty, topic_id, options, correct_answer, explanation, question_image_url, visual_type, visual_content, topic:topics(id, main_topic, grade, subject:subjects(id, name, code))')
       .eq('is_active', true)
     
     // Topic filtrelemesi

@@ -73,28 +73,30 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     // 7. Spesifik bozuk komut düzeltmeleri (ightarrow, ext, rac vb.)
     // ightarrow -> \rightarrow
     processed = processed.replace(/ightarrow/g, '\\rightarrow')
-    // ext -> \text
+    // ext -> \text (sadece rakam veya boşluktan sonra gelen)
     processed = processed.replace(/(\d)\s*ext/g, '$1 \\text')
-    processed = processed.replace(/\s+ext/g, ' \\text')
-    // rac -> \frac (Genellikle racp veya rac1 gibi görünüyor)
-    processed = processed.replace(/rac/g, '\\frac')
-    // imes -> \times
-    processed = processed.replace(/imes/g, '\\times')
-    // div -> \div
-    processed = processed.replace(/div(\d)/g, '\\div $1')
-    
-    // Yeni eklenenler (Delta, circ, approx, mu, lambda)
-    processed = processed.replace(/Delta/g, '\\Delta')
-    processed = processed.replace(/circ/g, '^\\circ')
-    processed = processed.replace(/approx/g, '\\approx')
-    processed = processed.replace(/\bmu\b/g, '\\mu') // mu kelimesini korumak için sınır kontrolü
-    processed = processed.replace(/lambda/g, '\\lambda')
-    processed = processed.replace(/sigma/g, '\\sigma')
-    processed = processed.replace(/alpha/g, '\\alpha')
-    processed = processed.replace(/beta/g, '\\beta')
-    processed = processed.replace(/theta/g, '\\theta')
-    processed = processed.replace(/pi/g, '\\pi')
-    processed = processed.replace(/omega/g, '\\omega')
+    processed = processed.replace(/\s+ext\{/g, ' \\text{')
+    // rac -> \frac (standalone, kelime içinde değil: brace, trace vb. koruma)
+    processed = processed.replace(/(?<![a-zA-Z\\])rac(?![a-zA-Z])/g, '\\frac')
+    // imes -> \times (standalone, sometimes vb. koruma)
+    processed = processed.replace(/(?<![a-zA-Z\\])imes(?![a-zA-Z])/g, '\\times')
+    // div -> \div (sadece rakamdan önce)
+    processed = processed.replace(/(?<![a-zA-Z\\])div(\d)/g, '\\div $1')
+
+    // Greek letters ve semboller - word boundary ile (Türkçe kelimeleri bozmaz)
+    processed = processed.replace(/(?<!\\)\bDelta\b/g, '\\Delta')
+    processed = processed.replace(/(?<!\\)\bcirc\b/g, '^\\circ')
+    processed = processed.replace(/(?<!\\)\bapprox\b/g, '\\approx')
+    processed = processed.replace(/(?<!\\)\bmu\b/g, '\\mu')
+    processed = processed.replace(/(?<!\\)\blambda\b/g, '\\lambda')
+    processed = processed.replace(/(?<!\\)\bsigma\b/g, '\\sigma')
+    processed = processed.replace(/(?<!\\)\balpha\b/g, '\\alpha')
+    processed = processed.replace(/(?<!\\)\bbeta\b/g, '\\beta')
+    processed = processed.replace(/(?<!\\)\btheta\b/g, '\\theta')
+    processed = processed.replace(/(?<!\\)\bomega\b/g, '\\omega')
+    // pi: Çok riskli (piyano, piknik, api vb.) - sadece $ blokları içinde veya standalone
+    // $ içindeki pi'leri yakala: rakam/boşluk/operatör yanındaki pi
+    processed = processed.replace(/(?<![a-zA-Z\\])pi(?![a-zA-Z])/g, '\\pi')
 
     // 8. Gereksiz backslash temizliği (\f -> f, \t -> t, \n -> n)
     // Sadece tek harfli ve arkasında boşluk/rakam olanları hedefliyoruz

@@ -16,16 +16,18 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import MathRenderer from '@/components/MathRenderer'
+import { QuestionText } from '@/components/QuestionCard'
 import { SingleXPFloat, MotivationFloat } from '@/components/XPFloatingAnimation'
 import ComboIndicator from '@/components/ComboIndicator'
 import QuestionSearch from '@/components/QuestionSearch'
-import { 
-  XP_REWARDS, 
+import {
+  XP_REWARDS,
   COMBO_SETTINGS,
   getMotivationalMessage,
   getStreakMotivationContext,
   type MotivationContext
 } from '@/lib/gamification'
+import { getGuestProgress, recordAnswer } from '@/lib/guestTracker'
 
 interface Subject {
   id: string
@@ -50,6 +52,8 @@ interface Question {
   difficulty: 'easy' | 'medium' | 'hard' | 'legendary'
   question_text: string
   question_image_url: string | null
+  visual_type: string | null
+  visual_content: string | null
   options: { A: string; B: string; C: string; D: string; E?: string }
   correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
   explanation: string | null
@@ -157,6 +161,10 @@ function HizliCozPageContent() {
   // Soru havuzu - zorluğa göre sıralı
   const [questionPool, setQuestionPool] = useState<Question[]>([])
   const [poolIndex, setPoolIndex] = useState(0)
+  const [allQuestionsExhausted, setAllQuestionsExhausted] = useState(false)
+
+  // Cross-session soru tekrarı engelleme
+  const answeredIdsRef = useRef<Set<string>>(new Set())
   
   // URL parametreleri için flag'ler
   const [isInitialized, setIsInitialized] = useState(false)
@@ -366,7 +374,14 @@ function HizliCozPageContent() {
   // SORU HAVUZU OLUŞTUR - Zorluğa göre sıralı (easy → medium → hard → legendary)
   const loadQuestionPool = async (grade: number, subject: Subject | null): Promise<Question[]> => {
     console.log('🎯 Soru havuzu yükleniyor - Sınıf:', grade, 'Ders:', subject?.name || 'Karışık')
-    
+
+    // 0. Çözülmüş soruları yükle (guest: localStorage)
+    const guestProgress = getGuestProgress()
+    const guestSolvedIds = new Set(guestProgress.solvedQuestionIds)
+    // Mevcut ref'e ekle
+    guestSolvedIds.forEach(id => answeredIdsRef.current.add(id))
+    console.log('🔒 Daha önce çözülmüş soru:', answeredIdsRef.current.size)
+
     // 1. Topic'leri bul
     let topicQuery = supabase
       .from('topics')
@@ -393,7 +408,7 @@ function HizliCozPageContent() {
       .from('questions')
       .select(`
         id, question_text, options, correct_answer, explanation, difficulty,
-        question_image_url, topic_id, times_answered, times_correct,
+        question_image_url, visual_type, visual_content, topic_id, times_answered, times_correct,
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
@@ -406,7 +421,19 @@ function HizliCozPageContent() {
 
     console.log('📊 Toplam soru sayısı:', questions.length)
 
-    // 3. Zorluğa göre sırala: easy → medium → hard → legendary
+    // 3. Çözülmüş soruları filtrele
+    const filteredQuestions = questions.filter(q => !answeredIdsRef.current.has(q.id))
+    console.log('📊 Filtrelenmiş (yeni) soru sayısı:', filteredQuestions.length, '/', questions.length)
+
+    if (filteredQuestions.length === 0) {
+      // Tüm sorular çözülmüş
+      setAllQuestionsExhausted(true)
+      return []
+    }
+
+    setAllQuestionsExhausted(false)
+
+    // 4. Zorluğa göre sırala: easy → medium → hard → legendary
     const difficultyOrder: Record<string, number> = {
       'easy': 1,
       'medium': 2,
@@ -414,15 +441,15 @@ function HizliCozPageContent() {
       'legendary': 4
     }
 
-    const sortedQuestions = [...questions].sort((a, b) => {
+    const sortedQuestions = [...filteredQuestions].sort((a, b) => {
       const orderA = difficultyOrder[a.difficulty] || 2
       const orderB = difficultyOrder[b.difficulty] || 2
-      
+
       // Aynı zorluktakiler arasında rastgele sırala
       if (orderA === orderB) {
         return Math.random() - 0.5
       }
-      
+
       return orderA - orderB
     })
 
@@ -443,16 +470,13 @@ function HizliCozPageContent() {
   // Havuzdan sonraki soruyu al
   const getNextFromPool = () => {
     if (questionPool.length === 0) return null
-    
-    // Havuzun sonuna geldiyse başa dön (ama karıştır)
+
+    // Havuzun sonuna geldiyse - tükenme uyarısı göster
     if (poolIndex >= questionPool.length) {
-      // Havuzu tekrar karıştır ama zorluk sırasını koru
-      const shuffled = [...questionPool].sort(() => Math.random() - 0.5)
-      setQuestionPool(shuffled)
-      setPoolIndex(0)
-      return shuffled[0]
+      setAllQuestionsExhausted(true)
+      return null
     }
-    
+
     const question = questionPool[poolIndex]
     setPoolIndex(prev => prev + 1)
     return question
@@ -517,8 +541,8 @@ function HizliCozPageContent() {
       setCurrentQuestion(nextQuestion)
       setQuestionIndex(prev => prev + 1)
       console.log('➡️ Sonraki soru:', nextQuestion.difficulty, '-', nextQuestion.topic?.main_topic)
-    } else {
-      // Havuz boş - tekrar yükle
+    } else if (!allQuestionsExhausted) {
+      // Havuz boş ama tükenme değil - yeni sorular olabilir
       console.log('🔄 Havuz bitti, yeniden yükleniyor...')
       const pool = await loadQuestionPool(selectedGrade, selectedSubject)
       if (pool.length > 0) {
@@ -529,6 +553,9 @@ function HizliCozPageContent() {
       } else {
         setCurrentQuestion(null)
       }
+    } else {
+      // Tüm sorular tükendi
+      setCurrentQuestion(null)
     }
   }
 
@@ -609,6 +636,12 @@ function HizliCozPageContent() {
       setTimeout(() => showMotivationMessage(streakContext), 300)
     } else if (!correct && prevSessionStreak >= 3) {
       setTimeout(() => showMotivationMessage('wrong_after_streak'), 300)
+    }
+
+    // Çözülen soruyu kaydet (guest tracker + session ref)
+    if (currentQuestion?.id) {
+      answeredIdsRef.current.add(currentQuestion.id)
+      recordAnswer(currentQuestion.id, correct)
     }
 
     // Update guest session
@@ -750,18 +783,60 @@ function HizliCozPageContent() {
     if (!currentQuestion) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex items-center justify-center p-4">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-            <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <BookOpen className="h-10 w-10 text-white/60" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Soru Bulunamadı</h2>
-            <p className="text-white/60 mb-6">Bu seçenekler için soru bulunmuyor.</p>
-            <button
-              onClick={() => setViewMode('setup')}
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-medium"
-            >
-              Farklı Seçenekler Dene
-            </button>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center max-w-md">
+            {allQuestionsExhausted ? (
+              <>
+                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-orange-500/30">
+                  <Trophy className="h-10 w-10 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Tebrikler! Bu konudaki tum sorulari cozdun!
+                </h2>
+                <p className="text-white/60 mb-6">
+                  Baska bir konu veya zorluk seviyesi secebilir, ya da ayni sorulari tekrar cozebilirsin.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => setViewMode('setup')}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-medium"
+                  >
+                    Baska Konu Sec
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setAllQuestionsExhausted(false)
+                      answeredIdsRef.current.clear()
+                      setPracticeLoading(true)
+                      const pool = await loadQuestionPool(selectedGrade, selectedSubject)
+                      if (pool.length > 0) {
+                        setQuestionPool(pool)
+                        setPoolIndex(1)
+                        setCurrentQuestion(pool[0])
+                        setQuestionIndex(prev => prev + 1)
+                      }
+                      setPracticeLoading(false)
+                    }}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium border border-white/20 transition-colors"
+                  >
+                    Ayni Sorulari Tekrar Coz
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <BookOpen className="h-10 w-10 text-white/60" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">Soru Bulunamadi</h2>
+                <p className="text-white/60 mb-6">Bu secenekler icin soru bulunmuyor.</p>
+                <button
+                  onClick={() => setViewMode('setup')}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-medium"
+                >
+                  Farkli Secenekler Dene
+                </button>
+              </>
+            )}
           </motion.div>
         </div>
       )
@@ -854,12 +929,16 @@ function HizliCozPageContent() {
               <span className="text-white/60">{currentQuestion.topic?.main_topic}</span>
             </div>
 
-            {/* Question Text */}
+            {/* Question Text + Visual Content */}
             <div className="text-white text-lg md:text-xl mb-8 leading-relaxed font-medium">
-              <MathRenderer text={currentQuestion.question_text} />
+              <QuestionText
+                text={currentQuestion.question_text}
+                visualType={currentQuestion.visual_type as any}
+                visualContent={currentQuestion.visual_content || undefined}
+              />
             </div>
 
-            {/* Image */}
+            {/* Image (eski tip - base64/URL) */}
             {currentQuestion.question_image_url && (
               <div className="mb-8 rounded-xl overflow-hidden border border-white/10">
                 <img src={currentQuestion.question_image_url} alt="Soru görseli" className="max-w-full" />

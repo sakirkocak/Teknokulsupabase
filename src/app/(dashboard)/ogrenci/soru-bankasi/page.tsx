@@ -16,7 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import MathRenderer from '@/components/MathRenderer'
-import DOMPurify from 'isomorphic-dompurify'
+import { QuestionText } from '@/components/QuestionCard'
 import { CelebrationModal, BadgeToast } from '@/components/gamification'
 import { SingleXPFloat, MotivationFloat } from '@/components/XPFloatingAnimation'
 import ComboIndicator from '@/components/ComboIndicator'
@@ -169,6 +169,10 @@ export default function SoruBankasiPage() {
   // ✅ REF'ler - async state güncellemesinden bağımsız (Sonraki Soru için)
   const activeSubjectIdRef = useRef<string | null>(null)
   const activeGradeRef = useRef<number>(8)
+
+  // Cross-session soru tekrarı engelleme
+  const answeredIdsRef = useRef<Set<string>>(new Set())
+  const [allQuestionsExhausted, setAllQuestionsExhausted] = useState(false)
 
   // Soru çözme state
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null)
@@ -359,10 +363,30 @@ export default function SoruBankasiPage() {
         .select('*')
         .eq('student_id', profile.id)
         .single()
-      
+
       if (points) {
         setStudentPoints(points)
       }
+    }
+
+    // Çözülmüş soruları yükle (cross-session dedup)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        const resp = await fetch('/api/answered-questions', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        })
+        if (resp.ok) {
+          const { questionIds } = await resp.json()
+          if (questionIds && questionIds.length > 0) {
+            answeredIdsRef.current = new Set(questionIds)
+            setAnsweredQuestionIds(questionIds)
+            console.log('🔒 Çözülmüş soru yüklendi:', questionIds.length)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('answered-questions yükleme hatası:', err)
     }
 
     setLoading(false)
@@ -660,11 +684,11 @@ export default function SoruBankasiPage() {
       .from('questions')
       .select(`
         id, question_text, options, correct_answer, explanation, difficulty,
-        question_image_url, topic_id, times_answered, times_correct,
+        question_image_url, visual_type, visual_content, topic_id, times_answered, times_correct,
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
-      .not('question_image_url', 'is', null)
+      .or('question_image_url.not.is.null,visual_type.neq.none')
 
     // Eğer bir ders seçiliyse, o dersten getir
     if (selectedSubject) {
@@ -689,13 +713,15 @@ export default function SoruBankasiPage() {
     const { data } = await query
 
     if (data && data.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex] as any)
+      const unseen = data.filter(q => !answeredIdsRef.current.has(q.id))
+      const pool = unseen.length > 0 ? unseen : data
+      const randomIndex = Math.floor(Math.random() * pool.length)
+      setCurrentQuestion(pool[randomIndex] as any)
       setQuestionIndex(1)
     } else {
       setCurrentQuestion(null)
     }
-    
+
     setPracticeLoading(false)
   }
 
@@ -717,7 +743,7 @@ export default function SoruBankasiPage() {
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
-      .not('question_image_url', 'is', null)
+      .or('question_image_url.not.is.null,visual_type.neq.none')
 
     if (selectedSubject) {
       const topicIds = topics.map(t => t.id)
@@ -744,8 +770,10 @@ export default function SoruBankasiPage() {
     const { data } = await query
 
     if (data && data.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex] as any)
+      const unseen = data.filter(q => !answeredIdsRef.current.has(q.id))
+      const pool = unseen.length > 0 ? unseen : data
+      const randomIndex = Math.floor(Math.random() * pool.length)
+      setCurrentQuestion(pool[randomIndex] as any)
       setQuestionIndex(prev => prev + 1)
     } else {
       setCurrentQuestion(null)
@@ -787,8 +815,10 @@ export default function SoruBankasiPage() {
       .in('topic_id', topicIds)
 
     if (data && data.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex] as any)
+      const unseen = data.filter(q => !answeredIdsRef.current.has(q.id))
+      const pool = unseen.length > 0 ? unseen : data
+      const randomIndex = Math.floor(Math.random() * pool.length)
+      setCurrentQuestion(pool[randomIndex] as any)
       setQuestionIndex(prev => prev + 1)
     } else {
       setCurrentQuestion(null)
@@ -832,8 +862,10 @@ export default function SoruBankasiPage() {
       .in('topic_id', topicIds)
 
     if (data && data.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex] as any)
+      const unseen = data.filter(q => !answeredIdsRef.current.has(q.id))
+      const pool = unseen.length > 0 ? unseen : data
+      const randomIndex = Math.floor(Math.random() * pool.length)
+      setCurrentQuestion(pool[randomIndex] as any)
       setQuestionIndex(prev => prev + 1)
     } else {
       setCurrentQuestion(null)
@@ -878,7 +910,7 @@ export default function SoruBankasiPage() {
             consecutiveCorrect: consecutiveCorrectCount,
             consecutiveWrong: consecutiveWrongCount,
             currentDifficulty: adaptiveDifficulty,
-            excludeQuestionIds: answeredQuestionIds.slice(-50) // Son 50 soruyu hariç tut
+            excludeQuestionIds: Array.from(answeredIdsRef.current).slice(-200) // Çözülmüş soruları hariç tut
           })
         })
 
@@ -969,16 +1001,24 @@ export default function SoruBankasiPage() {
       query = query.eq('difficulty', selectedDifficulty)
     }
 
-    // Görüntülü soru filtresi
+    // Görüntülü soru filtresi (hem image_url hem visual_type)
     if (showImageOnly) {
-      query = query.not('question_image_url', 'is', null)
+      query = query.or('question_image_url.not.is.null,visual_type.neq.none')
     }
 
     const { data } = await query
 
     if (data && data.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.length)
-      setCurrentQuestion(data[randomIndex] as any)
+      // Çözülmüş soruları filtrele
+      const unseen = data.filter(q => !answeredIdsRef.current.has(q.id))
+      const pool = unseen.length > 0 ? unseen : data
+
+      if (unseen.length === 0 && answeredIdsRef.current.size > 0) {
+        setAllQuestionsExhausted(true)
+      }
+
+      const randomIndex = Math.floor(Math.random() * pool.length)
+      setCurrentQuestion(pool[randomIndex] as any)
       setQuestionIndex(prev => prev + 1)
     } else {
       setCurrentQuestion(null)
@@ -1027,8 +1067,9 @@ export default function SoruBankasiPage() {
       setConsecutiveCorrectCount(0)
     }
     
-    // Track answered question IDs
+    // Track answered question IDs (both state and ref for dedup)
     if (currentQuestion?.id) {
+      answeredIdsRef.current.add(currentQuestion.id)
       setAnsweredQuestionIds(prev => [...prev, currentQuestion.id])
     }
 
@@ -1561,35 +1602,78 @@ export default function SoruBankasiPage() {
     if (!currentQuestion) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 flex items-center justify-center p-4">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center"
+            className="text-center max-w-md"
           >
-            <div className={`w-20 h-20 ${showImageOnly ? 'bg-purple-500/20' : 'bg-white/10'} rounded-full flex items-center justify-center mx-auto mb-6`}>
-              {showImageOnly ? (
-                <ImageIcon className="h-10 w-10 text-purple-400" />
-              ) : (
-                <BookOpen className="h-10 w-10 text-white/60" />
-              )}
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2">
-              {showImageOnly ? 'Görüntülü Soru Bulunamadı' : 'Bu Konuda Soru Yok'}
-            </h2>
-            <p className="text-white/60 mb-6">
-              {showImageOnly 
-                ? 'Bu ders/konuda henüz görüntülü soru eklenmemiş. Admin panelinden görüntülü soru üretebilirsiniz.'
-                : 'Bu konu için henüz soru eklenmemiş. Farklı bir konu seçebilirsin.'}
-            </p>
-            <button
-              onClick={() => {
-                if (showImageOnly) setShowImageOnly(false)
-                goBack()
-              }}
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white rounded-xl transition-all font-medium"
-            >
-              {showImageOnly ? 'Tüm Sorulara Dön' : 'Başka Konu Seç'}
-            </button>
+            {allQuestionsExhausted ? (
+              <>
+                <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-orange-500/30">
+                  <Trophy className="h-10 w-10 text-white" />
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Bu konudaki tum sorulari cozdun!
+                </h2>
+                <p className="text-white/60 mb-6">
+                  Tekrar cozmek istersen devam edebilirsin. Bundan sonra ayni sorular gelebilir.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => {
+                      setAllQuestionsExhausted(false)
+                      answeredIdsRef.current.clear()
+                      setAnsweredQuestionIds([])
+                      if (showImageOnly) {
+                        loadNextImageQuestion()
+                      } else {
+                        loadNextQuestion()
+                      }
+                    }}
+                    className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-xl font-medium"
+                  >
+                    Devam Et
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAllQuestionsExhausted(false)
+                      if (showImageOnly) setShowImageOnly(false)
+                      goBack()
+                    }}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-medium border border-white/20 transition-colors"
+                  >
+                    Baska Konu Sec
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`w-20 h-20 ${showImageOnly ? 'bg-purple-500/20' : 'bg-white/10'} rounded-full flex items-center justify-center mx-auto mb-6`}>
+                  {showImageOnly ? (
+                    <ImageIcon className="h-10 w-10 text-purple-400" />
+                  ) : (
+                    <BookOpen className="h-10 w-10 text-white/60" />
+                  )}
+                </div>
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  {showImageOnly ? 'Goruntulu Soru Bulunamadi' : 'Bu Konuda Soru Yok'}
+                </h2>
+                <p className="text-white/60 mb-6">
+                  {showImageOnly
+                    ? 'Bu ders/konuda henuz goruntulu soru eklenmemis. Admin panelinden goruntulu soru uretebilirsiniz.'
+                    : 'Bu konu icin henuz soru eklenmemis. Farkli bir konu secebilirsin.'}
+                </p>
+                <button
+                  onClick={() => {
+                    if (showImageOnly) setShowImageOnly(false)
+                    goBack()
+                  }}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white rounded-xl transition-all font-medium"
+                >
+                  {showImageOnly ? 'Tum Sorulara Don' : 'Baska Konu Sec'}
+                </button>
+              </>
+            )}
           </motion.div>
         </div>
       )
@@ -1771,39 +1855,21 @@ export default function SoruBankasiPage() {
               <span className="text-white/60">{currentQuestion.topic?.main_topic}</span>
             </div>
 
-            {/* Soru Metni */}
-            <div className="text-white text-lg md:text-xl mb-8 leading-relaxed font-medium">
-              <MathRenderer text={currentQuestion.question_text} />
-            </div>
+            {/* Soru Metni + Yeni Nesil Görsel İçerik */}
+            <QuestionText
+              text={currentQuestion.question_text}
+              visualType={currentQuestion.visual_type as any}
+              visualContent={currentQuestion.visual_content || undefined}
+              className="text-white text-lg md:text-xl mb-8 leading-relaxed font-medium"
+            />
 
             {/* Görsel - Hem image_url hem question_image_url desteklenir */}
             {(currentQuestion.image_url || currentQuestion.question_image_url) && (
               <div className="mb-8 rounded-xl overflow-hidden border border-white/10 bg-white/5 p-2">
-                <img 
-                  src={currentQuestion.image_url || currentQuestion.question_image_url || ''} 
+                <img
+                  src={currentQuestion.image_url || currentQuestion.question_image_url || ''}
                   alt="Soru görseli"
                   className="max-w-full max-h-[400px] mx-auto object-contain rounded-lg"
-                />
-              </div>
-            )}
-
-            {/* 🆕 Yeni Nesil Görsel İçerik (tablo, grafik, diyagram vs.) */}
-            {currentQuestion.visual_content && (
-              <div className="mb-8 rounded-xl overflow-hidden border border-indigo-500/30 bg-white p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
-                  <span className="text-indigo-600 text-sm font-medium">
-                    Yeni Nesil {currentQuestion.visual_type === 'table' ? 'Tablo' : currentQuestion.visual_type === 'chart' ? 'Grafik' : currentQuestion.visual_type === 'diagram' ? 'Diyagram' : currentQuestion.visual_type === 'flowchart' ? 'Akış Şeması' : currentQuestion.visual_type === 'pie' ? 'Pasta Grafiği' : 'Görsel'}
-                  </span>
-                </div>
-                <div 
-                  className="visual-content prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ 
-                    __html: DOMPurify.sanitize(currentQuestion.visual_content, {
-                      ADD_TAGS: ['svg', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'text', 'g', 'defs', 'linearGradient', 'stop', 'clipPath', 'marker', 'use', 'symbol', 'ellipse', 'tspan'],
-                      ADD_ATTR: ['viewBox', 'xmlns', 'd', 'fill', 'stroke', 'stroke-width', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height', 'transform', 'text-anchor', 'font-size', 'font-family', 'font-weight', 'dominant-baseline', 'points', 'rx', 'ry', 'offset', 'stop-color', 'stop-opacity', 'gradientUnits', 'gradientTransform', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'clip-path', 'marker-end', 'marker-start', 'href', 'xlink:href']
-                    })
-                  }} 
                 />
               </div>
             )}
