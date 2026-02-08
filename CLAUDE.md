@@ -112,6 +112,7 @@ src/
 │   ├── useDuelRealtime.ts       # Duello realtime
 │   ├── useGeminiLive.ts         # Gemini Live API
 │   ├── useHandTracking.ts       # El takibi (MediaPipe)
+│   ├── useMockExam.ts           # Deneme sinavi state yonetimi
 │   └── ...
 ├── lib/                         # Yardimci kutuphaneler
 │   ├── supabase/                # client.ts (browser), server.ts (SSR)
@@ -121,6 +122,8 @@ src/
 │   ├── latex/                   # normalizer, sanitizer, validator
 │   ├── question-bank/           # PDF olusturma, parser
 │   ├── jarvis/                  # scenes, voice-scripts
+│   ├── mock-exam/               # types.ts, scoring.ts, constants.ts
+│   ├── guestTracker.ts          # Misafir soru cozme takibi (localStorage)
 │   ├── gamification.ts          # XP, level, badge, streak, daily challenge
 │   ├── gemini.ts                # Gemini AI wrapper + retry logic
 │   └── rate-limit.ts            # API rate limiting
@@ -154,6 +157,11 @@ Middleware otomatik yonlendirme yapar: `ogretmen` rolu `/koc` altina, `ogrenci` 
 - **classrooms** - Sinif yonetimi
 - **tasks** - Odev/gorev sistemi
 - **exam_results** - Deneme sonuclari
+- **mock_exams** - Deneme sinavlari (bursluluk, LGS vb.)
+- **mock_exam_questions** - Deneme sinavi sorulari (exam_id → question_id)
+- **mock_exam_results** - Ogrenci deneme sonuclari (puanlama, konu analizi)
+- **exam_scoring_rules** - Sinav puanlama kurallari (katsayi, baz puan)
+- **user_answers** - Ogrenci cevap gecmisi (soru tekrari engelleme + AI analiz)
 - **ai_coach_chats** - AI koc sohbet gecmisi
 - **interactive_solutions** - Interaktif cozum cache
 - **video_solutions** - Video cozum cache
@@ -178,6 +186,8 @@ Middleware otomatik yonlendirme yapar: `ogretmen` rolu `/koc` altina, `ogrenci` 
 | `locations` | - | Sehir/ilce arama |
 | `schools` | - | Okul arama |
 | `student_stats` | - | Ogrenci istatistikleri |
+| `mock_exams` | - | Deneme sinavlari |
+| `mock_exam_results` | - | Deneme sonuclari |
 
 **Feature Flag:** `NEXT_PUBLIC_USE_TYPESENSE` (true/false)
 **Sync:** Supabase trigger'lar + webhook (`/api/webhooks/typesense-sync`)
@@ -203,6 +213,22 @@ Middleware otomatik yonlendirme yapar: `ogretmen` rolu `/koc` altina, `ogrenci` 
 - `POST /api/duel/start` - Duello baslat
 - `POST /api/duel/answer` - Cevap gonder
 - `POST /api/duel/accept` - Kabul et
+
+### Deneme Sinavi (Mock Exam)
+- `GET /api/mock-exam/list` - Deneme listesi
+- `GET /api/mock-exam/[examId]` - Deneme detayi + sorulari
+- `POST /api/mock-exam/submit` - Sinav gonderme (server-side puanlama)
+- `GET /api/mock-exam/results` - Ogrenci sonuclari
+- `GET /api/mock-exam/results/[resultId]` - Detayli sonuc
+- `POST /api/mock-exam/ai-analysis` - AI performans analizi
+- `POST /api/mock-exam/admin/create` - Deneme olustur (admin)
+- `PUT /api/mock-exam/admin/update` - Deneme guncelle (admin)
+- `DELETE /api/mock-exam/admin/delete` - Deneme sil (admin)
+- `POST /api/mock-exam/admin/generate` - AI ile soru uret (admin)
+
+### Soru Takibi
+- `GET /api/answered-questions` - Ogrencinin cozdugu soru ID'leri (cross-session dedup)
+- `POST /api/adaptive-question` - Adaptif zorluk ile soru sec
 
 ### Arama
 - `GET /api/leaderboard` - Liderlik (scope: turkey/city/school)
@@ -352,8 +378,21 @@ git push origin main  # Vercel auto-deploy
 | `src/app/api/leaderboard/route.ts` | Liderlik API |
 | `src/components/gamification/GamificationPanel.tsx` | Gamification UI |
 | `src/components/InteractiveSolutionButton.tsx` | Interaktif cozum baslat |
-| `src/lib/typesense/client.ts` | Typesense baglanti |
+| `src/lib/typesense/client.ts` | Typesense baglanti + COLLECTIONS sabitleri |
+| `src/lib/typesense/collections.ts` | Typesense collection semalari |
 | `src/lib/gemini.ts` | Gemini AI wrapper |
+| `src/app/hizli-coz/page.tsx` | Hizli soru cozme (dedup, pool filtreleme) |
+| `src/app/(dashboard)/ogrenci/soru-bankasi/page.tsx` | Soru bankasi (dedup, adaptive, gorsel sorular) |
+| `src/app/api/answered-questions/route.ts` | Cozulmus soru ID'leri API (cross-session dedup) |
+| `src/app/api/adaptive-question/route.ts` | Adaptive zorluk soru secimi |
+| `src/components/MathRenderer.tsx` | LaTeX render (regex guvenlik) |
+| `src/components/QuestionCard.tsx` | Soru karti + QuestionText bileseni |
+| `src/lib/guestTracker.ts` | Misafir kullanici soru takibi (localStorage) |
+| `src/lib/mock-exam/types.ts` | Deneme sinavi tip tanimlari |
+| `src/lib/mock-exam/scoring.ts` | Deneme sinavi puanlama motoru |
+| `src/hooks/useMockExam.ts` | Deneme sinavi state yonetimi |
+| `src/app/api/mock-exam/` | Deneme sinavi API route'lari (10 endpoint) |
+| `src/components/mock-exam/` | Deneme sinavi UI bilesenleri (10 component) |
 
 ## Kodlama Kurallari
 
