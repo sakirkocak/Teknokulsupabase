@@ -10,6 +10,7 @@ import {
   XCircle, AlertCircle, Home, BarChart3, Target, Volume2
 } from 'lucide-react'
 import SpeakButton from '@/components/SpeakButton'
+import MathRenderer from '@/components/MathRenderer'
 import { motion, AnimatePresence } from 'framer-motion'
 
 interface Question {
@@ -608,7 +609,7 @@ export default function ExamPage() {
 
               <div className="flex items-start gap-3 mb-6">
                 <div className="text-white text-lg leading-relaxed flex-1">
-                  {currentQuestion?.question_text}
+                  <MathRenderer text={currentQuestion?.question_text || ''} />
                 </div>
                 {currentQuestion?.question_text && (
                   <SpeakButton 
