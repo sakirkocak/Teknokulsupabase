@@ -284,6 +284,7 @@ async function getSampleQuestions(subjectCode: string, grade: number) {
     .from('questions')
     .select(`
       id, question_text, options, correct_answer, difficulty, topic_id,
+      visual_type, visual_content,
       topics!inner(subject_id, grade)
     `)
     .eq('topics.subject_id', subject.id)
@@ -520,12 +521,14 @@ export default async function GradePage({ params }: Props) {
             Örnek Sorular
           </h2>
           
-          <QuestionPreviewList 
+          <QuestionPreviewList
             questions={data.questions.map(q => ({
               id: q.id,
               question_text: q.question_text,
               options: q.options as { A: string; B: string; C: string; D: string; E?: string },
-              difficulty: q.difficulty
+              difficulty: q.difficulty,
+              visual_type: q.visual_type || null,
+              visual_content: q.visual_content || null,
             }))}
             subject={subject}
             grade={grade}

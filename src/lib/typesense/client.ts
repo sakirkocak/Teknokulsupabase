@@ -34,7 +34,9 @@ export const COLLECTIONS = {
   SCHOOLS: 'schools',
   STUDENT_STATS: 'student_stats',
   STUDENT_TOPIC_PROGRESS: 'student_topic_progress',
-  QUESTION_ACTIVITY: 'question_activity'  // Soru çözüm aktiviteleri (günlük/haftalık stats)
+  QUESTION_ACTIVITY: 'question_activity',  // Soru çözüm aktiviteleri (günlük/haftalık stats)
+  MOCK_EXAMS: 'mock_exams',  // Deneme sınavları
+  MOCK_EXAM_RESULTS: 'mock_exam_results',  // Deneme sonuçları
 } as const
 
 /**

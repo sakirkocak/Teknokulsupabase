@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { createServerClient } from '@supabase/ssr'
 import { BreadcrumbSchema, QuizSchema, LearningResourceSchema, EducationalQuestionSchema } from '@/components/JsonLdSchema'
 import MathRenderer from '@/components/MathRenderer'
+import { QuestionText } from '@/components/QuestionCard'
 import VideoSolutionButton from '@/components/VideoSolutionButton'
 import InteractiveSolutionButton from '@/components/InteractiveSolutionButton'
 import JarvisSolutionButton from '@/components/JarvisSolutionButton'
@@ -146,10 +147,10 @@ async function getQuestionData(questionId: string) {
     const [questionResult, relatedResult, videoResult] = await Promise.all([
       supabase.rpc('get_question_detail', { p_question_id: questionId }),
       supabase.rpc('get_related_questions', { p_question_id: questionId, p_limit: 5 }),
-      // Video bilgilerini al
+      // Video + görsel bilgilerini al
       supabase
         .from('questions')
-        .select('video_status, video_solution_url, video_storage_url')
+        .select('video_status, video_solution_url, video_storage_url, visual_type, visual_content')
         .eq('id', questionId)
         .single(),
     ])
@@ -161,12 +162,14 @@ async function getQuestionData(questionId: string) {
       console.error('get_related_questions error:', relatedResult.error)
     }
     
-    // Video bilgilerini question'a ekle
+    // Video + görsel bilgilerini question'a ekle
     const question = questionResult.data?.[0] || null
     if (question && videoResult.data) {
       question.video_status = videoResult.data.video_status
       question.video_solution_url = videoResult.data.video_solution_url
       question.video_storage_url = videoResult.data.video_storage_url
+      question.visual_type = videoResult.data.visual_type
+      question.visual_content = videoResult.data.visual_content
     }
     
     return {
@@ -339,12 +342,16 @@ export default async function SingleQuestionPage({ params }: Props) {
                 </div>
               </div>
               
-              {/* Soru Metni */}
+              {/* Soru Metni + Görsel İçerik */}
               <div className="prose prose-lg max-w-none">
-                <MathRenderer text={question.question_text} />
+                <QuestionText
+                  text={question.question_text}
+                  visualType={question.visual_type}
+                  visualContent={question.visual_content}
+                />
               </div>
-              
-              {/* Soru Görseli */}
+
+              {/* Soru Görseli (eski tip - base64/URL) */}
               {question.question_image_url && (
                 <div className="mt-4">
                   <img

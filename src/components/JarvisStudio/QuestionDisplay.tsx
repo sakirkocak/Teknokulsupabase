@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { ArrowLeft, Image, CheckCircle, XCircle, HelpCircle } from 'lucide-react'
+import MathRenderer from '@/components/MathRenderer'
 
 interface Question {
   id: string
@@ -82,7 +83,9 @@ export default function QuestionDisplay({ question, onBack, onAnswer, showAnswer
       <div className="flex-1 overflow-y-auto p-4">
         {/* Question Text */}
         <div className="mb-4">
-          <p className="text-gray-200 leading-relaxed">{question.question_text}</p>
+          <div className="text-gray-200 leading-relaxed">
+            <MathRenderer text={question.question_text} />
+          </div>
         </div>
 
         {/* Image */}
@@ -117,7 +120,7 @@ export default function QuestionDisplay({ question, onBack, onAnswer, showAnswer
                 }`}>
                   {key}
                 </span>
-                <span className="text-gray-300 text-sm flex-1">{value}</span>
+                <span className="text-gray-300 text-sm flex-1"><MathRenderer text={value} /></span>
                 {revealed && key === question.correct_answer && (
                   <CheckCircle className="w-5 h-5 text-green-400" />
                 )}
@@ -146,7 +149,7 @@ export default function QuestionDisplay({ question, onBack, onAnswer, showAnswer
               <HelpCircle className="w-4 h-4 text-cyan-400" />
               <span className="text-cyan-400 text-sm font-medium">Açıklama</span>
             </div>
-            <p className="text-gray-300 text-sm">{question.explanation}</p>
+            <div className="text-gray-300 text-sm"><MathRenderer text={question.explanation} /></div>
           </div>
         )}
       </div>

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import MathRenderer from '@/components/MathRenderer'
+import { QuestionText } from '@/components/QuestionCard'
 import MembershipPrompt from './MembershipPrompt'
 import { getSimilarQuestionsFast, isTypesenseEnabled } from '@/lib/typesense/browser-client'
 import {
@@ -34,6 +35,8 @@ interface Question {
   id: string
   question_text: string
   question_image_url: string | null
+  visual_type: string | null
+  visual_content: string | null
   options: { A: string; B: string; C: string; D: string; E?: string }
   correct_answer: 'A' | 'B' | 'C' | 'D' | 'E'
   explanation: string | null
@@ -128,6 +131,8 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
           id,
           question_text,
           question_image_url,
+          visual_type,
+          visual_content,
           options,
           correct_answer,
           explanation,
@@ -372,12 +377,16 @@ export default function QuestionSolveDrawer({ isOpen, onClose, questionId, searc
                 </div>
               )}
 
-              {/* Question Text */}
+              {/* Question Text + Visual Content */}
               <div className="text-lg text-gray-800 leading-relaxed">
-                <MathRenderer text={question.question_text} />
+                <QuestionText
+                  text={question.question_text}
+                  visualType={question.visual_type as any}
+                  visualContent={question.visual_content || undefined}
+                />
               </div>
 
-              {/* Question Image */}
+              {/* Question Image (eski tip - base64/URL) */}
               {question.question_image_url && (
                 <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-100">
                   <img

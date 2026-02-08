@@ -43,7 +43,9 @@ export const COLLECTIONS = {
   TOPICS: 'topics',  // 📚 Konu sayfaları için (şimşek hız!)
   LOCATIONS: 'locations',
   SCHOOLS: 'schools',
-  QUESTION_ACTIVITY: 'question_activity'  // Soru çözüm aktiviteleri
+  QUESTION_ACTIVITY: 'question_activity',  // Soru çözüm aktiviteleri
+  MOCK_EXAMS: 'mock_exams',  // Deneme sınavları
+  MOCK_EXAM_RESULTS: 'mock_exam_results',  // Deneme sonuçları
 } as const
 
 // Typesense aktif mi? (client-side)

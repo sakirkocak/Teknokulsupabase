@@ -12,6 +12,7 @@ import {
 
 import QuestionSearch from './QuestionSearch'
 import JarvisScene from './JarvisScene'
+import MathRenderer from '@/components/MathRenderer'
 
 // ===== TYPES =====
 interface Message {
@@ -687,7 +688,7 @@ export default function JarvisStudioPage() {
               </div>
               
               <div className="p-4 bg-slate-800 rounded-xl">
-                <p className="text-sm text-gray-300">{currentQuizQ?.question_text}</p>
+                <div className="text-sm text-gray-300"><MathRenderer text={currentQuizQ?.question_text || ''} /></div>
               </div>
               
               {currentQuizQ?.options && (
@@ -714,7 +715,7 @@ export default function JarvisStudioPage() {
                         quizAnswered && selectedAnswer === key ? 'bg-red-500 text-white' :
                         'bg-slate-700 text-gray-400'
                       }`}>{key}</span>
-                      <span className="text-sm text-gray-300">{value}</span>
+                      <span className="text-sm text-gray-300"><MathRenderer text={value} /></span>
                       {quizAnswered && key === currentQuizQ.correct_answer && <CheckCircle className="w-5 h-5 text-green-400 ml-auto" />}
                       {quizAnswered && selectedAnswer === key && key !== currentQuizQ.correct_answer && <XCircle className="w-5 h-5 text-red-400 ml-auto" />}
                     </button>

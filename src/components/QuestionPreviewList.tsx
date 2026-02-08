@@ -9,6 +9,8 @@ interface Question {
   question_text: string
   options: { A: string; B: string; C: string; D: string; E?: string }
   difficulty: string
+  visual_type?: string | null
+  visual_content?: string | null
 }
 
 interface QuestionPreviewListProps {
@@ -45,6 +47,11 @@ export default function QuestionPreviewList({ questions, subject, grade }: Quest
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${difficulty.color}`}>
                     <DiffIcon className="w-3 h-3" />
                     {difficulty.label}
+                  </span>
+                )}
+                {question.visual_type && question.visual_type !== 'none' && question.visual_content && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 text-xs font-medium rounded-full">
+                    Yeni Nesil
                   </span>
                 )}
               </div>

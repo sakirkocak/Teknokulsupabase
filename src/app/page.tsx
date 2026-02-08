@@ -781,6 +781,10 @@ export default function HomePage() {
                   <Trophy className="w-4 h-4" />
                   Liderlik
                 </Link>
+                <Link href="/deneme-dunyasi" className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-100 text-violet-600 rounded-full font-medium text-sm hover:bg-violet-200 transition-colors">
+                  <FileText className="w-4 h-4" />
+                  Deneme Sınavları
+                </Link>
               </div>
             </div>
 
@@ -2178,6 +2182,114 @@ export default function HomePage() {
                   />
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Deneme Dünyası - CTA Section */}
+      <section className="py-20 px-4 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 relative overflow-hidden">
+        {/* Background decorations */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-40 h-40 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-60 h-60 bg-white rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-white rounded-full blur-3xl" />
+        </div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Sol: Metin */}
+            <div>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-6">
+                <Calendar className="w-4 h-4" />
+                26 Nisan 2026 - Bursluluk Sınavı
+              </div>
+              <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6 leading-tight">
+                Deneme Dünyası
+              </h2>
+              <p className="text-xl text-white/80 mb-8 leading-relaxed">
+                Gerçek sınav formatında deneme sınavları çöz. Puanını gör, sıralamana bak,
+                eksik konularını tespit et. 5-11. sınıf bursluluk sınavlarına tam hazırlık.
+              </p>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+                {[
+                  { value: '80', label: 'Soru' },
+                  { value: '100', label: 'Dakika' },
+                  { value: '4', label: 'Ders' },
+                  { value: '500', label: 'Puan' },
+                ].map((stat, i) => (
+                  <div key={i} className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 text-center">
+                    <div className="text-2xl font-bold text-white">{stat.value}</div>
+                    <div className="text-white/60 text-sm">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-4">
+                <Link
+                  href="/deneme-dunyasi"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-white text-violet-700 rounded-2xl font-bold text-lg hover:bg-violet-50 hover:scale-105 transition-all shadow-xl shadow-black/20"
+                >
+                  <Play className="w-5 h-5" />
+                  Deneme Çöz
+                </Link>
+                <Link
+                  href="/kayit"
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-2xl font-bold text-lg hover:bg-white/20 transition-all border border-white/20"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                  Kayıt Ol
+                </Link>
+              </div>
+            </div>
+
+            {/* Sag: Sinav Onizleme Karti */}
+            <div className="hidden lg:block">
+              <div className="bg-white rounded-3xl p-8 shadow-2xl shadow-black/20 transform rotate-1 hover:rotate-0 transition-transform">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <div className="text-sm text-surface-400 mb-1">Bursluluk Deneme</div>
+                    <div className="text-xl font-bold text-surface-900">8. Sınıf Deneme - 1</div>
+                  </div>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-violet-100 text-violet-700 rounded-xl font-medium text-sm">
+                    <Clock className="w-4 h-4" />
+                    100 dk
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {[
+                    { name: 'Türkçe', count: 20, color: 'bg-red-500', width: 'w-full' },
+                    { name: 'Matematik', count: 20, color: 'bg-blue-500', width: 'w-full' },
+                    { name: 'Fen Bilimleri', count: 20, color: 'bg-green-500', width: 'w-full' },
+                    { name: 'Sosyal Bilgiler', count: 20, color: 'bg-amber-500', width: 'w-full' },
+                  ].map((subject, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className={`w-3 h-3 ${subject.color} rounded-full`} />
+                      <span className="text-sm text-surface-700 flex-1">{subject.name}</span>
+                      <span className="text-sm font-medium text-surface-500">{subject.count} soru</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-surface-100">
+                  <div className="flex items-center gap-2 text-sm text-surface-500">
+                    <Users className="w-4 h-4" />
+                    Katılımcılar
+                  </div>
+                  <div className="flex -space-x-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">
+                        {String.fromCharCode(65 + i)}
+                      </div>
+                    ))}
+                    <div className="w-8 h-8 rounded-full bg-surface-200 border-2 border-white flex items-center justify-center text-surface-500 text-xs font-bold">
+                      +
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

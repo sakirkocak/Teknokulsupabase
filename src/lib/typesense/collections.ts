@@ -251,6 +251,60 @@ export const questionActivitySchema: CollectionCreateSchema = {
 }
 
 // ============================================
+// MOCK EXAMS - Deneme Sinavlari
+// ============================================
+
+export const mockExamsSchema: CollectionCreateSchema = {
+  name: 'mock_exams',
+  fields: [
+    { name: 'exam_id', type: 'string' },
+    { name: 'title', type: 'string' },
+    { name: 'slug', type: 'string' },
+    { name: 'description', type: 'string', optional: true },
+    { name: 'grade', type: 'int32', facet: true },
+    { name: 'exam_type', type: 'string', facet: true },
+    { name: 'duration', type: 'int32' },
+    { name: 'question_count', type: 'int32' },
+    { name: 'is_active', type: 'bool', facet: true },
+    { name: 'total_attempts', type: 'int32', sort: true },
+    { name: 'average_score', type: 'float', optional: true },
+    { name: 'subjects', type: 'string[]', facet: true },
+    { name: 'start_date', type: 'int64', optional: true },
+    { name: 'end_date', type: 'int64', optional: true },
+    { name: 'created_at', type: 'int64' },
+  ],
+  default_sorting_field: 'created_at'
+}
+
+// ============================================
+// MOCK EXAM RESULTS - Deneme Sonuclari
+// ============================================
+
+export const mockExamResultsSchema: CollectionCreateSchema = {
+  name: 'mock_exam_results',
+  fields: [
+    { name: 'result_id', type: 'string' },
+    { name: 'exam_id', type: 'string', facet: true },
+    { name: 'exam_title', type: 'string' },
+    { name: 'user_id', type: 'string', facet: true },
+    { name: 'student_name', type: 'string' },
+    { name: 'score', type: 'float', sort: true },
+    { name: 'total_net', type: 'float' },
+    { name: 'time_taken', type: 'int32' },
+    { name: 'grade', type: 'int32', facet: true },
+    { name: 'exam_type', type: 'string', facet: true },
+    { name: 'rank', type: 'int32' },
+    { name: 'percentile', type: 'float' },
+    { name: 'turkce_net', type: 'float', optional: true },
+    { name: 'matematik_net', type: 'float', optional: true },
+    { name: 'fen_net', type: 'float', optional: true },
+    { name: 'sosyal_net', type: 'float', optional: true },
+    { name: 'completed_at', type: 'int64' },
+  ],
+  default_sorting_field: 'score'
+}
+
+// ============================================
 // DOCUMENT TYPE DEFINITIONS
 // ============================================
 
@@ -413,4 +467,46 @@ export interface QuestionActivityDocument {
   subject_code?: string
   grade?: number
   created_at: number
+}
+
+// Mock Exam document tipi (deneme sinavlari)
+export interface MockExamDocument {
+  id: string
+  exam_id: string
+  title: string
+  slug: string
+  description?: string
+  grade: number
+  exam_type: string
+  duration: number
+  question_count: number
+  is_active: boolean
+  total_attempts: number
+  average_score?: number
+  subjects: string[]
+  start_date?: number
+  end_date?: number
+  created_at: number
+}
+
+// Mock Exam Result document tipi (deneme sonuclari)
+export interface MockExamResultDocument {
+  id: string
+  result_id: string
+  exam_id: string
+  exam_title: string
+  user_id: string
+  student_name: string
+  score: number
+  total_net: number
+  time_taken: number
+  grade: number
+  exam_type: string
+  rank: number
+  percentile: number
+  turkce_net?: number
+  matematik_net?: number
+  fen_net?: number
+  sosyal_net?: number
+  completed_at: number
 }
