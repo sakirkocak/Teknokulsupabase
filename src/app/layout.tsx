@@ -160,6 +160,13 @@ export default function RootLayout({
             
             gtag('config', 'G-C6HMDXCKK8');
             gtag('config', 'AW-17821953417');
+            gtag('config', 'AW-1004911211');
+
+            gtag('event', 'conversion', {
+              'send_to': 'AW-1004911211/j1d_CPCe_N0bEOv0lt8D',
+              'value': 1.0,
+              'currency': 'TRY'
+            });
           `}
         </Script>
         
