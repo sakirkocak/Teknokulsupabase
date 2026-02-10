@@ -47,17 +47,10 @@ export default function MathRenderer({ text, content, className = '' }: MathRend
     // Times'tan sonra gelen rakam (örn: times3)
     processed = processed.replace(/\s*times\s*(\d)/g, ' \\times$1')
     
-    // 4. Double backslash temizliği (JSON'dan gelirken oluşabilir)
-    // \\frac -> \frac
-    // Not: Bazen \\ gerekebilir (newline gibi), o yüzden sadece latex komutlarını hedefliyoruz
-    processed = processed.replace(/\\\\frac/g, '\\frac')
-    processed = processed.replace(/\\\\sqrt/g, '\\sqrt')
-    processed = processed.replace(/\\\\times/g, '\\times')
-    processed = processed.replace(/\\\\cdot/g, '\\cdot')
-    processed = processed.replace(/\\\\pi/g, '\\pi')
-    processed = processed.replace(/\\\\alpha/g, '\\alpha')
-    processed = processed.replace(/\\\\beta/g, '\\beta')
-    processed = processed.replace(/\\\\theta/g, '\\theta')
+    // 4. Çoklu backslash temizliği (JSON encoding, DB escape vb.)
+    // \\frac, \\\frac, \\\\frac -> \frac
+    // Bilinen LaTeX komutlarından önceki fazla backslash'leri tek'e indir
+    processed = processed.replace(/\\{2,}(frac|sqrt|times|cdot|pi|alpha|beta|gamma|theta|omega|sigma|lambda|mu|delta|Delta|circ|approx|text|begin|end|left|right|rightarrow|div|neq|leq|geq|infty|sum|prod|int|log|ln|sin|cos|tan|lim|pm|mp)/g, '\\$1')
 
     // 5. Kesirleri düzelt: frac12 -> \frac{1}{2} (Bozuk render pattern'i)
     // Örnek: frac29 -> \frac{2}{9} (sadece tek haneli sayılar için güvenli)
