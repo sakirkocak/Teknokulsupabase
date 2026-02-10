@@ -609,7 +609,13 @@ export default function SoruBankasiPage() {
     if (topic) {
       setSelectedTopic(topic)
     }
-    
+
+    // ✅ REF'leri güncelle - seçili ders varsa ders bazlı soru gelsin
+    if (selectedSubject) {
+      activeSubjectIdRef.current = selectedSubject.subject_id
+    }
+    activeGradeRef.current = selectedGrade
+
     setViewMode('practice')
     setQuestionIndex(0)
     setSessionStats({ correct: 0, wrong: 0 })
@@ -688,7 +694,7 @@ export default function SoruBankasiPage() {
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
-      .or('question_image_url.not.is.null,visual_type.neq.none')
+      .or('question_image_url.not.is.null,visual_content.not.is.null')
 
     // Eğer bir ders seçiliyse, o dersten getir
     if (selectedSubject) {
@@ -743,7 +749,7 @@ export default function SoruBankasiPage() {
         topic:topics(id, main_topic, grade, subject:subjects(id, name, code))
       `)
       .eq('is_active', true)
-      .or('question_image_url.not.is.null,visual_type.neq.none')
+      .or('question_image_url.not.is.null,visual_content.not.is.null')
 
     if (selectedSubject) {
       const topicIds = topics.map(t => t.id)
@@ -1003,7 +1009,7 @@ export default function SoruBankasiPage() {
 
     // Görüntülü soru filtresi (hem image_url hem visual_type)
     if (showImageOnly) {
-      query = query.or('question_image_url.not.is.null,visual_type.neq.none')
+      query = query.or('question_image_url.not.is.null,visual_content.not.is.null')
     }
 
     const { data } = await query
