@@ -202,15 +202,16 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Typesense'den sorular çek (~130ms)
+ * Typesense'den soru ID'leri çek, ardından Supabase'den seçenekleri al (hibrit yaklaşım)
+ * Typesense'de option_a/b/c/d alanları yok, bu yüzden Supabase'den tamamlıyoruz
  */
 async function getQuestionsFromTypesense(grade: number | null, subject: string | null, count: number) {
   const filters: string[] = []
-  
+
   if (grade) {
     filters.push(`grade:=${grade}`)
   }
-  
+
   if (subject && subject !== 'Karışık' && subject !== 'all') {
     // Boşluk içeren ders isimleri için backtick kullan
     filters.push(`subject_name:\`${subject}\``)
@@ -220,9 +221,9 @@ async function getQuestionsFromTypesense(grade: number | null, subject: string |
     q: '*',
     query_by: 'question_text',
     per_page: count * 3,
-    include_fields: 'id,question_text,option_a,option_b,option_c,option_d,option_e,correct_answer,explanation,image_url,subject_name,subject_code,main_topic,grade,difficulty'
+    include_fields: 'id,question_text,question_id,subject_name,subject_code,main_topic,grade,difficulty'
   }
-  
+
   if (filters.length > 0) {
     searchParams.filter_by = filters.join(' && ')
   }
@@ -232,11 +233,51 @@ async function getQuestionsFromTypesense(grade: number | null, subject: string |
     .documents()
     .search(searchParams)
 
-  const questions = (result.hits || []).map((hit: any) => hit.document)
-  
+  const typesenseQuestions = (result.hits || []).map((hit: any) => hit.document)
+
   // Karıştır ve istenen sayıda al
-  const shuffled = shuffleArray(questions)
-  return shuffled.slice(0, count)
+  const shuffled = shuffleArray(typesenseQuestions).slice(0, count)
+
+  if (shuffled.length === 0) return []
+
+  // Supabase'den seçenekleri, doğru cevabı ve açıklamayı çek
+  const questionIds = shuffled.map((q: any) => q.question_id || q.id)
+  const { data: supabaseData, error: sbError } = await supabase
+    .from('questions')
+    .select('id, options, correct_answer, explanation, question_image_url')
+    .in('id', questionIds)
+
+  if (sbError) {
+    console.error('❌ Supabase options fetch hatası:', sbError)
+    return []
+  }
+
+  // ID bazlı map oluştur
+  const supabaseMap = new Map((supabaseData || []).map((q: any) => [q.id, q]))
+
+  // Typesense metadata + Supabase seçenekleri birleştir
+  return shuffled.map((tsQ: any) => {
+    const qId = tsQ.question_id || tsQ.id
+    const sbQ = supabaseMap.get(qId)
+    const options = sbQ?.options || {}
+    return {
+      id: qId,
+      question_text: tsQ.question_text,
+      option_a: options.A || options.a || '',
+      option_b: options.B || options.b || '',
+      option_c: options.C || options.c || '',
+      option_d: options.D || options.d || '',
+      option_e: options.E || options.e || null,
+      correct_answer: sbQ?.correct_answer || '',
+      explanation: sbQ?.explanation || '',
+      image_url: sbQ?.question_image_url || null,
+      subject_name: tsQ.subject_name,
+      subject_code: tsQ.subject_code,
+      topic_name: tsQ.main_topic,
+      grade: tsQ.grade,
+      difficulty: tsQ.difficulty,
+    }
+  }).filter((q: any) => q.option_a) // Seçeneği olmayan soruları filtrele
 }
 
 /**
