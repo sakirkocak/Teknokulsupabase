@@ -433,7 +433,15 @@ function HizliCozPageContent() {
 
     setAllQuestionsExhausted(false)
 
-    // 4. Zorluğa göre sırala: easy → medium → hard → legendary
+    // 4. Görsel ve normal soruları ayır
+    const visualQuestions = filteredQuestions.filter(
+      q => q.visual_type && q.visual_type !== 'none' && q.visual_content
+    )
+    const regularQuestions = filteredQuestions.filter(
+      q => !q.visual_type || q.visual_type === 'none' || !q.visual_content
+    )
+
+    // 5. Zorluğa göre sırala: easy → medium → hard → legendary
     const difficultyOrder: Record<string, number> = {
       'easy': 1,
       'medium': 2,
@@ -441,26 +449,42 @@ function HizliCozPageContent() {
       'legendary': 4
     }
 
-    const sortedQuestions = [...filteredQuestions].sort((a, b) => {
-      const orderA = difficultyOrder[a.difficulty] || 2
-      const orderB = difficultyOrder[b.difficulty] || 2
+    const sortByDifficulty = (arr: typeof filteredQuestions) =>
+      [...arr].sort((a, b) => {
+        const orderA = difficultyOrder[a.difficulty] || 2
+        const orderB = difficultyOrder[b.difficulty] || 2
+        if (orderA === orderB) return Math.random() - 0.5
+        return orderA - orderB
+      })
 
-      // Aynı zorluktakiler arasında rastgele sırala
-      if (orderA === orderB) {
-        return Math.random() - 0.5
+    const sortedRegular = sortByDifficulty(regularQuestions)
+    const sortedVisual = sortByDifficulty(visualQuestions)
+
+    // 6. Görsel soruları düzenli aralıklarla karıştır (her ~5 soruda 1 görsel)
+    const merged: typeof filteredQuestions = []
+    let vIdx = 0
+    const VISUAL_INTERVAL = 5
+
+    for (let i = 0; i < sortedRegular.length; i++) {
+      merged.push(sortedRegular[i])
+      if ((i + 1) % VISUAL_INTERVAL === 0 && vIdx < sortedVisual.length) {
+        merged.push(sortedVisual[vIdx++])
       }
+    }
+    // Kalan görsel soruları sona ekle
+    while (vIdx < sortedVisual.length) {
+      merged.push(sortedVisual[vIdx++])
+    }
 
-      return orderA - orderB
-    })
-
-    // Debug: Zorluk dağılımı
-    const easyCount = sortedQuestions.filter(q => q.difficulty === 'easy').length
-    const mediumCount = sortedQuestions.filter(q => q.difficulty === 'medium').length
-    const hardCount = sortedQuestions.filter(q => q.difficulty === 'hard').length
+    // Debug: Zorluk ve görsel dağılımı
+    const easyCount = merged.filter(q => q.difficulty === 'easy').length
+    const mediumCount = merged.filter(q => q.difficulty === 'medium').length
+    const hardCount = merged.filter(q => q.difficulty === 'hard').length
     console.log('📈 Zorluk dağılımı:', { easy: easyCount, medium: mediumCount, hard: hardCount })
+    console.log('🎨 Görsel soru:', sortedVisual.length, '/', merged.length)
 
     // Map topic array to single object (Supabase relation format)
-    const mappedQuestions = sortedQuestions.map((q: any) => ({
+    const mappedQuestions = merged.map((q: any) => ({
       ...q,
       topic: Array.isArray(q.topic) ? q.topic[0] : q.topic
     }))
@@ -929,14 +953,29 @@ function HizliCozPageContent() {
               <span className="text-white/60">{currentQuestion.topic?.main_topic}</span>
             </div>
 
-            {/* Question Text + Visual Content */}
-            <div className="text-white text-lg md:text-xl mb-8 leading-relaxed font-medium">
-              <QuestionText
-                text={currentQuestion.question_text}
-                visualType={currentQuestion.visual_type as any}
-                visualContent={currentQuestion.visual_content || undefined}
-              />
+            {/* Yeni Nesil badge */}
+            {currentQuestion.visual_type && currentQuestion.visual_type !== 'none' && currentQuestion.visual_content && (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-indigo-500/30 to-purple-500/30 border border-indigo-400/30 text-indigo-300 text-xs font-semibold rounded-full mb-4">
+                <Sparkles className="w-3 h-3" />
+                Yeni Nesil Soru
+              </div>
+            )}
+
+            {/* Question Text */}
+            <div className="text-white text-lg md:text-xl mb-4 leading-relaxed font-medium">
+              <MathRenderer text={currentQuestion.question_text} />
             </div>
+
+            {/* Visual Content - light background for readability */}
+            {currentQuestion.visual_type && currentQuestion.visual_type !== 'none' && currentQuestion.visual_content && (
+              <div className="mb-8 bg-white rounded-2xl p-4 border border-white/20">
+                <QuestionText
+                  text=""
+                  visualType={currentQuestion.visual_type as any}
+                  visualContent={currentQuestion.visual_content}
+                />
+              </div>
+            )}
 
             {/* Image (eski tip - base64/URL) */}
             {currentQuestion.question_image_url && (

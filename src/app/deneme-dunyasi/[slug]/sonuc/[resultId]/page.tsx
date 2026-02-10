@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronLeft, Share2, RefreshCw } from 'lucide-react'
+import { ChevronLeft, Share2, RefreshCw, Download } from 'lucide-react'
 import ExamResultSummary from '@/components/mock-exam/ExamResultSummary'
 import ExamSubjectBreakdown from '@/components/mock-exam/ExamSubjectBreakdown'
 import ExamTopicAnalysis from '@/components/mock-exam/ExamTopicAnalysis'
 import ExamLeaderboard from '@/components/mock-exam/ExamLeaderboard'
 import ExamAIRecommendations from '@/components/mock-exam/ExamAIRecommendations'
 import { analyzeTopics } from '@/lib/mock-exam/scoring'
+import { openExamReportPrint } from '@/lib/mock-exam/pdf-report'
 
 export default function ExamResultPage() {
   const params = useParams()
@@ -86,6 +87,13 @@ export default function ExamResultPage() {
           </Link>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => openExamReportPrint(data)}
+              className="flex items-center gap-1 px-3 py-2 text-sm text-surface-600 hover:bg-surface-100 rounded-xl"
+            >
+              <Download className="w-4 h-4" />
+              PDF Indir
+            </button>
             <Link
               href={`/deneme-dunyasi/${slug}/coz`}
               className="flex items-center gap-1 px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-xl"
