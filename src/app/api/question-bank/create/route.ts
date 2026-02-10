@@ -164,6 +164,8 @@ async function fetchQuestionDetails(
       options,
       correct_answer,
       difficulty,
+      visual_type,
+      visual_content,
       topic:topics(
         main_topic,
         subject:subjects(name)
@@ -192,7 +194,9 @@ async function fetchQuestionDetails(
       correct_answer: q.correct_answer || 'A',
       difficulty: q.difficulty || 'medium',
       subject_name: q.topic?.subject?.name || '',
-      main_topic: q.topic?.main_topic || ''
+      main_topic: q.topic?.main_topic || '',
+      visual_type: q.visual_type || null,
+      visual_content: q.visual_content || null,
     }
   })
 }
@@ -279,9 +283,14 @@ export async function POST(request: NextRequest) {
     // Karıştır ve seç
     const shuffledIds = shuffleArray(allQuestionIds)
     const selectedIds = shuffledIds.slice(0, parsed.question_count)
-    
+
     // Supabase'den detayları çek
-    const questions = await fetchQuestionDetails(supabase, selectedIds)
+    const rawQuestions = await fetchQuestionDetails(supabase, selectedIds)
+
+    // Gorsel sorulari one al
+    const visualQs = rawQuestions.filter(q => q.visual_content)
+    const regularQs = rawQuestions.filter(q => !q.visual_content)
+    const questions = [...visualQs, ...regularQs]
     
     if (questions.length < 10) {
       return NextResponse.json({

@@ -32,6 +32,58 @@ export interface SubjectConfig {
 
 export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
   // ===========================================
+  // BURSLULUK 2-3: Turkce 20, Mat 20, Hayat Bilgisi 20
+  // ===========================================
+  BURSLULUK_2: {
+    label: '2. Sinif Bursluluk Sinavi',
+    shortLabel: 'Bursluluk 2',
+    grades: [2],
+    duration: 60,
+    totalQuestions: 60,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 20, coefficient: 3 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 3 },
+      { code: 'hayat_bilgisi', name: 'Hayat Bilgisi', displayName: 'Hayat Bilgisi', questionCount: 20, coefficient: 3 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 200,
+  },
+  BURSLULUK_3: {
+    label: '3. Sinif Bursluluk Sinavi',
+    shortLabel: 'Bursluluk 3',
+    grades: [3],
+    duration: 60,
+    totalQuestions: 60,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 20, coefficient: 3 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 3 },
+      { code: 'hayat_bilgisi', name: 'Hayat Bilgisi', displayName: 'Hayat Bilgisi', questionCount: 20, coefficient: 3 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 200,
+  },
+  // ===========================================
+  // BURSLULUK 4: Turkce 20, Mat 20, Fen 20, Sosyal 20
+  // ===========================================
+  BURSLULUK_4: {
+    label: '4. Sinif Bursluluk Sinavi',
+    shortLabel: 'Bursluluk 4',
+    grades: [4],
+    duration: 80,
+    totalQuestions: 80,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 20, coefficient: 3 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 3 },
+      { code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 20, coefficient: 3 },
+      { code: 'sosyal_bilgiler', name: 'Sosyal Bilgiler', displayName: 'Sosyal Bilgiler', questionCount: 20, coefficient: 3 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 200,
+  },
+  // ===========================================
   // BURSLULUK 5-7: Turkce 20, Mat 20, Fen 20, Sosyal 20
   // ===========================================
   BURSLULUK_5: {
@@ -235,6 +287,9 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
 
 // Sinav turu etiketleri
 export const EXAM_TYPE_LABELS: Record<string, string> = {
+  BURSLULUK_2: '2. Sinif Bursluluk',
+  BURSLULUK_3: '3. Sinif Bursluluk',
+  BURSLULUK_4: '4. Sinif Bursluluk',
   BURSLULUK_5: '5. Sinif Bursluluk',
   BURSLULUK_6: '6. Sinif Bursluluk',
   BURSLULUK_7: '7. Sinif Bursluluk',
@@ -263,6 +318,7 @@ export const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: 
   tarih: { bg: 'bg-yellow-500', text: 'text-yellow-600', border: 'border-yellow-300', light: 'bg-yellow-50' },
   cografya: { bg: 'bg-teal-500', text: 'text-teal-600', border: 'border-teal-300', light: 'bg-teal-50' },
   felsefe: { bg: 'bg-violet-500', text: 'text-violet-600', border: 'border-violet-300', light: 'bg-violet-50' },
+  hayat_bilgisi: { bg: 'bg-pink-500', text: 'text-pink-600', border: 'border-pink-300', light: 'bg-pink-50' },
 }
 
 // Ders ikon emojileri
@@ -281,6 +337,7 @@ export const SUBJECT_ICONS: Record<string, string> = {
   tarih: 'TH',
   cografya: 'CG',
   felsefe: 'FL',
+  hayat_bilgisi: 'HB',
 }
 
 // Timer uyari esikleri (dakika)
@@ -305,6 +362,9 @@ export const STORAGE_KEYS = {
 
 // Sinav sinif secenekleri
 export const GRADE_OPTIONS = [
+  { value: 2, label: '2. Sinif' },
+  { value: 3, label: '3. Sinif' },
+  { value: 4, label: '4. Sinif' },
   { value: 5, label: '5. Sinif' },
   { value: 6, label: '6. Sinif' },
   { value: 7, label: '7. Sinif' },
@@ -330,6 +390,7 @@ export const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   tarih: 'Tarih',
   cografya: 'Coğrafya',
   felsefe: 'Felsefe',
+  hayat_bilgisi: 'Hayat Bilgisi',
   // Buyuk harfli versiyonlar (DB'den gelen)
   'Türkçe': 'Türkçe',
   'Matematik': 'Matematik',
@@ -344,6 +405,7 @@ export const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   'Tarih': 'Tarih',
   'Coğrafya': 'Coğrafya',
   'Felsefe': 'Felsefe',
+  'Hayat Bilgisi': 'Hayat Bilgisi',
 }
 
 // Subject code mapping (DB'deki -> lowercase)
@@ -372,4 +434,7 @@ export const SUBJECT_CODE_MAP: Record<string, string> = {
   'Tarih': 'tarih',
   'Coğrafya': 'cografya',
   'Felsefe': 'felsefe',
+  'Hayat Bilgisi': 'hayat_bilgisi',
+  'HAYAT BILGISI': 'hayat_bilgisi',
+  'Hayat bilgisi': 'hayat_bilgisi',
 }

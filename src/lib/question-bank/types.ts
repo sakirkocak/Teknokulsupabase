@@ -70,6 +70,8 @@ export interface QuestionForPDF {
   difficulty: string
   subject_name: string
   main_topic: string
+  visual_type?: string | null
+  visual_content?: string | null
 }
 
 export interface CreateBankRequest {

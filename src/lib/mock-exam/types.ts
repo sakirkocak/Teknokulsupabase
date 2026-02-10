@@ -3,7 +3,7 @@
 // =====================================================
 
 // Sinav turleri
-export type ExamType = 'BURSLULUK_5' | 'BURSLULUK_6' | 'BURSLULUK_7' | 'BURSLULUK_8' | 'BURSLULUK_9' | 'BURSLULUK_10' | 'BURSLULUK_11' | 'LGS' | 'TYT' | 'AYT'
+export type ExamType = 'BURSLULUK_2' | 'BURSLULUK_3' | 'BURSLULUK_4' | 'BURSLULUK_5' | 'BURSLULUK_6' | 'BURSLULUK_7' | 'BURSLULUK_8' | 'BURSLULUK_9' | 'BURSLULUK_10' | 'BURSLULUK_11' | 'LGS' | 'TYT' | 'AYT'
 
 // Sinav durumu
 export type ExamStatus = 'draft' | 'active' | 'ended'
@@ -12,7 +12,7 @@ export type ExamStatus = 'draft' | 'active' | 'ended'
 export type AnswerOption = 'A' | 'B' | 'C' | 'D'
 
 // Ders kodlari (Typesense ve DB'de kullanilan)
-export type SubjectCode = 'turkce' | 'matematik' | 'fen_bilimleri' | 'sosyal_bilgiler' | 'inkilap_tarihi' | 'din_kulturu' | 'ingilizce' | 'edebiyat' | 'fizik' | 'kimya' | 'biyoloji' | 'tarih' | 'cografya' | 'felsefe'
+export type SubjectCode = 'turkce' | 'matematik' | 'fen_bilimleri' | 'sosyal_bilgiler' | 'hayat_bilgisi' | 'inkilap_tarihi' | 'din_kulturu' | 'ingilizce' | 'edebiyat' | 'fizik' | 'kimya' | 'biyoloji' | 'tarih' | 'cografya' | 'felsefe'
 
 // =====================================================
 // SINAV MODELLERI

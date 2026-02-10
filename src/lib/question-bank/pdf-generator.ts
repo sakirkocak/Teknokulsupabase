@@ -91,7 +91,11 @@ export function generatePDFHtml(
     mixed: 'Karışık'
   }
   const difficultyName = parsed.difficulty ? difficultyNames[parsed.difficulty] : 'Karışık'
-  
+
+  // Watermark SVG
+  const watermarkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" transform="rotate(-30 150 100)" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="%23667eea" opacity="0.09" letter-spacing="2">teknokul.com.tr</text></svg>`
+  const watermarkBg = `data:image/svg+xml,${watermarkSvg}`
+
   // Sınıf/Sınav bilgisi
   const gradeInfo = parsed.exam_type 
     ? parsed.exam_type 
@@ -105,10 +109,13 @@ export function generatePDFHtml(
   // Sorular HTML
   const questionsHtml = questions.map((q, index) => {
     const questionText = renderLatex(q.question_text)
-    const imageHtml = q.question_image_url 
+    const imageHtml = q.question_image_url
       ? `<div class="question-image"><img src="${q.question_image_url}" alt="Soru görseli" /></div>`
       : ''
-    
+    const visualHtml = q.visual_content
+      ? `<div class="visual-content">${q.visual_content}</div>`
+      : ''
+
     return `
       <div class="question">
         <div class="question-header">
@@ -116,6 +123,7 @@ export function generatePDFHtml(
         </div>
         <div class="question-text">${questionText}</div>
         ${imageHtml}
+        ${visualHtml}
         <div class="options">
           <div class="option"><span class="option-letter">A)</span> ${renderLatex(q.option_a)}</div>
           <div class="option"><span class="option-letter">B)</span> ${renderLatex(q.option_b)}</div>
@@ -148,6 +156,8 @@ export function generatePDFHtml(
       line-height: 1.6;
       color: #1f2937;
       background: white;
+      background-image: url("${watermarkBg}");
+      background-repeat: repeat;
     }
     
     /* KAPAK SAYFASI */
@@ -235,7 +245,7 @@ export function generatePDFHtml(
     
     /* SORULAR BÖLÜMÜ */
     .questions-container {
-      padding: 30px 40px;
+      padding: 15px 25px;
     }
     
     .section-header {
@@ -260,62 +270,86 @@ export function generatePDFHtml(
     }
     
     .question {
-      margin-bottom: 30px;
-      padding: 20px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
       background: #f9fafb;
-      border-radius: 12px;
+      border-radius: 8px;
       border-left: 4px solid #667eea;
       page-break-inside: avoid;
     }
     
     .question-header {
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
     
     .question-number {
       display: inline-block;
       background: #667eea;
       color: white;
-      padding: 4px 12px;
+      padding: 2px 8px;
       border-radius: 20px;
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
     }
     
     .question-text {
-      font-size: 12pt;
-      line-height: 1.7;
+      font-size: 10pt;
+      line-height: 1.4;
       color: #1f2937;
-      margin-bottom: 15px;
+      margin-bottom: 8px;
     }
     
     .question-image {
-      margin: 15px 0;
+      margin: 6px 0;
       text-align: center;
     }
-    
+
     .question-image img {
-      max-width: 80%;
-      max-height: 200px;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      max-width: 70%;
+      max-height: 150px;
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
     
     .options {
       display: grid;
-      gap: 10px;
-      margin-top: 15px;
+      gap: 4px;
+      margin-top: 8px;
     }
-    
+
     .option {
       display: flex;
       align-items: flex-start;
-      gap: 10px;
-      padding: 10px 15px;
+      gap: 8px;
+      padding: 4px 8px;
       background: white;
-      border-radius: 8px;
+      border-radius: 6px;
       border: 1px solid #e5e7eb;
+      font-size: 10pt;
+      line-height: 1.4;
+    }
+
+    .visual-content {
+      margin: 8px 0;
+      max-height: 150px;
+      overflow: hidden;
+    }
+
+    .visual-content table {
+      border-collapse: collapse;
+      font-size: 9px;
+      margin: 0 auto;
+    }
+
+    .visual-content td, .visual-content th {
+      border: 1px solid #d1d5db;
+      padding: 2px 6px;
+    }
+
+    .visual-content svg {
+      max-width: 100%;
+      max-height: 140px;
     }
     
     .option-letter {
@@ -408,8 +442,9 @@ export function generatePDFHtml(
       body {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
+        background-image: url("${watermarkBg}") !important;
       }
-      
+
       .cover {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
         -webkit-print-color-adjust: exact !important;
@@ -423,6 +458,7 @@ export function generatePDFHtml(
       .answer-item {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
       }
+
     }
     
     @page {

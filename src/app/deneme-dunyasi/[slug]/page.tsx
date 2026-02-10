@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Clock, BookOpen, Users, BarChart3, Play, ChevronLeft, AlertTriangle, CheckCircle
+  Clock, BookOpen, Users, BarChart3, Play, ChevronLeft, AlertTriangle, CheckCircle, Download
 } from 'lucide-react'
 import { EXAM_TYPE_LABELS, SUBJECT_COLORS, SUBJECT_DISPLAY_NAMES } from '@/lib/mock-exam/constants'
+import { ExamQuestionForClient } from '@/lib/mock-exam/types'
+import { openExamPaperPrint } from '@/lib/mock-exam/exam-paper-pdf'
 
 export default function ExamDetailPage() {
   const router = useRouter()
@@ -14,6 +16,8 @@ export default function ExamDetailPage() {
   const slug = params.slug as string
 
   const [exam, setExam] = useState<any>(null)
+  const [questions, setQuestions] = useState<ExamQuestionForClient[]>([])
+  const [subjectGroups, setSubjectGroups] = useState<Record<string, ExamQuestionForClient[]>>({})
   const [loading, setLoading] = useState(true)
   const [previousResult, setPreviousResult] = useState<any>(null)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -46,6 +50,8 @@ export default function ExamDetailPage() {
 
       const detailData = await detailRes.json()
       setExam(detailData.exam)
+      setQuestions(detailData.questions || [])
+      setSubjectGroups(detailData.subjectGroups || {})
       setPreviousResult(detailData.userPreviousResult)
     } catch (e) {
       console.error('Exam detail error:', e)
@@ -60,6 +66,11 @@ export default function ExamDetailPage() {
     } else {
       router.push(`/deneme-dunyasi/${slug}/coz`)
     }
+  }
+
+  function handleDownloadPaper() {
+    if (!exam || questions.length === 0) return
+    openExamPaperPrint(exam, questions, subjectGroups)
   }
 
   if (loading) {
@@ -185,14 +196,26 @@ export default function ExamDetailPage() {
             </div>
           )}
 
-          {/* Basla butonu */}
-          <button
-            onClick={handleStartExam}
-            className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-primary-600 text-white rounded-xl text-lg font-bold hover:bg-primary-700 transition-colors"
-          >
-            <Play className="w-6 h-6" />
-            Sinava Basla
-          </button>
+          {/* Butonlar */}
+          <div className="flex gap-3">
+            <button
+              onClick={handleStartExam}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary-600 text-white rounded-xl text-lg font-bold hover:bg-primary-700 transition-colors"
+            >
+              <Play className="w-6 h-6" />
+              Sinava Basla
+            </button>
+            {questions.length > 0 && (
+              <button
+                onClick={handleDownloadPaper}
+                className="flex items-center justify-center gap-2 px-5 py-4 border-2 border-surface-200 text-surface-600 rounded-xl text-sm font-medium hover:bg-surface-50 hover:border-surface-300 transition-colors"
+                title="Soru kagidini indir / yazdir"
+              >
+                <Download className="w-5 h-5" />
+                <span className="hidden sm:inline">Soru Kagidi</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Yeniden cozme onay */}
