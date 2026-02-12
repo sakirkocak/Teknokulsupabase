@@ -83,6 +83,18 @@ interface Subject {
   color: string
 }
 
+interface ExamTopic {
+  id: string
+  exam_type: string
+  subject_code: string
+  subject_name: string
+  main_topic: string
+  sub_topic: string | null
+  topic_order: number
+  question_weight: number
+  osym_frequency: string
+}
+
 interface GeneratedQuestion {
   question_text: string
   options: {
@@ -168,6 +180,14 @@ export default function AIQuestionGeneratorPage() {
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
 
+  // ========== SINAV BAZLI MOD ==========
+  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | null>(null)
+  const [examSubjects, setExamSubjects] = useState<{ subject_code: string; subject_name: string; topics: ExamTopic[] }[]>([])
+  const [selectedExamSubject, setSelectedExamSubject] = useState<string>('')
+  const [examTopics, setExamTopics] = useState<ExamTopic[]>([])
+  const [selectedExamTopic, setSelectedExamTopic] = useState<ExamTopic | null>(null)
+  const [loadingExamTopics, setLoadingExamTopics] = useState(false)
+
   // ========== DİL SEÇİMİ (QUESTLY GLOBAL) ==========
   const [selectedLanguage, setSelectedLanguage] = useState<'tr' | 'en'>('tr')
   
@@ -203,6 +223,8 @@ export default function AIQuestionGeneratorPage() {
     lastError: null,
   })
   const [batchTopics, setBatchTopics] = useState<Topic[]>([])
+  const [batchExamTopics, setBatchExamTopics] = useState<ExamTopic[]>([])
+  const [batchSelectedExamSubjects, setBatchSelectedExamSubjects] = useState<string[]>([])
   const [shouldStopBatch, setShouldStopBatch] = useState(false)
   const [batchLogs, setBatchLogs] = useState<{ time: Date; message: string; type: 'info' | 'success' | 'error' | 'warning' }[]>([])
 
@@ -309,16 +331,67 @@ export default function AIQuestionGeneratorPage() {
     }
   }, [selectedSubject, selectedGrade, supabase])
 
+  // Load exam topics when exam mode changes
+  const loadExamTopics = useCallback(async (examType: string) => {
+    setLoadingExamTopics(true)
+    try {
+      const response = await fetch(`/api/exam-topics?exam_type=${examType}`)
+      const data = await response.json()
+      if (data.subjects) {
+        setExamSubjects(data.subjects)
+      }
+    } catch (error) {
+      console.error('Sınav konuları yüklenirken hata:', error)
+    } finally {
+      setLoadingExamTopics(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedExamMode) {
+      loadExamTopics(selectedExamMode)
+      setSelectedExamSubject('')
+      setSelectedExamTopic(null)
+      setExamTopics([])
+      setCurrentStep(1)
+    }
+  }, [selectedExamMode, loadExamTopics])
+
+  // When exam subject changes, filter topics
+  useEffect(() => {
+    if (selectedExamSubject && examSubjects.length > 0) {
+      const subjectData = examSubjects.find(s => s.subject_code === selectedExamSubject)
+      setExamTopics(subjectData?.topics || [])
+      setSelectedExamTopic(null)
+    }
+  }, [selectedExamSubject, examSubjects])
+
   async function handleGenerate() {
-    if (!selectedSubject || !selectedTopic || !selectedGrade) {
-      alert('Lütfen tüm seçimleri yapın')
-      return
+    // Sınav modu kontrolü
+    if (selectedExamMode) {
+      if (!selectedExamSubject || !selectedExamTopic) {
+        alert('Lütfen ders ve konu seçin')
+        return
+      }
+    } else {
+      if (!selectedSubject || !selectedTopic || !selectedGrade) {
+        alert('Lütfen tüm seçimleri yapın')
+        return
+      }
     }
 
-    const topic = topics.find(t => t.id === selectedTopic)
-    const subject = subjects.find(s => s.id === selectedSubject)
-    
-    if (!topic || !subject) return
+    const isExamMode = !!selectedExamMode
+
+    // Sınav modunda exam topic bilgilerini kullan
+    const subjectName = isExamMode ? selectedExamTopic!.subject_name : subjects.find(s => s.id === selectedSubject)?.name
+    const topicName = isExamMode
+      ? selectedExamTopic!.main_topic + (selectedExamTopic!.sub_topic ? ` - ${selectedExamTopic!.sub_topic}` : '')
+      : (() => { const t = topics.find(t => t.id === selectedTopic); return t ? t.main_topic + (t.sub_topic ? ` - ${t.sub_topic}` : '') : '' })()
+    const learningOutcome = isExamMode
+      ? selectedExamTopic!.main_topic + (selectedExamTopic!.sub_topic ? ` - ${selectedExamTopic!.sub_topic}` : '')
+      : topics.find(t => t.id === selectedTopic)?.learning_outcome || topicName
+
+    if (!subjectName) return
 
     setGenerating(true)
     setGeneratedQuestions([])
@@ -329,19 +402,20 @@ export default function AIQuestionGeneratorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          grade: selectedGrade,
-          subject: subject.name,
-          topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
-          learningOutcome: topic.learning_outcome || topic.main_topic,
+          grade: isExamMode ? 11 : selectedGrade,
+          subject: subjectName,
+          topic: topicName,
+          learningOutcome,
           difficulty: selectedDifficulty,
           count: questionCount,
-          lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
-          visualType: selectedVisualType  // 🆕 Yeni Nesil Soru görsel türü
+          lang: selectedLanguage,
+          visualType: selectedVisualType,
+          examMode: selectedExamMode  // 📋 TYT/AYT modu
         })
       })
 
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Soru üretme hatası')
       }
@@ -358,8 +432,11 @@ export default function AIQuestionGeneratorPage() {
   async function handleSaveAll() {
     if (generatedQuestions.length === 0) return
 
-    const topic = topics.find(t => t.id === selectedTopic)
-    if (!topic) return
+    const isExamMode = !!selectedExamMode
+
+    // Sınav modunda topic_id olarak curriculum topic'i bulmaya çalış, yoksa null
+    const topicId = isExamMode ? null : selectedTopic
+    if (!isExamMode && !topicId) return
 
     setSaving(true)
     let successCount = 0
@@ -368,23 +445,34 @@ export default function AIQuestionGeneratorPage() {
 
     try {
       for (const question of generatedQuestions) {
+        const insertData: Record<string, any> = {
+          difficulty: question.difficulty,
+          question_text: question.question_text,
+          options: question.options,
+          correct_answer: question.correct_answer,
+          explanation: question.explanation,
+          source: isExamMode ? `AI Generated (${selectedExamMode})` : selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated',
+          is_active: true,
+          created_by: profile?.id,
+          lang: selectedLanguage,
+          visual_type: question.visual_type || null,
+          visual_content: question.visual_content || null,
+        }
+
+        // Sınav modu: exam_types ve exam_topic_id ekle
+        if (isExamMode && selectedExamTopic) {
+          insertData.exam_types = [selectedExamMode!.toLowerCase()]
+          insertData.exam_topic_id = selectedExamTopic.id
+        }
+
+        // Curriculum topic_id varsa ekle
+        if (topicId) {
+          insertData.topic_id = topicId
+        }
+
         const { data, error } = await supabase
           .from('questions')
-          .insert({
-            topic_id: selectedTopic,
-            difficulty: question.difficulty,
-            question_text: question.question_text,
-            options: question.options,
-            correct_answer: question.correct_answer,
-            explanation: question.explanation,
-            source: selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated',
-            is_active: true,
-            created_by: profile?.id,
-            lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
-            // 🆕 Yeni Nesil Soru alanları
-            visual_type: question.visual_type || null,
-            visual_content: question.visual_content || null
-          })
+          .insert(insertData)
           .select('id')
           .single()
 
@@ -448,6 +536,16 @@ export default function AIQuestionGeneratorPage() {
   }
 
   function canProceedToStep(step: number): boolean {
+    if (selectedExamMode) {
+      // Sınav bazlı mod: TYT dersi → TYT konusu → Ayarlar → Üret
+      switch (step) {
+        case 2: return selectedExamSubject !== ''
+        case 3: return selectedExamSubject !== '' && selectedExamTopic !== null
+        case 4: return selectedExamSubject !== '' && selectedExamTopic !== null
+        case 5: return selectedExamSubject !== '' && selectedExamTopic !== null
+        default: return true
+      }
+    }
     switch (step) {
       case 2: return selectedGrade !== null
       case 3: return selectedGrade !== null && selectedSubject !== ''
@@ -494,11 +592,70 @@ export default function AIQuestionGeneratorPage() {
     addBatchLog(`${data?.length || 0} konu bulundu`, 'success')
   }
 
+  const loadBatchExamTopics = () => {
+    if (batchSelectedExamSubjects.length === 0 || examSubjects.length === 0) return
+
+    const topics: ExamTopic[] = []
+    for (const subjectCode of batchSelectedExamSubjects) {
+      const subjectData = examSubjects.find(s => s.subject_code === subjectCode)
+      if (subjectData) {
+        topics.push(...subjectData.topics)
+      }
+    }
+
+    setBatchExamTopics(topics)
+    addBatchLog(`${topics.length} TYT konusu seçildi (${batchSelectedExamSubjects.length} ders)`, 'success')
+  }
+
   useEffect(() => {
-    if (generationMode === 'batch' && selectedGrade && batchSelectedSubjects.length > 0) {
+    if (generationMode === 'batch' && selectedExamMode === 'TYT' && batchSelectedExamSubjects.length > 0 && examSubjects.length > 0) {
+      loadBatchExamTopics()
+    } else if (generationMode === 'batch' && !selectedExamMode && selectedGrade && batchSelectedSubjects.length > 0) {
       loadBatchTopics()
     }
-  }, [generationMode, selectedGrade, batchSelectedSubjects])
+  }, [generationMode, selectedGrade, batchSelectedSubjects, selectedExamMode, batchSelectedExamSubjects, examSubjects])
+
+  const generateQuestionsForExamTopic = async (examTopic: ExamTopic, difficulty: string): Promise<GeneratedQuestion[]> => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
+    try {
+      const response = await fetch('/api/ai/generate-curriculum-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: examTopic.subject_name,
+          topic: examTopic.main_topic + (examTopic.sub_topic ? ` - ${examTopic.sub_topic}` : ''),
+          learningOutcome: examTopic.main_topic + (examTopic.sub_topic ? ` - ${examTopic.sub_topic}` : ''),
+          difficulty,
+          count: batchQuestionsPerTopic,
+          lang: selectedLanguage,
+          visualType: batchSelectedVisualType,
+          examMode: 'TYT'
+        }),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMsg = errorData.error || `HTTP ${response.status}`
+        if (response.status === 429 || errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('quota')) {
+          throw new Error(`429: Rate limit aşıldı`)
+        }
+        throw new Error(errorMsg)
+      }
+
+      const data = await response.json()
+      return data.questions || []
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+      if (error.name === 'AbortError') throw new Error('Timeout: AI yanıt vermedi (60s)')
+      if (error.message === 'Failed to fetch') throw new Error('Network hatası: Bağlantı kurulamadı')
+      throw error
+    }
+  }
 
   const generateQuestionsForTopic = async (topic: Topic, difficulty: string): Promise<GeneratedQuestion[]> => {
     const subject = subjects.find(s => s.id === topic.subject_id)
@@ -559,7 +716,11 @@ export default function AIQuestionGeneratorPage() {
     }
   }
 
-  const saveQuestionsToDb = async (questions: GeneratedQuestion[], topicId: string): Promise<{ success: number; failed: number; savedIds: string[] }> => {
+  const saveQuestionsToDb = async (
+    questions: GeneratedQuestion[],
+    topicId: string | null,
+    examMeta?: { exam_types: string[]; exam_topic_id: string }
+  ): Promise<{ success: number; failed: number; savedIds: string[] }> => {
     let success = 0
     let failed = 0
     const savedIds: string[] = []
@@ -568,25 +729,34 @@ export default function AIQuestionGeneratorPage() {
     for (const question of questions) {
       let retries = 0
       let saved = false
-      
+
       while (retries < AUTO_GEN_CONFIG.DB_MAX_RETRIES && !saved) {
+        const insertData: Record<string, any> = {
+          difficulty: question.difficulty,
+          question_text: question.question_text,
+          options: question.options,
+          correct_answer: question.correct_answer,
+          explanation: question.explanation,
+          source: examMeta ? `AI Generated (TYT Batch)` : selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated (Batch)',
+          is_active: true,
+          created_by: profile?.id,
+          lang: selectedLanguage,
+          visual_type: question.visual_type || null,
+          visual_content: question.visual_content || null,
+        }
+
+        if (topicId) {
+          insertData.topic_id = topicId
+        }
+
+        if (examMeta) {
+          insertData.exam_types = examMeta.exam_types
+          insertData.exam_topic_id = examMeta.exam_topic_id
+        }
+
         const { data, error } = await supabase
           .from('questions')
-          .insert({
-            topic_id: topicId,
-            difficulty: question.difficulty,
-            question_text: question.question_text,
-            options: question.options,
-            correct_answer: question.correct_answer,
-            explanation: question.explanation,
-            source: selectedLanguage === 'en' ? 'AI Generated (Questly)' : 'AI Generated (Batch)',
-            is_active: true,
-            created_by: profile?.id,
-            lang: selectedLanguage,  // 🌍 Questly Global için dil desteği
-            // 🆕 Yeni Nesil Soru alanları
-            visual_type: question.visual_type || null,
-            visual_content: question.visual_content || null
-          })
+          .insert(insertData)
           .select('id')
           .single()
 
@@ -655,7 +825,10 @@ export default function AIQuestionGeneratorPage() {
   }
 
   const startBatchGeneration = async () => {
-    if (batchTopics.length === 0) {
+    const isExamBatch = !!selectedExamMode
+    const topicsList = isExamBatch ? batchExamTopics : batchTopics
+
+    if (topicsList.length === 0) {
       addBatchLog('Üretilecek konu bulunamadı!', 'error')
       return
     }
@@ -663,7 +836,7 @@ export default function AIQuestionGeneratorPage() {
     setShouldStopBatch(false)
     setBatchProgress({
       currentTopicIndex: 0,
-      totalTopics: batchTopics.length * batchSelectedDifficulties.length,
+      totalTopics: topicsList.length * batchSelectedDifficulties.length,
       completedTopics: [],
       failedTopics: [],
       totalQuestionsGenerated: 0,
@@ -674,7 +847,7 @@ export default function AIQuestionGeneratorPage() {
       lastError: null,
     })
     setBatchLogs([])
-    addBatchLog('🚀 Toplu üretim başlatıldı', 'info')
+    addBatchLog(`🚀 ${isExamBatch ? 'TYT ' : ''}Toplu üretim başlatıldı`, 'info')
 
     let totalGenerated = 0
     let totalSaved = 0
@@ -682,7 +855,7 @@ export default function AIQuestionGeneratorPage() {
     const completedTopics: string[] = []
     const failedTopics: string[] = []
 
-    for (const topic of batchTopics) {
+    for (const topic of topicsList) {
       for (const difficulty of batchSelectedDifficulties) {
         // Durdurma kontrolü
         if (shouldStopBatch) {
@@ -691,16 +864,22 @@ export default function AIQuestionGeneratorPage() {
           return
         }
 
-        const topicKey = `${topic.id}-${difficulty}`
-        const subject = subjects.find(s => s.id === topic.subject_id)
-        
+        const topicId = topic.id
+        const topicKey = `${topicId}-${difficulty}`
+        const topicName = isExamBatch
+          ? (topic as ExamTopic).main_topic
+          : (topic as Topic).main_topic
+        const topicIcon = isExamBatch
+          ? ({ turkce: '📖', matematik: '📐', geometri: '📏', fizik: '⚛️', kimya: '🧪', biyoloji: '🧬', tarih: '📜', cografya: '🌍', felsefe: '💭', din_kulturu: '🕌' } as Record<string, string>)[(topic as ExamTopic).subject_code] || '📖'
+          : subjects.find(s => s.id === (topic as Topic).subject_id)?.icon || '📖'
+
         setBatchProgress(prev => ({
           ...prev,
           currentTopicIndex: processedCount,
-          currentTopic: topic,
+          currentTopic: isExamBatch ? { id: topicId, subject_id: '', grade: 0, main_topic: topicName, sub_topic: (topic as ExamTopic).sub_topic, learning_outcome: null, unit_number: null } : topic as Topic,
         }))
 
-        addBatchLog(`📝 ${subject?.icon || '📖'} ${topic.main_topic.substring(0, 40)}... (${difficultyLabels[difficulty]?.label})`, 'info')
+        addBatchLog(`📝 ${topicIcon} ${topicName.substring(0, 40)}${(topic as any).sub_topic ? ` - ${(topic as any).sub_topic}` : ''}... (${difficultyLabels[difficulty]?.label})`, 'info')
 
         let retries = 0
         let success = false
@@ -708,13 +887,25 @@ export default function AIQuestionGeneratorPage() {
 
         while (retries < AUTO_GEN_CONFIG.MAX_RETRIES && !success) {
           try {
-            // Soru üret
-            const questions = await generateQuestionsForTopic(topic, difficulty)
+            let questions: GeneratedQuestion[]
+
+            if (isExamBatch) {
+              questions = await generateQuestionsForExamTopic(topic as ExamTopic, difficulty)
+            } else {
+              questions = await generateQuestionsForTopic(topic as Topic, difficulty)
+            }
+
             totalGenerated += questions.length
-            consecutiveRateLimits = 0 // Başarılı olunca sıfırla
+            consecutiveRateLimits = 0
 
             // Veritabanına kaydet
-            const saveResult = await saveQuestionsToDb(questions, topic.id)
+            const saveResult = isExamBatch
+              ? await saveQuestionsToDb(questions, null, {
+                  exam_types: [selectedExamMode!.toLowerCase()],
+                  exam_topic_id: topicId
+                })
+              : await saveQuestionsToDb(questions, topicId)
+
             totalSaved += saveResult.success
 
             completedTopics.push(topicKey)
@@ -734,16 +925,14 @@ export default function AIQuestionGeneratorPage() {
             const isRateLimit = errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('quota')
             const isTimeout = errorMsg.includes('Timeout') || errorMsg.includes('timeout')
             const isNetwork = errorMsg.includes('Network') || errorMsg.includes('fetch')
-            
+
             if (isRateLimit) {
               consecutiveRateLimits++
-              // Exponential backoff - her rate limit'te bekleme süresini 1.5x artır
               const waitTime = AUTO_GEN_CONFIG.ERROR_RETRY_DELAY * Math.pow(1.5, consecutiveRateLimits - 1)
               const waitSeconds = Math.round(waitTime / 1000)
               addBatchLog(`⚠️ Rate limit! ${waitSeconds} saniye bekleniyor (${consecutiveRateLimits}. kez)...`, 'warning')
               await sleep(waitTime)
             } else if (isTimeout || isNetwork) {
-              // Network/Timeout hataları için daha kısa bekle
               addBatchLog(`⚠️ ${isTimeout ? 'Timeout' : 'Network'} hatası. 10 saniye bekleniyor...`, 'warning')
               await sleep(10000)
             } else if (retries < AUTO_GEN_CONFIG.MAX_RETRIES) {
@@ -751,7 +940,7 @@ export default function AIQuestionGeneratorPage() {
               await sleep(5000)
             } else {
               failedTopics.push(topicKey)
-              addBatchLog(`❌ ${topic.main_topic.substring(0, 30)}... başarısız: ${errorMsg}`, 'error')
+              addBatchLog(`❌ ${topicName.substring(0, 30)}... başarısız: ${errorMsg}`, 'error')
               setBatchProgress(prev => ({
                 ...prev,
                 failedTopics: [...failedTopics],
@@ -764,7 +953,7 @@ export default function AIQuestionGeneratorPage() {
         processedCount++
 
         // Rate limit koruması - istekler arası bekleme
-        if (!shouldStopBatch && processedCount < batchTopics.length * batchSelectedDifficulties.length) {
+        if (!shouldStopBatch && processedCount < topicsList.length * batchSelectedDifficulties.length) {
           await sleep(AUTO_GEN_CONFIG.DELAY_BETWEEN_REQUESTS)
         }
       }
@@ -775,7 +964,7 @@ export default function AIQuestionGeneratorPage() {
       status: 'completed',
       currentTopic: null,
     }))
-    addBatchLog(`🎉 Toplu üretim tamamlandı! ${totalSaved} soru kaydedildi.`, 'success')
+    addBatchLog(`🎉 ${isExamBatch ? 'TYT ' : ''}Toplu üretim tamamlandı! ${totalSaved} soru kaydedildi.`, 'success')
   }
 
   const pauseBatchGeneration = () => {
@@ -802,7 +991,7 @@ export default function AIQuestionGeneratorPage() {
 
   const selectedSubjectData = subjects.find(s => s.id === selectedSubject)
   const selectedTopicData = topics.find(t => t.id === selectedTopic)
-  const isHighSchool = selectedGrade !== null && selectedGrade >= 9
+  const isHighSchool = selectedExamMode === 'TYT' || (selectedGrade !== null && selectedGrade >= 9)
 
   if (profileLoading) {
     return (
@@ -840,7 +1029,7 @@ export default function AIQuestionGeneratorPage() {
                   AI Soru Üretici
                 </h1>
                 <p className="text-gray-600">
-                  MEB müfredatına uygun sorular üretin
+                  {selectedExamMode === 'TYT' ? 'ÖSYM TYT formatında sorular üretin' : 'MEB müfredatına uygun sorular üretin'}
                 </p>
               </div>
             </div>
@@ -878,6 +1067,39 @@ export default function AIQuestionGeneratorPage() {
               )}
             </div>
 
+            {/* Exam Mode Toggle */}
+            <div className="flex flex-col items-end gap-2">
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => { setSelectedExamMode(null); setCurrentStep(1) }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    !selectedExamMode
+                      ? 'bg-white text-purple-600 shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  Sınıf Bazlı
+                </button>
+                <button
+                  onClick={() => { setSelectedExamMode('TYT'); setGenerationMode('single') }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    selectedExamMode === 'TYT'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  TYT
+                </button>
+              </div>
+              {selectedExamMode === 'TYT' && (
+                <div className="text-xs text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> ÖSYM TYT formatında soru üretimi
+                </div>
+              )}
+            </div>
+
             {/* Mode Toggle */}
             <div className="flex bg-gray-100 rounded-xl p-1">
               <button
@@ -910,15 +1132,40 @@ export default function AIQuestionGeneratorPage() {
         {generationMode === 'single' && (
           <>
         {/* Breadcrumb Navigation */}
-        {(selectedGrade || selectedSubjectData || selectedTopicData) && (
-          <motion.div 
+        {selectedExamMode ? (
+          /* Sınav bazlı breadcrumb */
+          (selectedExamSubject || selectedExamTopic) && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6 flex items-center gap-2 text-sm flex-wrap">
+              <span className="px-3 py-1.5 bg-orange-100 text-orange-700 rounded-full font-medium">{selectedExamMode}</span>
+              {selectedExamSubject && (
+                <>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <button onClick={() => goToStep(1)} className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-all font-medium">
+                    {examSubjects.find(s => s.subject_code === selectedExamSubject)?.subject_name}
+                  </button>
+                </>
+              )}
+              {selectedExamTopic && (
+                <>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                  <button onClick={() => goToStep(2)} className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-all font-medium">
+                    {selectedExamTopic.main_topic.substring(0, 30)}{selectedExamTopic.sub_topic ? ` - ${selectedExamTopic.sub_topic.substring(0, 20)}` : ''}
+                  </button>
+                </>
+              )}
+            </motion.div>
+          )
+        ) : (
+          /* Sınıf bazlı breadcrumb */
+          (selectedGrade || selectedSubjectData || selectedTopicData) && (
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="mb-6 flex items-center gap-2 text-sm flex-wrap"
           >
             {selectedGrade && (
               <>
-                <button 
+                <button
                   onClick={() => goToStep(1)}
                   className="px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 transition-all font-medium"
                 >
@@ -929,7 +1176,7 @@ export default function AIQuestionGeneratorPage() {
             {selectedSubjectData && (
               <>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
-                <button 
+                <button
                   onClick={() => goToStep(2)}
                   className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 transition-all font-medium"
                 >
@@ -940,7 +1187,7 @@ export default function AIQuestionGeneratorPage() {
             {selectedTopicData && (
               <>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
-                <button 
+                <button
                   onClick={() => goToStep(3)}
                   className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition-all font-medium"
                 >
@@ -949,6 +1196,7 @@ export default function AIQuestionGeneratorPage() {
               </>
             )}
           </motion.div>
+          )
         )}
 
         {/* Step Progress */}
@@ -958,14 +1206,22 @@ export default function AIQuestionGeneratorPage() {
           className="mb-8"
         >
           <div className="flex items-center justify-between">
-            {STEPS.map((step, index) => (
+            {(selectedExamMode
+              ? [
+                  { id: 1, name: 'Ders', icon: BookOpen },
+                  { id: 2, name: 'Konu', icon: Layers },
+                  { id: 3, name: 'Ayarlar', icon: Target },
+                  { id: 4, name: 'Üret', icon: Wand2 }
+                ]
+              : STEPS
+            ).map((step, index, arr) => (
               <div key={step.id} className="flex items-center">
                 <button
                   onClick={() => goToStep(step.id)}
                   disabled={!canProceedToStep(step.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
                     currentStep === step.id
-                      ? 'bg-purple-600 text-white shadow-lg'
+                      ? selectedExamMode ? 'bg-orange-500 text-white shadow-lg' : 'bg-purple-600 text-white shadow-lg'
                       : currentStep > step.id
                       ? 'bg-green-100 text-green-700'
                       : canProceedToStep(step.id)
@@ -980,7 +1236,7 @@ export default function AIQuestionGeneratorPage() {
                   )}
                   <span className="hidden sm:inline font-medium">{step.name}</span>
                 </button>
-                {index < STEPS.length - 1 && (
+                {index < arr.length - 1 && (
                   <div className={`w-8 lg:w-16 h-1 mx-2 rounded ${
                     currentStep > step.id ? 'bg-green-400' : 'bg-gray-200'
                   }`} />
@@ -992,7 +1248,7 @@ export default function AIQuestionGeneratorPage() {
 
         {/* Step Content */}
         <AnimatePresence mode="wait">
-          {/* Step 1: Grade Selection */}
+          {/* Step 1: Grade Selection OR Exam Subject Selection */}
           {currentStep === 1 && (
             <motion.div
               key="step1"
@@ -1001,38 +1257,93 @@ export default function AIQuestionGeneratorPage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
             >
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Sınıf Seçin</h2>
-              <p className="text-gray-600 mb-6">Soru oluşturmak istediğiniz sınıf seviyesini seçin</p>
+              {selectedExamMode === 'TYT' ? (
+                /* TYT Ders Seçimi */
+                <>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">TYT Dersi Seçin</h2>
+                  <p className="text-gray-600 mb-6">ÖSYM TYT formatında soru üretmek istediğiniz dersi seçin</p>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {[1,2,3,4,5,6,7,8,9,10,11,12].map(grade => (
-                  <button
-                    key={grade}
-                    onClick={() => {
-                      setSelectedGrade(grade)
-                      setCurrentStep(2)
-                    }}
-                    className={`p-4 rounded-xl border-2 transition-all hover:scale-105 ${
-                      selectedGrade === grade
-                        ? 'border-purple-500 bg-purple-50 shadow-lg'
-                        : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                    }`}
-                  >
-                    <div className="text-3xl mb-2">{gradeInfo[grade].emoji}</div>
-                    <div className="text-xl font-bold text-gray-800">{grade}. Sınıf</div>
-                    <div className="text-sm text-gray-500">{gradeInfo[grade].level}</div>
-                    {gradeInfo[grade].exam && (
-                      <div className="mt-1 text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full inline-block">
-                        {gradeInfo[grade].exam}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
+                  {loadingExamTopics ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                      {examSubjects.map(subject => {
+                        const subjectIcons: Record<string, string> = {
+                          turkce: '📖', matematik: '📐', geometri: '📏', fizik: '⚛️',
+                          kimya: '🧪', biyoloji: '🧬', tarih: '📜', cografya: '🌍',
+                          felsefe: '💭', din_kulturu: '🕌'
+                        }
+                        const tytQuestionCounts: Record<string, number> = {
+                          turkce: 40, matematik: 30, geometri: 10, fizik: 7,
+                          kimya: 7, biyoloji: 6, tarih: 5, cografya: 5,
+                          felsefe: 5, din_kulturu: 5
+                        }
+                        return (
+                          <button
+                            key={subject.subject_code}
+                            onClick={() => {
+                              setSelectedExamSubject(subject.subject_code)
+                              setCurrentStep(2)
+                            }}
+                            className={`p-4 rounded-xl border-2 transition-all hover:scale-105 text-left ${
+                              selectedExamSubject === subject.subject_code
+                                ? 'border-orange-500 bg-orange-50 shadow-lg'
+                                : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                            }`}
+                          >
+                            <div className="text-3xl mb-2">{subjectIcons[subject.subject_code] || '📖'}</div>
+                            <div className="font-bold text-gray-800">{subject.subject_name}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {subject.topics.length} konu
+                            </div>
+                            <div className="mt-1 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full inline-block">
+                              TYT: {tytQuestionCounts[subject.subject_code] || '?'} soru
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Sınıf Seçimi (orijinal) */
+                <>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">Sınıf Seçin</h2>
+                  <p className="text-gray-600 mb-6">Soru oluşturmak istediğiniz sınıf seviyesini seçin</p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(grade => (
+                      <button
+                        key={grade}
+                        onClick={() => {
+                          setSelectedGrade(grade)
+                          setCurrentStep(2)
+                        }}
+                        className={`p-4 rounded-xl border-2 transition-all hover:scale-105 ${
+                          selectedGrade === grade
+                            ? 'border-purple-500 bg-purple-50 shadow-lg'
+                            : 'border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                        }`}
+                      >
+                        <div className="text-3xl mb-2">{gradeInfo[grade].emoji}</div>
+                        <div className="text-xl font-bold text-gray-800">{grade}. Sınıf</div>
+                        <div className="text-sm text-gray-500">{gradeInfo[grade].level}</div>
+                        {gradeInfo[grade].exam && (
+                          <div className="mt-1 text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full inline-block">
+                            {gradeInfo[grade].exam}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </motion.div>
           )}
 
-          {/* Step 2: Subject Selection */}
+          {/* Step 2: Subject Selection OR TYT Topic Selection */}
           {currentStep === 2 && (
             <motion.div
               key="step2"
@@ -1041,130 +1352,296 @@ export default function AIQuestionGeneratorPage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800">Ders Seçin</h2>
-                  <p className="text-gray-600">{selectedGrade}. Sınıf müfredatındaki dersler</p>
-                </div>
-                <button 
-                  onClick={() => setCurrentStep(1)}
-                  className="flex items-center gap-2 text-gray-600 hover:text-purple-600"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Geri
-                </button>
-              </div>
-
-              {loadingSubjects ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-                </div>
-              ) : subjects.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  Bu sınıf için ders bulunamadı
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {subjects.map(subject => (
+              {selectedExamMode === 'TYT' ? (
+                /* TYT Konu Seçimi */
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-800">TYT Konu Seçin</h2>
+                      <p className="text-gray-600">
+                        {examSubjects.find(s => s.subject_code === selectedExamSubject)?.subject_name} konuları
+                      </p>
+                    </div>
                     <button
-                      key={subject.id}
-                      onClick={() => {
-                        setSelectedSubject(subject.id)
-                        setCurrentStep(3)
-                      }}
-                      className={`p-4 rounded-xl border-2 transition-all hover:scale-105 text-left ${
-                        selectedSubject === subject.id
-                          ? 'border-blue-500 bg-blue-50 shadow-lg'
-                          : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                      }`}
+                      onClick={() => setCurrentStep(1)}
+                      className="flex items-center gap-2 text-gray-600 hover:text-orange-600"
                     >
-                      <div className="text-3xl mb-2">{subject.icon}</div>
-                      <div className="font-bold text-gray-800">{subject.name}</div>
+                      <ArrowLeft className="w-4 h-4" />
+                      Geri
                     </button>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          )}
+                  </div>
 
-          {/* Step 3: Topic Selection */}
-          {currentStep === 3 && (
-            <motion.div
-              key="step3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800">Konu / Kazanım Seçin</h2>
-                  <p className="text-gray-600">{selectedSubjectData?.icon} {selectedSubjectData?.name} dersi konuları</p>
-                </div>
-                <button 
-                  onClick={() => setCurrentStep(2)}
-                  className="flex items-center gap-2 text-gray-600 hover:text-purple-600"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Geri
-                </button>
-              </div>
-
-              {loadingTopics ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-                </div>
-              ) : topics.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📭</div>
-                  <p className="text-gray-500">Bu ders için konu/kazanım bulunamadı</p>
-                  <p className="text-sm text-gray-400 mt-2">Önce müfredat veritabanına konu ekleyin</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                  {Object.entries(groupedTopics).map(([mainTopic, topicList]) => (
-                    <div key={mainTopic} className="border border-gray-200 rounded-xl overflow-hidden">
-                      <div className="bg-gray-50 px-4 py-2 font-medium text-gray-700 flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-gray-500" />
-                        {mainTopic}
-                      </div>
-                      <div className="divide-y divide-gray-100">
-                        {topicList.map(topic => (
+                  {examTopics.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">📭</div>
+                      <p className="text-gray-500">Bu ders için TYT konusu bulunamadı</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                      {examTopics.map(topic => {
+                        const freqColors: Record<string, string> = {
+                          cok_sik: 'bg-red-100 text-red-700',
+                          sik: 'bg-orange-100 text-orange-700',
+                          orta: 'bg-yellow-100 text-yellow-700',
+                          nadir: 'bg-gray-100 text-gray-600'
+                        }
+                        const freqLabels: Record<string, string> = {
+                          cok_sik: 'Çok Sık', sik: 'Sık', orta: 'Orta', nadir: 'Nadir'
+                        }
+                        return (
                           <button
                             key={topic.id}
                             onClick={() => {
-                              setSelectedTopic(topic.id)
-                              setCurrentStep(4)
+                              setSelectedExamTopic(topic)
+                              setCurrentStep(3)
                             }}
-                            className={`w-full text-left px-4 py-3 transition-all hover:bg-green-50 ${
-                              selectedTopic === topic.id ? 'bg-green-100' : ''
+                            className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all hover:bg-orange-50 flex items-center justify-between ${
+                              selectedExamTopic?.id === topic.id
+                                ? 'border-orange-500 bg-orange-50 shadow'
+                                : 'border-gray-200 hover:border-orange-300'
                             }`}
                           >
-                            <div className="flex items-start gap-3">
-                              <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                                selectedTopic === topic.id ? 'bg-green-500' : 'bg-gray-300'
-                              }`} />
-                              <div>
-                                {topic.sub_topic && (
-                                  <div className="text-sm text-gray-500 mb-1">{topic.sub_topic}</div>
-                                )}
-                                <div className="text-gray-700">
-                                  {topic.learning_outcome || topic.main_topic}
-                                </div>
+                            <div>
+                              <div className="font-medium text-gray-800">
+                                {topic.main_topic}
                               </div>
+                              {topic.sub_topic && (
+                                <div className="text-sm text-gray-500 mt-0.5">
+                                  {topic.sub_topic}
+                                </div>
+                              )}
                             </div>
+                            <span className={`text-xs px-2 py-1 rounded-full font-medium ${freqColors[topic.osym_frequency] || 'bg-gray-100 text-gray-600'}`}>
+                              {freqLabels[topic.osym_frequency] || topic.osym_frequency}
+                            </span>
                           </button>
-                        ))}
-                      </div>
+                        )
+                      })}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
+              ) : (
+                /* Orijinal Ders Seçimi */
+                <>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-800">Ders Seçin</h2>
+                      <p className="text-gray-600">{selectedGrade}. Sınıf müfredatındaki dersler</p>
+                    </div>
+                    <button
+                      onClick={() => setCurrentStep(1)}
+                      className="flex items-center gap-2 text-gray-600 hover:text-purple-600"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Geri
+                    </button>
+                  </div>
+
+                  {loadingSubjects ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                    </div>
+                  ) : subjects.length === 0 ? (
+                    <div className="text-center py-12 text-gray-500">
+                      Bu sınıf için ders bulunamadı
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {subjects.map(subject => (
+                        <button
+                          key={subject.id}
+                          onClick={() => {
+                            setSelectedSubject(subject.id)
+                            setCurrentStep(3)
+                          }}
+                          className={`p-4 rounded-xl border-2 transition-all hover:scale-105 text-left ${
+                            selectedSubject === subject.id
+                              ? 'border-blue-500 bg-blue-50 shadow-lg'
+                              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                          }`}
+                        >
+                          <div className="text-3xl mb-2">{subject.icon}</div>
+                          <div className="font-bold text-gray-800">{subject.name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </motion.div>
           )}
 
-          {/* Step 4: Settings */}
-          {currentStep === 4 && (
+          {/* Step 3: Topic Selection (curriculum) OR Settings (exam mode) */}
+          {currentStep === 3 && (
+            selectedExamMode ? (
+              /* Exam Mode Step 3 = Settings */
+              <motion.div
+                key="step3-exam-settings"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Soru Ayarları</h2>
+                    <p className="text-gray-600">Zorluk seviyesi ve soru sayısını belirleyin</p>
+                  </div>
+                  <button onClick={() => setCurrentStep(2)} className="flex items-center gap-2 text-gray-600 hover:text-orange-600">
+                    <ArrowLeft className="w-4 h-4" /> Geri
+                  </button>
+                </div>
+
+                {/* Selected Exam Topic Info */}
+                {selectedExamTopic && (
+                  <div className="mb-8 p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-xl border border-orange-100">
+                    <div className="text-sm text-orange-600 font-medium mb-1">TYT - {selectedExamTopic.subject_name}:</div>
+                    <div className="text-gray-800 font-medium">
+                      {selectedExamTopic.main_topic}
+                      {selectedExamTopic.sub_topic && <span className="text-gray-600"> - {selectedExamTopic.sub_topic}</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Difficulty */}
+                <div className="mb-8">
+                  <label className="block text-lg font-semibold text-gray-800 mb-4">Zorluk Seviyesi</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {Object.entries(difficultyLabels).map(([key, { label, color, bg, emoji }]) => (
+                      <button key={key} onClick={() => setSelectedDifficulty(key)}
+                        className={`p-4 rounded-xl border-2 transition-all ${selectedDifficulty === key ? `border-current ${bg} ${color} shadow-lg` : 'border-gray-200 hover:border-gray-300'}`}>
+                        <div className="text-2xl mb-2">{emoji}</div>
+                        <div className={`font-bold ${selectedDifficulty === key ? color : 'text-gray-700'}`}>{label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Visual Type */}
+                <div className="mb-8">
+                  <label className="block text-lg font-semibold text-gray-800 mb-2">Yeni Nesil Soru Türü</label>
+                  <p className="text-sm text-gray-500 mb-4">Sorularınıza tablo, grafik ve diyagram ekleyebilirsiniz</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    {Object.entries(visualTypeLabels).map(([key, { label, emoji, description }]) => (
+                      <button key={key} onClick={() => setSelectedVisualType(key as VisualType)} title={description}
+                        className={`p-3 rounded-xl border-2 transition-all ${selectedVisualType === key ? 'border-indigo-500 bg-indigo-50 shadow-lg' : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'}`}>
+                        <div className="text-2xl mb-1">{emoji}</div>
+                        <div className={`text-xs font-medium ${selectedVisualType === key ? 'text-indigo-700' : 'text-gray-600'}`}>{label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Question Count */}
+                <div className="mb-8">
+                  <label className="block text-lg font-semibold text-gray-800 mb-4">Soru Sayısı</label>
+                  <div className="flex gap-4">
+                    {[5, 10, 15, 20].map(count => (
+                      <button key={count} onClick={() => setQuestionCount(count)}
+                        className={`flex-1 py-4 rounded-xl text-lg font-bold transition-all ${questionCount === count ? 'bg-orange-500 text-white shadow-lg' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Option Count Info */}
+                <div className="mb-8 p-4 bg-orange-50 rounded-xl border border-orange-100">
+                  <div className="flex items-center gap-2 text-orange-700">
+                    <Target className="w-5 h-5" />
+                    <span className="font-medium">5 şıklı sorular üretilecek (ÖSYM TYT formatı)</span>
+                  </div>
+                </div>
+
+                {/* Generate Button */}
+                <button
+                  onClick={() => { setCurrentStep(4); handleGenerate() }}
+                  className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold text-lg rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3"
+                >
+                  <Wand2 className="w-6 h-6" />
+                  TYT Soru Üret
+                  <ArrowRight className="w-6 h-6" />
+                </button>
+              </motion.div>
+            ) : (
+              /* Curriculum Mode Step 3 = Topic Selection */
+              <motion.div
+                key="step3"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Konu / Kazanım Seçin</h2>
+                    <p className="text-gray-600">{selectedSubjectData?.icon} {selectedSubjectData?.name} dersi konuları</p>
+                  </div>
+                  <button
+                    onClick={() => setCurrentStep(2)}
+                    className="flex items-center gap-2 text-gray-600 hover:text-purple-600"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Geri
+                  </button>
+                </div>
+
+                {loadingTopics ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                  </div>
+                ) : topics.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">📭</div>
+                    <p className="text-gray-500">Bu ders için konu/kazanım bulunamadı</p>
+                    <p className="text-sm text-gray-400 mt-2">Önce müfredat veritabanına konu ekleyin</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                    {Object.entries(groupedTopics).map(([mainTopic, topicList]) => (
+                      <div key={mainTopic} className="border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-2 font-medium text-gray-700 flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-gray-500" />
+                          {mainTopic}
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {topicList.map(topic => (
+                            <button
+                              key={topic.id}
+                              onClick={() => {
+                                setSelectedTopic(topic.id)
+                                setCurrentStep(4)
+                              }}
+                              className={`w-full text-left px-4 py-3 transition-all hover:bg-green-50 ${
+                                selectedTopic === topic.id ? 'bg-green-100' : ''
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
+                                  selectedTopic === topic.id ? 'bg-green-500' : 'bg-gray-300'
+                                }`} />
+                                <div>
+                                  {topic.sub_topic && (
+                                    <div className="text-sm text-gray-500 mb-1">{topic.sub_topic}</div>
+                                  )}
+                                  <div className="text-gray-700">
+                                    {topic.learning_outcome || topic.main_topic}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )
+          )}
+
+          {/* Step 4: Settings (curriculum) - skip in exam mode */}
+          {currentStep === 4 && !selectedExamMode && (
             <motion.div
               key="step4"
               initial={{ opacity: 0, x: 20 }}
@@ -1305,10 +1782,10 @@ export default function AIQuestionGeneratorPage() {
             </motion.div>
           )}
 
-          {/* Step 5: Generated Questions */}
-          {currentStep === 5 && (
+          {/* Step 5 (curriculum) / Step 4 (exam): Generated Questions */}
+          {((currentStep === 5 && !selectedExamMode) || (currentStep === 4 && selectedExamMode)) && (
             <motion.div
-              key="step5"
+              key="step-results"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
@@ -1319,12 +1796,14 @@ export default function AIQuestionGeneratorPage() {
                     {generating ? 'Sorular Üretiliyor...' : `Üretilen Sorular (${generatedQuestions.length})`}
                   </h2>
                   <p className="text-gray-600">
-                    {selectedTopicData?.main_topic}
+                    {selectedExamMode
+                      ? `TYT - ${selectedExamTopic?.main_topic || ''}`
+                      : selectedTopicData?.main_topic}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button 
-                    onClick={() => setCurrentStep(4)}
+                  <button
+                    onClick={() => setCurrentStep(selectedExamMode ? 3 : 4)}
                     className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-purple-600 bg-white rounded-lg border"
                   >
                     <ArrowLeft className="w-4 h-4" />
@@ -1413,7 +1892,7 @@ export default function AIQuestionGeneratorPage() {
                     <button
                       onClick={() => {
                         setSaveStatus(null)
-                        setCurrentStep(3)
+                        setCurrentStep(selectedExamMode ? 2 : 3)
                       }}
                       className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
                     >
@@ -1699,85 +2178,157 @@ export default function AIQuestionGeneratorPage() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Sınıf Seçimi */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">📚 Sınıf Seçin</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(grade => (
-                      <button
-                        key={grade}
-                        onClick={() => {
-                          setSelectedGrade(grade)
-                          setBatchSelectedSubjects([])
-                        }}
-                        className={`p-2 rounded-lg text-center transition-all ${
-                          selectedGrade === grade
-                            ? 'bg-orange-500 text-white shadow-lg'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        <div className="font-bold">{grade}</div>
-                        <div className="text-xs opacity-75">{gradeInfo[grade].level.charAt(0)}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Ders Seçimi */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    📖 Dersler ({batchSelectedSubjects.length} seçili)
-                  </label>
-                  {loadingSubjects ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-                    </div>
-                  ) : subjects.length === 0 ? (
-                    <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                      {selectedGrade ? 'Ders bulunamadı' : 'Önce sınıf seçin'}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded-lg">
-                      <button
-                        onClick={() => {
-                          if (batchSelectedSubjects.length === subjects.length) {
-                            setBatchSelectedSubjects([])
-                          } else {
-                            setBatchSelectedSubjects(subjects.map(s => s.id))
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                          batchSelectedSubjects.length === subjects.length
-                            ? 'bg-orange-500 text-white'
-                            : 'bg-white text-gray-700 border border-gray-200'
-                        }`}
-                      >
-                        {batchSelectedSubjects.length === subjects.length ? '✓ Tümü' : 'Tümünü Seç'}
-                      </button>
-                      {subjects.map(subject => (
+                {selectedExamMode === 'TYT' ? (
+                  /* TYT Ders Seçimi - tek blok, sınıf gerekmez */
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      📋 TYT Dersleri ({batchSelectedExamSubjects.length} seçili)
+                    </label>
+                    {loadingExamTopics ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                      </div>
+                    ) : examSubjects.length === 0 ? (
+                      <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                        TYT dersleri yükleniyor...
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
                         <button
-                          key={subject.id}
                           onClick={() => {
-                            setBatchSelectedSubjects(prev => 
-                              prev.includes(subject.id)
-                                ? prev.filter(id => id !== subject.id)
-                                : [...prev, subject.id]
-                            )
+                            if (batchSelectedExamSubjects.length === examSubjects.length) {
+                              setBatchSelectedExamSubjects([])
+                            } else {
+                              setBatchSelectedExamSubjects(examSubjects.map(s => s.subject_code))
+                            }
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1 ${
-                            batchSelectedSubjects.includes(subject.id)
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                            batchSelectedExamSubjects.length === examSubjects.length
                               ? 'bg-orange-500 text-white'
-                              : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
+                              : 'bg-white text-gray-700 border border-gray-200'
                           }`}
                         >
-                          <span>{subject.icon}</span>
-                          <span>{subject.name}</span>
-                          {batchSelectedSubjects.includes(subject.id) && <Check className="w-3 h-3" />}
+                          {batchSelectedExamSubjects.length === examSubjects.length ? '✓ Tümü' : 'Tümünü Seç'}
                         </button>
-                      ))}
+                        {examSubjects.map(subject => {
+                          const subjectIcons: Record<string, string> = {
+                            turkce: '📖', matematik: '📐', geometri: '📏', fizik: '⚛️',
+                            kimya: '🧪', biyoloji: '🧬', tarih: '📜', cografya: '🌍',
+                            felsefe: '💭', din_kulturu: '🕌'
+                          }
+                          return (
+                            <button
+                              key={subject.subject_code}
+                              onClick={() => {
+                                setBatchSelectedExamSubjects(prev =>
+                                  prev.includes(subject.subject_code)
+                                    ? prev.filter(c => c !== subject.subject_code)
+                                    : [...prev, subject.subject_code]
+                                )
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1 ${
+                                batchSelectedExamSubjects.includes(subject.subject_code)
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
+                              }`}
+                            >
+                              <span>{subjectIcons[subject.subject_code] || '📖'}</span>
+                              <span>{subject.subject_name}</span>
+                              <span className="text-xs opacity-75">({subject.topics.length})</span>
+                              {batchSelectedExamSubjects.includes(subject.subject_code) && <Check className="w-3 h-3" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {batchExamTopics.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Toplam {batchExamTopics.length} TYT konusu seçili derslerde mevcut
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Sınıf Bazlı - Sınıf + Ders Seçimi */
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">📚 Sınıf Seçin</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(grade => (
+                          <button
+                            key={grade}
+                            onClick={() => {
+                              setSelectedGrade(grade)
+                              setBatchSelectedSubjects([])
+                            }}
+                            className={`p-2 rounded-lg text-center transition-all ${
+                              selectedGrade === grade
+                                ? 'bg-orange-500 text-white shadow-lg'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            <div className="font-bold">{grade}</div>
+                            <div className="text-xs opacity-75">{gradeInfo[grade].level.charAt(0)}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  )}
-                </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        📖 Dersler ({batchSelectedSubjects.length} seçili)
+                      </label>
+                      {loadingSubjects ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                        </div>
+                      ) : subjects.length === 0 ? (
+                        <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                          {selectedGrade ? 'Ders bulunamadı' : 'Önce sınıf seçin'}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded-lg">
+                          <button
+                            onClick={() => {
+                              if (batchSelectedSubjects.length === subjects.length) {
+                                setBatchSelectedSubjects([])
+                              } else {
+                                setBatchSelectedSubjects(subjects.map(s => s.id))
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                              batchSelectedSubjects.length === subjects.length
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-white text-gray-700 border border-gray-200'
+                            }`}
+                          >
+                            {batchSelectedSubjects.length === subjects.length ? '✓ Tümü' : 'Tümünü Seç'}
+                          </button>
+                          {subjects.map(subject => (
+                            <button
+                              key={subject.id}
+                              onClick={() => {
+                                setBatchSelectedSubjects(prev =>
+                                  prev.includes(subject.id)
+                                    ? prev.filter(id => id !== subject.id)
+                                    : [...prev, subject.id]
+                                )
+                              }}
+                              className={`px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1 ${
+                                batchSelectedSubjects.includes(subject.id)
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
+                              }`}
+                            >
+                              <span>{subject.icon}</span>
+                              <span>{subject.name}</span>
+                              {batchSelectedSubjects.includes(subject.id) && <Check className="w-3 h-3" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {/* Zorluk Seçimi */}
                 <div>
@@ -1855,13 +2406,13 @@ export default function AIQuestionGeneratorPage() {
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="space-y-1">
                     <div className="text-sm text-gray-600">
-                      <span className="font-medium">{batchTopics.length}</span> konu × <span className="font-medium">{batchSelectedDifficulties.length}</span> zorluk × <span className="font-medium">{batchQuestionsPerTopic}</span> soru = 
+                      <span className="font-medium">{selectedExamMode ? batchExamTopics.length : batchTopics.length}</span> konu × <span className="font-medium">{batchSelectedDifficulties.length}</span> zorluk × <span className="font-medium">{batchQuestionsPerTopic}</span> soru =
                       <span className="text-orange-600 font-bold ml-1">
-                        ~{batchTopics.length * batchSelectedDifficulties.length * batchQuestionsPerTopic} soru
+                        ~{(selectedExamMode ? batchExamTopics.length : batchTopics.length) * batchSelectedDifficulties.length * batchQuestionsPerTopic} soru
                       </span>
                     </div>
                     <div className="text-xs text-gray-500">
-                      ⏱️ Tahmini süre: ~{Math.ceil((batchTopics.length * batchSelectedDifficulties.length * AUTO_GEN_CONFIG.DELAY_BETWEEN_REQUESTS) / 60000)} dakika
+                      ⏱️ Tahmini süre: ~{Math.ceil(((selectedExamMode ? batchExamTopics.length : batchTopics.length) * batchSelectedDifficulties.length * AUTO_GEN_CONFIG.DELAY_BETWEEN_REQUESTS) / 60000)} dakika
                     </div>
                   </div>
                   
@@ -1869,11 +2420,11 @@ export default function AIQuestionGeneratorPage() {
                     {batchProgress.status === 'idle' || batchProgress.status === 'completed' || batchProgress.status === 'paused' ? (
                       <button
                         onClick={startBatchGeneration}
-                        disabled={batchTopics.length === 0 || batchSelectedDifficulties.length === 0}
+                        disabled={(selectedExamMode ? batchExamTopics.length === 0 : batchTopics.length === 0) || batchSelectedDifficulties.length === 0}
                         className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <Play className="w-5 h-5" />
-                        {batchProgress.status === 'paused' ? 'Devam Et' : 'Üretimi Başlat'}
+                        {batchProgress.status === 'paused' ? 'Devam Et' : selectedExamMode ? 'TYT Üretimi Başlat' : 'Üretimi Başlat'}
                       </button>
                     ) : (
                       <button

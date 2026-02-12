@@ -5,19 +5,23 @@ import { getQuestionEmbedding } from '@/lib/gemini-embedding'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { grade, subject, topic, learningOutcome, difficulty, count, lang, visualType } = body
+    const { grade, subject, topic, learningOutcome, difficulty, count, lang, visualType, examMode } = body
 
     // Validasyon
-    if (!grade || !subject || !topic || !learningOutcome) {
+    if (!subject || !topic || !learningOutcome) {
       return NextResponse.json(
-        { error: 'Sınıf, ders, konu ve kazanım alanları zorunludur' },
+        { error: 'Ders, konu ve kazanım alanları zorunludur' },
         { status: 400 }
       )
     }
 
-    // Sınıf kontrolü
-    const gradeNum = parseInt(grade)
-    if (isNaN(gradeNum) || gradeNum < 1 || gradeNum > 12) {
+    // Sınav modu kontrolü
+    const validExamModes = ['TYT', 'AYT'] as const
+    const selectedExamMode = validExamModes.includes(examMode) ? examMode as 'TYT' | 'AYT' : null
+
+    // Sınıf kontrolü - TYT modunda grade opsiyonel (varsayılan 11)
+    const gradeNum = selectedExamMode ? (grade ? parseInt(grade) : 11) : parseInt(grade)
+    if (!selectedExamMode && (!grade || isNaN(gradeNum) || gradeNum < 1 || gradeNum > 12)) {
       return NextResponse.json(
         { error: 'Sınıf 1-12 arasında olmalıdır' },
         { status: 400 }
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
     const selectedVisualType: VisualType = validVisualTypes.includes(visualType) ? visualType : 'none'
     const isNewGeneration = selectedVisualType !== 'none'
 
-    console.log(`AI Soru Üretimi: ${gradeNum}. Sınıf - ${subject} - ${topic} [${language.toUpperCase()}]${isNewGeneration ? ` 🆕 Yeni Nesil: ${selectedVisualType}` : ''}`)
+    console.log(`AI Soru Üretimi: ${selectedExamMode || `${gradeNum}. Sınıf`} - ${subject} - ${topic} [${language.toUpperCase()}]${isNewGeneration ? ` 🆕 Yeni Nesil: ${selectedVisualType}` : ''}`)
 
     const questions = await generateCurriculumQuestions(
       gradeNum,
@@ -54,7 +58,8 @@ export async function POST(request: NextRequest) {
       (difficulty as Difficulty) || 'medium',
       questionCount,
       language,  // 🌍 Questly Global için dil desteği
-      selectedVisualType  // 🆕 Yeni Nesil Soru görsel türü
+      selectedVisualType,  // 🆕 Yeni Nesil Soru görsel türü
+      selectedExamMode  // 📋 Sınav bazlı üretim modu (TYT/AYT)
     )
 
     // 🧠 Semantic Search: Her soru için embedding üret
@@ -86,9 +91,10 @@ export async function POST(request: NextRequest) {
         learningOutcome,
         difficulty: difficulty || 'medium',
         count: questionsWithEmbedding.length,
-        optionCount: gradeNum >= 9 ? 5 : 4,
+        optionCount: (gradeNum >= 9 || selectedExamMode === 'TYT') ? 5 : 4,
         lang: language,
         embeddingsGenerated: questionsWithEmbedding.filter(q => q.embedding).length,
+        examMode: selectedExamMode,
         // 🆕 Yeni Nesil Soru meta bilgileri
         visualType: selectedVisualType,
         isNewGeneration,

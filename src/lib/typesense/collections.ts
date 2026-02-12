@@ -99,6 +99,9 @@ export const questionsSchema: CollectionCreateSchema = {
     // 🎬 VIDEO ve İNTERAKTİF ÇÖZÜM durumu
     { name: 'has_video', type: 'bool', facet: true, optional: true },           // Video çözümü var mı?
     { name: 'has_interactive', type: 'bool', facet: true, optional: true },     // İnteraktif çözümü var mı?
+
+    // 📋 SINAV TÜRÜ etiketleme (TYT, AYT vb.)
+    { name: 'exam_types', type: 'string[]', facet: true, optional: true },      // ['tyt'], ['tyt','ayt']
     
     // 📊 İSTATİSTİKLER - Popüler sorular sayfaları için
     { name: 'times_answered', type: 'int32', facet: true },
@@ -370,6 +373,8 @@ export interface QuestionDocument {
   // 🎬 Video ve İnteraktif Çözüm durumu
   has_video?: boolean      // Video çözümü var mı?
   has_interactive?: boolean  // İnteraktif çözümü var mı?
+  // 📋 Sınav türü etiketleme
+  exam_types?: string[]    // ['tyt'], ['tyt','ayt']
   // İstatistikler
   times_answered: number
   times_correct: number

@@ -9,10 +9,10 @@ export type ExamType = 'BURSLULUK_2' | 'BURSLULUK_3' | 'BURSLULUK_4' | 'BURSLULU
 export type ExamStatus = 'draft' | 'active' | 'ended'
 
 // Cevap secenekleri
-export type AnswerOption = 'A' | 'B' | 'C' | 'D'
+export type AnswerOption = 'A' | 'B' | 'C' | 'D' | 'E'
 
 // Ders kodlari (Typesense ve DB'de kullanilan)
-export type SubjectCode = 'turkce' | 'matematik' | 'fen_bilimleri' | 'sosyal_bilgiler' | 'hayat_bilgisi' | 'inkilap_tarihi' | 'din_kulturu' | 'ingilizce' | 'edebiyat' | 'fizik' | 'kimya' | 'biyoloji' | 'tarih' | 'cografya' | 'felsefe'
+export type SubjectCode = 'turkce' | 'matematik' | 'geometri' | 'fen_bilimleri' | 'sosyal_bilgiler' | 'hayat_bilgisi' | 'inkilap_tarihi' | 'din_kulturu' | 'ingilizce' | 'edebiyat' | 'fizik' | 'kimya' | 'biyoloji' | 'tarih' | 'cografya' | 'felsefe'
 
 // =====================================================
 // SINAV MODELLERI
@@ -101,7 +101,7 @@ export interface ExamQuestionForClient {
   question_image_url: string | null
   visual_type: string | null
   visual_content: string | null
-  options: { A: string; B: string; C: string; D: string }
+  options: { A: string; B: string; C: string; D: string; E?: string }
 }
 
 // Sinav cozme durumu (localStorage + state)

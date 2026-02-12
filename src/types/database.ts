@@ -243,6 +243,26 @@ export interface Question {
   created_at: string
   updated_at: string
   topic?: Topic
+  // Sinav bazli etiketleme
+  exam_types?: string[]         // ['tyt'], ['tyt', 'ayt'], etc.
+  exam_topic_id?: string | null // exam_topics tablosuna referans
+}
+
+// Sinav bazli konu tanimlari (TYT, AYT vb.)
+export interface ExamTopic {
+  id: string
+  exam_type: string           // 'TYT', 'AYT'
+  subject_code: string        // 'turkce', 'matematik', 'geometri'
+  subject_name: string        // 'Türkçe', 'Temel Matematik'
+  main_topic: string          // 'Paragraf', 'Üçgenler'
+  sub_topic: string | null    // 'Ana Düşünce', 'Özel Üçgenler'
+  topic_order: number
+  question_weight: number
+  osym_frequency: 'cok_sik' | 'sik' | 'orta' | 'nadir'
+  grades: number[]
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }
 
 export interface AIRecommendation {

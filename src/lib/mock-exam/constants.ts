@@ -263,6 +263,48 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 200,
   },
   // ===========================================
+  // TYT (Temel Yeterlilik Testi)
+  // 125 soru, 165 dakika, 4 yanlis = 1 dogru goturur
+  // ===========================================
+  TYT: {
+    label: 'TYT Deneme Sınavı',
+    shortLabel: 'TYT',
+    grades: [11, 12],
+    duration: 165,
+    totalQuestions: 125,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 40, coefficient: 1.33 },
+      {
+        code: 'sosyal_bilgiler', name: 'Sosyal Bilimler', displayName: 'Sosyal Bilimler', questionCount: 25, coefficient: 1.36,
+        subSubjects: [
+          { code: 'tarih', name: 'Tarih', questionCount: 5 },
+          { code: 'cografya', name: 'Coğrafya', questionCount: 5 },
+          { code: 'felsefe', name: 'Felsefe', questionCount: 5 },
+          { code: 'din_kulturu', name: 'Din Kültürü', questionCount: 5 },
+          { code: 'inkilap_tarihi', name: 'İnkılap Tarihi', questionCount: 5 },
+        ],
+      },
+      {
+        code: 'matematik', name: 'Temel Matematik', displayName: 'Temel Matematik', questionCount: 40, coefficient: 1.33,
+        subSubjects: [
+          { code: 'matematik', name: 'Matematik', questionCount: 30 },
+          { code: 'geometri', name: 'Geometri', questionCount: 10 },
+        ],
+      },
+      {
+        code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 20, coefficient: 1.36,
+        subSubjects: [
+          { code: 'fizik', name: 'Fizik', questionCount: 7 },
+          { code: 'kimya', name: 'Kimya', questionCount: 7 },
+          { code: 'biyoloji', name: 'Biyoloji', questionCount: 6 },
+        ],
+      },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  // ===========================================
   // LGS
   // ===========================================
   LGS: {
@@ -318,6 +360,7 @@ export const SUBJECT_COLORS: Record<string, { bg: string; text: string; border: 
   tarih: { bg: 'bg-yellow-500', text: 'text-yellow-600', border: 'border-yellow-300', light: 'bg-yellow-50' },
   cografya: { bg: 'bg-teal-500', text: 'text-teal-600', border: 'border-teal-300', light: 'bg-teal-50' },
   felsefe: { bg: 'bg-violet-500', text: 'text-violet-600', border: 'border-violet-300', light: 'bg-violet-50' },
+  geometri: { bg: 'bg-sky-500', text: 'text-sky-600', border: 'border-sky-300', light: 'bg-sky-50' },
   hayat_bilgisi: { bg: 'bg-pink-500', text: 'text-pink-600', border: 'border-pink-300', light: 'bg-pink-50' },
 }
 
@@ -337,6 +380,7 @@ export const SUBJECT_ICONS: Record<string, string> = {
   tarih: 'TH',
   cografya: 'CG',
   felsefe: 'FL',
+  geometri: 'GE',
   hayat_bilgisi: 'HB',
 }
 

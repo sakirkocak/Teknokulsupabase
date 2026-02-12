@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
         visual_type,
         visual_content,
         video_status,
-        interactive_solution_status
+        interactive_solution_status,
+        exam_types
       `)
       .eq('id', questionId)
       .single()
@@ -158,6 +159,8 @@ export async function POST(req: NextRequest) {
       // 🆕 Yeni Nesil Soru
       is_new_generation: !!(question as any).visual_content,
       visual_type: (question as any).visual_type || '',
+      // 📋 Sınav türü etiketleme
+      exam_types: Array.isArray((question as any).exam_types) ? (question as any).exam_types : [],
       // 🎬 Video ve İnteraktif Çözüm durumu
       has_video: (question as any).video_status === 'completed',
       has_interactive: (question as any).interactive_solution_status === 'completed',

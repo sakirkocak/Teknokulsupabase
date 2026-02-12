@@ -297,6 +297,8 @@ async function handleQuestionsSync(
       // 🆕 Yeni Nesil Soru alanları
       is_new_generation: !!record.visual_type && record.visual_type !== 'none',
       visual_type: safeString(record.visual_type),
+      // 📋 Sınav türü etiketleme
+      exam_types: Array.isArray(record.exam_types) ? record.exam_types : [],
       // İstatistikler
       times_answered: timesAnswered,
       times_correct: timesCorrect,

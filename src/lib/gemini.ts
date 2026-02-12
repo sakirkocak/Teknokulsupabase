@@ -1045,6 +1045,119 @@ const getExamContext = (grade: number): { examType: string; format: string; tips
   }
 }
 
+// =====================================================
+// TYT SINAV FORMATI - ÖSYM Tarzı Prompt Üretici
+// =====================================================
+function getTYTExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Türkçe': `
+   📝 ÖSYM TYT TÜRKÇE FORMATI (40 soru):
+   • Paragraf ağırlıklı: yaklaşık 25-30 soru paragraf temelli
+   • UZUN METİNLER: 200-400 kelimelik paragraflar oluştur
+   • Anlam bilgisi: sözcükte, cümlede, paragrafta anlam
+   • Dil bilgisi: ses, yapı, tür, cümle ögeleri
+   • Anlatım bozukluğu: son 2-3 soru genelde
+   • Soru kökünde "Aşağıdaki parçaya/paragrafa göre..." ile başlayan uzun okuma parçaları
+   • Çeldirici şıklar anlam yakınlığı ile oluşturulmalı
+   • PARAGRAF soruları için gerçek bir paragraf YAZ, sadece soru sorma`,
+
+    'Temel Matematik': `
+   🔢 ÖSYM TYT MATEMATİK FORMATI (30 soru):
+   • Günlük hayat senaryoları ile problem kurulumu
+   • Görsel öğeler: tablo, grafik, şema soruda yer alabilir
+   • İşlem ağırlıklı DEĞİL, YORUM ağırlıklı
+   • Sorular kısa, şık ve net olmalı
+   • Problemler: yaş, iş-işçi, karışım, hareket, yüzde, oran
+   • Temel kavram: küme, fonksiyon, polinom, olasılık
+   • ÖSYM tarzı: "Buna göre..." ifadesi sıkça kullanılır`,
+
+    'Geometri': `
+   📐 ÖSYM TYT GEOMETRİ FORMATI (10 soru):
+   • Şekil/çizim İÇEREN sorular (soru kökünde "Şekilde..." ifadesi)
+   • Üçgen, dörtgen, çember ağırlıklı
+   • Analitik geometri: 1-2 soru
+   • Katı cisimler: 1-2 soru
+   • Görsel düşünme gerektiren, yaratıcı problemler
+   • Şekil açıklaması metinde verilmeli`,
+
+    'Fizik': `
+   ⚡ ÖSYM TYT FİZİK FORMATI (7 soru):
+   • Deney düzeneğinden soru (tablo/şema ile)
+   • Günlük hayat örnekleri (koltuk itme, yürüyüş, market)
+   • Grafik yorumlama (hız-zaman, kuvvet-uzama)
+   • Kavramsal ağırlıklı, hesaplama az
+   • I, II, III formatında yargı soruları sıkça kullanılır`,
+
+    'Kimya': `
+   🧪 ÖSYM TYT KİMYA FORMATI (7 soru):
+   • Periyodik tablo ve atom yapısı
+   • Deney sonucu yorumlama
+   • Tablo okuma ve karşılaştırma
+   • Kimyasal formüller ve denklemler
+   • Günlük yaşam (asit-baz, çözeltiler)`,
+
+    'Biyoloji': `
+   🧬 ÖSYM TYT BİYOLOJİ FORMATI (6 soru):
+   • Şema/diyagram yorumlama (hücre, organ sistemleri)
+   • Deney sonuçları analizi
+   • İnsan fizyolojisi ağırlıklı
+   • Bilimsel süreç becerileri
+   • I, II, III yargı formatı sıkça kullanılır`,
+
+    'Tarih': `
+   📜 ÖSYM TYT TARİH FORMATI (5 soru):
+   • Neden-sonuç ilişkisi, kronoloji
+   • Kaynak metin analizi
+   • Karşılaştırma (Osmanlı-Avrupa)
+   • Harita/görsel kaynak kullanımı`,
+
+    'Coğrafya': `
+   🌍 ÖSYM TYT COĞRAFYA FORMATI (5 soru):
+   • Harita okuma ve yorumlama
+   • Tablo/grafik analizi
+   • İklim-bitki ilişkisi
+   • Türkiye coğrafyası ağırlıklı`,
+
+    'Felsefe': `
+   💭 ÖSYM TYT FELSEFE FORMATI (5 soru):
+   • Kavram ayrımı
+   • Düşünür-görüş eşleştirme
+   • Argüman analizi
+   • Felsefi metin yorumlama`,
+
+    'Din Kültürü ve Ahlak Bilgisi': `
+   🕌 ÖSYM TYT DİN KÜLTÜRÜ FORMATI (5 soru):
+   • Ayet/hadis yorumlama
+   • Temel kavramlar
+   • Ahlaki değerler
+   • Karşılaştırma (dinler arası)`,
+  }
+
+  // subject_name yerine subject_code da gelebilir, eslestirelim
+  const normalizedSubject = subject.includes('Türkçe') || subject === 'turkce' ? 'Türkçe'
+    : subject.includes('Matematik') || subject === 'matematik' ? 'Temel Matematik'
+    : subject.includes('Geometri') || subject === 'geometri' ? 'Geometri'
+    : subject.includes('Fizik') || subject === 'fizik' ? 'Fizik'
+    : subject.includes('Kimya') || subject === 'kimya' ? 'Kimya'
+    : subject.includes('Biyoloji') || subject === 'biyoloji' ? 'Biyoloji'
+    : subject.includes('Tarih') || subject === 'tarih' ? 'Tarih'
+    : subject.includes('Coğrafya') || subject.includes('Cografya') || subject === 'cografya' ? 'Coğrafya'
+    : subject.includes('Felsefe') || subject === 'felsefe' ? 'Felsefe'
+    : subject.includes('Din') || subject === 'din_kulturu' ? 'Din Kültürü ve Ahlak Bilgisi'
+    : subject
+
+  return {
+    examType: 'TYT (ÖSYM Temel Yeterlilik Testi)',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, 125 soru 165 dakika',
+    tips: subjectTips[normalizedSubject] || `
+   📋 ÖSYM TYT GENEL FORMAT:
+   • Analiz ve yorum ağırlıklı
+   • 5 şık (A-E)
+   • Kavramsal sorular
+   • Günlük hayat bağlamı`
+  }
+}
+
 export async function generateCurriculumQuestions(
   grade: number,
   subject: string,
@@ -1053,14 +1166,15 @@ export async function generateCurriculumQuestions(
   difficulty: Difficulty,
   count: number = 5,
   lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
-  visualType: VisualType = 'none'  // 🆕 Yeni Nesil Soru görsel türü
+  visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
+  examMode?: 'TYT' | 'AYT' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
-  // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5)
-  const isHighSchool = grade >= 9
+  // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5, TYT her zaman 5)
+  const isHighSchool = grade >= 9 || examMode === 'TYT'
   const optionCount = isHighSchool ? 5 : 4
-  
-  // Sınav bağlamı
-  const examContext = getExamContext(grade)
+
+  // Sınav bağlamı - TYT modu aktifse TYT-spesifik context kullan
+  const examContext = examMode === 'TYT' ? getTYTExamContext(subject) : getExamContext(grade)
   
   // Ders bazlı yönergeler
   const subjectGuidelines = getSubjectGuidelines(subject, grade)
@@ -1092,21 +1206,31 @@ export async function generateCurriculumQuestions(
   // 🌍 QUESTLY GLOBAL: Dile göre prompt oluştur
   const prompt = lang === 'en' 
     ? generateEnglishPrompt(grade, subject, topic, learningOutcome, difficulty, count, optionCount, isHighSchool, bloomPriority)
-    : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.
+    : `${examMode === 'TYT'
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ SORU YAZARISIN. Gerçek TYT sınavı formatında, ÖSYM kalitesinde mükemmel sorular üreteceksin. 2025 TYT sınavı referans alınacak.`
+      : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
-🎯 GÖREV: ${grade}. SINIF ${subject.toUpperCase()} SORUSU ÜRET
+🎯 GÖREV: ${examMode === 'TYT' ? `TYT ${subject.toUpperCase()} SORUSU ÜRET` : `${grade}. SINIF ${subject.toUpperCase()} SORUSU ÜRET`}
 ════════════════════════════════════════════════════════════
 
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
-│ Sınıf: ${grade}. Sınıf                                    
-│ Ders: ${subject}                                          
-│ Konu: ${topic}                                            
-│ Kazanım: "${learningOutcome}"                              
+${examMode === 'TYT'
+  ? `│ Sınav: TYT (Temel Yeterlilik Testi)
+│ Ders: ${subject}
+│ Konu: ${topic}
+│ Kazanım: "${learningOutcome}"
 │ Zorluk: ${difficulty.toUpperCase()} - ${selectedDifficultyDesc}
-│ Format: ${examContext.format}                             
-│ Üretilecek: ${count} soru                                 
+│ Format: 5 şıklı (A-E), 4 yanlış 1 doğru götürür
+│ Üretilecek: ${count} soru`
+  : `│ Sınıf: ${grade}. Sınıf
+│ Ders: ${subject}
+│ Konu: ${topic}
+│ Kazanım: "${learningOutcome}"
+│ Zorluk: ${difficulty.toUpperCase()} - ${selectedDifficultyDesc}
+│ Format: ${examContext.format}
+│ Üretilecek: ${count} soru`}
 └─────────────────────────────────────────────────────────┘
 
 🎨 BU SORU SETİ İÇİN ÖZEL DİREKTİFLER:
@@ -1139,10 +1263,10 @@ ${subjectGuidelines}
 
 1. SORU KÖKÜ:
    ✓ Net, anlaşılır ve tek anlama gelen
-   ✓ ${grade}. sınıf Türkçe seviyesine uygun
+   ✓ ${examMode === 'TYT' ? 'Lise düzeyi Türkçe seviyesine uygun' : `${grade}. sınıf Türkçe seviyesine uygun`}
    ✓ Kazanımı doğrudan ölçen
    ✓ Gereksiz bilgi içermeyen
-   ${grade <= 4 ? '✓ Kısa ve basit cümleler' : grade >= 9 ? '✓ Akademik dil kullanılabilir' : '✓ Orta uzunlukta, net ifadeler'}
+   ${examMode === 'TYT' ? '✓ ÖSYM soru kalıplarına uygun, akademik dil' : grade <= 4 ? '✓ Kısa ve basit cümleler' : grade >= 9 ? '✓ Akademik dil kullanılabilir' : '✓ Orta uzunlukta, net ifadeler'}
 
 2. ŞIKLAR (${optionCount} adet):
    ✓ Tüm şıklar mantıklı ve olası
@@ -1207,11 +1331,11 @@ ${getVisualInstructions(visualType, subject)}
 • Şıkların uzunlukları benzer olsun ama cümle yapıları farklı olsun
 • Doğru cevap her soruda rastgele dağılsın (A, B, C, D${isHighSchool ? ', E' : ''} eşit olasılıkla)
 
-ŞİMDİ ${count} ADET MÜKEMMEL VE ÇEŞİTLİ ${subject.toUpperCase()} SORUSU ÜRET:`
+ŞİMDİ ${count} ADET MÜKEMMEL VE ÇEŞİTLİ ${examMode === 'TYT' ? 'ÖSYM TYT ' : ''}${subject.toUpperCase()} SORUSU ÜRET:`
 
   // 🚀 Retry mekanizması ile soru üretimi
   return await withRetry(async () => {
-    console.log(`AI Soru Üretimi başlatılıyor: ${grade}. Sınıf ${subject} - ${topic} [${lang.toUpperCase()}]`)
+    console.log(`AI Soru Üretimi başlatılıyor: ${examMode === 'TYT' ? 'TYT' : `${grade}. Sınıf`} ${subject} - ${topic} [${lang.toUpperCase()}]`)
     
     // 📤 Gemini API çağrısı
     let text = ''

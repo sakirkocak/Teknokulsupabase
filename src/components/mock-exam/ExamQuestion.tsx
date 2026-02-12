@@ -17,7 +17,7 @@ interface ExamQuestionProps {
   onPrev: () => void
 }
 
-const OPTION_LABELS: AnswerOption[] = ['A', 'B', 'C', 'D']
+const OPTION_LABELS: AnswerOption[] = ['A', 'B', 'C', 'D', 'E']
 
 // DOMPurify SVG/HTML sanitize config
 const SANITIZE_CONFIG = {
