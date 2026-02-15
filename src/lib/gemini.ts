@@ -1158,6 +1158,139 @@ function getTYTExamContext(subject: string): { examType: string; format: string;
   }
 }
 
+// =====================================================
+// AYT (Alan Yeterlilik Testi) - ÖSYM Sınav Bağlamı
+// =====================================================
+function getAYTExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Edebiyat': `
+   📚 ÖSYM AYT EDEBİYAT FORMATI (24 soru):
+   • Edebi akımlar ve dönem analizi (Divan, Tanzimat, Servet-i Fünun, Milli Edebiyat, Cumhuriyet)
+   • Şair-eser eşleştirme, edebi kişilik tanıma
+   • Metin tahlili: Şiir çözümleme, düzyazı analizi
+   • Uzun paragraflardan çıkarım yapma
+   • Edebi sanatlar, vezin, kafiye soruları
+   • Roman/hikaye/tiyatro türü karşılaştırma
+   • Anlam bilgisi ve söz sanatları derinlemesine`,
+
+    'Matematik': `
+   🔢 ÖSYM AYT MATEMATİK FORMATI (29 soru):
+   • Çok adımlı karmaşık problemler
+   • Türev uygulamaları: maksimum-minimum, eğim, teğet
+   • İntegral: alan, hacim hesabı, belirli-belirsiz integral
+   • Limit ve süreklilik: epsilon-delta yaklaşımı
+   • Fonksiyonlar: bileşke, ters fonksiyon, grafik analizi
+   • Diziler ve seriler: yakınsama, genel terim
+   • Logaritma ve üstel fonksiyonlar
+   • Olasılık ve kombinatorik: koşullu olasılık, binom dağılımı
+   • Matris ve determinant`,
+
+    'Geometri': `
+   📐 ÖSYM AYT GEOMETRİ FORMATI (11 soru):
+   • Analitik geometri ağırlıklı: doğru denklemleri, çember denklemi
+   • Konik kesitler: parabol, elips, hiperbol
+   • Uzay geometrisi: prizma, piramit, küre, koni
+   • Trigonometri: trigonometrik fonksiyonlar, ters trigonometrik
+   • Özel üçgenler ve çember özellikleri
+   • Dönüşüm geometrisi
+   • Koordinat düzleminde alan ve uzunluk hesabı`,
+
+    'Fizik': `
+   ⚡ ÖSYM AYT FİZİK FORMATI (14 soru):
+   • Deney düzeneği tasarlama ve yorumlama
+   • Grafik analizi: ivme-zaman, kuvvet-uzama, akım-gerilim
+   • Elektrik ve manyetizma: devre analizi, manyetik alan
+   • Dalga mekaniği: kırınım, girişim, rezonans
+   • Modern fizik: fotoelektrik, atom modelleri, radyoaktivite
+   • Newton yasaları ileri uygulamalar
+   • Enerji korunumu ve momentum
+   • Formül türetme ve birim analizi`,
+
+    'Kimya': `
+   🧪 ÖSYM AYT KİMYA FORMATI (13 soru):
+   • Reaksiyon kinetiği: hız ifadesi, aktivasyon enerjisi
+   • Kimyasal denge: Kp, Kc hesabı, Le Chatelier
+   • Organik kimya: mekanizmalar, fonksiyonel gruplar, izomeri
+   • Elektrokimya: pil, elektroliz, Nernst denklemi
+   • Asit-baz dengesi: tampon çözeltiler, pH hesabı
+   • Termokimya: Hess yasası, entalpi değişimi
+   • Çözünürlük dengesi: Kçç hesabı
+   • Atom teorisi ve periyodik özellikler`,
+
+    'Biyoloji': `
+   🧬 ÖSYM AYT BİYOLOJİ FORMATI (13 soru):
+   • Genetik problem çözme: çaprazlama, soy ağacı, bağlı genler
+   • Biyoteknoloji: DNA teknolojisi, klonlama, GDO
+   • Ekoloji: besin piramidi, enerji akışı, popülasyon dinamiği
+   • Bitki fizyolojisi: fotosentez detayları, su taşınımı
+   • Sinir sistemi: sinaps, nörotransmitter, refleks yayı
+   • Endokrin sistem: hormon mekanizmaları, geri bildirim
+   • Hücre bölünmesi: mitoz/mayoz karşılaştırma
+   • Deney yorumu ve bilimsel süreç`,
+
+    'Tarih': `
+   📜 ÖSYM AYT TARİH FORMATI (21 soru):
+   • Tarih-1 (10 soru): İslamiyet öncesi, İlk Müslüman Türk devletleri, Osmanlı kuruluş-yükselme
+   • Tarih-2 (11 soru): Osmanlı gerileme-dağılma, I. Dünya Savaşı, Milli Mücadele, Çağdaş Türkiye
+   • Kaynak analizi: belge, ferman, antlaşma metni yorumlama
+   • Dönem karşılaştırma: Osmanlı-Avrupa, reform hareketleri
+   • Neden-sonuç ilişkisi ve kronolojik sıralama
+   • Harita ve görsel kaynak kullanımı`,
+
+    'Coğrafya': `
+   🌍 ÖSYM AYT COĞRAFYA FORMATI (17 soru):
+   • Coğrafya-1 (6 soru): Fiziki coğrafya, ekosistem, iklim
+   • Coğrafya-2 (11 soru): Beşeri coğrafya, Türkiye ekonomisi, nüfus
+   • Harita analizi ve yorumlama
+   • Doğal afetler ve çevre sorunları
+   • Türkiye'nin bölgesel özellikleri
+   • Ekonomik coğrafya: tarım, sanayi, ulaşım
+   • Tablo ve grafik yorumlama`,
+
+    'Felsefe Grubu': `
+   💭 ÖSYM AYT FELSEFE GRUBU FORMATI (12 soru):
+   • Felsefe: Bilgi felsefesi, varlık felsefesi, ahlak felsefesi
+   • Mantık: Önermeler mantığı, akıl yürütme, kıyas
+   • Psikoloji: Gelişim, öğrenme, algı, motivasyon
+   • Sosyoloji: Toplumsal yapı, değişme, kurumlar
+   • Düşünür-görüş eşleştirme
+   • Kavram analizi ve karşılaştırma
+   • Metin yorumlama`,
+
+    'Din Kültürü ve Ahlak Bilgisi': `
+   🕌 ÖSYM AYT DİN KÜLTÜRÜ FORMATI (6 soru):
+   • Ayet ve hadis analizi, tefsir
+   • Hz. Muhammed'in hayatı ve öğretileri
+   • İslam düşünce tarihi ve tasavvuf kavramları
+   • Karşılaştırmalı din: diğer dinlerin temel özellikleri
+   • İslam ve bilim ilişkisi
+   • Ahlaki değerler ve güncel sorunlar`,
+  }
+
+  const normalizedSubject = subject.includes('Edebiyat') || subject === 'edebiyat' ? 'Edebiyat'
+    : subject.includes('Matematik') || subject === 'matematik' ? 'Matematik'
+    : subject.includes('Geometri') || subject === 'geometri' ? 'Geometri'
+    : subject.includes('Fizik') || subject === 'fizik' ? 'Fizik'
+    : subject.includes('Kimya') || subject === 'kimya' ? 'Kimya'
+    : subject.includes('Biyoloji') || subject === 'biyoloji' ? 'Biyoloji'
+    : subject.includes('Tarih') || subject === 'tarih' ? 'Tarih'
+    : subject.includes('Coğrafya') || subject.includes('Cografya') || subject === 'cografya' ? 'Coğrafya'
+    : subject.includes('Felsefe') || subject === 'felsefe' ? 'Felsefe Grubu'
+    : subject.includes('Din') || subject === 'din_kulturu' ? 'Din Kültürü ve Ahlak Bilgisi'
+    : subject
+
+  return {
+    examType: 'AYT (ÖSYM Alan Yeterlilik Testi)',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, 160 soru 180 dakika',
+    tips: subjectTips[normalizedSubject] || `
+   📋 ÖSYM AYT GENEL FORMAT:
+   • İleri düzey analiz ve sentez ağırlıklı
+   • 5 şık (A-E)
+   • Üniversite hazırlık seviyesi
+   • Derin kavramsal sorular`
+  }
+}
+
 export async function generateCurriculumQuestions(
   grade: number,
   subject: string,
@@ -1169,12 +1302,12 @@ export async function generateCurriculumQuestions(
   visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
   examMode?: 'TYT' | 'AYT' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
-  // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5, TYT her zaman 5)
-  const isHighSchool = grade >= 9 || examMode === 'TYT'
+  // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5, TYT/AYT her zaman 5)
+  const isHighSchool = grade >= 9 || examMode === 'TYT' || examMode === 'AYT'
   const optionCount = isHighSchool ? 5 : 4
 
-  // Sınav bağlamı - TYT modu aktifse TYT-spesifik context kullan
-  const examContext = examMode === 'TYT' ? getTYTExamContext(subject) : getExamContext(grade)
+  // Sınav bağlamı - TYT/AYT modu aktifse sınav-spesifik context kullan
+  const examContext = examMode === 'TYT' ? getTYTExamContext(subject) : examMode === 'AYT' ? getAYTExamContext(subject) : getExamContext(grade)
   
   // Ders bazlı yönergeler
   const subjectGuidelines = getSubjectGuidelines(subject, grade)
@@ -1208,21 +1341,23 @@ export async function generateCurriculumQuestions(
     ? generateEnglishPrompt(grade, subject, topic, learningOutcome, difficulty, count, optionCount, isHighSchool, bloomPriority)
     : `${examMode === 'TYT'
       ? `SEN ÖSYM'NİN EN DENEYİMLİ SORU YAZARISIN. Gerçek TYT sınavı formatında, ÖSYM kalitesinde mükemmel sorular üreteceksin. 2025 TYT sınavı referans alınacak.`
+      : examMode === 'AYT'
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ AYT SORU YAZARISIN. Alan Yeterlilik Testi formatında, üniversiteye hazırlık düzeyinde ileri seviye sorular üreteceksin. 2025 AYT sınavı referans alınacak.`
       : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
-🎯 GÖREV: ${examMode === 'TYT' ? `TYT ${subject.toUpperCase()} SORUSU ÜRET` : `${grade}. SINIF ${subject.toUpperCase()} SORUSU ÜRET`}
+🎯 GÖREV: ${examMode ? `${examMode} ${subject.toUpperCase()} SORUSU ÜRET` : `${grade}. SINIF ${subject.toUpperCase()} SORUSU ÜRET`}
 ════════════════════════════════════════════════════════════
 
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
-${examMode === 'TYT'
-  ? `│ Sınav: TYT (Temel Yeterlilik Testi)
+${examMode
+  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT (Temel Yeterlilik Testi)' : 'AYT (Alan Yeterlilik Testi)'}
 │ Ders: ${subject}
 │ Konu: ${topic}
 │ Kazanım: "${learningOutcome}"
 │ Zorluk: ${difficulty.toUpperCase()} - ${selectedDifficultyDesc}
-│ Format: 5 şıklı (A-E), 4 yanlış 1 doğru götürür
+│ Format: ${examContext.format}
 │ Üretilecek: ${count} soru`
   : `│ Sınıf: ${grade}. Sınıf
 │ Ders: ${subject}
@@ -1263,10 +1398,10 @@ ${subjectGuidelines}
 
 1. SORU KÖKÜ:
    ✓ Net, anlaşılır ve tek anlama gelen
-   ✓ ${examMode === 'TYT' ? 'Lise düzeyi Türkçe seviyesine uygun' : `${grade}. sınıf Türkçe seviyesine uygun`}
+   ✓ ${examMode ? 'Lise düzeyi Türkçe seviyesine uygun' : `${grade}. sınıf Türkçe seviyesine uygun`}
    ✓ Kazanımı doğrudan ölçen
    ✓ Gereksiz bilgi içermeyen
-   ${examMode === 'TYT' ? '✓ ÖSYM soru kalıplarına uygun, akademik dil' : grade <= 4 ? '✓ Kısa ve basit cümleler' : grade >= 9 ? '✓ Akademik dil kullanılabilir' : '✓ Orta uzunlukta, net ifadeler'}
+   ${examMode ? '✓ ÖSYM soru kalıplarına uygun, akademik dil' : grade <= 4 ? '✓ Kısa ve basit cümleler' : grade >= 9 ? '✓ Akademik dil kullanılabilir' : '✓ Orta uzunlukta, net ifadeler'}
 
 2. ŞIKLAR (${optionCount} adet):
    ✓ Tüm şıklar mantıklı ve olası
@@ -1331,11 +1466,11 @@ ${getVisualInstructions(visualType, subject)}
 • Şıkların uzunlukları benzer olsun ama cümle yapıları farklı olsun
 • Doğru cevap her soruda rastgele dağılsın (A, B, C, D${isHighSchool ? ', E' : ''} eşit olasılıkla)
 
-ŞİMDİ ${count} ADET MÜKEMMEL VE ÇEŞİTLİ ${examMode === 'TYT' ? 'ÖSYM TYT ' : ''}${subject.toUpperCase()} SORUSU ÜRET:`
+ŞİMDİ ${count} ADET MÜKEMMEL VE ÇEŞİTLİ ${examMode ? `ÖSYM ${examMode} ` : ''}${subject.toUpperCase()} SORUSU ÜRET:`
 
   // 🚀 Retry mekanizması ile soru üretimi
   return await withRetry(async () => {
-    console.log(`AI Soru Üretimi başlatılıyor: ${examMode === 'TYT' ? 'TYT' : `${grade}. Sınıf`} ${subject} - ${topic} [${lang.toUpperCase()}]`)
+    console.log(`AI Soru Üretimi başlatılıyor: ${examMode ? examMode : `${grade}. Sınıf`} ${subject} - ${topic} [${lang.toUpperCase()}]`)
     
     // 📤 Gemini API çağrısı
     let text = ''

@@ -305,6 +305,54 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 100,
   },
   // ===========================================
+  // AYT (Alan Yeterlilik Testi)
+  // 160 soru, 180 dakika, 4 yanlis = 1 dogru goturur
+  // ===========================================
+  AYT: {
+    label: 'AYT Deneme Sınavı',
+    shortLabel: 'AYT',
+    grades: [11, 12],
+    duration: 180,
+    totalQuestions: 160,
+    subjects: [
+      {
+        code: 'edebiyat', name: 'TDE-Sosyal Bilimler 1', displayName: 'TDE - Sosyal Bilimler 1', questionCount: 40, coefficient: 1.0,
+        subSubjects: [
+          { code: 'edebiyat', name: 'Türk Dili ve Edebiyatı', questionCount: 24 },
+          { code: 'tarih', name: 'Tarih-1', questionCount: 10 },
+          { code: 'cografya', name: 'Coğrafya-1', questionCount: 6 },
+        ],
+      },
+      {
+        code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 40, coefficient: 1.0,
+        subSubjects: [
+          { code: 'matematik', name: 'Matematik', questionCount: 29 },
+          { code: 'geometri', name: 'Geometri', questionCount: 11 },
+        ],
+      },
+      {
+        code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 40, coefficient: 1.0,
+        subSubjects: [
+          { code: 'fizik', name: 'Fizik', questionCount: 14 },
+          { code: 'kimya', name: 'Kimya', questionCount: 13 },
+          { code: 'biyoloji', name: 'Biyoloji', questionCount: 13 },
+        ],
+      },
+      {
+        code: 'sosyal_bilgiler', name: 'Sosyal Bilimler 2', displayName: 'Sosyal Bilimler 2', questionCount: 40, coefficient: 1.0,
+        subSubjects: [
+          { code: 'tarih', name: 'Tarih-2', questionCount: 11 },
+          { code: 'cografya', name: 'Coğrafya-2', questionCount: 11 },
+          { code: 'felsefe', name: 'Felsefe Grubu', questionCount: 12 },
+          { code: 'din_kulturu', name: 'Din Kültürü', questionCount: 6 },
+        ],
+      },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  // ===========================================
   // LGS
   // ===========================================
   LGS: {

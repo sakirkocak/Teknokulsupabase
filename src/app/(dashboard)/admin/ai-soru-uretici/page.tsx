@@ -604,11 +604,11 @@ export default function AIQuestionGeneratorPage() {
     }
 
     setBatchExamTopics(topics)
-    addBatchLog(`${topics.length} TYT konusu seçildi (${batchSelectedExamSubjects.length} ders)`, 'success')
+    addBatchLog(`${topics.length} ${selectedExamMode} konusu seçildi (${batchSelectedExamSubjects.length} ders)`, 'success')
   }
 
   useEffect(() => {
-    if (generationMode === 'batch' && selectedExamMode === 'TYT' && batchSelectedExamSubjects.length > 0 && examSubjects.length > 0) {
+    if (generationMode === 'batch' && selectedExamMode && batchSelectedExamSubjects.length > 0 && examSubjects.length > 0) {
       loadBatchExamTopics()
     } else if (generationMode === 'batch' && !selectedExamMode && selectedGrade && batchSelectedSubjects.length > 0) {
       loadBatchTopics()
@@ -991,7 +991,7 @@ export default function AIQuestionGeneratorPage() {
 
   const selectedSubjectData = subjects.find(s => s.id === selectedSubject)
   const selectedTopicData = topics.find(t => t.id === selectedTopic)
-  const isHighSchool = selectedExamMode === 'TYT' || (selectedGrade !== null && selectedGrade >= 9)
+  const isHighSchool = !!selectedExamMode || (selectedGrade !== null && selectedGrade >= 9)
 
   if (profileLoading) {
     return (
@@ -1029,7 +1029,7 @@ export default function AIQuestionGeneratorPage() {
                   AI Soru Üretici
                 </h1>
                 <p className="text-gray-600">
-                  {selectedExamMode === 'TYT' ? 'ÖSYM TYT formatında sorular üretin' : 'MEB müfredatına uygun sorular üretin'}
+                  {selectedExamMode ? `ÖSYM ${selectedExamMode} formatında sorular üretin` : 'MEB müfredatına uygun sorular üretin'}
                 </p>
               </div>
             </div>
@@ -1092,10 +1092,25 @@ export default function AIQuestionGeneratorPage() {
                   <Target className="w-4 h-4" />
                   TYT
                 </button>
+                <button
+                  onClick={() => { setSelectedExamMode('AYT'); setGenerationMode('single') }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    selectedExamMode === 'AYT'
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  AYT
+                </button>
               </div>
-              {selectedExamMode === 'TYT' && (
-                <div className="text-xs text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-200 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" /> ÖSYM TYT formatında soru üretimi
+              {selectedExamMode && (
+                <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
+                  selectedExamMode === 'TYT'
+                    ? 'text-orange-600 bg-orange-50 border-orange-200'
+                    : 'text-blue-600 bg-blue-50 border-blue-200'
+                }`}>
+                  <Sparkles className="w-3 h-3" /> ÖSYM {selectedExamMode} formatında soru üretimi
                 </div>
               )}
             </div>
@@ -1257,15 +1272,15 @@ export default function AIQuestionGeneratorPage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
             >
-              {selectedExamMode === 'TYT' ? (
-                /* TYT Ders Seçimi */
+              {selectedExamMode ? (
+                /* Sınav (TYT/AYT) Ders Seçimi */
                 <>
-                  <h2 className="text-2xl font-bold text-gray-800 mb-2">TYT Dersi Seçin</h2>
-                  <p className="text-gray-600 mb-6">ÖSYM TYT formatında soru üretmek istediğiniz dersi seçin</p>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">{selectedExamMode} Dersi Seçin</h2>
+                  <p className="text-gray-600 mb-6">ÖSYM {selectedExamMode} formatında soru üretmek istediğiniz dersi seçin</p>
 
                   {loadingExamTopics ? (
                     <div className="flex items-center justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+                      <Loader2 className={`w-8 h-8 animate-spin ${selectedExamMode === 'AYT' ? 'text-blue-600' : 'text-orange-600'}`} />
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -1273,13 +1288,14 @@ export default function AIQuestionGeneratorPage() {
                         const subjectIcons: Record<string, string> = {
                           turkce: '📖', matematik: '📐', geometri: '📏', fizik: '⚛️',
                           kimya: '🧪', biyoloji: '🧬', tarih: '📜', cografya: '🌍',
-                          felsefe: '💭', din_kulturu: '🕌'
+                          felsefe: '💭', din_kulturu: '🕌', edebiyat: '📚'
                         }
-                        const tytQuestionCounts: Record<string, number> = {
-                          turkce: 40, matematik: 30, geometri: 10, fizik: 7,
-                          kimya: 7, biyoloji: 6, tarih: 5, cografya: 5,
-                          felsefe: 5, din_kulturu: 5
+                        const examQuestionCounts: Record<string, Record<string, number>> = {
+                          TYT: { turkce: 40, matematik: 30, geometri: 10, fizik: 7, kimya: 7, biyoloji: 6, tarih: 5, cografya: 5, felsefe: 5, din_kulturu: 5 },
+                          AYT: { edebiyat: 24, matematik: 29, geometri: 11, fizik: 14, kimya: 13, biyoloji: 13, tarih: 21, cografya: 17, felsefe: 12, din_kulturu: 6 }
                         }
+                        const qCount = examQuestionCounts[selectedExamMode!]?.[subject.subject_code]
+                        const accentColor = selectedExamMode === 'AYT' ? 'blue' : 'orange'
                         return (
                           <button
                             key={subject.subject_code}
@@ -1289,8 +1305,8 @@ export default function AIQuestionGeneratorPage() {
                             }}
                             className={`p-4 rounded-xl border-2 transition-all hover:scale-105 text-left ${
                               selectedExamSubject === subject.subject_code
-                                ? 'border-orange-500 bg-orange-50 shadow-lg'
-                                : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                                ? `border-${accentColor}-500 bg-${accentColor}-50 shadow-lg`
+                                : `border-gray-200 hover:border-${accentColor}-300 hover:bg-${accentColor}-50`
                             }`}
                           >
                             <div className="text-3xl mb-2">{subjectIcons[subject.subject_code] || '📖'}</div>
@@ -1298,8 +1314,8 @@ export default function AIQuestionGeneratorPage() {
                             <div className="text-xs text-gray-500 mt-1">
                               {subject.topics.length} konu
                             </div>
-                            <div className="mt-1 text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full inline-block">
-                              TYT: {tytQuestionCounts[subject.subject_code] || '?'} soru
+                            <div className={`mt-1 text-xs px-2 py-0.5 bg-${accentColor}-100 text-${accentColor}-700 rounded-full inline-block`}>
+                              {selectedExamMode}: {qCount || '?'} soru
                             </div>
                           </button>
                         )
@@ -1352,8 +1368,8 @@ export default function AIQuestionGeneratorPage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
             >
-              {selectedExamMode === 'TYT' ? (
-                /* TYT Konu Seçimi */
+              {selectedExamMode ? (
+                /* Sınav (TYT/AYT) Konu Seçimi */
                 <>
                   <div className="flex items-center justify-between mb-6">
                     <div>
@@ -2178,11 +2194,11 @@ export default function AIQuestionGeneratorPage() {
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                {selectedExamMode === 'TYT' ? (
-                  /* TYT Ders Seçimi - tek blok, sınıf gerekmez */
+                {selectedExamMode ? (
+                  /* Sınav (TYT/AYT) Ders Seçimi - tek blok, sınıf gerekmez */
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      📋 TYT Dersleri ({batchSelectedExamSubjects.length} seçili)
+                      📋 {selectedExamMode} Dersleri ({batchSelectedExamSubjects.length} seçili)
                     </label>
                     {loadingExamTopics ? (
                       <div className="flex items-center justify-center py-4">
@@ -2190,7 +2206,7 @@ export default function AIQuestionGeneratorPage() {
                       </div>
                     ) : examSubjects.length === 0 ? (
                       <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                        TYT dersleri yükleniyor...
+                        {selectedExamMode} dersleri yükleniyor...
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
