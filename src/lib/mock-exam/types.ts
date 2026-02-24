@@ -12,7 +12,7 @@ export type ExamStatus = 'draft' | 'active' | 'ended'
 export type AnswerOption = 'A' | 'B' | 'C' | 'D' | 'E'
 
 // Ders kodlari (Typesense ve DB'de kullanilan)
-export type SubjectCode = 'turkce' | 'matematik' | 'geometri' | 'fen_bilimleri' | 'sosyal_bilgiler' | 'hayat_bilgisi' | 'inkilap_tarihi' | 'din_kulturu' | 'ingilizce' | 'edebiyat' | 'fizik' | 'kimya' | 'biyoloji' | 'tarih' | 'cografya' | 'felsefe'
+export type SubjectCode = 'turkce' | 'matematik' | 'geometri' | 'fen_bilimleri' | 'sosyal_bilgiler' | 'hayat_bilgisi' | 'inkilap_tarihi' | 'din_kulturu' | 'ingilizce' | 'edebiyat' | 'fizik' | 'kimya' | 'biyoloji' | 'tarih' | 'cografya' | 'felsefe' | 'vatandaslik'
 
 // =====================================================
 // SINAV MODELLERI

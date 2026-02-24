@@ -353,6 +353,30 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 100,
   },
   // ===========================================
+  // KPSS (Kamu Personel Seçme Sınavı - Lisans)
+  // 120 soru (GY 60 + GK 60), 135 dakika, 4 yanlış = 1 doğru götürür
+  // Not: Güncel Bilgiler (6 soru) AI ile üretilemiyor, dahil edilmedi
+  // ===========================================
+  KPSS: {
+    label: 'KPSS Lisans Deneme Sınavı',
+    shortLabel: 'KPSS',
+    grades: [0],  // Sınıf dışı - sınav bazlı
+    duration: 135,
+    totalQuestions: 114,  // Güncel Bilgiler hariç
+    subjects: [
+      // Genel Yetenek
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe (GY)', questionCount: 30, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik (GY)', questionCount: 30, coefficient: 1.0 },
+      // Genel Kültür
+      { code: 'tarih', name: 'Tarih', displayName: 'Tarih (GK)', questionCount: 27, coefficient: 1.0 },
+      { code: 'cografya', name: 'Cografya', displayName: 'Coğrafya (GK)', questionCount: 18, coefficient: 1.0 },
+      { code: 'vatandaslik', name: 'Vatandaslik', displayName: 'Vatandaşlık (GK)', questionCount: 9, coefficient: 1.0 },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  // ===========================================
   // LGS
   // ===========================================
   LGS: {
@@ -390,6 +414,7 @@ export const EXAM_TYPE_LABELS: Record<string, string> = {
   LGS: 'LGS',
   TYT: 'TYT',
   AYT: 'AYT',
+  KPSS: 'KPSS Lisans',
 }
 
 // Ders renkleri (UI icin)

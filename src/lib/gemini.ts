@@ -1291,6 +1291,41 @@ function getAYTExamContext(subject: string): { examType: string; format: string;
   }
 }
 
+// ============================================================
+// KPSS Sınav Bağlamı
+// ============================================================
+function getKPSSExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Türkçe': `📝 ÖSYM KPSS TÜRKÇE (30 soru, Genel Yetenek):
+Paragraf soruları ağırlıklı (14-15 soru): ana düşünce, yardımcı düşünce, boşluk doldurma, paragrafı tamamlama, yazarın amacı ve tutumu. 200-400 kelimelik akademik, sosyal bilim veya felsefi metinler kullan. Dil bilgisi (8-10 soru): sözcük türleri, sözcükte yapı, cümlenin ögeleri, ses olayları, yazım kuralları, noktalama. Anlam bilgisi (5-6 soru): sözcükte anlam, cümlede anlam, anlatım bozukluğu. Sözel mantık sorularına da yer ver. KPSS Türkçe'de soyut-felsefi metinler, bilimsel popüler metinler, biyografik ve sosyolojik metinler tercih edilir.`,
+
+    'Matematik': `🔢 ÖSYM KPSS MATEMATİK (30 soru, Genel Yetenek):
+Temel işlemler (8-10 soru): sayılar ve sayı sistemleri, EBOB/EKOK, üslü/köklü sayılar, mutlak değer, modüler aritmetik. Problem çözme (10-12 soru): oran-orantı, yüzde, karışım, iş-zaman, hız-mesafe, yaş problemleri, kar-zarar. Sayısal mantık (3-6 soru): örüntü bulma, sayı dizileri, tablo/grafik yorumlama. Geometri (4-6 soru): üçgen, dörtgen, çember özellikleri, analitik geometri temelleri. Kombinasyon/Olasılık (2-3 soru). KPSS'de sezgisel çözüm yolları olan, pratik hayatla bağlantılı, birden fazla işlem adımı gerektiren sorular üret.`,
+
+    'Tarih': `🏛️ ÖSYM KPSS TARİH (27 soru, Genel Kültür):
+İslamiyet öncesi Türk tarihi (2 soru): İlk Türk devletleri, kültür ve uygarlık. İlk Türk-İslam devletleri (3 soru): Karahanlılar, Gazneliler, Selçuklular, kültür ve uygarlık. Osmanlı siyasi tarihi (3 soru): kuruluş, yükselme, duraklama dönemleri. Osmanlı kültür ve uygarlığı (5 soru): devlet teşkilatı, ekonomi, eğitim, sanat. 20. yüzyıl Osmanlı (4 soru): gerileme, Balkan Savaşları, I. Dünya Savaşı. Kurtuluş Savaşı (2 soru). Atatürk dönemi inkılapları (5 soru): siyasi, hukuki, eğitim, ekonomi, sosyal inkılaplar. Atatürk ilkeleri (2 soru): cumhuriyetçilik, milliyetçilik, halkçılık, devletçilik, laiklik, devrimcilik. Güncel Türk tarihi (2 soru). Neden-sonuç, karşılaştırma, kronoloji ağırlıklı sorular üret.`,
+
+    'Coğrafya': `🗺️ ÖSYM KPSS COĞRAFYA (18 soru, Genel Kültür):
+Türkiye fiziki coğrafyası (7-8 soru): yer şekilleri ve dağlar, akarsular ve göller, iklim ve iklim tipleri, doğal bitki örtüsü, toprak türleri. Beşeri ve ekonomik coğrafya (10-11 soru): nüfus artışı ve nüfus hareketleri, kır/kent yerleşmeleri, tarım ve hayvancılık, orman ve maden kaynakları, sanayi bölgeleri, ulaşım ağları, ticaret ve turizm. Türkiye'nin coğrafi bölgeleri ve özellikleri. Harita bilgisi. Dünya coğrafyasından 1-2 soru. Güncel Türkiye coğrafyası gerektiren, yorumlama ve karşılaştırma odaklı sorular üret.`,
+
+    'Vatandaşlık': `⚖️ ÖSYM KPSS VATANDAŞLIK/ANAYASA (9 soru, Genel Kültür):
+Temel hukuk kavramları (2 soru): hukukun kaynakları, hukuk dalları, yaptırım çeşitleri, kamu-özel hukuk ayrımı. TC Anayasası genel esaslar (2 soru): devletin temel nitelikleri, egemenlik, Türk milletinin unsurları. Temel hak ve ödevler (1 soru): hak kategorileri, temel hakların sınırlandırılması. Devlet organları (3 soru): TBMM yetki ve görevleri, Cumhurbaşkanı yetki ve görevleri, Anayasa Mahkemesi ve yüksek mahkemeler. İdare hukuku (2 soru): kamu yönetimi yapısı, merkezi/yerel yönetim, kamu görevlileri statüsü, idari yargı. Anayasa maddeleri ve kamu hukuku kurallarına dayalı, yorum gerektiren sorular üret.`,
+  }
+
+  const normalized = subject.toLowerCase().replace(/[^a-zğüşıöç]/g, '')
+  let key = 'Türkçe'
+  if (normalized.includes('mat') || normalized.includes('geom')) key = 'Matematik'
+  else if (normalized.includes('tar') || normalized.includes('inkilap') || normalized.includes('ataturk')) key = 'Tarih'
+  else if (normalized.includes('cog') || normalized.includes('cografya')) key = 'Coğrafya'
+  else if (normalized.includes('vat') || normalized.includes('anayasa') || normalized.includes('hukuk')) key = 'Vatandaşlık'
+
+  return {
+    examType: 'KPSS (Kamu Personel Seçme Sınavı) Lisans',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, GY 60 + GK 60 = 120 soru, 135 dakika',
+    tips: subjectTips[key] || `📚 KPSS ${subject}: ÖSYM KPSS lisans formatında, devlet memurluğu sınavına hazırlık düzeyinde analitik sorular üret.`,
+  }
+}
+
 export async function generateCurriculumQuestions(
   grade: number,
   subject: string,
@@ -1300,14 +1335,17 @@ export async function generateCurriculumQuestions(
   count: number = 5,
   lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
   visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
-  examMode?: 'TYT' | 'AYT' | null  // 📋 Sınav bazlı üretim modu
+  examMode?: 'TYT' | 'AYT' | 'KPSS' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
-  // Sınıf seviyesine göre şık sayısı (LGS 4, YKS 5, TYT/AYT her zaman 5)
-  const isHighSchool = grade >= 9 || examMode === 'TYT' || examMode === 'AYT'
+  // Sınıf seviyesine göre şık sayısı — KPSS/TYT/AYT her zaman 5 şık
+  const isHighSchool = grade >= 9 || examMode === 'TYT' || examMode === 'AYT' || examMode === 'KPSS'
   const optionCount = isHighSchool ? 5 : 4
 
-  // Sınav bağlamı - TYT/AYT modu aktifse sınav-spesifik context kullan
-  const examContext = examMode === 'TYT' ? getTYTExamContext(subject) : examMode === 'AYT' ? getAYTExamContext(subject) : getExamContext(grade)
+  // Sınav bağlamı
+  const examContext = examMode === 'TYT' ? getTYTExamContext(subject)
+    : examMode === 'AYT' ? getAYTExamContext(subject)
+    : examMode === 'KPSS' ? getKPSSExamContext(subject)
+    : getExamContext(grade)
   
   // Ders bazlı yönergeler
   const subjectGuidelines = getSubjectGuidelines(subject, grade)
@@ -1337,12 +1375,14 @@ export async function generateCurriculumQuestions(
   const selectedSpecialTip = getRandomSpecialTip(subject)
   
   // 🌍 QUESTLY GLOBAL: Dile göre prompt oluştur
-  const prompt = lang === 'en' 
+  const prompt = lang === 'en'
     ? generateEnglishPrompt(grade, subject, topic, learningOutcome, difficulty, count, optionCount, isHighSchool, bloomPriority)
     : `${examMode === 'TYT'
       ? `SEN ÖSYM'NİN EN DENEYİMLİ SORU YAZARISIN. Gerçek TYT sınavı formatında, ÖSYM kalitesinde mükemmel sorular üreteceksin. 2025 TYT sınavı referans alınacak.`
       : examMode === 'AYT'
       ? `SEN ÖSYM'NİN EN DENEYİMLİ AYT SORU YAZARISIN. Alan Yeterlilik Testi formatında, üniversiteye hazırlık düzeyinde ileri seviye sorular üreteceksin. 2025 AYT sınavı referans alınacak.`
+      : examMode === 'KPSS'
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ KPSS SORU YAZARISIN. Kamu Personel Seçme Sınavı formatında, devlet memurluğu sınavına hazırlık düzeyinde, analitik düşünme gerektiren mükemmel sorular üreteceksin. 2024-2025 KPSS Lisans sınavları referans alınacak.`
       : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
@@ -1352,7 +1392,7 @@ export async function generateCurriculumQuestions(
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
 ${examMode
-  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT (Temel Yeterlilik Testi)' : 'AYT (Alan Yeterlilik Testi)'}
+  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT (Temel Yeterlilik Testi)' : examMode === 'AYT' ? 'AYT (Alan Yeterlilik Testi)' : 'KPSS (Kamu Personel Seçme Sınavı) Lisans'}
 │ Ders: ${subject}
 │ Konu: ${topic}
 │ Kazanım: "${learningOutcome}"
