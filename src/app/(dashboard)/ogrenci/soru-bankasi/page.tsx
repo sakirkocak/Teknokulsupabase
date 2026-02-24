@@ -45,6 +45,35 @@ import {
   type MotivationContext
 } from '@/lib/gamification'
 import { HoneypotTrap } from '@/components/security/HoneypotTrap'
+import { getTypesenseBrowserClient, isTypesenseEnabled } from '@/lib/typesense/browser-client'
+import { COLLECTIONS } from '@/lib/typesense/client'
+
+// TYT/AYT ders listesi (sınav modu)
+const TYT_SUBJECTS = [
+  { code: 'turkce', name: 'Türkçe', icon: '📝' },
+  { code: 'matematik', name: 'Temel Matematik', icon: '🔢' },
+  { code: 'geometri', name: 'Geometri', icon: '📐' },
+  { code: 'fizik', name: 'Fizik', icon: '⚗️' },
+  { code: 'kimya', name: 'Kimya', icon: '🧪' },
+  { code: 'biyoloji', name: 'Biyoloji', icon: '🧬' },
+  { code: 'tarih', name: 'Tarih', icon: '🏛️' },
+  { code: 'cografya', name: 'Coğrafya', icon: '🗺️' },
+  { code: 'felsefe', name: 'Felsefe', icon: '💭' },
+  { code: 'din_kulturu', name: 'Din Kültürü', icon: '📖' },
+]
+
+const AYT_SUBJECTS = [
+  { code: 'edebiyat', name: 'Türk Dili ve Edebiyatı', icon: '📚' },
+  { code: 'matematik', name: 'Matematik', icon: '🔢' },
+  { code: 'geometri', name: 'Geometri', icon: '📐' },
+  { code: 'fizik', name: 'Fizik', icon: '⚗️' },
+  { code: 'kimya', name: 'Kimya', icon: '🧪' },
+  { code: 'biyoloji', name: 'Biyoloji', icon: '🧬' },
+  { code: 'tarih', name: 'Tarih', icon: '🏛️' },
+  { code: 'cografya', name: 'Coğrafya', icon: '🗺️' },
+  { code: 'felsefe', name: 'Felsefe', icon: '💭' },
+  { code: 'din_kulturu', name: 'Din Kültürü', icon: '📖' },
+]
 
 interface Subject {
   id: string
@@ -169,6 +198,12 @@ export default function SoruBankasiPage() {
   // ✅ REF'ler - async state güncellemesinden bağımsız (Sonraki Soru için)
   const activeSubjectIdRef = useRef<string | null>(null)
   const activeGradeRef = useRef<number>(8)
+
+  // TYT/AYT Sınav Modu
+  const [examMode, setExamMode] = useState<'TYT' | 'AYT' | null>(null)
+  const examModeRef = useRef<'TYT' | 'AYT' | null>(null)
+  const examSubjectCodeRef = useRef<string | null>(null)
+  const [examSubjectCounts, setExamSubjectCounts] = useState<Record<string, number>>({})
 
   // Cross-session soru tekrarı engelleme
   const answeredIdsRef = useRef<Set<string>>(new Set())
@@ -628,6 +663,43 @@ export default function SoruBankasiPage() {
   }
 
   // Hızlı Başla - Rastgele soru çöz (tüm derslerden)
+  // TYT/AYT dersine başla
+  const quickStartExamSubject = async (subjectCode: string) => {
+    examModeRef.current = examMode
+    examSubjectCodeRef.current = subjectCode
+    activeSubjectIdRef.current = null
+    setSelectedSubject(null)
+    setSelectedTopic(null)
+    setSelectedDifficulty('')
+    setViewMode('practice')
+    await loadExamQuestion()
+  }
+
+  // TYT/AYT soru sayılarını yükle
+  const loadExamSubjectCounts = async (mode: 'TYT' | 'AYT') => {
+    if (!isTypesenseEnabled()) return
+    try {
+      const client = getTypesenseBrowserClient()
+      const result = await client
+        .collections(COLLECTIONS.QUESTIONS)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'question_text',
+          filter_by: `exam_types:=${mode.toLowerCase()}`,
+          per_page: 1,
+          facet_by: 'subject_code',
+          max_facet_values: 30,
+        } as any)
+      const facet = (result as any).facet_counts?.find((f: any) => f.field_name === 'subject_code')
+      if (facet) {
+        const counts: Record<string, number> = {}
+        for (const v of facet.counts) counts[v.value] = v.count
+        setExamSubjectCounts(counts)
+      }
+    } catch { /* ignore */ }
+  }
+
   const quickStart = async () => {
     // ✅ REF'leri sıfırla - tüm derslerden soru gelecek
     activeSubjectIdRef.current = null
@@ -884,12 +956,80 @@ export default function SoruBankasiPage() {
   const [consecutiveCorrectCount, setConsecutiveCorrectCount] = useState(0)
   const [consecutiveWrongCount, setConsecutiveWrongCount] = useState(0)
 
+  // TYT/AYT soru yükle (Typesense'den)
+  const loadExamQuestion = async () => {
+    const mode = examModeRef.current
+    const subjectCode = examSubjectCodeRef.current
+    if (!mode || !subjectCode) return
+
+    setPracticeLoading(true)
+    try {
+      const client = getTypesenseBrowserClient()
+      const result = await client
+        .collections(COLLECTIONS.QUESTIONS)
+        .documents()
+        .search({
+          q: '*',
+          query_by: 'question_text',
+          filter_by: `exam_types:=${mode.toLowerCase()} && subject_code:=${subjectCode}`,
+          per_page: 250,
+          sort_by: 'created_at:desc',
+          include_fields: 'question_id',
+        } as any)
+
+      const hits = result.hits || []
+      const unseenIds = hits
+        .map((h: any) => h.document.question_id)
+        .filter((id: string) => !answeredIdsRef.current.has(id))
+
+      const pool = unseenIds.length > 0 ? unseenIds : hits.map((h: any) => h.document.question_id)
+      if (pool.length === 0) { setCurrentQuestion(null); setPracticeLoading(false); return }
+
+      const randomId = pool[Math.floor(Math.random() * pool.length)]
+      const { data: q } = await supabase
+        .from('questions')
+        .select(`id, question_text, options, correct_answer, explanation, difficulty,
+          question_image_url, topic_id, exam_types, exam_topic_id, times_answered, times_correct,
+          visual_type, visual_content`)
+        .eq('id', randomId)
+        .single()
+
+      if (q) {
+        // exam_topic bilgisini al (subject adı için)
+        let topicMeta: any = { id: '', main_topic: `${mode} Sorusu`, grade: 0, subject: { id: '', name: subjectCode, code: subjectCode } }
+        if ((q as any).exam_topic_id) {
+          const { data: et } = await supabase
+            .from('exam_topics')
+            .select('subject_code, subject_name, main_topic')
+            .eq('id', (q as any).exam_topic_id)
+            .single()
+          if (et) {
+            topicMeta = { id: (q as any).exam_topic_id, main_topic: et.main_topic, grade: 0, subject: { id: '', name: et.subject_name, code: et.subject_code } }
+          }
+        }
+        setCurrentQuestion({ ...(q as any), topic: topicMeta })
+        setQuestionIndex(prev => prev + 1)
+      }
+    } catch (err) {
+      console.error('Exam soru yüklenemedi:', err)
+      setCurrentQuestion(null)
+    } finally {
+      setPracticeLoading(false)
+    }
+  }
+
   const loadNextQuestion = async (topic?: Topic) => {
     setSelectedAnswer(null)
     setShowResult(false)
     setEarnedPoints(null)
     setTimerKey(prev => prev + 1)
     setQuestionStartTime(Date.now())
+
+    // TYT/AYT modu: Typesense'den doğrudan yükle
+    if (examModeRef.current) {
+      await loadExamQuestion()
+      return
+    }
 
     const topicToUse = topic || selectedTopic
 
@@ -2727,12 +2867,90 @@ export default function SoruBankasiPage() {
           </div>
         )}
 
-        {/* Dersler - Kart Grid */}
+        {/* TYT / AYT Modu Toggle */}
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={() => {
+              const next = examMode === 'TYT' ? null : 'TYT'
+              setExamMode(next)
+              examModeRef.current = next
+              if (next) loadExamSubjectCounts(next)
+            }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              examMode === 'TYT'
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 dark:shadow-orange-900/40'
+                : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100'
+            }`}
+          >
+            📋 TYT Modu
+            {examMode === 'TYT' && <span className="text-xs bg-white/30 px-1.5 py-0.5 rounded-full">Aktif</span>}
+          </button>
+          <button
+            onClick={() => {
+              const next = examMode === 'AYT' ? null : 'AYT'
+              setExamMode(next)
+              examModeRef.current = next
+              if (next) loadExamSubjectCounts(next)
+            }}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              examMode === 'AYT'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-blue-900/40'
+                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100'
+            }`}
+          >
+            📋 AYT Modu
+            {examMode === 'AYT' && <span className="text-xs bg-white/30 px-1.5 py-0.5 rounded-full">Aktif</span>}
+          </button>
+        </div>
+
+        {/* TYT/AYT Ders Kartları */}
+        {examMode && (
+          <>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {examMode} Dersleri
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-8">
+              {(examMode === 'TYT' ? TYT_SUBJECTS : AYT_SUBJECTS).map(sub => {
+                const count = examSubjectCounts[sub.code] || 0
+                const examColor = examMode === 'TYT'
+                  ? 'from-orange-500 to-amber-500'
+                  : 'from-blue-600 to-indigo-600'
+                return (
+                  <motion.button
+                    key={sub.code}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => quickStartExamSubject(sub.code)}
+                    className="relative overflow-hidden bg-white dark:bg-gray-800 rounded-2xl shadow-sm hover:shadow-lg transition-all border-2 border-transparent hover:border-orange-200 dark:hover:border-blue-800 p-4 text-left"
+                  >
+                    <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${examColor}`} />
+                    <div className="text-3xl mb-2">{sub.icon}</div>
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm">{sub.name}</p>
+                    {count > 0 && (
+                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                        <BookOpen className="h-3 w-3" />
+                        {count} soru
+                      </p>
+                    )}
+                    <div className={`mt-3 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-gradient-to-r ${examColor} text-white text-xs font-medium`}>
+                      <Play className="h-3 w-3" />
+                      Başla
+                    </div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Dersler - Kart Grid (Sınıf bazlı - examMode kapalıyken) */}
+        {!examMode && (
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           {selectedGrade}. Sınıf Dersleri
         </h2>
+        )}
 
-        {gradeSubjects.length > 0 ? (
+        {!examMode && gradeSubjects.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {gradeSubjects.map(gs => {
               const subject = gs.subject

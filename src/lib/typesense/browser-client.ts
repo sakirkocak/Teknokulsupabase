@@ -1225,6 +1225,7 @@ export interface AdminQuestionFilters {
   isNewGeneration?: boolean  // 🆕 Yeni nesil soru filtresi
   hasVideo?: boolean         // 🎬 Video çözümü var mı?
   hasInteractive?: boolean   // ✨ İnteraktif çözümü var mı?
+  examType?: string          // 'tyt', 'ayt', 'lgs' - sınav türü filtresi
   searchQuery?: string
   page?: number
   pageSize?: number
@@ -1261,6 +1262,7 @@ export async function searchQuestionsForAdmin(
     isNewGeneration,
     hasVideo,
     hasInteractive,
+    examType,
     searchQuery,
     page = 1,
     pageSize = 20
@@ -1276,6 +1278,7 @@ export async function searchQuestionsForAdmin(
   if (isNewGeneration) filterParts.push(`is_new_generation:=true`)
   if (hasVideo) filterParts.push(`has_video:=true`)
   if (hasInteractive) filterParts.push(`has_interactive:=true`)
+  if (examType) filterParts.push(`exam_types:=${examType}`)
 
   try {
     const result = await client

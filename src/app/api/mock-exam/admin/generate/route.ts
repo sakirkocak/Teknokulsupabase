@@ -48,20 +48,23 @@ export async function POST(req: NextRequest) {
       isVisual: boolean
     }> = []
 
+    // TYT/AYT sinav bazli sinavlar icin exam_types filtresi kullan
+    const examTypeFilter = ['TYT', 'AYT'].includes(exam_type) ? exam_type.toLowerCase() : undefined
+
     // Her subject config icin soru sec
     for (const subjectConfig of config.subjects) {
       if (subjectConfig.subSubjects && subjectConfig.subSubjects.length > 0) {
         // Kompozit ders: alt derslerden soru sec (orn: Sosyal = Inkilap + Din)
         for (const sub of subjectConfig.subSubjects) {
           const questions = await fetchQuestionsFromTypesense(
-            grade, sub.code, sub.questionCount, subjectConfig.displayName
+            grade, sub.code, sub.questionCount, subjectConfig.displayName, examTypeFilter
           )
           selectedQuestions.push(...questions)
         }
       } else {
         // Tekil ders
         const questions = await fetchQuestionsFromTypesense(
-          grade, subjectConfig.code, subjectConfig.questionCount, subjectConfig.displayName
+          grade, subjectConfig.code, subjectConfig.questionCount, subjectConfig.displayName, examTypeFilter
         )
         selectedQuestions.push(...questions)
       }
@@ -108,7 +111,8 @@ async function fetchQuestionsFromTypesense(
   grade: number,
   subjectCode: string,
   count: number,
-  displaySubject: string
+  displaySubject: string,
+  examType?: string  // 'tyt', 'ayt' - sinav bazli filtre
 ): Promise<Array<{
   questionId: string
   subject: string
@@ -126,13 +130,23 @@ async function fetchQuestionsFromTypesense(
 
   if (!isTypesenseAvailable()) return result
 
+  // Filtre olustur: TYT/AYT icin exam_types kullan, diger sinavlar icin grade filtrele
+  let filterBy: string
+  if (examType) {
+    // TYT/AYT: sinav bazli soru secimi (grade bagimsiz)
+    filterBy = `subject_code:=${subjectCode} && exam_types:=${examType}`
+  } else {
+    // LGS/Bursluluk: sinif bazli soru secimi
+    filterBy = `subject_code:=${subjectCode} && grade:=${grade}`
+  }
+
   // Typesense'den soruları çek
   const searchResult = await typesenseClient
     .collections(COLLECTIONS.QUESTIONS)
     .documents()
     .search({
       q: '*',
-      filter_by: `subject_code:=${subjectCode} && grade:=${grade}`,
+      filter_by: filterBy,
       per_page: 250,
       include_fields: 'question_id,main_topic,visual_type,is_new_generation',
     })

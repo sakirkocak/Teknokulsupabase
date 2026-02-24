@@ -135,6 +135,8 @@ interface Question {
   // ✨ İnteraktif Çözüm alanları
   interactive_solution_status?: string | null
   interactive_solution_id?: string | null
+  // Sınav türü (TYT/AYT)
+  exam_types?: string[]
 }
 
 const difficultyConfig = {
@@ -159,7 +161,8 @@ export default function AdminSoruYonetimiPage() {
   const [filterDifficulty, setFilterDifficulty] = useState<string>('')
   const [filterTopic, setFilterTopic] = useState<string>('')
   const [filterHasImage, setFilterHasImage] = useState(false) // Görüntülü soru filtresi
-  const [filterNewGeneration, setFilterNewGeneration] = useState(false) // 🆕 Yeni nesil soru filtresi
+  const [filterNewGeneration, setFilterNewGeneration] = useState(false) // Yeni nesil soru filtresi
+  const [filterExamType, setFilterExamType] = useState<string>('') // TYT/AYT/LGS sınav türü filtresi
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('') // ⚡ Debounced arama
   const [showFilters, setShowFilters] = useState(true)
@@ -224,7 +227,7 @@ export default function AdminSoruYonetimiPage() {
 
   useEffect(() => {
     loadQuestions()
-  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, filterHasImage, filterNewGeneration, debouncedSearchQuery, currentPage])
+  }, [filterGrade, filterSubject, filterDifficulty, filterTopic, filterHasImage, filterNewGeneration, filterExamType, debouncedSearchQuery, currentPage])
 
   useEffect(() => {
     if (filterGrade) {
@@ -352,6 +355,7 @@ export default function AdminSoruYonetimiPage() {
           topicId: filterTopic,
           hasImage: filterHasImage,
           isNewGeneration: filterNewGeneration,
+          examType: filterExamType || undefined,
           searchQuery: debouncedSearchQuery,
           page: currentPage,
           pageSize
@@ -367,6 +371,7 @@ export default function AdminSoruYonetimiPage() {
             .select(`
               id,
               topic_id,
+              exam_types,
               question_text,
               question_image_url,
               options,
@@ -403,34 +408,51 @@ export default function AdminSoruYonetimiPage() {
           if (detailedQuestions && detailedQuestions.length > 0) {
             // Typesense sıralamasını koru
             const questionMap = new Map(detailedQuestions.map(q => [q.id, q]))
+            // Typesense sonuçlarını da map'e al (TYT/AYT için fallback)
+            const typesenseMap = new Map(result.questions.map(q => [q.question_id, q]))
             const mappedQuestions: Question[] = questionIds
               .map(id => questionMap.get(id))
               .filter(Boolean)
-              .map((q: any) => ({
-                id: q.id,
-                topic_id: q.topic_id || '',
-                difficulty: q.difficulty,
-                question_text: q.question_text,
-                question_image_url: q.question_image_url,
-                options: q.options || { A: '', B: '', C: '', D: '' },
-                correct_answer: q.correct_answer,
-                explanation: q.explanation,
-                source: q.source,
-                times_answered: q.times_answered || 0,
-                times_correct: q.times_correct || 0,
-                created_at: q.created_at,
-                visual_type: q.visual_type,
-                visual_content: q.visual_content,
-                topic: q.topic || {
+              .map((q: any) => {
+                // TYT/AYT soruları için topic_id null - Typesense verisini fallback kullan
+                const tsData = typesenseMap.get(q.id)
+                const topicFallback = q.topic || (tsData ? {
                   id: '',
                   subject_id: '',
-                  grade: 0,
-                  main_topic: 'Bilinmiyor',
-                  sub_topic: null,
+                  grade: tsData.grade || 0,
+                  main_topic: tsData.main_topic || 'Bilinmiyor',
+                  sub_topic: tsData.sub_topic || null,
                   learning_outcome: null,
+                  subject: {
+                    id: '',
+                    name: tsData.subject_name || 'Bilinmiyor',
+                    code: tsData.subject_code || '',
+                    icon: null
+                  }
+                } : {
+                  id: '', subject_id: '', grade: 0,
+                  main_topic: 'Bilinmiyor', sub_topic: null, learning_outcome: null,
                   subject: { id: '', name: 'Bilinmiyor', code: '', icon: null }
+                })
+                return {
+                  id: q.id,
+                  topic_id: q.topic_id || '',
+                  exam_types: q.exam_types || (tsData as any)?.exam_types || [],
+                  difficulty: q.difficulty,
+                  question_text: q.question_text,
+                  question_image_url: q.question_image_url,
+                  options: q.options || { A: '', B: '', C: '', D: '' },
+                  correct_answer: q.correct_answer,
+                  explanation: q.explanation,
+                  source: q.source,
+                  times_answered: q.times_answered || 0,
+                  times_correct: q.times_correct || 0,
+                  created_at: q.created_at,
+                  visual_type: q.visual_type,
+                  visual_content: q.visual_content,
+                  topic: topicFallback,
                 }
-              }))
+              })
             
             setQuestions(mappedQuestions)
             setTotalCount(result.total)
@@ -724,7 +746,7 @@ export default function AdminSoruYonetimiPage() {
             <div className="flex items-center gap-2">
               <Filter className="h-5 w-5 text-primary-500" />
               <span className="font-medium text-surface-900 dark:text-white">Filtreler</span>
-              {(filterGrade || filterSubject || filterDifficulty || filterTopic || filterHasImage || filterNewGeneration || searchQuery) && (
+              {(filterGrade || filterSubject || filterDifficulty || filterTopic || filterHasImage || filterNewGeneration || filterExamType || searchQuery) && (
                 <span className="px-2 py-0.5 bg-primary-100 text-primary-600 text-xs rounded-full">
                   Aktif
                 </span>
@@ -857,7 +879,7 @@ export default function AdminSoruYonetimiPage() {
                       </span>
                     </button>
                     
-                    {/* 🆕 Yeni Nesil Sorular */}
+                    {/* Yeni Nesil Sorular */}
                     <button
                       onClick={() => {
                         setFilterNewGeneration(!filterNewGeneration)
@@ -876,6 +898,29 @@ export default function AdminSoruYonetimiPage() {
                         {stats.newGeneration}
                       </span>
                     </button>
+
+                    {/* Sınav Türü: TYT / AYT / LGS */}
+                    {(['tyt', 'ayt', 'lgs'] as const).map((et) => (
+                      <button
+                        key={et}
+                        onClick={() => {
+                          setFilterExamType(filterExamType === et ? '' : et)
+                          setCurrentPage(1)
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                          filterExamType === et
+                            ? et === 'tyt'
+                              ? 'bg-orange-500 text-white shadow-lg shadow-orange-200'
+                              : et === 'ayt'
+                              ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                              : 'bg-green-600 text-white shadow-lg shadow-green-200'
+                            : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200'
+                        }`}
+                      >
+                        {et.toUpperCase()}
+                        {filterExamType === et && <span className="ml-1">✓</span>}
+                      </button>
+                    ))}
                   </div>
                   
                   {/* ⚡ Anlık Arama */}
@@ -962,10 +1007,21 @@ export default function AdminSoruYonetimiPage() {
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         {question.topic && (
                           <>
-                            <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-700 rounded-full text-surface-600 dark:text-surface-400">
-                              <GraduationCap className="h-3 w-3 inline mr-1" />
-                              {question.topic.grade}. Sınıf
-                            </span>
+                            {/* Grade badge: TYT/AYT için sınıf yerine sınav adı */}
+                            {question.topic.grade === 0 ? (
+                              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                question.exam_types?.includes('ayt')
+                                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                  : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                              }`}>
+                                {question.exam_types?.includes('ayt') ? 'AYT' : 'TYT'}
+                              </span>
+                            ) : (
+                              <span className="text-xs px-2 py-1 bg-surface-100 dark:bg-surface-700 rounded-full text-surface-600 dark:text-surface-400">
+                                <GraduationCap className="h-3 w-3 inline mr-1" />
+                                {question.topic.grade}. Sınıf
+                              </span>
+                            )}
                             <span className="text-xs px-2 py-1 bg-primary-100 dark:bg-primary-900/30 rounded-full text-primary-600 dark:text-primary-400">
                               {(question.topic.subject as any)?.icon} {(question.topic.subject as any)?.name}
                             </span>
@@ -1492,7 +1548,11 @@ export default function AdminSoruYonetimiPage() {
                   <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
                     <div className="flex items-center gap-2 text-white/50 text-sm">
                       <BookOpen className="w-4 h-4" />
-                      <span>{previewQuestion.topic.grade}. Sınıf</span>
+                      <span>
+                        {previewQuestion.topic.grade === 0
+                          ? (previewQuestion.exam_types?.includes('ayt') ? 'AYT' : 'TYT')
+                          : `${previewQuestion.topic.grade}. Sınıf`}
+                      </span>
                       <span className="text-white/30">•</span>
                       <span>{previewQuestion.topic.main_topic}</span>
                       {previewQuestion.topic.sub_topic && (

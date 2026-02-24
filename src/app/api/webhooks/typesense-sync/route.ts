@@ -256,48 +256,90 @@ async function handleQuestionsSync(
       return
     }
     
-    // Topic bilgilerini çek
-    const { data: topicData, error: topicError } = await supabase
-      .from('topics')
-      .select(`
-        id,
-        main_topic,
-        sub_topic,
-        grade,
-        subject:subjects!inner(id, code, name)
-      `)
-      .eq('id', record.topic_id)
-      .single()
-    
-    if (topicError || !topicData) {
-      console.warn(`Webhook: topic bulunamadı: ${record.topic_id}`)
+    // Topic bilgilerini çek: önce topics, yoksa exam_topics dene (TYT/AYT)
+    let subjectCode = 'unknown'
+    let subjectName = 'Bilinmeyen'
+    let mainTopic = ''
+    let subTopic = ''
+    let grade = 0
+    let topicIdForDoc = ''
+
+    if (record.topic_id) {
+      // Normal soru: topics → subjects join
+      const { data: topicData, error: topicError } = await supabase
+        .from('topics')
+        .select(`
+          id,
+          main_topic,
+          sub_topic,
+          grade,
+          subject:subjects!inner(id, code, name)
+        `)
+        .eq('id', record.topic_id)
+        .single()
+
+      if (topicError || !topicData) {
+        console.warn(`Webhook: topic bulunamadı: ${record.topic_id}`)
+        return
+      }
+
+      grade = safeNumber(topicData.grade)
+      subjectCode = safeString((topicData.subject as any)?.code, 'unknown')
+      subjectName = safeString((topicData.subject as any)?.name, 'Bilinmeyen')
+      mainTopic = safeString(topicData.main_topic)
+      subTopic = safeString(topicData.sub_topic)
+      topicIdForDoc = record.topic_id
+
+    } else if (record.exam_topic_id) {
+      // TYT/AYT sorusu: exam_topics tablosundan al
+      const { data: examTopicData, error: examTopicError } = await supabase
+        .from('exam_topics')
+        .select('subject_code, subject_name, main_topic, sub_topic, grades')
+        .eq('id', record.exam_topic_id)
+        .single()
+
+      if (examTopicError || !examTopicData) {
+        console.warn(`Webhook: exam_topic bulunamadı: ${record.exam_topic_id}`)
+        return
+      }
+
+      // TYT/AYT soruları sınıf tabanlı değil, sınav tabanlı
+      // grade: 0 = "sınav sorusu" (sınıf sistemiyle karışmasın)
+      grade = 0
+      subjectCode = safeString(examTopicData.subject_code, 'unknown')
+      subjectName = safeString(examTopicData.subject_name, 'Bilinmeyen')
+      mainTopic = safeString(examTopicData.main_topic)
+      subTopic = safeString(examTopicData.sub_topic)
+      topicIdForDoc = record.exam_topic_id  // exam_topic_id'yi topic_id alanına yaz
+
+    } else {
+      console.warn(`Webhook: topic_id ve exam_topic_id ikisi de yok: ${questionId}`)
       return
     }
-    
+
     // 📊 İstatistikler
     const timesAnswered = safeNumber(record.times_answered)
     const timesCorrect = safeNumber(record.times_correct)
 
     // 🚀 OPTİMİZE: Sadece arama/filtreleme için gereken alanlar
     // Detaylar (options, explanation, correct_answer, image_url) Supabase'den çekilir
-    // Embedding'ler Supabase pgvector'da tutulur
     const document: Record<string, any> = {
       id: questionId,
       question_id: questionId,
-      topic_id: safeString(record.topic_id),  // 🆕 Topic ID (filtre için)
+      topic_id: topicIdForDoc,
       question_text: safeString(record.question_text),
       // Filtreleme alanları
       difficulty: safeString(record.difficulty, 'medium'),
-      subject_code: safeString((topicData.subject as any)?.code, 'unknown'),
-      subject_name: safeString((topicData.subject as any)?.name, 'Bilinmeyen'),
-      main_topic: safeString(topicData.main_topic),
-      sub_topic: safeString(topicData.sub_topic),
-      grade: safeNumber(topicData.grade),
+      subject_code: subjectCode,
+      subject_name: subjectName,
+      main_topic: mainTopic,
+      sub_topic: subTopic,
+      grade,
       has_image: !!record.question_image_url,
-      // 🆕 Yeni Nesil Soru alanları
+      // Yeni Nesil Soru alanları
       is_new_generation: !!record.visual_type && record.visual_type !== 'none',
       visual_type: safeString(record.visual_type),
-      // 📋 Sınav türü etiketleme
+      // Sınav türü etiketleme (TYT/AYT)
       exam_types: Array.isArray(record.exam_types) ? record.exam_types : [],
       // İstatistikler
       times_answered: timesAnswered,

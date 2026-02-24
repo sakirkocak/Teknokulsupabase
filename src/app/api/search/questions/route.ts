@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
   const grade = searchParams.get('grade')
   const subject = searchParams.get('subject')
   const difficulty = searchParams.get('difficulty')
+  const examType = searchParams.get('exam_type') // 'tyt', 'ayt', 'lgs'
   const page = parseInt(searchParams.get('page') || '1')
   const perPage = parseInt(searchParams.get('per_page') || '20')
 
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
     // Typesense kullanilabilir mi kontrol et
     if (isTypesenseAvailable()) {
       const result = await searchQuestionsFromTypesense({
-        query, grade, subject, difficulty, page, perPage
+        query, grade, subject, difficulty, examType, page, perPage
       })
       
       const duration = Date.now() - startTime
@@ -91,6 +92,7 @@ export async function GET(req: NextRequest) {
     const result = await searchQuestionsFromSupabase({
       query, grade, subject, difficulty, page, perPage
     })
+    // Not: Supabase fallback'te exam_type filtresi uygulanmaz
     
     const duration = Date.now() - startTime
     console.log(`📊 Search from Supabase: "${query}" - ${duration}ms, ${result.total} results`)
@@ -133,10 +135,11 @@ async function searchQuestionsFromTypesense(params: {
   grade: string | null
   subject: string | null
   difficulty: string | null
+  examType?: string | null
   page: number
   perPage: number
 }): Promise<{ results: SearchResult[], total: number, page: number, per_page: number }> {
-  let { query, grade, subject, difficulty, page, perPage } = params
+  let { query, grade, subject, difficulty, examType, page, perPage } = params
   
   // Filtre olustur
   const filters: string[] = []
@@ -186,7 +189,10 @@ async function searchQuestionsFromTypesense(params: {
   if (difficulty) {
     filters.push(`difficulty:=${difficulty}`)
   }
-  
+  if (examType) {
+    filters.push(`exam_types:=${examType}`)
+  }
+
   // 🆕 Yeni nesil filtresi
   if (isNewGenerationSearch) {
     filters.push(`is_new_generation:=true`)
