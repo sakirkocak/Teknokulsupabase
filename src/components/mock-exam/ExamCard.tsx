@@ -48,9 +48,11 @@ export default function ExamCard({
             <p className="text-sm text-surface-500 mt-1 line-clamp-2">{description}</p>
           )}
         </div>
-        <span className="text-sm font-medium text-surface-400 bg-surface-50 px-3 py-1 rounded-lg">
-          {grade}. Sinif
-        </span>
+        {grade > 0 && (
+          <span className="text-sm font-medium text-surface-400 bg-surface-50 px-3 py-1 rounded-lg">
+            {grade}. Sınıf
+          </span>
+        )}
       </div>
 
       {/* Ders etiketleri */}

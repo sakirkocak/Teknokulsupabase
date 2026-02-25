@@ -269,7 +269,7 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
   TYT: {
     label: 'TYT Deneme Sınavı',
     shortLabel: 'TYT',
-    grades: [11, 12],
+    grades: [0],
     duration: 165,
     totalQuestions: 125,
     subjects: [
@@ -311,7 +311,7 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
   AYT: {
     label: 'AYT Deneme Sınavı',
     shortLabel: 'AYT',
-    grades: [11, 12],
+    grades: [0],
     duration: 180,
     totalQuestions: 160,
     subjects: [

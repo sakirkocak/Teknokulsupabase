@@ -6,6 +6,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const grade = searchParams.get('grade')
     const examType = searchParams.get('exam_type')
+    const examGroup = searchParams.get('exam_group')
     const slug = searchParams.get('slug')
     const page = parseInt(searchParams.get('page') || '1')
     const perPage = Math.min(parseInt(searchParams.get('per_page') || '20'), 50)
@@ -18,6 +19,9 @@ export async function GET(req: NextRequest) {
     const filterParts: string[] = ['is_active:true']
     if (grade) filterParts.push(`grade:=${grade}`)
     if (examType) filterParts.push(`exam_type:=${examType}`)
+    if (examGroup === 'BURSLULUK') {
+      filterParts.push('exam_type:[BURSLULUK_2,BURSLULUK_3,BURSLULUK_4,BURSLULUK_5,BURSLULUK_6,BURSLULUK_7,BURSLULUK_8,BURSLULUK_9,BURSLULUK_10,BURSLULUK_11]')
+    }
     if (slug) filterParts.push(`slug:=${slug}`)
 
     const result = await typesenseClient

@@ -37,6 +37,7 @@ export default function AdminExamBuilder({ onSave }: AdminExamBuilderProps) {
 
   const config = EXAM_CONFIGS[examType]
   const subjects = config?.subjects || []
+  const isExamBased = config?.grades?.[0] === 0
 
   // Slug otomatik olusturma
   function handleTitleChange(value: string) {
@@ -58,8 +59,9 @@ export default function AdminExamBuilder({ onSave }: AdminExamBuilderProps) {
     const newConfig = EXAM_CONFIGS[type]
     if (newConfig) {
       setDuration(newConfig.duration)
-      // Grade'i ilk uygun sinifa set et
-      if (newConfig.grades.length > 0 && !newConfig.grades.includes(grade)) {
+      if (newConfig.grades[0] === 0) {
+        setGrade(0)
+      } else if (!newConfig.grades.includes(grade)) {
         setGrade(newConfig.grades[0])
       }
     }
@@ -119,7 +121,7 @@ export default function AdminExamBuilder({ onSave }: AdminExamBuilderProps) {
 
   // Kaydet
   async function handleSave() {
-    if (!title || !slug || !grade || !examType) {
+    if (!title || !slug || grade === undefined || !examType) {
       setError('Lutfen tum zorunlu alanlari doldurun')
       return
     }
@@ -219,15 +221,21 @@ export default function AdminExamBuilder({ onSave }: AdminExamBuilderProps) {
 
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-1">Sinif *</label>
-            <select
-              value={grade}
-              onChange={(e) => setGrade(Number(e.target.value))}
-              className="w-full px-4 py-2.5 border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-300 outline-none"
-            >
-              {GRADE_OPTIONS.map(g => (
-                <option key={g.value} value={g.value}>{g.label}</option>
-              ))}
-            </select>
+            {isExamBased ? (
+              <div className="w-full px-4 py-2.5 border border-surface-100 bg-surface-50 rounded-xl text-sm text-surface-500">
+                Sinav Bazlı (0)
+              </div>
+            ) : (
+              <select
+                value={grade}
+                onChange={(e) => setGrade(Number(e.target.value))}
+                className="w-full px-4 py-2.5 border border-surface-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-200 focus:border-primary-300 outline-none"
+              >
+                {GRADE_OPTIONS.map(g => (
+                  <option key={g.value} value={g.value}>{g.label}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
