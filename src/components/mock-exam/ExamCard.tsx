@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Clock, Users, BarChart3, BookOpen } from 'lucide-react'
+import { Clock, Users, BarChart3, BookOpen, ArrowRight } from 'lucide-react'
 import { EXAM_TYPE_LABELS, SUBJECT_COLORS } from '@/lib/mock-exam/constants'
 
 interface ExamCardProps {
@@ -18,6 +18,26 @@ interface ExamCardProps {
   subjects: string[]
 }
 
+const EXAM_TYPE_COLORS: Record<string, { badge: string; accent: string; hover: string }> = {
+  LGS:              { badge: 'bg-indigo-100 text-indigo-700', accent: 'border-l-indigo-400', hover: 'hover:border-indigo-300' },
+  TYT:              { badge: 'bg-orange-100 text-orange-700', accent: 'border-l-orange-400', hover: 'hover:border-orange-300' },
+  AYT:              { badge: 'bg-rose-100 text-rose-700',     accent: 'border-l-rose-400',   hover: 'hover:border-rose-300' },
+  KPSS:             { badge: 'bg-blue-100 text-blue-700',     accent: 'border-l-blue-400',   hover: 'hover:border-blue-300' },
+  KPSS_ONLISANS:    { badge: 'bg-cyan-100 text-cyan-700',     accent: 'border-l-cyan-400',   hover: 'hover:border-cyan-300' },
+  KPSS_ORTAOGRETIM: { badge: 'bg-teal-100 text-teal-700',     accent: 'border-l-teal-400',   hover: 'hover:border-teal-300' },
+  DGS:              { badge: 'bg-green-100 text-green-700',   accent: 'border-l-green-400',  hover: 'hover:border-green-300' },
+  ALES:             { badge: 'bg-violet-100 text-violet-700', accent: 'border-l-violet-400', hover: 'hover:border-violet-300' },
+}
+
+function getBurslulukColor(exam_type: string) {
+  if (exam_type.startsWith('BURSLULUK')) {
+    return { badge: 'bg-amber-100 text-amber-700', accent: 'border-l-amber-400', hover: 'hover:border-amber-300' }
+  }
+  return null
+}
+
+const DEFAULT_COLORS = { badge: 'bg-primary-100 text-primary-700', accent: 'border-l-primary-400', hover: 'hover:border-primary-300' }
+
 export default function ExamCard({
   title,
   slug,
@@ -30,63 +50,73 @@ export default function ExamCard({
   average_score,
   subjects,
 }: ExamCardProps) {
+  const typeColors = EXAM_TYPE_COLORS[exam_type] || getBurslulukColor(exam_type) || DEFAULT_COLORS
+
   return (
     <Link
       href={`/deneme-dunyasi/${slug}`}
-      className="block bg-white rounded-2xl border border-surface-100 hover:border-primary-300 hover:shadow-lg transition-all p-6 group"
+      className={`flex flex-col bg-white rounded-2xl border border-surface-100 border-l-4 ${typeColors.accent} ${typeColors.hover} hover:shadow-xl transition-all duration-200 group overflow-hidden`}
     >
-      {/* Ust kisim */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <span className="inline-block px-3 py-1 bg-primary-50 text-primary-600 rounded-full text-xs font-medium mb-2">
+      {/* Üst kısım */}
+      <div className="p-6 flex-1">
+        <div className="flex items-start justify-between mb-3">
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${typeColors.badge}`}>
             {EXAM_TYPE_LABELS[exam_type] || exam_type}
           </span>
-          <h3 className="text-lg font-bold text-surface-900 group-hover:text-primary-600 transition-colors">
-            {title}
-          </h3>
-          {description && (
-            <p className="text-sm text-surface-500 mt-1 line-clamp-2">{description}</p>
+          {grade > 0 && (
+            <span className="text-xs font-medium text-surface-400 bg-surface-50 px-2.5 py-1 rounded-lg">
+              {grade}. Sınıf
+            </span>
           )}
         </div>
-        {grade > 0 && (
-          <span className="text-sm font-medium text-surface-400 bg-surface-50 px-3 py-1 rounded-lg">
-            {grade}. Sınıf
-          </span>
+
+        <h3 className="text-lg font-bold text-surface-900 group-hover:text-primary-600 transition-colors leading-snug mb-2">
+          {title}
+        </h3>
+
+        {description && (
+          <p className="text-sm text-surface-500 line-clamp-2 leading-relaxed">
+            {description}
+          </p>
+        )}
+
+        {/* Ders etiketleri */}
+        {subjects.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-4">
+            {subjects.map(subject => {
+              const color = SUBJECT_COLORS[subject] || SUBJECT_COLORS.turkce
+              return (
+                <span
+                  key={subject}
+                  className={`text-xs px-2.5 py-1 rounded-lg ${color.light} ${color.text} font-medium`}
+                >
+                  {subject.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
+              )
+            })}
+          </div>
         )}
       </div>
 
-      {/* Ders etiketleri */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {subjects.map(subject => {
-          const color = SUBJECT_COLORS[subject] || SUBJECT_COLORS.turkce
-          return (
-            <span
-              key={subject}
-              className={`text-xs px-2 py-1 rounded-md ${color.light} ${color.text} font-medium`}
-            >
-              {subject.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </span>
-          )
-        })}
-      </div>
-
-      {/* Istatistikler */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-surface-50">
-        <div className="flex items-center gap-2 text-sm text-surface-500">
-          <BookOpen className="w-4 h-4" />
-          <span>{question_count} soru</span>
+      {/* Alt istatistik bar */}
+      <div className="px-6 py-4 bg-surface-50/60 border-t border-surface-100 flex items-center justify-between">
+        <div className="flex items-center gap-4 text-xs text-surface-500">
+          <span className="flex items-center gap-1.5">
+            <BookOpen className="w-3.5 h-3.5" />
+            {question_count} soru
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            {duration} dk
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" />
+            {total_attempts} kişi
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-sm text-surface-500">
-          <Clock className="w-4 h-4" />
-          <span>{duration} dk</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-surface-500">
-          <Users className="w-4 h-4" />
-          <span>{total_attempts} kisi</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-surface-500">
-          <BarChart3 className="w-4 h-4" />
-          <span>Ort. {Math.round(average_score)}</span>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-primary-600 group-hover:gap-2.5 transition-all">
+          <span>Başla</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </div>
       </div>
     </Link>
