@@ -181,7 +181,9 @@ export default function AIQuestionGeneratorPage() {
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
 
   // ========== SINAV BAZLI MOD ==========
-  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | null>(null)
+  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | 'ALES' | null>(null)
+  const [showYksDropdown, setShowYksDropdown] = useState(false)
+  const [showKpssDropdown, setShowKpssDropdown] = useState(false)
   const [examSubjects, setExamSubjects] = useState<{ subject_code: string; subject_name: string; topics: ExamTopic[] }[]>([])
   const [selectedExamSubject, setSelectedExamSubject] = useState<string>('')
   const [examTopics, setExamTopics] = useState<ExamTopic[]>([])
@@ -1067,78 +1069,89 @@ export default function AIQuestionGeneratorPage() {
               )}
             </div>
 
-            {/* Exam Mode Toggle */}
+            {/* Exam Mode Toggle — Gruplu Dropdown */}
             <div className="flex flex-col items-end gap-2">
-              <div className="flex bg-gray-100 rounded-xl p-1">
+              <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+
+                {/* Sınıf Bazlı */}
                 <button
-                  onClick={() => { setSelectedExamMode(null); setCurrentStep(1) }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    !selectedExamMode
-                      ? 'bg-white text-purple-600 shadow'
-                      : 'text-gray-600 hover:text-gray-900'
+                  onClick={() => { setSelectedExamMode(null); setShowYksDropdown(false); setShowKpssDropdown(false); setCurrentStep(1) }}
+                  className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-sm ${
+                    !selectedExamMode ? 'bg-white text-purple-600 shadow' : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   <GraduationCap className="w-4 h-4" />
-                  Sınıf Bazlı
+                  Sınıf
                 </button>
+
+                {/* YKS Dropdown (TYT / AYT) */}
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowYksDropdown(v => !v); setShowKpssDropdown(false) }}
+                    className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-sm ${
+                      selectedExamMode === 'TYT' || selectedExamMode === 'AYT'
+                        ? selectedExamMode === 'TYT'
+                          ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow'
+                          : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Target className="w-4 h-4" />
+                    {selectedExamMode === 'TYT' ? 'TYT' : selectedExamMode === 'AYT' ? 'AYT' : 'YKS'}
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showYksDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-50 min-w-[120px] py-1">
+                      {[
+                        { mode: 'TYT' as const, label: 'TYT', color: 'text-orange-600' },
+                        { mode: 'AYT' as const, label: 'AYT', color: 'text-blue-600' },
+                      ].map(({ mode, label, color }) => (
+                        <button key={mode} onClick={() => { setSelectedExamMode(mode); setGenerationMode('single'); setShowYksDropdown(false) }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedExamMode === mode ? `${color} font-semibold` : 'text-gray-700'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* KPSS Dropdown (Lisans / Ön Lisans / Lise) */}
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowKpssDropdown(v => !v); setShowYksDropdown(false) }}
+                    className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-sm ${
+                      ['KPSS', 'KPSS_ONLISANS', 'KPSS_ORTAOGRETIM'].includes(selectedExamMode ?? '')
+                        ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    <Target className="w-4 h-4" />
+                    {selectedExamMode === 'KPSS' ? 'KPSS Lisans'
+                      : selectedExamMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans'
+                      : selectedExamMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Lise'
+                      : 'KPSS'}
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showKpssDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-gray-100 z-50 min-w-[150px] py-1">
+                      {[
+                        { mode: 'KPSS' as const, label: 'KPSS Lisans' },
+                        { mode: 'KPSS_ONLISANS' as const, label: 'KPSS Ön Lisans' },
+                        { mode: 'KPSS_ORTAOGRETIM' as const, label: 'KPSS Lise' },
+                      ].map(({ mode, label }) => (
+                        <button key={mode} onClick={() => { setSelectedExamMode(mode); setGenerationMode('single'); setShowKpssDropdown(false) }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${selectedExamMode === mode ? 'text-amber-600 font-semibold' : 'text-gray-700'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* DGS */}
                 <button
-                  onClick={() => { setSelectedExamMode('TYT'); setGenerationMode('single') }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    selectedExamMode === 'TYT'
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  TYT
-                </button>
-                <button
-                  onClick={() => { setSelectedExamMode('AYT'); setGenerationMode('single') }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    selectedExamMode === 'AYT'
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  AYT
-                </button>
-                <button
-                  onClick={() => { setSelectedExamMode('KPSS'); setGenerationMode('single') }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    selectedExamMode === 'KPSS'
-                      ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  KPSS Lisans
-                </button>
-                <button
-                  onClick={() => { setSelectedExamMode('KPSS_ONLISANS'); setGenerationMode('single') }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    selectedExamMode === 'KPSS_ONLISANS'
-                      ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  KPSS Ön Lisans
-                </button>
-                <button
-                  onClick={() => { setSelectedExamMode('KPSS_ORTAOGRETIM'); setGenerationMode('single') }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-                    selectedExamMode === 'KPSS_ORTAOGRETIM'
-                      ? 'bg-gradient-to-r from-yellow-500 to-lime-500 text-white shadow'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Target className="w-4 h-4" />
-                  KPSS Lise
-                </button>
-                <button
-                  onClick={() => { setSelectedExamMode('DGS'); setGenerationMode('single') }}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                  onClick={() => { setSelectedExamMode('DGS'); setGenerationMode('single'); setShowYksDropdown(false); setShowKpssDropdown(false) }}
+                  className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-sm ${
                     selectedExamMode === 'DGS'
                       ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow'
                       : 'text-gray-600 hover:text-gray-900'
@@ -1147,21 +1160,34 @@ export default function AIQuestionGeneratorPage() {
                   <Target className="w-4 h-4" />
                   DGS
                 </button>
+
+                {/* ALES */}
+                <button
+                  onClick={() => { setSelectedExamMode('ALES'); setGenerationMode('single'); setShowYksDropdown(false); setShowKpssDropdown(false) }}
+                  className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-sm ${
+                    selectedExamMode === 'ALES'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  ALES
+                </button>
               </div>
+
               {selectedExamMode && (
                 <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
                   selectedExamMode === 'TYT' ? 'text-orange-600 bg-orange-50 border-orange-200'
                   : selectedExamMode === 'AYT' ? 'text-blue-600 bg-blue-50 border-blue-200'
-                  : selectedExamMode === 'KPSS' ? 'text-amber-700 bg-amber-50 border-amber-200'
-                  : selectedExamMode === 'KPSS_ONLISANS' ? 'text-amber-600 bg-orange-50 border-orange-200'
-                  : selectedExamMode === 'KPSS_ORTAOGRETIM' ? 'text-lime-700 bg-lime-50 border-lime-200'
-                  : 'text-purple-700 bg-purple-50 border-purple-200'
+                  : ['KPSS', 'KPSS_ONLISANS', 'KPSS_ORTAOGRETIM'].includes(selectedExamMode) ? 'text-amber-700 bg-amber-50 border-amber-200'
+                  : selectedExamMode === 'DGS' ? 'text-purple-700 bg-purple-50 border-purple-200'
+                  : 'text-teal-700 bg-teal-50 border-teal-200'
                 }`}>
                   <Sparkles className="w-3 h-3" /> ÖSYM {
                     selectedExamMode === 'KPSS' ? 'KPSS Lisans'
                     : selectedExamMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans'
                     : selectedExamMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim'
-                    : 'DGS'
+                    : selectedExamMode
                   } formatında soru üretimi
                 </div>
               )}

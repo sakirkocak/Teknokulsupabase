@@ -353,6 +353,27 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 100,
   },
   // ===========================================
+  // ALES (Akademik Personel ve Lisansüstü Eğitimi Giriş Sınavı)
+  // 100 soru, 150 dakika, 4 yanlış = 1 doğru
+  // Sayısal: Mat 25 + Geo 10 + Sayısal Mantık 15 = 50
+  // Sözel: Türkçe 50 (Paragraf 35 ağırlıklı)
+  // ===========================================
+  ALES: {
+    label: 'ALES Deneme Sınavı',
+    shortLabel: 'ALES',
+    grades: [0],
+    duration: 150,
+    totalQuestions: 100,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe (Sözel)', questionCount: 50, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik (Sayısal)', questionCount: 40, coefficient: 1.0 },
+      { code: 'geometri', name: 'Geometri', displayName: 'Geometri (Sayısal)', questionCount: 10, coefficient: 1.0 },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  // ===========================================
   // DGS (Dikey Geçiş Sınavı)
   // 100 soru (Sayısal 50 + Sözel 50), 135 dakika, 4 yanlış = 1 doğru
   // ===========================================
@@ -480,6 +501,7 @@ export const EXAM_TYPE_LABELS: Record<string, string> = {
   TYT: 'TYT',
   AYT: 'AYT',
   DGS: 'DGS',
+  ALES: 'ALES',
   KPSS: 'KPSS Lisans',
   KPSS_ONLISANS: 'KPSS Ön Lisans',
   KPSS_ORTAOGRETIM: 'KPSS Ortaöğretim',

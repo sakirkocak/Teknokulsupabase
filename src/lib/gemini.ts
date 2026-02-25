@@ -1292,6 +1292,48 @@ function getAYTExamContext(subject: string): { examType: string; format: string;
 }
 
 // ============================================================
+// ALES (Akademik Personel ve Lisansüstü Eğitimi Giriş Sınavı)
+// 100 soru, 150 dakika — Sözel: Paragraf 35 soru, çok akademik
+// ============================================================
+function getALESExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Türkçe': `📝 ÖSYM ALES TÜRKÇE (50 soru):
+Paragraf soruları çok baskın (35 soru) — 300-600 kelimelik akademik, bilimsel, felsefi metinler. Ana düşünce, yardımcı düşünce, başlık, boşluk doldurma, cümle ekleme/çıkarma, sıralama, yazarın amacı ve tutumu, çıkarım yapma.
+
+Anlam bilgisi (5-7 soru): Cümlede anlam (anlamca yakın cümle, cümle yorumlama), sözcükte anlam (eş/zıt/mecaz), anlatım bozuklukları (cümle yapısı hataları — minimal).
+
+Sözel mantık (8-10 soru): Kavram analojisi, seri/örüntü tamamlama, ilişki belirleme, mantıksal çıkarım.
+
+NOT: Yazım, noktalama, ses olayları SORULMUYOR. Paragraf soruları ALES'te DGS'den çok daha uzun ve akademik düzeyde.`,
+
+    'Matematik': `🔢 ÖSYM ALES MATEMATİK (25 soru + 15 Sayısal Mantık = 40):
+NOT: Toplamda 50 sayısal soruda 15 tanesi Sayısal Mantık'tır.
+
+Temel matematik (11-12 soru): Sayı sistemleri, bölünebilme/EBOB/EKOK, üslü-köklü, oran-orantı-yüzde, denklemler-eşitsizlikler, kümeler, fonksiyonlar temel düzeyde.
+
+Problemler (8-9 soru): Hız-mesafe-zaman, iş-havuz, karışım, yaş, kâr-zarar, faiz, tablo/grafik yorumlama.
+
+Sayısal mantık (15 soru): Sayı/harf dizileri, matris örüntüleri (2x2-3x3 eksik değer), sayısal analoji, kodlama/şifreleme, tablo çıkarım. ALES sayısal mantık soruları KPSS'ye göre daha zor ve analitik.
+
+Diğer (2-3 soru): Permütasyon, kombinasyon, olasılık.`,
+
+    'Geometri': `📐 ÖSYM ALES GEOMETRİ (10 soru):
+Üçgenler (3 soru): Açılar, alan-çevre, özel üçgenler, benzerlik. Dörtgenler ve çokgenler (2 soru): Paralelkenar, kare, yamuk, düzgün çokgen açıları. Çember (1 soru): Alan, yay-kiriş. Temel geometri (1 soru): Paralel doğru açıları. Analitik geometri (2-3 soru): Uzaklık formülü, doğru denklemi, noktanın doğruya uzaklığı, eğim.`,
+  }
+
+  const normalized = subject.toLowerCase().replace(/[^a-zğüşıöç]/g, '')
+  let key = 'Türkçe'
+  if (normalized.includes('mat')) key = 'Matematik'
+  else if (normalized.includes('geom')) key = 'Geometri'
+
+  return {
+    examType: 'ALES (Akademik Personel ve Lisansüstü Eğitimi Giriş Sınavı)',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, Sözel 50 (Türkçe) + Sayısal 50 (Mat 25 + Geo 10 + Mantık 15) = 100 soru, 150 dakika',
+    tips: subjectTips[key] || `📚 ALES ${subject}: ÖSYM ALES formatında, yüksek lisans/doktora adayları için akademik düzeyde sorular üret.`,
+  }
+}
+
+// ============================================================
 // DGS (Dikey Geçiş Sınavı) Sınav Bağlamı
 // 100 soru (Sayısal 50 + Sözel 50), 135 dakika
 // Türkçe'de dil bilgisi YOK, sayısal/sözel mantık AĞIR
@@ -1446,7 +1488,7 @@ export async function generateCurriculumQuestions(
   count: number = 5,
   lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
   visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
-  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | null  // 📋 Sınav bazlı üretim modu
+  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | 'ALES' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
   // Sınıf seviyesine göre şık sayısı — KPSS/TYT/AYT her zaman 5 şık
   const isHighSchool = grade >= 9 || !!examMode
@@ -1459,6 +1501,7 @@ export async function generateCurriculumQuestions(
     : examMode === 'KPSS_ONLISANS' ? getKPSSOnlisansExamContext(subject)
     : examMode === 'KPSS_ORTAOGRETIM' ? getKPSSOrtaogretimExamContext(subject)
     : examMode === 'DGS' ? getDGSExamContext(subject)
+    : examMode === 'ALES' ? getALESExamContext(subject)
     : getExamContext(grade)
   
   // Ders bazlı yönergeler
@@ -1503,6 +1546,8 @@ export async function generateCurriculumQuestions(
       ? `SEN ÖSYM'NİN DENEYİMLİ KPSS SORU YAZARISIN. KPSS Ortaöğretim formatında, lise mezunu adaylar için lise müfredatı düzeyinde sorular üreteceksin. 2024 KPSS Ortaöğretim sınavı referans alınacak.`
       : examMode === 'DGS'
       ? `SEN ÖSYM'NİN EN DENEYİMLİ DGS SORU YAZARISIN. Dikey Geçiş Sınavı formatında, sözel/sayısal mantık ağırlıklı, anlama ve akıl yürütme odaklı mükemmel sorular üreteceksin. 2024-2025 DGS sınavları referans alınacak. NOT: Türkçe sorularında dil bilgisi (yazım/noktalama/ses olayları) SORMA.`
+      : examMode === 'ALES'
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ ALES SORU YAZARISIN. Akademik Personel ve Lisansüstü Eğitimi Giriş Sınavı formatında, yüksek lisans/doktora adaylarına yönelik akademik düzeyde sorular üreteceksin. 2024-2025 ALES sınavları referans alınacak. Türkçe'de paragraf soruları çok uzun ve akademik, sayısalda mantık ağırlıklı.`
       : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
@@ -1512,7 +1557,7 @@ export async function generateCurriculumQuestions(
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
 ${examMode
-  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT' : examMode === 'AYT' ? 'AYT' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : examMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim' : 'DGS (Dikey Geçiş Sınavı)'}
+  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT' : examMode === 'AYT' ? 'AYT' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : examMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim' : examMode === 'DGS' ? 'DGS' : 'ALES'}
 │ Ders: ${subject}
 │ Konu: ${topic}
 │ Kazanım: "${learningOutcome}"
