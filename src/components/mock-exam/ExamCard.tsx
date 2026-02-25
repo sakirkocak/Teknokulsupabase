@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Clock, Users, BarChart3, BookOpen, ArrowRight } from 'lucide-react'
-import { EXAM_TYPE_LABELS, SUBJECT_COLORS } from '@/lib/mock-exam/constants'
+import { Clock, Users, BookOpen, ArrowRight } from 'lucide-react'
+import { EXAM_TYPE_LABELS, SUBJECT_COLORS, EXAM_CONFIGS } from '@/lib/mock-exam/constants'
 
 interface ExamCardProps {
   id: string
@@ -51,6 +51,8 @@ export default function ExamCard({
   subjects,
 }: ExamCardProps) {
   const typeColors = EXAM_TYPE_COLORS[exam_type] || getBurslulukColor(exam_type) || DEFAULT_COLORS
+  const isExamBased = EXAM_CONFIGS[exam_type]?.grades?.[0] === 0
+  const showGrade = !isExamBased && grade > 0
 
   return (
     <Link
@@ -63,7 +65,7 @@ export default function ExamCard({
           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ${typeColors.badge}`}>
             {EXAM_TYPE_LABELS[exam_type] || exam_type}
           </span>
-          {grade > 0 && (
+          {showGrade && (
             <span className="text-xs font-medium text-surface-400 bg-surface-50 px-2.5 py-1 rounded-lg">
               {grade}. Sınıf
             </span>
