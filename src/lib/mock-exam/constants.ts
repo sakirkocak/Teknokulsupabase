@@ -353,6 +353,27 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 100,
   },
   // ===========================================
+  // DGS (Dikey Geçiş Sınavı)
+  // 100 soru (Sayısal 50 + Sözel 50), 135 dakika, 4 yanlış = 1 doğru
+  // ===========================================
+  DGS: {
+    label: 'DGS Deneme Sınavı',
+    shortLabel: 'DGS',
+    grades: [0],
+    duration: 135,
+    totalQuestions: 100,
+    subjects: [
+      // Sözel Bölüm
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe (Sözel)', questionCount: 50, coefficient: 1.0 },
+      // Sayısal Bölüm
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik (Sayısal)', questionCount: 43, coefficient: 1.0 },
+      { code: 'geometri', name: 'Geometri', displayName: 'Geometri (Sayısal)', questionCount: 7, coefficient: 1.0 },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  // ===========================================
   // KPSS (Kamu Personel Seçme Sınavı - Lisans)
   // 120 soru (GY 60 + GK 60), 135 dakika, 4 yanlış = 1 doğru götürür
   // Not: Güncel Bilgiler (6 soru) AI ile üretilemiyor, dahil edilmedi
@@ -458,6 +479,7 @@ export const EXAM_TYPE_LABELS: Record<string, string> = {
   LGS: 'LGS',
   TYT: 'TYT',
   AYT: 'AYT',
+  DGS: 'DGS',
   KPSS: 'KPSS Lisans',
   KPSS_ONLISANS: 'KPSS Ön Lisans',
   KPSS_ORTAOGRETIM: 'KPSS Ortaöğretim',

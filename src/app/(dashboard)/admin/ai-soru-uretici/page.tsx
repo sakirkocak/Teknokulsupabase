@@ -181,7 +181,7 @@ export default function AIQuestionGeneratorPage() {
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
 
   // ========== SINAV BAZLI MOD ==========
-  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | null>(null)
+  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | null>(null)
   const [examSubjects, setExamSubjects] = useState<{ subject_code: string; subject_name: string; topics: ExamTopic[] }[]>([])
   const [selectedExamSubject, setSelectedExamSubject] = useState<string>('')
   const [examTopics, setExamTopics] = useState<ExamTopic[]>([])
@@ -1136,6 +1136,17 @@ export default function AIQuestionGeneratorPage() {
                   <Target className="w-4 h-4" />
                   KPSS Lise
                 </button>
+                <button
+                  onClick={() => { setSelectedExamMode('DGS'); setGenerationMode('single') }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    selectedExamMode === 'DGS'
+                      ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  DGS
+                </button>
               </div>
               {selectedExamMode && (
                 <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
@@ -1143,13 +1154,14 @@ export default function AIQuestionGeneratorPage() {
                   : selectedExamMode === 'AYT' ? 'text-blue-600 bg-blue-50 border-blue-200'
                   : selectedExamMode === 'KPSS' ? 'text-amber-700 bg-amber-50 border-amber-200'
                   : selectedExamMode === 'KPSS_ONLISANS' ? 'text-amber-600 bg-orange-50 border-orange-200'
-                  : 'text-lime-700 bg-lime-50 border-lime-200'
+                  : selectedExamMode === 'KPSS_ORTAOGRETIM' ? 'text-lime-700 bg-lime-50 border-lime-200'
+                  : 'text-purple-700 bg-purple-50 border-purple-200'
                 }`}>
                   <Sparkles className="w-3 h-3" /> ÖSYM {
                     selectedExamMode === 'KPSS' ? 'KPSS Lisans'
                     : selectedExamMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans'
                     : selectedExamMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim'
-                    : selectedExamMode
+                    : 'DGS'
                   } formatında soru üretimi
                 </div>
               )}

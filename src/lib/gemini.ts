@@ -1292,6 +1292,47 @@ function getAYTExamContext(subject: string): { examType: string; format: string;
 }
 
 // ============================================================
+// DGS (Dikey Geçiş Sınavı) Sınav Bağlamı
+// 100 soru (Sayısal 50 + Sözel 50), 135 dakika
+// Türkçe'de dil bilgisi YOK, sayısal/sözel mantık AĞIR
+// ============================================================
+function getDGSExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Türkçe': `📝 ÖSYM DGS TÜRKÇE (50 soru — SÖZEL BÖLÜM):
+⚠️ DGS TÜRKÇE'DE DİL BİLGİSİ SORULMUYOR: Yazım kuralları, noktalama, ses olayları, cümle yapısı gibi konular DGS'de yer almaz. Sadece ANLAM ve MANTIK.
+
+Paragraf soruları (22 soru): Ana düşünce, yardımcı düşünce, boşluk doldurma, paragrafı tamamlama, cümle sıralaması, paragraftan anlam çıkarma. Metinler genellikle 150-300 kelimelik sosyal bilim, felsefe, tarih veya bilim metinleridir. Cümlede anlam (14-15 soru): Anlamca yakın cümle bulma, cümle yorumlama, ifade çıkarma, "Bu cümle ne anlatır?" tarzı sorular. Sözcükte anlam (4-5 soru): Eş anlamlı, zıt anlamlı, mecaz anlam, deyim ve atasözü.
+
+Sözel mantık (8 soru): Analoji ("A, B'ye göre ne ise C, D'ye göre aynıdır"), kavram ilişkisi, seri/örüntü tamamlama (kelimelerde), "Hangisi diğerlerinden farklıdır" tarzı kavram sınıflandırma.
+
+Sorular dil bilgisi gerektirmez, anlama ve akıl yürütme odaklıdır.`,
+
+    'Matematik': `🔢 ÖSYM DGS MATEMATİK (43 soru — SAYISAL BÖLÜM):
+⚠️ SAYISAL MANTIK ÇOK AĞIR (17 soru!): DGS'nin en kritik kısmı.
+
+Sayısal mantık (17 soru): Sayı/harf dizileri (belirli bir kurala göre sıralanan sayı/harf serisi tamamlama), matris örüntüleri (2x2 veya 3x3 tabloda eksik sayı/sembol), sayısal analoji (A:B = C:? formatında sayı ilişkisi), tablo ve grafik yorumlama, "hangisi diğer ilişkiyi tamamlar" tarzı ilişki soruları. Temel matematik (15-16 soru): Sayı teorisi (basamak, EBOB/EKOK, asal), üslü/köklü, oran-orantı, yüzde, denklemler. Problemler (10-11 soru): Hız-mesafe, iş-zaman, karışım, yaş, kâr-zarar — çok adımlı ama makul zorlukta. Diğer (1-2 soru): Kümeler, permütasyon/kombinasyon, olasılık.
+
+Sayısal mantık soruları ALES'e benzer ancak DGS'de daha az akademik, daha pratik.`,
+
+    'Geometri': `📐 ÖSYM DGS GEOMETRİ (7 soru — SAYISAL BÖLÜM):
+Üçgenler ve dörtgenler (3-4 soru): İç açı toplamı, alan hesabı, benzerlik, özel üçgenler (dik, eşkenar, ikizkenar), paralelkenar ve dikdörtgen özellikleri. Çokgenler ve çember (1-2 soru): Düzgün çokgen açıları, çemberin alanı ve çevresi, çember-doğru ilişkisi. Analitik geometri (1-2 soru): İki nokta arası uzaklık, doğrunun denklemi, nokta-doğru uzaklığı.
+
+DGS geometrisi lisans düzeyinde değil, görsel düşünme ve temel formül uygulaması. Şekil verilmeden de çözülebilir kısa sorular tercih edilir.`,
+  }
+
+  const normalized = subject.toLowerCase().replace(/[^a-zğüşıöç]/g, '')
+  let key = 'Türkçe'
+  if (normalized.includes('mat')) key = 'Matematik'
+  else if (normalized.includes('geom')) key = 'Geometri'
+
+  return {
+    examType: 'DGS (Dikey Geçiş Sınavı)',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, Sayısal 50 (Mat 43 + Geo 7) + Sözel 50 (Türkçe) = 100 soru, 135 dakika',
+    tips: subjectTips[key] || `📚 DGS ${subject}: ÖSYM DGS formatında, anlama ve mantık ağırlıklı sorular üret.`,
+  }
+}
+
+// ============================================================
 // KPSS Ön Lisans Sınav Bağlamı
 // Lisans'a çok yakın ama ön lisans müfredatı seviyesinde
 // ============================================================
@@ -1405,7 +1446,7 @@ export async function generateCurriculumQuestions(
   count: number = 5,
   lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
   visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
-  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | null  // 📋 Sınav bazlı üretim modu
+  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
   // Sınıf seviyesine göre şık sayısı — KPSS/TYT/AYT her zaman 5 şık
   const isHighSchool = grade >= 9 || !!examMode
@@ -1417,6 +1458,7 @@ export async function generateCurriculumQuestions(
     : examMode === 'KPSS' ? getKPSSExamContext(subject)
     : examMode === 'KPSS_ONLISANS' ? getKPSSOnlisansExamContext(subject)
     : examMode === 'KPSS_ORTAOGRETIM' ? getKPSSOrtaogretimExamContext(subject)
+    : examMode === 'DGS' ? getDGSExamContext(subject)
     : getExamContext(grade)
   
   // Ders bazlı yönergeler
@@ -1459,6 +1501,8 @@ export async function generateCurriculumQuestions(
       ? `SEN ÖSYM'NİN DENEYİMLİ KPSS SORU YAZARISIN. KPSS Ön Lisans formatında, ön lisans mezunu adaylar için uygun zorluk ve içerikte sorular üreteceksin. 2024 KPSS Ön Lisans sınavı referans alınacak.`
       : examMode === 'KPSS_ORTAOGRETIM'
       ? `SEN ÖSYM'NİN DENEYİMLİ KPSS SORU YAZARISIN. KPSS Ortaöğretim formatında, lise mezunu adaylar için lise müfredatı düzeyinde sorular üreteceksin. 2024 KPSS Ortaöğretim sınavı referans alınacak.`
+      : examMode === 'DGS'
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ DGS SORU YAZARISIN. Dikey Geçiş Sınavı formatında, sözel/sayısal mantık ağırlıklı, anlama ve akıl yürütme odaklı mükemmel sorular üreteceksin. 2024-2025 DGS sınavları referans alınacak. NOT: Türkçe sorularında dil bilgisi (yazım/noktalama/ses olayları) SORMA.`
       : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
@@ -1468,7 +1512,7 @@ export async function generateCurriculumQuestions(
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
 ${examMode
-  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT (Temel Yeterlilik Testi)' : examMode === 'AYT' ? 'AYT (Alan Yeterlilik Testi)' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : 'KPSS Ortaöğretim'}
+  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT' : examMode === 'AYT' ? 'AYT' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : examMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim' : 'DGS (Dikey Geçiş Sınavı)'}
 │ Ders: ${subject}
 │ Konu: ${topic}
 │ Kazanım: "${learningOutcome}"
