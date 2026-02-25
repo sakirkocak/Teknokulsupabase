@@ -5,15 +5,12 @@ import { createServerClient } from '@supabase/ssr'
 import { BreadcrumbSchema, QuizSchema, LearningResourceSchema, EducationalQuestionSchema } from '@/components/JsonLdSchema'
 import MathRenderer from '@/components/MathRenderer'
 import { QuestionText } from '@/components/QuestionCard'
-import VideoSolutionButton from '@/components/VideoSolutionButton'
-import InteractiveSolutionButton from '@/components/InteractiveSolutionButton'
-import JarvisSolutionButton from '@/components/JarvisSolutionButton'
-import { 
-  BookOpen, Calculator, Beaker, Globe, Languages, 
+import {
+  BookOpen, Calculator, Beaker, Globe, Languages,
   Atom, FlaskConical, Leaf, History, BookText,
   ChevronRight, CheckCircle, XCircle, Star, Zap,
   ArrowLeft, ArrowRight, Target, Sparkles, Clock,
-  Share2, Bookmark, ThumbsUp, MessageCircle, Video
+  Share2, Bookmark, ThumbsUp, MessageCircle
 } from 'lucide-react'
 
 // ISR - 1 saat cache (şimşek hız için!)
@@ -410,59 +407,6 @@ export default async function SingleQuestionPage({ params }: Props) {
               </div>
             )}
             
-            {/* Video Çözüm */}
-            <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 border-t border-purple-100">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h3 className="text-sm font-semibold text-purple-800 mb-1 flex items-center gap-2">
-                    <Video className="w-4 h-4" />
-                    Video Çözüm
-                  </h3>
-                  <p className="text-xs text-purple-600">
-                    {question.video_storage_url || question.video_solution_url 
-                      ? 'Bu sorunun video çözümü hazır!' 
-                      : 'AI ile video çözüm oluştur'}
-                  </p>
-                </div>
-                <VideoSolutionButton
-                  questionId={question.id}
-                  videoUrl={question.video_solution_url}
-                  videoStorageUrl={question.video_storage_url}
-                  videoStatus={question.video_status || 'none'}
-                />
-              </div>
-            </div>
-
-            {/* İnteraktif Çözüm */}
-            <div className="p-6 bg-gradient-to-r from-indigo-50 to-cyan-50 border-t border-indigo-100">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h3 className="text-sm font-semibold text-indigo-800 mb-1 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    İnteraktif Çözüm
-                  </h3>
-                  <p className="text-xs text-indigo-600">
-                    Adım adım, sesli ve animasyonlu çözüm. Quiz ile kendini test et!
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <InteractiveSolutionButton
-                    questionId={question.id}
-                    questionText={question.question_text}
-                    subjectName={subjectName}
-                  />
-                  <JarvisSolutionButton
-                    questionId={question.id}
-                    questionText={question.question_text}
-                    subject={subject}
-                    options={options}
-                    correctAnswer={question.correct_answer}
-                    explanation={question.explanation}
-                    grade={gradeNum}
-                  />
-                </div>
-              </div>
-            </div>
           </article>
 
           {/* Hızlı Çöz CTA */}

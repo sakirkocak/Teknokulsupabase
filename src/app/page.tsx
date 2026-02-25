@@ -788,17 +788,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* 🤖 Jarvis - AI Asistan */}
-            <Link 
-              href="/tekno-ogretmen" 
-              className="hidden md:flex group items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-600 text-white rounded-xl font-bold text-base hover:shadow-xl hover:shadow-cyan-500/40 hover:scale-105 transition-all duration-300"
-            >
-              {/* Glow Effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-600 rounded-xl blur-lg opacity-50 group-hover:opacity-80 transition-opacity -z-10" />
-              <Bot className="w-5 h-5" />
-              <span>Jarvis</span>
-              <span className="px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase tracking-wide">AI</span>
-            </Link>
             
             {/* Sağ: Sağ Menü + Butonlar */}
             <div className="hidden lg:flex items-center gap-3">
@@ -933,21 +922,6 @@ export default function HomePage() {
             className="md:hidden bg-white border-b border-surface-100 px-4 py-4 max-h-[80vh] overflow-y-auto"
           >
             <div className="space-y-2">
-              {/* 🤖 Jarvis - Mobile */}
-              <Link 
-                href="/tekno-ogretmen" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-4 bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-600 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/30"
-              >
-                <Bot className="w-6 h-6" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    Jarvis
-                    <span className="px-1.5 py-0.5 bg-yellow-400 text-[9px] text-yellow-900 font-bold rounded-full uppercase">AI</span>
-                  </div>
-                  <div className="text-xs text-white/80 font-normal">Yapay Zeka Özel Ders Asistanı</div>
-                </div>
-              </Link>
               
               <Link
                 href={soruCozHref}
