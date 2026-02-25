@@ -3,7 +3,7 @@
 // =====================================================
 
 // Sinav turleri
-export type ExamType = 'BURSLULUK_2' | 'BURSLULUK_3' | 'BURSLULUK_4' | 'BURSLULUK_5' | 'BURSLULUK_6' | 'BURSLULUK_7' | 'BURSLULUK_8' | 'BURSLULUK_9' | 'BURSLULUK_10' | 'BURSLULUK_11' | 'LGS' | 'TYT' | 'AYT'
+export type ExamType = 'BURSLULUK_2' | 'BURSLULUK_3' | 'BURSLULUK_4' | 'BURSLULUK_5' | 'BURSLULUK_6' | 'BURSLULUK_7' | 'BURSLULUK_8' | 'BURSLULUK_9' | 'BURSLULUK_10' | 'BURSLULUK_11' | 'LGS' | 'TYT' | 'AYT' | 'SINIF_1' | 'SINIF_2' | 'SINIF_3' | 'SINIF_4' | 'SINIF_5' | 'SINIF_6' | 'SINIF_7' | 'SINIF_8' | 'SINIF_9' | 'SINIF_10' | 'SINIF_11' | 'SINIF_12'
 
 // Sinav durumu
 export type ExamStatus = 'draft' | 'active' | 'ended'

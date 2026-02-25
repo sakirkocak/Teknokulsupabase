@@ -463,6 +463,262 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 0,
   },
   // ===========================================
+  // SINIF BAZLI DENEMELER (1-12)
+  // İlkokul (1-4): Ceza yok, kısa süreli
+  // Ortaokul (5-8): 3 yanlış = 1 doğru
+  // Lise (9-12): 4 yanlış = 1 doğru
+  // ===========================================
+  SINIF_1: {
+    label: '1. Sınıf Genel Değerlendirme',
+    shortLabel: '1. Sınıf',
+    grades: [1],
+    duration: 30,
+    totalQuestions: 20,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 10, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 10, coefficient: 1.0 },
+    ],
+    wrongPenalty: 0,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  SINIF_2: {
+    label: '2. Sınıf Genel Değerlendirme',
+    shortLabel: '2. Sınıf',
+    grades: [2],
+    duration: 40,
+    totalQuestions: 30,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 12, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 12, coefficient: 1.0 },
+      { code: 'hayat_bilgisi', name: 'Hayat Bilgisi', displayName: 'Hayat Bilgisi', questionCount: 6, coefficient: 1.0 },
+    ],
+    wrongPenalty: 0,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  SINIF_3: {
+    label: '3. Sınıf Genel Değerlendirme',
+    shortLabel: '3. Sınıf',
+    grades: [3],
+    duration: 45,
+    totalQuestions: 40,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 15, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 15, coefficient: 1.0 },
+      { code: 'hayat_bilgisi', name: 'Hayat Bilgisi', displayName: 'Hayat Bilgisi', questionCount: 10, coefficient: 1.0 },
+    ],
+    wrongPenalty: 0,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  SINIF_4: {
+    label: '4. Sınıf Genel Değerlendirme',
+    shortLabel: '4. Sınıf',
+    grades: [4],
+    duration: 60,
+    totalQuestions: 50,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 15, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 15, coefficient: 1.0 },
+      { code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 10, coefficient: 1.0 },
+      { code: 'sosyal_bilgiler', name: 'Sosyal Bilgiler', displayName: 'Sosyal Bilgiler', questionCount: 10, coefficient: 1.0 },
+    ],
+    wrongPenalty: 0,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  SINIF_5: {
+    label: '5. Sınıf Genel Değerlendirme',
+    shortLabel: '5. Sınıf',
+    grades: [5],
+    duration: 70,
+    totalQuestions: 60,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 15, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 15, coefficient: 1.0 },
+      { code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 15, coefficient: 1.0 },
+      { code: 'sosyal_bilgiler', name: 'Sosyal Bilgiler', displayName: 'Sosyal Bilgiler', questionCount: 15, coefficient: 1.0 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_6: {
+    label: '6. Sınıf Genel Değerlendirme',
+    shortLabel: '6. Sınıf',
+    grades: [6],
+    duration: 75,
+    totalQuestions: 60,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 15, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 15, coefficient: 1.0 },
+      { code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 15, coefficient: 1.0 },
+      { code: 'sosyal_bilgiler', name: 'Sosyal Bilgiler', displayName: 'Sosyal Bilgiler', questionCount: 15, coefficient: 1.0 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_7: {
+    label: '7. Sınıf Genel Değerlendirme',
+    shortLabel: '7. Sınıf',
+    grades: [7],
+    duration: 90,
+    totalQuestions: 80,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 20, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 1.0 },
+      { code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 20, coefficient: 1.0 },
+      { code: 'sosyal_bilgiler', name: 'Sosyal Bilgiler', displayName: 'Sosyal Bilgiler', questionCount: 20, coefficient: 1.0 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_8: {
+    label: '8. Sınıf Genel Değerlendirme',
+    shortLabel: '8. Sınıf',
+    grades: [8],
+    duration: 105,
+    totalQuestions: 90,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe', questionCount: 20, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 1.0 },
+      { code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 20, coefficient: 1.0 },
+      { code: 'inkilap_tarihi', name: 'Inkilap Tarihi', displayName: 'İnkılap Tarihi', questionCount: 10, coefficient: 1.0 },
+      { code: 'din_kulturu', name: 'Din Kulturu', displayName: 'Din Kültürü', questionCount: 10, coefficient: 1.0 },
+      { code: 'ingilizce', name: 'Ingilizce', displayName: 'İngilizce', questionCount: 10, coefficient: 1.0 },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_9: {
+    label: '9. Sınıf Genel Değerlendirme',
+    shortLabel: '9. Sınıf',
+    grades: [9],
+    duration: 90,
+    totalQuestions: 80,
+    subjects: [
+      { code: 'edebiyat', name: 'Turk Dili ve Edebiyati', displayName: 'Türk Dili ve Edebiyatı', questionCount: 20, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 1.0 },
+      {
+        code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 20, coefficient: 1.0,
+        subSubjects: [
+          { code: 'fizik', name: 'Fizik', questionCount: 7 },
+          { code: 'kimya', name: 'Kimya', questionCount: 7 },
+          { code: 'biyoloji', name: 'Biyoloji', questionCount: 6 },
+        ],
+      },
+      {
+        code: 'sosyal_bilgiler', name: 'Sosyal Bilimler', displayName: 'Sosyal Bilimler', questionCount: 20, coefficient: 1.0,
+        subSubjects: [
+          { code: 'tarih', name: 'Tarih', questionCount: 7 },
+          { code: 'cografya', name: 'Coğrafya', questionCount: 5 },
+          { code: 'felsefe', name: 'Felsefe', questionCount: 4 },
+          { code: 'din_kulturu', name: 'Din Kültürü', questionCount: 4 },
+        ],
+      },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_10: {
+    label: '10. Sınıf Genel Değerlendirme',
+    shortLabel: '10. Sınıf',
+    grades: [10],
+    duration: 90,
+    totalQuestions: 80,
+    subjects: [
+      { code: 'edebiyat', name: 'Turk Dili ve Edebiyati', displayName: 'Türk Dili ve Edebiyatı', questionCount: 20, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 20, coefficient: 1.0 },
+      {
+        code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 20, coefficient: 1.0,
+        subSubjects: [
+          { code: 'fizik', name: 'Fizik', questionCount: 7 },
+          { code: 'kimya', name: 'Kimya', questionCount: 7 },
+          { code: 'biyoloji', name: 'Biyoloji', questionCount: 6 },
+        ],
+      },
+      {
+        code: 'sosyal_bilgiler', name: 'Sosyal Bilimler', displayName: 'Sosyal Bilimler', questionCount: 20, coefficient: 1.0,
+        subSubjects: [
+          { code: 'tarih', name: 'Tarih', questionCount: 7 },
+          { code: 'cografya', name: 'Coğrafya', questionCount: 5 },
+          { code: 'felsefe', name: 'Felsefe', questionCount: 4 },
+          { code: 'din_kulturu', name: 'Din Kültürü', questionCount: 4 },
+        ],
+      },
+    ],
+    wrongPenalty: 3,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_11: {
+    label: '11. Sınıf Genel Değerlendirme',
+    shortLabel: '11. Sınıf',
+    grades: [11],
+    duration: 120,
+    totalQuestions: 100,
+    subjects: [
+      { code: 'edebiyat', name: 'Turk Dili ve Edebiyati', displayName: 'Türk Dili ve Edebiyatı', questionCount: 25, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 25, coefficient: 1.0 },
+      {
+        code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 25, coefficient: 1.0,
+        subSubjects: [
+          { code: 'fizik', name: 'Fizik', questionCount: 9 },
+          { code: 'kimya', name: 'Kimya', questionCount: 9 },
+          { code: 'biyoloji', name: 'Biyoloji', questionCount: 7 },
+        ],
+      },
+      {
+        code: 'sosyal_bilgiler', name: 'Sosyal Bilimler', displayName: 'Sosyal Bilimler', questionCount: 25, coefficient: 1.0,
+        subSubjects: [
+          { code: 'tarih', name: 'Tarih', questionCount: 9 },
+          { code: 'cografya', name: 'Coğrafya', questionCount: 7 },
+          { code: 'felsefe', name: 'Felsefe', questionCount: 5 },
+          { code: 'din_kulturu', name: 'Din Kültürü', questionCount: 4 },
+        ],
+      },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  SINIF_12: {
+    label: '12. Sınıf Genel Değerlendirme',
+    shortLabel: '12. Sınıf',
+    grades: [12],
+    duration: 120,
+    totalQuestions: 100,
+    subjects: [
+      { code: 'edebiyat', name: 'Turk Dili ve Edebiyati', displayName: 'Türk Dili ve Edebiyatı', questionCount: 25, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik', questionCount: 25, coefficient: 1.0 },
+      {
+        code: 'fen_bilimleri', name: 'Fen Bilimleri', displayName: 'Fen Bilimleri', questionCount: 25, coefficient: 1.0,
+        subSubjects: [
+          { code: 'fizik', name: 'Fizik', questionCount: 9 },
+          { code: 'kimya', name: 'Kimya', questionCount: 9 },
+          { code: 'biyoloji', name: 'Biyoloji', questionCount: 7 },
+        ],
+      },
+      {
+        code: 'sosyal_bilgiler', name: 'Sosyal Bilimler', displayName: 'Sosyal Bilimler', questionCount: 25, coefficient: 1.0,
+        subSubjects: [
+          { code: 'tarih', name: 'Tarih', questionCount: 9 },
+          { code: 'cografya', name: 'Coğrafya', questionCount: 7 },
+          { code: 'felsefe', name: 'Felsefe', questionCount: 5 },
+          { code: 'din_kulturu', name: 'Din Kültürü', questionCount: 4 },
+        ],
+      },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 100, max: 500 },
+    basePoints: 100,
+  },
+  // ===========================================
   // LGS
   // ===========================================
   LGS: {
@@ -487,6 +743,18 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
 
 // Sinav turu etiketleri
 export const EXAM_TYPE_LABELS: Record<string, string> = {
+  SINIF_1: '1. Sınıf',
+  SINIF_2: '2. Sınıf',
+  SINIF_3: '3. Sınıf',
+  SINIF_4: '4. Sınıf',
+  SINIF_5: '5. Sınıf',
+  SINIF_6: '6. Sınıf',
+  SINIF_7: '7. Sınıf',
+  SINIF_8: '8. Sınıf',
+  SINIF_9: '9. Sınıf',
+  SINIF_10: '10. Sınıf',
+  SINIF_11: '11. Sınıf',
+  SINIF_12: '12. Sınıf',
   BURSLULUK_2: '2. Sinif Bursluluk',
   BURSLULUK_3: '3. Sinif Bursluluk',
   BURSLULUK_4: '4. Sinif Bursluluk',
@@ -569,16 +837,18 @@ export const STORAGE_KEYS = {
 
 // Sinav sinif secenekleri
 export const GRADE_OPTIONS = [
-  { value: 2, label: '2. Sinif' },
-  { value: 3, label: '3. Sinif' },
-  { value: 4, label: '4. Sinif' },
-  { value: 5, label: '5. Sinif' },
-  { value: 6, label: '6. Sinif' },
-  { value: 7, label: '7. Sinif' },
-  { value: 8, label: '8. Sinif' },
-  { value: 9, label: '9. Sinif' },
-  { value: 10, label: '10. Sinif' },
-  { value: 11, label: '11. Sinif' },
+  { value: 1, label: '1. Sınıf' },
+  { value: 2, label: '2. Sınıf' },
+  { value: 3, label: '3. Sınıf' },
+  { value: 4, label: '4. Sınıf' },
+  { value: 5, label: '5. Sınıf' },
+  { value: 6, label: '6. Sınıf' },
+  { value: 7, label: '7. Sınıf' },
+  { value: 8, label: '8. Sınıf' },
+  { value: 9, label: '9. Sınıf' },
+  { value: 10, label: '10. Sınıf' },
+  { value: 11, label: '11. Sınıf' },
+  { value: 12, label: '12. Sınıf' },
 ]
 
 // Subject display name mapping
