@@ -1292,7 +1292,77 @@ function getAYTExamContext(subject: string): { examType: string; format: string;
 }
 
 // ============================================================
-// KPSS Sınav Bağlamı
+// KPSS Ön Lisans Sınav Bağlamı
+// Lisans'a çok yakın ama ön lisans müfredatı seviyesinde
+// ============================================================
+function getKPSSOnlisansExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Türkçe': `📝 KPSS ÖN LİSANS TÜRKÇE (30 soru):
+Paragraf soruları ağırlıklı (14-15 soru): ana düşünce, yardımcı düşünce, boşluk doldurma, paragrafı tamamlama. Metinler lisansa göre biraz daha sade ama yine de analiz gerektiren; sosyal, tarihsel veya bilimsel popüler metinler kullan. Dil bilgisi (7-9 soru): sözcük türleri, ses olayları, yazım kuralları, noktalama. Anlam bilgisi (5-6 soru): sözcükte anlam, cümlede anlam, anlatım bozukluğu. Sözel mantık soruları (4 soru). Sorular lisans kadar akademik değil, günlük dil ve lise mezunlarının anlayabileceği düzeyde olmalı.`,
+    'Matematik': `🔢 KPSS ÖN LİSANS MATEMATİK (27 soru):
+Temel işlemler (6-8 soru): sayılar, EBOB/EKOK, üslü/köklü, oran-orantı, yüzde. Problemler (8-10 soru): hız-mesafe, iş-zaman, karışım, yaş, kâr-zarar — ortaöğretim seviyesinde çözülebilir günlük hayat problemleri. Sayısal mantık (3-4 soru). Denklemler ve kümeler (3-4 soru). Tablo/grafik (2-3 soru). Lisanstaki kadar derin olmayan, mantık ağırlıklı ama çok adımlı sorular üret.`,
+    'Geometri': `📐 KPSS ÖN LİSANS GEOMETRİ (3 soru):
+Temel düzlem geometrisi: üçgen özellikleri (iç açı, alan, benzerlik), dörtgen türleri (dikdörtgen, kare, paralelkenar), çember ve daire. Analitik geometriye girme. Görsel şekil gerektiren, açı hesaplama veya alan bulma odaklı pratik sorular üret.`,
+    'Tarih': `🏛️ KPSS ÖN LİSANS TARİH (27 soru — Atatürk ağırlıklı):
+İslamiyet öncesi Türk tarihi (1 soru). Türk-İslam devletleri (2 soru). Osmanlı Devleti — siyasi, kültürel, ekonomik (9 soru). Kurtuluş Savaşı hazırlık ve cepheler (3 soru). Atatürk dönemi inkılapları — siyasi, hukuki, eğitim, ekonomi, sosyal (5 soru). Atatürk ilkeleri — altı ilke, gerekçeleri ve sonuçları (4 soru). Atatürk dönemi iç-dış politika (1 soru). Çağdaş Türk ve dünya tarihi (2 soru). Atatürk inkılapları ve ilkeleri toplam 9 soru — bu konulara özellikle ağırlık ver. Kronoloji, neden-sonuç, karşılaştırma soruları üret.`,
+    'Coğrafya': `🗺️ KPSS ÖN LİSANS COĞRAFYA (18 soru — Türkiye odaklı):
+Coğrafi konum ve harita (1 soru). Fiziki özellikler — yer şekilleri, dağlar, akarsular, göller (2 soru). İklim ve bitki örtüsü (2 soru). Nüfus ve yerleşme (2 soru). Tarım, hayvancılık, ormancılık (3 soru). Madencilik, enerji, sanayi (2 soru). Ulaşım, ticaret, turizm (2 soru). Bölgesel coğrafya (4 soru). Türkiye coğrafyasına odaklan, lise müfredatı düzeyinde somut bilgi gerektiren sorular üret.`,
+    'Vatandaşlık': `⚖️ KPSS ÖN LİSANS VATANDAŞLIK (9 soru — sade format):
+Temel hukuk kavramları (3 soru): hukuk kaynakları, hak türleri, yaptırım çeşitleri, kamu-özel hukuk ayrımı. Devlet organları (4 soru): TBMM yetki ve görevleri, Cumhurbaşkanı yetkileri, yargı organları — Anayasa'nın temel maddeleri. İdare hukuku (2 soru): merkezi-yerel yönetim, kamu görevlileri. Lisansa göre daha sade, anayasa maddelerini doğrudan soran ama liseden daha analitik sorular üret.`,
+  }
+
+  const normalized = subject.toLowerCase().replace(/[^a-zğüşıöç]/g, '')
+  let key = 'Türkçe'
+  if (normalized.includes('mat')) key = 'Matematik'
+  else if (normalized.includes('geom')) key = 'Geometri'
+  else if (normalized.includes('tar') || normalized.includes('ataturk') || normalized.includes('inkilap')) key = 'Tarih'
+  else if (normalized.includes('cog')) key = 'Coğrafya'
+  else if (normalized.includes('vat') || normalized.includes('anayasa') || normalized.includes('hukuk')) key = 'Vatandaşlık'
+
+  return {
+    examType: 'KPSS Ön Lisans (Kamu Personel Seçme Sınavı)',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, GY 60 (Türkçe 30 + Mat 27 + Geo 3) + GK 60 = 120 soru, 130 dakika',
+    tips: subjectTips[key] || `📚 KPSS Ön Lisans ${subject}: Ön lisans mezunu adaylar için, lise düzeyini aşan ama lisans kadar derin olmayan KPSS formatında sorular üret.`,
+  }
+}
+
+// ============================================================
+// KPSS Ortaöğretim (Lise) Sınav Bağlamı
+// Lise mezunları için, müfredat seviyesinde sorular
+// ============================================================
+function getKPSSOrtaogretimExamContext(subject: string): { examType: string; format: string; tips: string } {
+  const subjectTips: Record<string, string> = {
+    'Türkçe': `📝 KPSS ORTAÖĞRETİM TÜRKÇE (30 soru):
+Paragraf soruları ağırlıklı (14-15 soru): ana düşünce, yardımcı düşünce, boşluk doldurma — lise düzeyinde anlaşılır metinler kullan (gazete/dergi tarzı, 150-300 kelime). Dil bilgisi (4-5 soru): sözcük türleri, ses olayları, yazım kuralları, noktalama. Anlam bilgisi (4-5 soru): sözcükte anlam, cümlede anlam, anlatım bozukluğu. Sözel mantık soruları (4 soru) — sıraya koyma, hangisi ilk/son, eksik parça. Sorular lise mezununun rahatça anlayabileceği, günlük dil kullanımı yakın olmalı.`,
+    'Matematik': `🔢 KPSS ORTAÖĞRETİM MATEMATİK (27 soru):
+Temel işlemler (5-7 soru): sayılar, EBOB/EKOK, üslü/köklü — ortaokul/lise temel matematik. Problemler (8-10 soru): hız-mesafe, iş-zaman, yaş, karışım, kâr-zarar — kısa ve net günlük hayat problemleri. Matematiksel ilişkiler (5-6 soru): basit denklemler, oran-orantı uygulamaları. Sayısal mantık (4 soru): sayı dizisi, tablo yorumlama, örüntü. Rasyonel işlemler (2-3 soru). Sorular çok adımlı olmayan, lise öğrencisinin yapabileceği pratik düzeyde olmalı.`,
+    'Geometri': `📐 KPSS ORTAÖĞRETİM GEOMETRİ (3 soru):
+Temel geometri: üçgen (iç açı toplamı, alan, özel üçgenler), dörtgen türleri, çember. Şekil üzerinde açı veya alan hesaplama. Lise geometri müfredatı düzeyinde — analitik geometri veya koordinat sorma. Görsel şekil gerektiren basit sorular.`,
+    'Tarih': `🏛️ KPSS ORTAÖĞRETİM TARİH (27 soru — Atatürk çok ağırlıklı):
+İlk Türk devletleri (1 soru). Türk-İslam devletleri (2 soru). Osmanlı Devleti — kuruluş, yükselme, gerileme, dağılma (9 soru): padişahlar, savaşlar, kurumlar, I. Dünya Savaşı. Kurtuluş Savaşı (3 soru): hazırlık dönemi, cepheler, Mudanya-Lozan. Atatürk ilke ve inkılapları (9 SORU — EN AĞIR BÖLÜM): cumhuriyetin ilanı, halifeliğin kaldırılması, hukuk inkılabı, eğitim inkılabı, ekonomik inkılaplar, sosyal inkılaplar, Atatürk ilkeleri (6 ilke). Çağdaş Türk ve dünya tarihi (3 soru). Lise tarih ders kitabı düzeyinde, ezbere dayalı değil kavramsal anlama odaklı sorular üret.`,
+    'Coğrafya': `🗺️ KPSS ORTAÖĞRETİM COĞRAFYA (18 soru — sadece Türkiye):
+Coğrafi konum (1 soru). İklim ve bitki örtüsü (2 soru): iklim tipleri, bitki örtüsü dağılışı. Fiziki özellikler (4 soru): dağlar, ovalar, akarsular, göller. Beşeri özellikler (3 soru): nüfus artışı/azalması, göç, kır-kent nüfusu, yerleşme. Ekonomik özellikler (8 soru): tarım ürünleri ve bölgeleri, sanayi tesisleri, madenler, enerji kaynakları, ulaşım ağları, turizm. Sadece Türkiye coğrafyası — lise müfredatı düzeyinde somut bilgi gerektiren sorular üret.`,
+    'Vatandaşlık': `⚖️ KPSS ORTAÖĞRETİM VATANDAŞLIK (9 soru — en sade):
+Temel hukuk kavramları (3 soru): hukuk nedir, hukuk dalları, yaptırım türleri, temel kavramlar. Yasama-Yürütme-Yargı (4 soru): TBMM'nin yapısı ve görevleri, Cumhurbaşkanının yetkileri, yargı organları — anayasal maddeler. İdare hukuku (2 soru): devlet teşkilatının yapısı, merkezi/yerel yönetim farkları. Lise vatandaşlık ve demokrasi ders kitabı düzeyinde, hukuk terimleri bilgisi gerektiren ama çok derin olmayan sorular üret.`,
+  }
+
+  const normalized = subject.toLowerCase().replace(/[^a-zğüşıöç]/g, '')
+  let key = 'Türkçe'
+  if (normalized.includes('mat')) key = 'Matematik'
+  else if (normalized.includes('geom')) key = 'Geometri'
+  else if (normalized.includes('tar') || normalized.includes('ataturk') || normalized.includes('inkilap')) key = 'Tarih'
+  else if (normalized.includes('cog')) key = 'Coğrafya'
+  else if (normalized.includes('vat') || normalized.includes('anayasa') || normalized.includes('hukuk')) key = 'Vatandaşlık'
+
+  return {
+    examType: 'KPSS Ortaöğretim/Lise (Kamu Personel Seçme Sınavı)',
+    format: '5 şıklı (A-E), 4 yanlış 1 doğru götürür, GY 60 (Türkçe 30 + Mat 27 + Geo 3) + GK 60 = 120 soru, 130 dakika',
+    tips: subjectTips[key] || `📚 KPSS Ortaöğretim ${subject}: Lise mezunu adaylar için, lise müfredatı düzeyinde KPSS formatında sorular üret.`,
+  }
+}
+
+// ============================================================
+// KPSS Lisans Sınav Bağlamı
 // ============================================================
 function getKPSSExamContext(subject: string): { examType: string; format: string; tips: string } {
   const subjectTips: Record<string, string> = {
@@ -1335,16 +1405,18 @@ export async function generateCurriculumQuestions(
   count: number = 5,
   lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
   visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
-  examMode?: 'TYT' | 'AYT' | 'KPSS' | null  // 📋 Sınav bazlı üretim modu
+  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
   // Sınıf seviyesine göre şık sayısı — KPSS/TYT/AYT her zaman 5 şık
-  const isHighSchool = grade >= 9 || examMode === 'TYT' || examMode === 'AYT' || examMode === 'KPSS'
+  const isHighSchool = grade >= 9 || !!examMode
   const optionCount = isHighSchool ? 5 : 4
 
   // Sınav bağlamı
   const examContext = examMode === 'TYT' ? getTYTExamContext(subject)
     : examMode === 'AYT' ? getAYTExamContext(subject)
     : examMode === 'KPSS' ? getKPSSExamContext(subject)
+    : examMode === 'KPSS_ONLISANS' ? getKPSSOnlisansExamContext(subject)
+    : examMode === 'KPSS_ORTAOGRETIM' ? getKPSSOrtaogretimExamContext(subject)
     : getExamContext(grade)
   
   // Ders bazlı yönergeler
@@ -1382,7 +1454,11 @@ export async function generateCurriculumQuestions(
       : examMode === 'AYT'
       ? `SEN ÖSYM'NİN EN DENEYİMLİ AYT SORU YAZARISIN. Alan Yeterlilik Testi formatında, üniversiteye hazırlık düzeyinde ileri seviye sorular üreteceksin. 2025 AYT sınavı referans alınacak.`
       : examMode === 'KPSS'
-      ? `SEN ÖSYM'NİN EN DENEYİMLİ KPSS SORU YAZARISIN. Kamu Personel Seçme Sınavı formatında, devlet memurluğu sınavına hazırlık düzeyinde, analitik düşünme gerektiren mükemmel sorular üreteceksin. 2024-2025 KPSS Lisans sınavları referans alınacak.`
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ KPSS SORU YAZARISIN. KPSS Lisans formatında, devlet memurluğu sınavına hazırlık düzeyinde, analitik düşünme gerektiren mükemmel sorular üreteceksin. 2024-2025 KPSS Lisans sınavları referans alınacak.`
+      : examMode === 'KPSS_ONLISANS'
+      ? `SEN ÖSYM'NİN DENEYİMLİ KPSS SORU YAZARISIN. KPSS Ön Lisans formatında, ön lisans mezunu adaylar için uygun zorluk ve içerikte sorular üreteceksin. 2024 KPSS Ön Lisans sınavı referans alınacak.`
+      : examMode === 'KPSS_ORTAOGRETIM'
+      ? `SEN ÖSYM'NİN DENEYİMLİ KPSS SORU YAZARISIN. KPSS Ortaöğretim formatında, lise mezunu adaylar için lise müfredatı düzeyinde sorular üreteceksin. 2024 KPSS Ortaöğretim sınavı referans alınacak.`
       : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
@@ -1392,7 +1468,7 @@ export async function generateCurriculumQuestions(
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
 ${examMode
-  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT (Temel Yeterlilik Testi)' : examMode === 'AYT' ? 'AYT (Alan Yeterlilik Testi)' : 'KPSS (Kamu Personel Seçme Sınavı) Lisans'}
+  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT (Temel Yeterlilik Testi)' : examMode === 'AYT' ? 'AYT (Alan Yeterlilik Testi)' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : 'KPSS Ortaöğretim'}
 │ Ders: ${subject}
 │ Konu: ${topic}
 │ Kazanım: "${learningOutcome}"

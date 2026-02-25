@@ -377,6 +377,50 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 0,
   },
   // ===========================================
+  // KPSS ÖN LİSANS (Ön lisans mezunları)
+  // 120 soru, 130 dakika, GY: Türkçe 30 + Mat 27 + Geo 3 / GK: Tarih 27 + Cog 18 + Vat 9
+  // ===========================================
+  KPSS_ONLISANS: {
+    label: 'KPSS Ön Lisans Deneme Sınavı',
+    shortLabel: 'KPSS Ön Lisans',
+    grades: [0],
+    duration: 130,
+    totalQuestions: 114,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe (GY)', questionCount: 30, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik (GY)', questionCount: 27, coefficient: 1.0 },
+      { code: 'geometri', name: 'Geometri', displayName: 'Geometri (GY)', questionCount: 3, coefficient: 1.0 },
+      { code: 'tarih', name: 'Tarih', displayName: 'Tarih (GK)', questionCount: 27, coefficient: 1.0 },
+      { code: 'cografya', name: 'Cografya', displayName: 'Coğrafya (GK)', questionCount: 18, coefficient: 1.0 },
+      { code: 'vatandaslik', name: 'Vatandaslik', displayName: 'Vatandaşlık (GK)', questionCount: 9, coefficient: 1.0 },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  // ===========================================
+  // KPSS ORTAÖĞRETİM (Lise mezunları)
+  // 120 soru, 130 dakika — Ön Lisans ile aynı format, lise zorluk
+  // ===========================================
+  KPSS_ORTAOGRETIM: {
+    label: 'KPSS Ortaöğretim (Lise) Deneme Sınavı',
+    shortLabel: 'KPSS Lise',
+    grades: [0],
+    duration: 130,
+    totalQuestions: 114,
+    subjects: [
+      { code: 'turkce', name: 'Turkce', displayName: 'Türkçe (GY)', questionCount: 30, coefficient: 1.0 },
+      { code: 'matematik', name: 'Matematik', displayName: 'Matematik (GY)', questionCount: 27, coefficient: 1.0 },
+      { code: 'geometri', name: 'Geometri', displayName: 'Geometri (GY)', questionCount: 3, coefficient: 1.0 },
+      { code: 'tarih', name: 'Tarih', displayName: 'Tarih (GK)', questionCount: 27, coefficient: 1.0 },
+      { code: 'cografya', name: 'Cografya', displayName: 'Coğrafya (GK)', questionCount: 18, coefficient: 1.0 },
+      { code: 'vatandaslik', name: 'Vatandaslik', displayName: 'Vatandaşlık (GK)', questionCount: 9, coefficient: 1.0 },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  // ===========================================
   // LGS
   // ===========================================
   LGS: {
@@ -415,6 +459,8 @@ export const EXAM_TYPE_LABELS: Record<string, string> = {
   TYT: 'TYT',
   AYT: 'AYT',
   KPSS: 'KPSS Lisans',
+  KPSS_ONLISANS: 'KPSS Ön Lisans',
+  KPSS_ORTAOGRETIM: 'KPSS Ortaöğretim',
 }
 
 // Ders renkleri (UI icin)

@@ -181,7 +181,7 @@ export default function AIQuestionGeneratorPage() {
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
 
   // ========== SINAV BAZLI MOD ==========
-  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | null>(null)
+  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | null>(null)
   const [examSubjects, setExamSubjects] = useState<{ subject_code: string; subject_name: string; topics: ExamTopic[] }[]>([])
   const [selectedExamSubject, setSelectedExamSubject] = useState<string>('')
   const [examTopics, setExamTopics] = useState<ExamTopic[]>([])
@@ -1112,18 +1112,45 @@ export default function AIQuestionGeneratorPage() {
                   }`}
                 >
                   <Target className="w-4 h-4" />
-                  KPSS
+                  KPSS Lisans
+                </button>
+                <button
+                  onClick={() => { setSelectedExamMode('KPSS_ONLISANS'); setGenerationMode('single') }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    selectedExamMode === 'KPSS_ONLISANS'
+                      ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  KPSS Ön Lisans
+                </button>
+                <button
+                  onClick={() => { setSelectedExamMode('KPSS_ORTAOGRETIM'); setGenerationMode('single') }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
+                    selectedExamMode === 'KPSS_ORTAOGRETIM'
+                      ? 'bg-gradient-to-r from-yellow-500 to-lime-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Target className="w-4 h-4" />
+                  KPSS Lise
                 </button>
               </div>
               {selectedExamMode && (
                 <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
-                  selectedExamMode === 'TYT'
-                    ? 'text-orange-600 bg-orange-50 border-orange-200'
-                    : selectedExamMode === 'AYT'
-                    ? 'text-blue-600 bg-blue-50 border-blue-200'
-                    : 'text-amber-600 bg-amber-50 border-amber-200'
+                  selectedExamMode === 'TYT' ? 'text-orange-600 bg-orange-50 border-orange-200'
+                  : selectedExamMode === 'AYT' ? 'text-blue-600 bg-blue-50 border-blue-200'
+                  : selectedExamMode === 'KPSS' ? 'text-amber-700 bg-amber-50 border-amber-200'
+                  : selectedExamMode === 'KPSS_ONLISANS' ? 'text-amber-600 bg-orange-50 border-orange-200'
+                  : 'text-lime-700 bg-lime-50 border-lime-200'
                 }`}>
-                  <Sparkles className="w-3 h-3" /> ÖSYM {selectedExamMode} formatında soru üretimi
+                  <Sparkles className="w-3 h-3" /> ÖSYM {
+                    selectedExamMode === 'KPSS' ? 'KPSS Lisans'
+                    : selectedExamMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans'
+                    : selectedExamMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim'
+                    : selectedExamMode
+                  } formatında soru üretimi
                 </div>
               )}
             </div>
