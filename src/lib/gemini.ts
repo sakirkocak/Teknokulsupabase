@@ -1479,6 +1479,142 @@ Temel hukuk kavramları (2 soru): hukukun kaynakları, hukuk dalları, yaptırı
   }
 }
 
+// =====================================================
+// YDS (Yabancı Dil Bilgisi Seviye Tespit Sınavı)
+// ÖSYM YDS/e-YDS Sınav Bağlamı — İngilizce
+// =====================================================
+function getYDSExamContext(questionType: string): { examType: string; format: string; tips: string } {
+  const typeTips: Record<string, string> = {
+    'grammar': `
+   🔤 ÖSYM YDS DİL BİLGİSİ FORMATI (10 soru):
+   • Cümlede boş bırakılan yere uygun dilbilgisi yapısını seç
+   • KURAL: Her soruda FARKLI bir dilbilgisi konusu test et
+   • Konular: tenses (present perfect, past perfect, conditionals), modal verbs (must/should/might/could), passive voice, relative clauses (who/which/that/where), articles (a/an/the), prepositions, gerund vs infinitive, reported speech
+   • Soru kökü: "...., ---- ...." şeklinde boşluklu cümle
+   • Şıklar (A-E): aynı kelime grubunun farklı formları (went / had gone / has gone / would go / goes)
+   • Zorluk: C1 seviyesi (İngilizce C1 Advanced)
+   • ÖRNEK: "By the time we arrived, they ---- the meeting already." → A) finish  B) finished  C) had finished  D) have finished  E) were finishing`,
+
+    'vocabulary': `
+   📖 ÖSYM YDS KELİME FORMATI (6 soru):
+   • EŞ ANLAM (Synonym): "The word/phrase '...' in the passage is closest in meaning to..."
+   • ZIT ANLAM (Antonym): "Which of the following is opposite in meaning to '...' as used in the sentence?"
+   • Akademik kelime hazinesi: C1-C2 seviyesi (CAE/CPE kelime listesi)
+   • Kelimeler: Latince/Yunanca kökenli akademik vocabulary (exacerbate, ameliorate, propound, refute, corroborate, substantiate vb.)
+   • Şıklar: anlam yakınlığı olan 4 çeldirici + 1 doğru
+   • Soru için kısa bir cümle bağlamı ver (15-25 kelime)
+   • ÖRNEK: "The scientist's findings substantially corroborated the existing theory." → "corroborated" closest meaning: A) contradicted  B) confirmed  C) modified  D) challenged  E) ignored`,
+
+    'cloze': `
+   📝 ÖSYM YDS CLOZE TEST FORMATI (10 soru):
+   • 150-200 kelimelik AKADEMİK bir paragraf oluştur
+   • Paragrafta 1 boşluk bırak (---- ile işaretle)
+   • Her soru için FARKLI bir paragraf ve FARKLI bir boşluk konumu
+   • Boşluk türleri: discourse markers (however, therefore, nevertheless, furthermore), conjunctions, pronouns, transition phrases, academic collocations
+   • Paragraf konuları: bilim, tarih, çevre, teknoloji, sosyal bilimler (akademik metin tarzı)
+   • question_text'e PARAGRAFIN TAMAMINI yaz, boşluk yerini ---- ile göster
+   • Şıklar: bağlamsal olarak yakın 4 çeldirici + 1 doğru
+   • C1 seviyesi
+   • ÖRNEK: "Climate change poses unprecedented challenges... Scientists argue that ---- immediate action is taken, the consequences will be irreversible." → A) whether  B) unless  C) although  D) since  E) as if`,
+
+    'sentence_completion': `
+   ✏️ ÖSYM YDS CÜMLE TAMAMLAMA FORMATI (10 soru):
+   • İki tür: (1) Cümlenin BAŞI verilir, sonu seçilir  (2) Cümlenin SONU verilir, başı seçilir
+   • ÖSYM YDS'de genellikle: "...., ----." veya "----, ...." formatı
+   • Test edilen ilişkiler: cause-effect (so that, because), contrast (although, even though, whereas), condition (if, unless, provided that), purpose (in order to, so as to), result (consequently, therefore)
+   • Şıklar: 5 farklı mantıksal tamamlama — sadece 1'i doğru
+   • C1 düzeyi akademik içerik
+   • ÖRNEK: "Despite extensive research on the subject, ----." → A) scientists have finally resolved the debate  B) the underlying mechanisms remain poorly understood  C) experts agree on all the key findings  D) the question has been completely answered  E) there is no longer any dispute`,
+
+    'reading': `
+   📚 ÖSYM YDS OKUMA ANLAMA FORMATI (~20 soru, 4-5 soru/pasaj):
+   • 250-350 kelimelik AKADEMİK/BİLİMSEL bir paragraf oluştur
+   • Paragrafı question_text'in BAŞINA yaz, ardından soruyu ekle
+   • Format: [PASSAGE]\n\n---\n\nSoru metni
+   • Soru türleri (her soru için 1 tür):
+     - Ana fikir: "What is the main idea/purpose of this passage?"
+     - Detay: "According to the passage, which of the following is true about...?"
+     - Çıkarım: "It can be inferred from the passage that..."
+     - Kelime bağlamı: "The word '...' in paragraph X is closest in meaning to..."
+     - Yazar amacı: "The author mentions ... in order to..."
+   • Pasaj konuları: biyoloji, psikoloji, tarih, çevre, ekonomi, teknoloji (C1-C2)
+   • Şıklar: çok yakın ve yanıltıcı 4 çeldirici + 1 doğru`,
+
+    'translation_en_tr': `
+   🔄 ÖSYM YDS ÇEVİRİ (İNG→TR) FORMATI (3 soru):
+   • Karmaşık İngilizce cümle → Türkçeye çevirisi
+   • İngilizce cümle: 25-40 kelime, ileri düzey yapılar (participial phrases, complex conditionals, passive voice + modal, relative clauses)
+   • Şıklar (A-E): 5 farklı Türkçe çeviri — YALNIZCA BİRİ tam doğru
+   • Yanlış şıklardaki hatalar: anlam kayması, kısmi tercüme, fazla/eksik bilgi, yanlış zaman
+   • C1-C2 akademik İngilizce
+   • question_text'e İngilizce cümleyi yaz, şıklara Türkçe çevirileri koy`,
+
+    'translation_tr_en': `
+   🔄 ÖSYM YDS ÇEVİRİ (TR→İNG) FORMATI (3 soru):
+   • Karmaşık Türkçe cümle → İngilizceye çevirisi
+   • Türkçe cümle: akademik tarz, 20-35 kelime
+   • Şıklar (A-E): 5 farklı İngilizce çeviri — YALNIZCA BİRİ tam doğru
+   • Yanlış şıklardaki hatalar: yanlış tense, fazla literal tercüme, idiom hatası, yapı değişikliği
+   • question_text'e Türkçe cümleyi yaz, şıklara İngilizce çevirileri koy`,
+
+    'dialogue': `
+   💬 ÖSYM YDS DİYALOG TAMAMLAMA FORMATI (5 soru):
+   • 4-6 satırlık bir konuşma, 1 satır ---- ile boş bırakılır
+   • Konuşmacılar: A ve B (isim verilmez, A: / B: formatı)
+   • Boşluk konumu: ortada veya sonda
+   • Test edilen: sosyal uygunluk, konuşma akışı, register (formal/informal), bağlam tutarlılığı
+   • Şıklar: aynı konuşma bağlamına uygun ama FARKLI niyetler taşıyan 5 seçenek
+   • B2-C1 seviyesi
+   • ÖRNEK:
+     A: I've been struggling with this project for weeks.
+     B: ----
+     A: That would be great, thank you so much.
+     → A) You should quit immediately.  B) Would you like some help with it?  C) I don't think you can do it.  D) Why did you start it?  E) It's not important anyway.`,
+
+    'near_synonym': `
+   🔁 ÖSYM YDS ANLAMA YAKIN CÜMLE FORMATI (4-5 soru):
+   • Verilen cümleyle ANLAM BAKIMINDAN EN YAKIN cümleyi seç
+   • Kaynak cümle: 20-35 kelime, akademik/ileri düzey
+   • Şıklar: aynı bilgiyi FARKLI yapılarla ifade eden 5 cümle
+   • Doğru şık: tam eşdeğer anlam (paraphrase)
+   • Yanlış şıklar: kısmi doğru, zıt anlam, fazla/eksik bilgi içeren
+   • Test edilen: aktif-pasif dönüşüm, clause reduction, synonym kullanımı, anlamsal eşdeğerlik
+   • C1-C2 seviyesi`,
+
+    'paragraph_completion': `
+   📋 ÖSYM YDS PARAGRAF TAMAMLAMA FORMATI (4-5 soru):
+   • 4-5 cümlelik paragraf, 1 cümle [----] ile çıkarılmış
+   • Çıkarılan cümle: paragrafın ortasında veya sonunda
+   • Paragraf: akademik, tutarlı ve gelişmiş bir argüman
+   • Şıklar: 5 farklı cümle — sadece 1'i paragraf akışına tam uyar
+   • Doğru şık: önceki ve sonraki cümlelerle hem lexical hem logical bağlantı kurar
+   • Yanlış şıklar: konuyla ilgili ama yanlış pozisyonda/kopuk
+   • C1-C2 seviyesi`,
+
+    'irrelevant_sentence': `
+   ❌ ÖSYM YDS CÜMLE BOZUCUYU BULMA FORMATI (5 soru):
+   • 5 numaralandırılmış cümleden oluşan paragraf yaz (I, II, III, IV, V)
+   • Paragraf konusu: bilim, tarih, çevre, teknoloji — tutarlı bir argüman
+   • 1 cümle konuyla alakasız veya başka bir konuya ait
+   • Soru: "Which of the sentences is unrelated to the topic of the passage?"
+   • Doğru şık: numaralı cümle (I, II, III, IV veya V)
+   • Şıklar: A) I  B) II  C) III  D) IV  E) V
+   • Yanlış cümle: bağlam dışı ama aynı semantic alanda görünebilir
+   • C1-C2 seviyesi`,
+  }
+
+  return {
+    examType: 'YDS/e-YDS (ÖSYM Yabancı Dil Sınavı)',
+    format: '5 şıklı (A-E), 80 soru 180 dakika, her doğru 1.25 puan, 0-100 ölçek',
+    tips: typeTips[questionType] || `
+   🌐 ÖSYM YDS GENEL FORMAT:
+   • Sorular İNGİLİZCE yazılır (soru kökü + şıklar)
+   • Açıklama Türkçe olabilir
+   • C1-C2 akademik İngilizce seviyesi
+   • 5 şık (A-E)`,
+  }
+}
+
 export async function generateCurriculumQuestions(
   grade: number,
   subject: string,
@@ -1488,7 +1624,7 @@ export async function generateCurriculumQuestions(
   count: number = 5,
   lang: 'tr' | 'en' = 'tr',  // 🌍 Questly Global için dil desteği
   visualType: VisualType = 'none',  // 🆕 Yeni Nesil Soru görsel türü
-  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | 'ALES' | null  // 📋 Sınav bazlı üretim modu
+  examMode?: 'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | 'ALES' | 'YDS' | null  // 📋 Sınav bazlı üretim modu
 ): Promise<CurriculumQuestion[]> {
   // Sınıf seviyesine göre şık sayısı — KPSS/TYT/AYT her zaman 5 şık
   const isHighSchool = grade >= 9 || !!examMode
@@ -1502,6 +1638,7 @@ export async function generateCurriculumQuestions(
     : examMode === 'KPSS_ORTAOGRETIM' ? getKPSSOrtaogretimExamContext(subject)
     : examMode === 'DGS' ? getDGSExamContext(subject)
     : examMode === 'ALES' ? getALESExamContext(subject)
+    : examMode === 'YDS' ? getYDSExamContext(topic)  // YDS'de topic = soru tipi
     : getExamContext(grade)
   
   // Ders bazlı yönergeler
@@ -1548,6 +1685,8 @@ export async function generateCurriculumQuestions(
       ? `SEN ÖSYM'NİN EN DENEYİMLİ DGS SORU YAZARISIN. Dikey Geçiş Sınavı formatında, sözel/sayısal mantık ağırlıklı, anlama ve akıl yürütme odaklı mükemmel sorular üreteceksin. 2024-2025 DGS sınavları referans alınacak. NOT: Türkçe sorularında dil bilgisi (yazım/noktalama/ses olayları) SORMA.`
       : examMode === 'ALES'
       ? `SEN ÖSYM'NİN EN DENEYİMLİ ALES SORU YAZARISIN. Akademik Personel ve Lisansüstü Eğitimi Giriş Sınavı formatında, yüksek lisans/doktora adaylarına yönelik akademik düzeyde sorular üreteceksin. 2024-2025 ALES sınavları referans alınacak. Türkçe'de paragraf soruları çok uzun ve akademik, sayısalda mantık ağırlıklı.`
+      : examMode === 'YDS'
+      ? `SEN ÖSYM'NİN EN DENEYİMLİ YDS/e-YDS SORU YAZARISIN. Yabancı Dil Bilgisi Seviye Tespit Sınavı formatında, C1-C2 İngilizce seviyesinde mükemmel sorular üreteceksin. 2024-2025 ÖSYM YDS sınavları referans alınacak. KRİTİK: Sorular ve şıklar İNGİLİZCE yazılacak. Açıklama (explanation) TÜRKÇE olabilir. ÖSYM YDS soru kalitesinde, gerçek sınav standardında sorular üret.`
       : `SEN TÜRKİYE'NİN EN İYİ SORU BANKASI YAZARISIN. ${examContext.examType} formatında mükemmel sorular üreteceksin.`}
 
 ════════════════════════════════════════════════════════════
@@ -1557,7 +1696,7 @@ export async function generateCurriculumQuestions(
 📚 KAZANIM BİLGİLERİ:
 ┌─────────────────────────────────────────────────────────┐
 ${examMode
-  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT' : examMode === 'AYT' ? 'AYT' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : examMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim' : examMode === 'DGS' ? 'DGS' : 'ALES'}
+  ? `│ Sınav: ${examMode === 'TYT' ? 'TYT' : examMode === 'AYT' ? 'AYT' : examMode === 'KPSS' ? 'KPSS Lisans' : examMode === 'KPSS_ONLISANS' ? 'KPSS Ön Lisans' : examMode === 'KPSS_ORTAOGRETIM' ? 'KPSS Ortaöğretim' : examMode === 'DGS' ? 'DGS' : examMode === 'ALES' ? 'ALES' : 'YDS'}
 │ Ders: ${subject}
 │ Konu: ${topic}
 │ Kazanım: "${learningOutcome}"

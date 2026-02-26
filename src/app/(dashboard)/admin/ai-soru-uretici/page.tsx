@@ -181,9 +181,10 @@ export default function AIQuestionGeneratorPage() {
   const [saveStatus, setSaveStatus] = useState<{ success: number; failed: number } | null>(null)
 
   // ========== SINAV BAZLI MOD ==========
-  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | 'ALES' | null>(null)
+  const [selectedExamMode, setSelectedExamMode] = useState<'TYT' | 'AYT' | 'KPSS' | 'KPSS_ONLISANS' | 'KPSS_ORTAOGRETIM' | 'DGS' | 'ALES' | 'YDS' | null>(null)
   const [showYksDropdown, setShowYksDropdown] = useState(false)
   const [showKpssDropdown, setShowKpssDropdown] = useState(false)
+  const [selectedYdsType, setSelectedYdsType] = useState<string | null>(null)
   const [examSubjects, setExamSubjects] = useState<{ subject_code: string; subject_name: string; topics: ExamTopic[] }[]>([])
   const [selectedExamSubject, setSelectedExamSubject] = useState<string>('')
   const [examTopics, setExamTopics] = useState<ExamTopic[]>([])
@@ -370,7 +371,12 @@ export default function AIQuestionGeneratorPage() {
 
   async function handleGenerate() {
     // Sınav modu kontrolü
-    if (selectedExamMode) {
+    if (selectedExamMode === 'YDS') {
+      if (!selectedYdsType) {
+        alert('Lütfen YDS soru tipini seçin')
+        return
+      }
+    } else if (selectedExamMode) {
       if (!selectedExamSubject || !selectedExamTopic) {
         alert('Lütfen ders ve konu seçin')
         return
@@ -383,13 +389,33 @@ export default function AIQuestionGeneratorPage() {
     }
 
     const isExamMode = !!selectedExamMode
+    const isYDS = selectedExamMode === 'YDS'
+
+    // YDS için özel subject/topic
+    const ydsTypeLabels: Record<string, string> = {
+      grammar: 'Dil Bilgisi (Grammar)',
+      vocabulary: 'Kelime Bilgisi (Vocabulary)',
+      cloze: 'Cloze Test (Boşluk Doldurma)',
+      sentence_completion: 'Cümle Tamamlama',
+      reading: 'Okuma Anlama (Reading Comprehension)',
+      translation_en_tr: 'Çeviri İng→Tr',
+      translation_tr_en: 'Çeviri Tr→İng',
+      dialogue: 'Diyalog Tamamlama',
+      near_synonym: 'Anlama Yakın Cümle',
+      paragraph_completion: 'Paragraf Tamamlama',
+      irrelevant_sentence: 'Yabancı Cümle Bulma',
+    }
 
     // Sınav modunda exam topic bilgilerini kullan
-    const subjectName = isExamMode ? selectedExamTopic!.subject_name : subjects.find(s => s.id === selectedSubject)?.name
-    const topicName = isExamMode
+    const subjectName = isYDS ? 'İngilizce'
+      : isExamMode ? selectedExamTopic!.subject_name
+      : subjects.find(s => s.id === selectedSubject)?.name
+    const topicName = isYDS ? (selectedYdsType || '')
+      : isExamMode
       ? selectedExamTopic!.main_topic + (selectedExamTopic!.sub_topic ? ` - ${selectedExamTopic!.sub_topic}` : '')
       : (() => { const t = topics.find(t => t.id === selectedTopic); return t ? t.main_topic + (t.sub_topic ? ` - ${t.sub_topic}` : '') : '' })()
-    const learningOutcome = isExamMode
+    const learningOutcome = isYDS ? (ydsTypeLabels[selectedYdsType || ''] || topicName)
+      : isExamMode
       ? selectedExamTopic!.main_topic + (selectedExamTopic!.sub_topic ? ` - ${selectedExamTopic!.sub_topic}` : '')
       : topics.find(t => t.id === selectedTopic)?.learning_outcome || topicName
 
@@ -538,6 +564,16 @@ export default function AIQuestionGeneratorPage() {
   }
 
   function canProceedToStep(step: number): boolean {
+    if (selectedExamMode === 'YDS') {
+      // YDS: soru tipi seç → ayarlar → üret (konu seçimi yok)
+      switch (step) {
+        case 2: return selectedYdsType !== null
+        case 3: return selectedYdsType !== null
+        case 4: return selectedYdsType !== null
+        case 5: return selectedYdsType !== null
+        default: return true
+      }
+    }
     if (selectedExamMode) {
       // Sınav bazlı mod: TYT dersi → TYT konusu → Ayarlar → Üret
       switch (step) {
@@ -1173,6 +1209,19 @@ export default function AIQuestionGeneratorPage() {
                   <Target className="w-4 h-4" />
                   ALES
                 </button>
+
+                {/* YDS */}
+                <button
+                  onClick={() => { setSelectedExamMode('YDS'); setSelectedYdsType(null); setGenerationMode('single'); setShowYksDropdown(false); setShowKpssDropdown(false) }}
+                  className={`px-3 py-2 rounded-lg font-medium transition-all flex items-center gap-1.5 text-sm ${
+                    selectedExamMode === 'YDS'
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  🇬🇧
+                  YDS
+                </button>
               </div>
 
               {selectedExamMode && (
@@ -1181,6 +1230,7 @@ export default function AIQuestionGeneratorPage() {
                   : selectedExamMode === 'AYT' ? 'text-blue-600 bg-blue-50 border-blue-200'
                   : ['KPSS', 'KPSS_ONLISANS', 'KPSS_ORTAOGRETIM'].includes(selectedExamMode) ? 'text-amber-700 bg-amber-50 border-amber-200'
                   : selectedExamMode === 'DGS' ? 'text-purple-700 bg-purple-50 border-purple-200'
+                  : selectedExamMode === 'YDS' ? 'text-sky-700 bg-sky-50 border-sky-200'
                   : 'text-teal-700 bg-teal-50 border-teal-200'
                 }`}>
                   <Sparkles className="w-3 h-3" /> ÖSYM {
@@ -1350,8 +1400,46 @@ export default function AIQuestionGeneratorPage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8"
             >
-              {selectedExamMode ? (
-                /* Sınav (TYT/AYT) Ders Seçimi */
+              {selectedExamMode === 'YDS' ? (
+                /* YDS Soru Tipi Seçimi */
+                <>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-2">🇬🇧 YDS Soru Tipi Seçin</h2>
+                  <p className="text-gray-600 mb-6">ÖSYM YDS/e-YDS formatında üretmek istediğiniz soru tipini seçin</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {[
+                      { key: 'grammar',           label: 'Dil Bilgisi',            emoji: '🔤', count: 10, desc: 'Tense, modal, clause...' },
+                      { key: 'vocabulary',        label: 'Kelime',                 emoji: '📖', count: 6,  desc: 'Synonym / Antonym' },
+                      { key: 'cloze',             label: 'Cloze Test',             emoji: '📝', count: 10, desc: 'Boşluk doldurma' },
+                      { key: 'sentence_completion', label: 'Cümle Tamamlama',    emoji: '✏️', count: 10, desc: 'Başı/sonu tamamla' },
+                      { key: 'reading',           label: 'Okuma Anlama',           emoji: '📚', count: 20, desc: 'Pasaj + sorular' },
+                      { key: 'translation_en_tr', label: 'Çeviri (İng→Tr)',       emoji: '🔄', count: 3,  desc: 'İngilizce → Türkçe' },
+                      { key: 'translation_tr_en', label: 'Çeviri (Tr→İng)',       emoji: '🔁', count: 3,  desc: 'Türkçe → İngilizce' },
+                      { key: 'dialogue',          label: 'Diyalog Tamamlama',      emoji: '💬', count: 5,  desc: 'Konuşma boşluğu' },
+                      { key: 'near_synonym',      label: 'Anlama Yakın Cümle',     emoji: '🔁', count: 5,  desc: 'Paraphrase' },
+                      { key: 'paragraph_completion', label: 'Paragraf Tamamlama', emoji: '📋', count: 5,  desc: 'Eksik cümleyi bul' },
+                      { key: 'irrelevant_sentence', label: 'Yabancı Cümle',       emoji: '❌', count: 5,  desc: 'Bağdaşmayan cümle' },
+                    ].map(type => (
+                      <button
+                        key={type.key}
+                        onClick={() => { setSelectedYdsType(type.key); setCurrentStep(2) }}
+                        className={`p-4 rounded-xl border-2 transition-all hover:scale-105 text-left ${
+                          selectedYdsType === type.key
+                            ? 'border-sky-500 bg-sky-50 shadow-lg'
+                            : 'border-gray-200 hover:border-sky-300 hover:bg-sky-50'
+                        }`}
+                      >
+                        <div className="text-3xl mb-2">{type.emoji}</div>
+                        <div className="font-bold text-gray-800 text-sm">{type.label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{type.desc}</div>
+                        <div className="mt-2 text-xs px-2 py-0.5 bg-sky-100 text-sky-700 rounded-full inline-block">
+                          YDS: {type.count} soru
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : selectedExamMode ? (
+                /* Sınav (TYT/AYT/KPSS/DGS/ALES) Ders Seçimi */
                 <>
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">{selectedExamMode} Dersi Seçin</h2>
                   <p className="text-gray-600 mb-6">ÖSYM {selectedExamMode} formatında soru üretmek istediğiniz dersi seçin</p>
