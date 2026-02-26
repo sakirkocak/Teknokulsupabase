@@ -2022,61 +2022,270 @@ export interface GeneratedImageQuestion {
   bloom_level: string
 }
 
-// Görüntü tipi açıklamaları
-const imageTypeDescriptions: Record<string, string> = {
-  graph: 'Çizgi grafik, sütun grafik veya pasta grafik',
-  diagram: 'Bilimsel diyagram (DNA, hücre, atom yapısı vb.)',
-  chart: 'Veri tablosu veya karşılaştırma çizelgesi',
-  map: 'Harita veya coğrafi şema',
-  scientific: 'Deney düzeneği veya fizik/kimya şeması',
-  geometry: 'Geometrik şekil veya matematiksel çizim'
+// =====================================================
+// ÖSYM GÖRSEL SORU SİSTEMİ
+// Gerçek 2025 TYT/AYT/KPSS/DGS/ALES sınav analizine dayalı
+// =====================================================
+
+// 10 gerçek ÖSYM görsel kategorisi
+export const OSYM_IMAGE_TYPES: Record<string, {
+  label: string
+  description: string
+  emoji: string
+  exams: string[]         // hangi sınavlarda geçerli
+  subjects: string[]      // hangi derslerde geçerli (boşsa hepsi)
+  osymFrequency: 'very_high' | 'high' | 'medium' | 'low'
+}> = {
+  geometry_shape: {
+    label: 'Geometrik Şekil',
+    description: 'Üçgen, dörtgen, çember ve alan şekilleri (TYT\'de en sık)',
+    emoji: '🔺',
+    exams: ['TYT', 'AYT', 'LGS', 'SINIF'],
+    subjects: ['matematik', 'geometri'],
+    osymFrequency: 'very_high',
+  },
+  '3d_solid': {
+    label: '3D Cisim',
+    description: 'Küp, prizma, silindir, koni ve katı cisimler',
+    emoji: '🧊',
+    exams: ['TYT', 'AYT', 'LGS', 'SINIF'],
+    subjects: ['matematik', 'geometri'],
+    osymFrequency: 'high',
+  },
+  coordinate_graph: {
+    label: 'Koordinat/Fonksiyon',
+    description: 'Koordinat düzlemi, fonksiyon grafiği, integral alanı',
+    emoji: '📈',
+    exams: ['AYT', 'TYT', 'ALES', 'DGS', 'SINIF'],
+    subjects: ['matematik', 'geometri', 'fizik'],
+    osymFrequency: 'high',
+  },
+  data_graph: {
+    label: 'Veri Grafiği',
+    description: 'Pasta grafik, sütun grafik, çizgi grafik (KPSS\'de çok)',
+    emoji: '🥧',
+    exams: ['TYT', 'KPSS', 'KPSS_ONLISANS', 'KPSS_ORTAOGRETIM', 'ALES', 'DGS', 'SINIF'],
+    subjects: ['matematik', 'tarih', 'cografya', 'sosyal_bilgiler'],
+    osymFrequency: 'high',
+  },
+  physics_experiment: {
+    label: 'Fizik Düzeneği',
+    description: 'Elektrik devresi, yay-kütle sistemi, optik düzenek',
+    emoji: '⚡',
+    exams: ['TYT', 'AYT', 'LGS', 'SINIF'],
+    subjects: ['fizik', 'fen_bilimleri'],
+    osymFrequency: 'very_high',
+  },
+  wave_force: {
+    label: 'Dalga/Kuvvet',
+    description: 'Dalga grafiği, kuvvet diyagramı, serbest cisim',
+    emoji: '〜',
+    exams: ['TYT', 'AYT', 'SINIF'],
+    subjects: ['fizik', 'fen_bilimleri'],
+    osymFrequency: 'high',
+  },
+  biology_diagram: {
+    label: 'Biyoloji Şeması',
+    description: 'Hücre zarı, nefron, popülasyon-zaman grafiği',
+    emoji: '🧬',
+    exams: ['TYT', 'AYT', 'LGS', 'SINIF'],
+    subjects: ['biyoloji', 'fen_bilimleri'],
+    osymFrequency: 'high',
+  },
+  chemistry_schema: {
+    label: 'Kimya Şeması',
+    description: 'Elektrokimyasal hücre, piston düzeneği, molekül',
+    emoji: '⚗️',
+    exams: ['AYT', 'TYT', 'SINIF'],
+    subjects: ['kimya', 'fen_bilimleri'],
+    osymFrequency: 'medium',
+  },
+  geography_map: {
+    label: 'Coğrafya Haritası',
+    description: 'Numaralandırılmış bölge haritası, iklim/tarih haritası',
+    emoji: '🗺️',
+    exams: ['TYT', 'AYT', 'KPSS', 'KPSS_ONLISANS', 'KPSS_ORTAOGRETIM', 'DGS', 'LGS', 'SINIF'],
+    subjects: ['cografya', 'tarih', 'sosyal_bilgiler'],
+    osymFrequency: 'very_high',
+  },
+  logic_table: {
+    label: 'Veri/Mantık Tablosu',
+    description: 'Karşılaştırma tablosu, Venn diyagramı, akış şeması',
+    emoji: '📊',
+    exams: ['KPSS', 'KPSS_ONLISANS', 'KPSS_ORTAOGRETIM', 'ALES', 'DGS', 'SINIF'],
+    subjects: [], // hepsi
+    osymFrequency: 'high',
+  },
 }
 
-// Görüntü prompt'u oluştur
+// Sınav + ders kombinasyonuna göre uygun görsel tipleri döndür
+export function getExamImageTypes(examMode: string | null, subjectCode?: string): string[] {
+  if (!examMode || examMode === 'SINIF') {
+    // Sınıf bazlı: derse göre filtrele
+    if (!subjectCode) return Object.keys(OSYM_IMAGE_TYPES)
+    return Object.entries(OSYM_IMAGE_TYPES)
+      .filter(([, t]) => t.subjects.length === 0 || t.subjects.includes(subjectCode))
+      .map(([key]) => key)
+  }
+
+  return Object.entries(OSYM_IMAGE_TYPES)
+    .filter(([, t]) => {
+      const examMatch = t.exams.includes(examMode) || t.exams.includes('TYT') // TYT genel
+      const subjectMatch = !subjectCode || t.subjects.length === 0 || t.subjects.includes(subjectCode)
+      return examMatch && subjectMatch
+    })
+    .sort((a, b) => {
+      const order = { very_high: 0, high: 1, medium: 2, low: 3 }
+      return order[a[1].osymFrequency] - order[b[1].osymFrequency]
+    })
+    .map(([key]) => key)
+}
+
+// Eski tip adlarını yeni sisteme map et (geriye dönük uyumluluk)
+const LEGACY_TYPE_MAP: Record<string, string> = {
+  graph: 'data_graph',
+  diagram: 'biology_diagram',
+  chart: 'logic_table',
+  map: 'geography_map',
+  scientific: 'physics_experiment',
+  geometry: 'geometry_shape',
+}
+
+// Görüntü tipi açıklamaları (geriye dönük uyumluluk + yeni tipler)
+const imageTypeDescriptions: Record<string, string> = {
+  // Yeni ÖSYM tipleri
+  geometry_shape: 'Geometrik şekil (üçgen, dörtgen, çember, alan)',
+  '3d_solid': '3D cisim (küp, prizma, silindir, koni)',
+  coordinate_graph: 'Koordinat düzlemi ve fonksiyon grafiği',
+  data_graph: 'Veri grafiği (pasta, sütun, çizgi)',
+  physics_experiment: 'Fizik deney düzeneği (elektrik devresi, yay-kütle)',
+  wave_force: 'Dalga grafiği ve kuvvet/vektör diyagramı',
+  biology_diagram: 'Biyoloji şeması (hücre, nefron, popülasyon)',
+  chemistry_schema: 'Kimya şeması (elektrokimyasal hücre, piston)',
+  geography_map: 'Coğrafya/tarih haritası',
+  logic_table: 'Veri tablosu, Venn diyagramı veya akış şeması',
+  // Eski tipler (geriye dönük uyumluluk)
+  graph: 'veri grafiği',
+  diagram: 'bilimsel diyagram',
+  chart: 'veri tablosu',
+  map: 'harita',
+  scientific: 'deney düzeneği',
+  geometry: 'geometrik şekil',
+}
+
+// ÖSYM standardında görüntü promptu oluştur
 function createImagePrompt(
   imageType: string,
   subject: string,
   topic: string,
   description: string,
-  grade: number
+  grade: number,
+  examMode?: string | null
 ): string {
-  const baseStyle = `Clean, educational diagram style. Simple lines, clear labels in Turkish. 
-  White or light gray background. No decorative elements. 
-  Suitable for ${grade}. grade students in Turkey.`
+  // Eski tip adlarını yeni sisteme çevir
+  const resolvedType = LEGACY_TYPE_MAP[imageType] || imageType
+
+  const examLabel = examMode ? `${examMode} sınavı` : `${grade}. sınıf Türkiye müfredatı`
+
+  const osymBase = `ÖSYM sınav görseli standartları: beyaz arka plan, temiz siyah çizgiler, tüm etiketler Türkçe, sade ve net, ${examLabel} seviyesine uygun.`
 
   const typePrompts: Record<string, string> = {
-    graph: `Create a clear ${description}. 
-    X and Y axes clearly labeled in Turkish. 
-    Grid lines visible. Data points connected with smooth lines.
-    Legend if multiple data series. ${baseStyle}`,
-    
-    diagram: `Create a scientific diagram of ${description}. 
-    Parts clearly labeled in Turkish with arrows.
-    Accurate scientific representation.
-    Colors: blue, green, orange for different parts. ${baseStyle}`,
-    
-    chart: `Create a data table or chart showing ${description}.
-    Rows and columns clearly defined.
-    Headers in bold. Numbers clearly readable.
-    Use colors to highlight important data. ${baseStyle}`,
-    
-    map: `Create an educational map showing ${description}.
-    Geographic features clearly marked.
-    Cities/regions labeled in Turkish.
-    Compass rose and scale if relevant. ${baseStyle}`,
-    
-    scientific: `Create a scientific illustration of ${description}.
-    Equipment/setup clearly labeled in Turkish.
-    Arrows showing direction of flow/force if applicable.
-    Accurate proportions and relationships. ${baseStyle}`,
-    
-    geometry: `Create a geometric diagram showing ${description}.
-    Clean lines, accurate angles.
-    Measurements and labels in Turkish.
-    Use standard geometric notation. ${baseStyle}`
+    geometry_shape: `ÖSYM geometri şekli üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Beyaz arka plan, kalın siyah çizgiler
+- Köşe noktaları büyük Türk harfi (A, B, C...) siyah dolu nokta ile
+- Kenar uzunlukları şekil üzerinde (a, b, x veya sayısal değer)
+- Dik açılar küçük kare sembolüyle işaretlenir
+- Yardımcı çizgiler (yükseklik, orta nokta) noktalı
+- Şekil kağıt ortasında, etrafında boşluk
+- ${osymBase}`,
+
+    '3d_solid': `ÖSYM 3D cisim şeması üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Perspektif/izometrik çizim, beyaz arka plan
+- Görünmeyen kenarlar kesik çizgi, görünenler tam çizgi
+- Köşe noktaları harfle (A, B, C...) etiketlenir
+- Ölçüler cisim üzerinde veya yanında (h, a, r veya sayı)
+- Kesit veriliyorsa farklı renk veya tarama
+- ${osymBase}`,
+
+    coordinate_graph: `ÖSYM koordinat/fonksiyon grafiği üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- x ve y eksenleri ok uçlu, orijin "O" ile işaretli
+- Eksen değerleri eşit aralıklı sayılarla
+- Fonksiyon eğrisi düzgün ve belirgin
+- Özel noktalar (tepe, kökler, kesişim) büyük nokta + koordinat
+- Asimptotlar kesik çizgiyle
+- Birden fazla fonksiyon: farklı renk ve etiket (f, g)
+- İntegral alanı taralı, a ve b sınır değerleri işaretli
+- ${osymBase}`,
+
+    data_graph: `ÖSYM veri grafiği üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Pasta grafiği: net dilimler, yüzde veya değer etiketleri, renk lejantı
+- Sütun grafiği: dikey sütunlar, Y ekseni değerleri, X'te kategori etiketleri
+- Çizgi grafiği: veri noktaları işaretli, birden fazla çizgi varsa etiketli
+- Türkçe başlık ve eksen isimleri
+- Birimler eksende (kg, km, % vb.)
+- ${osymBase}`,
+
+    physics_experiment: `ÖSYM fizik deney düzeneği şeması üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Pil: uzun-kısa çizgi sembolü, kutup işaretleri
+- Direnç: dişli dikdörtgen veya zigzag, değeri üzerinde (R=10Ω)
+- Ampul: daire içinde X
+- Yay: heliks şeklinde, sabiti k, kütle m
+- Kuvvet okları kalın, değer üzerinde (F=20N)
+- I, II, III düzenekleri net ayrılmış
+- Tüm parçalar Türkçe etiketli
+- ${osymBase}`,
+
+    wave_force: `ÖSYM dalga veya kuvvet diyagramı üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Dalga: düzgün sinüs/kosinüs, T (periyot) ve λ (dalga boyu) işaretli
+- Serbest cisim: cisim kutu veya daire, TÜM kuvvetler ok + Türkçe etiket (Fg, N, f, T)
+- Vektörler kalın ok, bileşenler kesik çizgilerle
+- Hareket grafiği (x-t veya v-t): Türkçe eksenler, eğim/alan bölgeleri işaretli
+- ${osymBase}`,
+
+    biology_diagram: `ÖSYM biyoloji şeması üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Hücre organelleri şematik (ayrıntısız), Türkçe etiket + ok
+- Nefron/organ kesiti: katmanlar/bölümler Türkçe etiketli
+- Popülasyon grafiği: x=zaman, y=birey sayısı, türler farklı renk
+- I, II, III veriler: ayrı grafik veya sütunlu tablo
+- Deney grupları tablosu: Türkçe başlıklı (Deney/Kontrol)
+- ${osymBase}`,
+
+    chemistry_schema: `ÖSYM kimya şeması üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Elektrokimyasal hücre: sol anot(−) sağ katot(+), köprü bağlantı, elektrot+çözelti Türkçe
+- Piston düzeneği: silindir içinde piston, üstte ağırlık veya basınç, hacim değişimi okla
+- Yapısal formül: açık Lewis yapısı, bağlar ve atomlar standart
+- Titrasyon: büretle damlayan sıvı, renk değişimi belirtilmiş
+- ${osymBase}`,
+
+    geography_map: `ÖSYM coğrafya veya tarih haritası üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Türkiye veya dünya ana hatları kalın siyah konturla
+- Bölgeler numaralandırılmış (I, II, III veya 1, 2, 3) veya harfli
+- Her bölge farklı renk veya tarama deseni
+- Şehirler nokta + Türkçe isimle
+- Okyanuslar/göller açık mavi, dağlar kahverengi gölge
+- Osmanlı haritasında sınır değişimleri okla veya farklı renk
+- ${osymBase}`,
+
+    logic_table: `ÖSYM veri tablosu veya mantık şeması üret. Konu: ${description}
+ÇİZİM KURALLARI:
+- Tablo: kalın başlık satırı, ince iç çizgiler, Türkçe başlıklar
+- Sayısal veriler sağa hizalı, metin sola hizalı
+- Bilinmeyen değerler "?" ile
+- Venn diyagramı: 2-3 daire, kesişim bölgeleri renklendirilmiş + etiketli
+- Akış şeması: dikdörtgen (işlem), baklava (karar), ok bağlantıları, Türkçe
+- ${osymBase}`,
   }
 
-  return typePrompts[imageType] || `Create an educational image of ${description}. ${baseStyle}`
+  return typePrompts[resolvedType] || typePrompts['geometry_shape']
 }
 
 // Görüntü üret (Nano Banana)
@@ -2133,158 +2342,134 @@ async function generateImageDescription(
   grade: number,
   subject: string,
   topic: string,
-  imageType: string
+  imageType: string,
+  examMode?: string | null
 ): Promise<string> {
-  const imageTypeDesc = imageTypeDescriptions[imageType] || imageType
-  
-  const prompt = `Sen bir eğitim içerik uzmanısın. ${grade}. sınıf ${subject} dersi "${topic}" konusu için ${imageTypeDesc} türünde bir görsel açıklaması oluştur.
+  const resolvedType = LEGACY_TYPE_MAP[imageType] || imageType
+  const typeInfo = OSYM_IMAGE_TYPES[resolvedType]
+  const imageTypeDesc = typeInfo?.description || imageTypeDescriptions[imageType] || imageType
+  const examContext = examMode ? `${examMode} sınavı formatında` : `${grade}. sınıf düzeyinde`
 
-Bu görsel, öğrencilerin konuyu anlamasına yardımcı olacak ve soru sorulabilecek bir görsel olmalı.
+  // Her görsel tipi için gerçek ÖSYM örneklerine dayalı ipuçları
+  const typeExamples: Record<string, string> = {
+    geometry_shape: '"ABC üçgeninde BD açıortayı çizilmiş, |AB|=6, |AC|=8 iken |BD|=?" sorusu için üçgen şekli',
+    '3d_solid': '"Kenar uzunluğu a olan küpten bir köşesinden dik kesit alınmış şekil"',
+    coordinate_graph: '"f(x)=x²-4 fonksiyonunun x=-3 ile x=3 arasındaki grafiği, kökleri işaretli"',
+    data_graph: '"3 şehrin aylık ortalama yağış miktarlarını gösteren sütun grafik, Ocak-Aralık"',
+    physics_experiment: '"Yay sabitli bir yaya asılı m kütleli cisim, yayın sıkışma/gerilme düzeneği"',
+    wave_force: '"Sabit hızla hareket eden cismin x-t grafiği ve v-t grafiği karşılaştırması"',
+    biology_diagram: '"Hücre zarı yapısı: fosfolipid çift tabaka, protein kanalları Türkçe etiketli"',
+    chemistry_schema: '"Zn|Zn²⁺||Cu²⁺|Cu galvanik pil düzeneği, elektrot reaksiyonları gösterilmiş"',
+    geography_map: '"Türkiye iklim bölgelerinin gösterildiği harita, I-V numaralı bölgeler renkli"',
+    logic_table: '"4 öğrencinin 3 sınava ait notlarını gösteren tablo, boş hücreler ? ile"',
+  }
 
-SADECE görsel açıklamasını yaz, başka bir şey yazma. Türkçe yaz.
+  const prompt = `Sen bir ÖSYM görsel tasarım uzmanısın. ${examContext} ${subject} dersi "${topic}" konusu için ${imageTypeDesc} türünde SPESİFİK bir görsel açıklaması oluştur.
 
-Örnek formatlar:
-- Grafik için: "K, L, M şehirlerinin yıl boyunca gündüz süresi değişimini gösteren çizgi grafik"
-- Diyagram için: "DNA çift sarmal yapısı ve adenin-timin, guanin-sitozin eşleşmelerini gösteren diyagram"
-- Tablo için: "Elementlerin atom numarası, kütle numarası ve elektron sayısını gösteren tablo"
-- Harita için: "Dünya'nın 21 Haziran tarihindeki Güneş etrafındaki konumunu gösteren şema"
-- Deney için: "Asit-baz tepkimesini gösteren deney düzeneği"
-- Geometri için: "ABC üçgeninde açıortay ve kenarortay çizimini gösteren şekil"
+Bu görsel bir soru eşliğinde kullanılacak ve öğrencinin görseli analiz ederek soruyu cevaplaması gerekecek.
 
-ŞİMDİ "${topic}" KONUSU İÇİN UYGUN BİR GÖRSEL AÇIKLAMASI YAZ:`
+ÖNEMLİ: Genel açıklama değil, ÖSYM'deki gibi spesifik değerler ve durumlar içeren bir görsel tanımla.
+
+Benzer örnek: ${typeExamples[resolvedType] || `"${topic} konusunda öğrencinin analiz edeceği spesifik bir ${imageTypeDesc}"`}
+
+SADECE görsel açıklamasını yaz. Türkçe yaz. 1-2 cümle.
+
+"${topic}" KONUSU İÇİN ÖSYM TARZINDA GÖRSEL AÇIKLAMASI:`
 
   try {
     const result = await geminiModel.generateContent(prompt)
     const response = await result.response
     let text = response.text().trim()
-    
-    // Temizle - sadece açıklamayı al
     text = text.replace(/^["']|["']$/g, '').trim()
-    
     return text || `${topic} konusunu gösteren ${imageTypeDesc}`
-    
   } catch (error) {
     console.error('Görsel açıklaması üretme hatası:', error)
     return `${topic} konusunu gösteren ${imageTypeDesc}`
   }
 }
 
-// Görüntülü soru üret (imageDescription artık optional)
+// Görüntülü soru üret
 export async function generateImageQuestion(
   grade: number,
   subject: string,
   topic: string,
   imageType: string,
-  imageDescription?: string, // Artık optional!
-  difficulty: Difficulty = 'medium'
+  imageDescription?: string,
+  difficulty: Difficulty = 'medium',
+  examMode?: string | null
 ): Promise<GeneratedImageQuestion> {
-  const isHighSchool = grade >= 9
-  
-  // Eğer görsel açıklaması verilmemişse AI üretsin
-  const finalImageDescription = imageDescription || await generateImageDescription(grade, subject, topic, imageType)
-  
-  console.log('Görsel açıklaması:', finalImageDescription)
-  
-  // Görüntü için prompt oluştur
-  const imagePrompt = createImagePrompt(imageType, subject, topic, finalImageDescription, grade)
-  
-  // Soru metni ve şıkları için AI'dan yardım al
-  const questionPrompt = `Sen bir soru bankası yazarısın. ${grade}. sınıf ${subject} dersi için "${topic}" konusunda GÖRÜNTÜLÜ bir soru hazırla.
+  const isHighSchool = grade >= 9 || !!examMode
+  const resolvedType = LEGACY_TYPE_MAP[imageType] || imageType
+  const typeDesc = imageTypeDescriptions[resolvedType] || imageType
+
+  const finalImageDescription = imageDescription || await generateImageDescription(grade, subject, topic, imageType, examMode)
+  const imagePrompt = createImagePrompt(imageType, subject, topic, finalImageDescription, grade, examMode)
+
+  const examIntro = examMode
+    ? `Sen ÖSYM'nin en deneyimli ${examMode} görüntülü soru yazarısın. Gerçek ÖSYM ${examMode} sınav kalitesinde soru hazırla.`
+    : `Sen bir soru bankası yazarısın. ${grade}. sınıf ${subject} dersi için görüntülü soru hazırla.`
+
+  const questionPrompt = `${examIntro}
 
 GÖRÜNTÜ AÇIKLAMASI: ${finalImageDescription}
-GÖRÜNTÜ TİPİ: ${imageTypeDescriptions[imageType] || imageType}
-ZORLUK: ${difficulty}
+GÖRÜNTÜ TİPİ: ${typeDesc}
+DERS: ${subject} | KONU: ${topic} | ZORLUK: ${difficulty}
 
-Bu görüntüye bakarak cevaplanabilecek bir soru hazırla. Soru, öğrencinin görüntüyü analiz etmesini gerektirsin.
+Bu görüntüye bakarak cevaplanabilecek bir ÖSYM kalitesinde soru hazırla.
 
 SADECE JSON formatında yanıt ver:
 {
-  "question_text": "Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre... [soru metni]",
-  "image_description": "${finalImageDescription}",
+  "question_text": "Yukarıdaki ${typeDesc} göre... [soru metni]",
   "options": {
-    "A": "Şık A metni",
-    "B": "Şık B metni",
-    "C": "Şık C metni",
-    "D": "Şık D metni"${isHighSchool ? ',\n    "E": "Şık E metni"' : ''}
+    "A": "Şık A",
+    "B": "Şık B",
+    "C": "Şık C",
+    "D": "Şık D"${isHighSchool ? ',\n    "E": "Şık E"' : ''}
   },
-  "correct_answer": "B",
-  "explanation": "Doğru cevap B çünkü... [açıklama]",
+  "correct_answer": "C",
+  "explanation": "Doğru cevap C çünkü... [görsele dayalı açıklama]",
   "bloom_level": "analiz"
 }
 
 KURALLAR:
-- Soru görüntüyü analiz etmeyi gerektirsin
-- Doğru cevap rastgele bir şık olsun (her zaman A veya B değil)
-- Açıklama görüntüdeki detayları referans alsın
-- bloom_level: bilgi, kavrama, uygulama, analiz, sentez, değerlendirme`
+- Doğru cevap rastgele şık olsun (A, B, C, D${isHighSchool ? ', E' : ''} eşit olasılıklı)
+- Açıklama görseldeki spesifik verileri referans alsın
+- ${examMode ? `ÖSYM ${examMode} soru dili ve formatı kullan` : 'Yaşa uygun dil kullan'}`
 
   try {
-    console.log('Soru üretme prompt gönderiliyor...')
-    
-    // Soru metnini üret
     const result = await geminiModel.generateContent(questionPrompt)
-    const response = await result.response
-    let text = response.text()
-    
-    console.log('AI yanıtı (ilk 500 karakter):', text.substring(0, 500))
-    
-    // JSON'u temizle ve parse et
+    let text = result.response.text()
     text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
     const jsonMatch = text.match(/\{[\s\S]*\}/)
-    
-    if (!jsonMatch) {
-      console.error('JSON bulunamadı! AI yanıtı:', text)
-      throw new Error('JSON format bulunamadı')
-    }
-    
-    let jsonStr = jsonMatch[0]
-      .replace(/,(\s*[}\]])/g, '$1')
-      .replace(/[\x00-\x1F\x7F]/g, ' ')
-    
-    console.log('Parse edilecek JSON (ilk 300 karakter):', jsonStr.substring(0, 300))
-    
-    const questionData = JSON.parse(jsonStr)
-    
-    console.log('Parse edilen soru:', {
-      question_text: questionData.question_text?.substring(0, 50),
-      options: questionData.options,
-      correct_answer: questionData.correct_answer
-    })
-    
+    if (!jsonMatch) throw new Error('JSON format bulunamadı')
+    const questionData = JSON.parse(
+      jsonMatch[0].replace(/,(\s*[}\]])/g, '$1').replace(/[\x00-\x1F\x7F]/g, ' ')
+    )
     return {
-      question_text: questionData.question_text || 'Yukarıdaki görüntüye göre hangi ifade doğrudur?',
+      question_text: questionData.question_text || `Yukarıdaki ${typeDesc} göre hangi ifade doğrudur?`,
       image_prompt: imagePrompt,
       options: {
-        A: questionData.options?.A || 'Şık A',
-        B: questionData.options?.B || 'Şık B',
-        C: questionData.options?.C || 'Şık C',
-        D: questionData.options?.D || 'Şık D',
-        ...(isHighSchool && { E: questionData.options?.E || 'Şık E' })
+        A: questionData.options?.A || 'I ve II',
+        B: questionData.options?.B || 'I ve III',
+        C: questionData.options?.C || 'II ve III',
+        D: questionData.options?.D || 'I, II ve III',
+        ...(isHighSchool && { E: questionData.options?.E || 'Hiçbiri' }),
       },
-      correct_answer: (questionData.correct_answer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E',
+      correct_answer: (questionData.correct_answer || 'C').toUpperCase() as 'A'|'B'|'C'|'D'|'E',
       explanation: questionData.explanation || '',
       difficulty,
-      bloom_level: questionData.bloom_level || 'analiz'
+      bloom_level: questionData.bloom_level || 'analiz',
     }
-    
   } catch (error: any) {
     console.error('Görüntülü soru üretme hatası:', error)
-    
-    // Hata durumunda fallback soru döndür
     return {
-      question_text: `Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre aşağıdaki ifadelerden hangisi doğrudur?`,
+      question_text: `Yukarıdaki ${typeDesc} göre aşağıdaki ifadelerden hangisi doğrudur?`,
       image_prompt: imagePrompt,
-      options: {
-        A: 'I ve II',
-        B: 'I ve III', 
-        C: 'II ve III',
-        D: 'I, II ve III',
-        ...(isHighSchool && { E: 'Hiçbiri' })
-      },
+      options: { A: 'I ve II', B: 'I ve III', C: 'II ve III', D: 'I, II ve III', ...(isHighSchool && { E: 'Hiçbiri' }) },
       correct_answer: 'C' as const,
       explanation: 'Görüntü analiz edilerek doğru cevap belirlenmelidir.',
       difficulty,
-      bloom_level: 'analiz'
+      bloom_level: 'analiz',
     }
   }
 }
@@ -2341,77 +2526,83 @@ SADECE görsel açıklamasını yaz, başka bir şey yazma. Türkçe yaz. Çok s
   }
 }
 
-// Görüntülü soru + görsel birlikte üret (YENİ AKIŞ)
+// Görüntülü soru + görsel birlikte üret (Ana akış)
+// Adım 1: ÖSYM tarzı soru üret → Adım 2: Soruya özel görsel açıklaması → Adım 3: Görsel üret
 export async function generateCompleteImageQuestion(
   grade: number,
   subject: string,
   topic: string,
   imageType: string,
   difficulty: Difficulty = 'medium',
-  imageDescription?: string // Optional - artık dikkate alınmıyor, soru bazlı üretiliyor
+  imageDescription?: string,
+  examMode?: string | null
 ): Promise<GeneratedImageQuestion> {
-  const isHighSchool = grade >= 9
-  
-  console.log('🆕 YENİ AKIŞ: Önce soru, sonra soruya özel görsel üretiliyor...')
-  
-  // ADIM 1: Önce SADECE soru metnini ve şıklarını üret (görsel olmadan)
-  const questionPrompt = `Sen bir soru bankası yazarısın. ${grade}. sınıf ${subject} dersi için "${topic}" konusunda bir soru hazırla.
+  const isHighSchool = grade >= 9 || !!examMode
+  const resolvedType = LEGACY_TYPE_MAP[imageType] || imageType
+  const typeInfo = OSYM_IMAGE_TYPES[resolvedType]
+  const typeDesc = typeInfo?.description || imageTypeDescriptions[resolvedType] || imageType
 
-ZORLUK: ${difficulty}
-GÖRSEL TİPİ: ${imageTypeDescriptions[imageType] || imageType} (görsel sonra eklenecek)
+  console.log(`🎯 Görüntülü soru üretimi: ${examMode || `${grade}.sınıf`} ${subject} - ${topic} [${resolvedType}]`)
 
-Bu soru bir ${imageTypeDescriptions[imageType] || 'görsel'} eşliğinde sorulacak. Soruyu öyle yaz ki:
-1. Görsel verisi analiz edilmesi gereksin
-2. Soru çok genel değil, SPESİFİK bir durum/veri sorsun
-3. Tüm konuyu değil, konunun BELİRLİ BİR PARÇASINI test etsin
+  // ADIM 1: Önce soru metnini üret
+  const examIntro = examMode
+    ? `Sen ÖSYM'nin en deneyimli ${examMode} görüntülü soru yazarısın. 2025 ${examMode} sınavındaki görüntülü sorular kalitesinde, gerçek ÖSYM standardında bir soru hazırla.`
+    : `Sen Türkiye'nin en iyi soru bankası yazarısın. ${grade}. sınıf ${subject} dersi için müfredata uygun görüntülü bir soru hazırla.`
 
-SADECE JSON formatında yanıt ver:
+  const difficultyMap: Record<string, string> = {
+    easy: 'Kolay (temel düzey, direkt okunabilir)',
+    medium: 'Orta (yorumlama gerektiren)',
+    hard: 'Zor (çok adımlı analiz)',
+    legendary: 'Olimpiyat/En zor (sentez ve yaratıcı düşünme)',
+  }
+
+  const questionPrompt = `${examIntro}
+
+SORU PARAMETRELERI:
+- Ders: ${subject}
+- Konu: ${topic}
+- Görsel Tipi: ${typeDesc}
+- Zorluk: ${difficultyMap[difficulty] || difficulty}
+${examMode ? `- Sınav Formatı: ÖSYM ${examMode} görüntülü soru standartları` : ''}
+
+Bu soru bir ${typeDesc} görseli eşliğinde sorulacak.
+ÖSYM tarzı SPESİFİK soru: genel konuyu değil, görseldeki spesifik veriyi/durumu sorgula.
+
+SADECE JSON:
 {
-  "question_text": "Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre... [SPESİFİK soru metni]",
-  "specific_data_needed": "Bu soruyu cevaplamak için görselde GÖSTERİLMESİ GEREKEN spesifik veri/bilgi",
+  "question_text": "Yukarıdaki ${typeDesc} göre ... [spesifik soru]",
+  "specific_data_needed": "Görselde kesinlikle gösterilmesi gereken spesifik veri (örn: 'ABC üçgeninde h yüksekliği ve x değeri')",
   "options": {
-    "A": "Şık A metni",
-    "B": "Şık B metni",
-    "C": "Şık C metni",
-    "D": "Şık D metni"${isHighSchool ? ',\n    "E": "Şık E metni"' : ''}
+    "A": "...",
+    "B": "...",
+    "C": "...",
+    "D": "..."${isHighSchool ? ',\n    "E": "..."' : ''}
   },
-  "correct_answer": "B",
-  "explanation": "Doğru cevap B çünkü... [açıklama]",
+  "correct_answer": "${['A','B','C','D','E'][Math.floor(Math.random()*5)]}",
+  "explanation": "Doğru cevap ... çünkü görseldeki [spesifik veri] gösteriyor ki...",
   "bloom_level": "analiz"
 }
 
-KURALLAR:
-- Soru SPESİFİK olsun, genel konuyu değil belirli bir durumu test etsin
-- Doğru cevap rastgele bir şık olsun
-- specific_data_needed alanı ÇOK ÖNEMLİ - görsel tam buna göre üretilecek`
+KESİN KURALLAR:
+- Doğru cevap A, B, C, D${isHighSchool ? ', E' : ''} arasından rastgele seçilmeli (hep aynı olmasın)
+- specific_data_needed çok önemli — görsel TAM buna göre üretilecek
+- ${examMode ? `ÖSYM ${examMode} soru dili (akademik, "Yukarıdaki ... göre..." formatı)` : 'Yaşa uygun, net dil'}`
 
   try {
     console.log('ADIM 1: Soru metni üretiliyor...')
-    
     const result = await geminiModel.generateContent(questionPrompt)
-    const response = await result.response
-    let text = response.text()
-    
-    // JSON'u temizle ve parse et
+    let text = result.response.text()
     text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim()
     const jsonMatch = text.match(/\{[\s\S]*\}/)
-    
-    if (!jsonMatch) {
-      throw new Error('JSON format bulunamadı')
-    }
-    
-    let jsonStr = jsonMatch[0]
-      .replace(/,(\s*[}\]])/g, '$1')
-      .replace(/[\x00-\x1F\x7F]/g, ' ')
-    
-    const questionData = JSON.parse(jsonStr)
-    
-    console.log('Üretilen soru:', questionData.question_text?.substring(0, 80))
-    console.log('Gerekli veri:', questionData.specific_data_needed)
-    
-    // ADIM 2: Soruya ÖZEL görsel açıklaması üret
-    console.log('ADIM 2: Soruya özel görsel açıklaması üretiliyor...')
-    
+    if (!jsonMatch) throw new Error('JSON format bulunamadı')
+    const questionData = JSON.parse(
+      jsonMatch[0].replace(/,(\s*[}\]])/g, '$1').replace(/[\x00-\x1F\x7F]/g, ' ')
+    )
+    console.log('✅ Soru üretildi:', questionData.question_text?.substring(0, 80))
+    console.log('📐 Gerekli görsel:', questionData.specific_data_needed)
+
+    // ADIM 2: Soruya özel görsel açıklaması
+    console.log('ADIM 2: Soruya özel görsel açıklaması...')
     const customImageDescription = await generateImageDescriptionForQuestion(
       questionData.question_text,
       questionData.options,
@@ -2420,18 +2611,14 @@ KURALLAR:
       topic,
       imageType
     )
-    
-    // Görüntü için prompt oluştur
-    const imagePrompt = createImagePrompt(imageType, subject, topic, customImageDescription, grade)
-    
+
+    const imagePrompt = createImagePrompt(imageType, subject, topic, customImageDescription, grade, examMode)
+
     // ADIM 3: Görsel üret
-    console.log('ADIM 3: Soruya özel görsel üretiliyor...')
-    
+    console.log('ADIM 3: Görsel üretiliyor...')
     let image_base64: string | undefined
-    
     try {
       const imageResult = await generateEducationalImage(imagePrompt)
-      
       if (imageResult) {
         image_base64 = `data:${imageResult.mimeType};base64,${imageResult.base64}`
         console.log('✅ Görsel başarıyla üretildi')
@@ -2439,45 +2626,36 @@ KURALLAR:
     } catch (imageError) {
       console.error('Görsel üretimi başarısız:', imageError)
     }
-    
+
     return {
-      question_text: questionData.question_text || 'Yukarıdaki görüntüye göre hangi ifade doğrudur?',
+      question_text: questionData.question_text || `Yukarıdaki ${typeDesc} göre hangi ifade doğrudur?`,
       image_prompt: imagePrompt,
       image_base64,
       options: {
-        A: questionData.options?.A || 'Şık A',
-        B: questionData.options?.B || 'Şık B',
-        C: questionData.options?.C || 'Şık C',
-        D: questionData.options?.D || 'Şık D',
-        ...(isHighSchool && { E: questionData.options?.E || 'Şık E' })
+        A: questionData.options?.A || 'I ve II',
+        B: questionData.options?.B || 'I ve III',
+        C: questionData.options?.C || 'II ve III',
+        D: questionData.options?.D || 'I, II ve III',
+        ...(isHighSchool && { E: questionData.options?.E || 'Hiçbiri' }),
       },
-      correct_answer: (questionData.correct_answer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D' | 'E',
+      correct_answer: (questionData.correct_answer || 'C').toUpperCase() as 'A'|'B'|'C'|'D'|'E',
       explanation: questionData.explanation || '',
       difficulty,
-      bloom_level: questionData.bloom_level || 'analiz'
+      bloom_level: questionData.bloom_level || 'analiz',
     }
-    
+
   } catch (error: any) {
     console.error('Görüntülü soru üretme hatası:', error)
-    
-    // Hata durumunda fallback
-    const fallbackImageDesc = `${topic} konusunda basit bir ${imageTypeDescriptions[imageType] || 'görsel'}`
-    const fallbackPrompt = createImagePrompt(imageType, subject, topic, fallbackImageDesc, grade)
-    
+    const fallbackDesc = `${topic} konusunda ${typeDesc}`
+    const fallbackPrompt = createImagePrompt(imageType, subject, topic, fallbackDesc, grade, examMode)
     return {
-      question_text: `Yukarıdaki ${imageTypeDescriptions[imageType] || 'görüntüye'} göre aşağıdaki ifadelerden hangisi doğrudur?`,
+      question_text: `Yukarıdaki ${typeDesc} göre aşağıdaki ifadelerden hangisi doğrudur?`,
       image_prompt: fallbackPrompt,
-      options: {
-        A: 'I ve II',
-        B: 'I ve III', 
-        C: 'II ve III',
-        D: 'I, II ve III',
-        ...(isHighSchool && { E: 'Hiçbiri' })
-      },
+      options: { A: 'I ve II', B: 'I ve III', C: 'II ve III', D: 'I, II ve III', ...(isHighSchool && { E: 'Hiçbiri' }) },
       correct_answer: 'C' as const,
       explanation: 'Görüntü analiz edilerek doğru cevap belirlenmelidir.',
       difficulty,
-      bloom_level: 'analiz'
+      bloom_level: 'analiz',
     }
   }
 }

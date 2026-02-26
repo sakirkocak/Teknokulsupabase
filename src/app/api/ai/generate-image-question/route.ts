@@ -1,64 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { 
-  generateImageQuestion, 
+import {
+  generateImageQuestion,
   generateCompleteImageQuestion,
   generateEducationalImage,
-  Difficulty 
+  Difficulty
 } from '@/lib/gemini'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Görüntü üretimi zaman alabilir
+export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      grade, 
-      subject, 
-      topic, 
-      imageType, 
-      imageDescription, // Artık optional - AI otomatik üretebilir
+    const {
+      grade,
+      subject,
+      topic,
+      imageType,
+      imageDescription,
       difficulty,
-      generateImage = true // Görüntü de üretilsin mi
+      generateImage = true,
+      examMode = null,        // TYT | AYT | KPSS | DGS | ALES | null
     } = body
 
-    // Validasyon - imageDescription artık zorunlu DEĞİL
-    if (!grade || !subject || !topic || !imageType) {
+    // examMode varsa grade zorunlu değil
+    if (!subject || !topic || !imageType) {
       return NextResponse.json(
-        { error: 'Sınıf, ders, konu ve görüntü tipi gerekli' },
+        { error: 'Ders, konu ve görüntü tipi gerekli' },
         { status: 400 }
       )
     }
 
-    // Görüntülü soru üret
+    if (!examMode && !grade) {
+      return NextResponse.json(
+        { error: 'Sınıf veya sınav modu gerekli' },
+        { status: 400 }
+      )
+    }
+
+    const effectiveGrade = examMode ? 11 : Number(grade) // examMode varsa lise seviyesi
+
     let question
-    
+
     if (generateImage) {
-      // Görüntü ile birlikte üret (imageDescription optional)
       question = await generateCompleteImageQuestion(
-        Number(grade),
+        effectiveGrade,
         subject,
         topic,
         imageType,
         (difficulty || 'medium') as Difficulty,
-        imageDescription // undefined olabilir, AI üretecek
+        imageDescription,
+        examMode
       )
     } else {
-      // Sadece soru metni ve prompt üret (görüntü yok)
       question = await generateImageQuestion(
-        Number(grade),
+        effectiveGrade,
         subject,
         topic,
         imageType,
-        imageDescription, // undefined olabilir, AI üretecek
-        (difficulty || 'medium') as Difficulty
+        imageDescription,
+        (difficulty || 'medium') as Difficulty,
+        examMode
       )
     }
 
-    return NextResponse.json({ 
-      success: true,
-      question 
-    })
+    return NextResponse.json({ success: true, question })
 
   } catch (error: any) {
     console.error('Generate image question error:', error)
@@ -76,19 +82,13 @@ export async function GET(request: NextRequest) {
     const prompt = searchParams.get('prompt')
 
     if (!prompt) {
-      return NextResponse.json(
-        { error: 'Görüntü açıklaması (prompt) gerekli' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Görüntü açıklaması (prompt) gerekli' }, { status: 400 })
     }
 
     const imageResult = await generateEducationalImage(prompt)
 
     if (!imageResult) {
-      return NextResponse.json(
-        { error: 'Görüntü üretilemedi' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Görüntü üretilemedi' }, { status: 500 })
     }
 
     return NextResponse.json({
@@ -104,4 +104,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

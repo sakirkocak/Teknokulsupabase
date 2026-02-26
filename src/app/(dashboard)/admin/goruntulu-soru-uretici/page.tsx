@@ -41,14 +41,29 @@ import {
 import Image from 'next/image'
 
 // Görüntü tipleri
+// 10 gerçek ÖSYM görsel soru tipi (2025 TYT/AYT/KPSS/DGS/ALES analizine dayalı)
 const IMAGE_TYPES = [
-  { id: 'graph', name: 'Grafik', icon: LineChart, description: 'Çizgi, sütun veya pasta grafik', color: 'bg-blue-500' },
-  { id: 'diagram', name: 'Diyagram', icon: Dna, description: 'Bilimsel diyagram (DNA, hücre vb.)', color: 'bg-purple-500' },
-  { id: 'chart', name: 'Tablo', icon: BarChart3, description: 'Veri tablosu veya çizelge', color: 'bg-green-500' },
-  { id: 'map', name: 'Harita', icon: Map, description: 'Coğrafi harita veya şema', color: 'bg-amber-500' },
-  { id: 'scientific', name: 'Deney', icon: FlaskConical, description: 'Deney düzeneği veya fizik şeması', color: 'bg-red-500' },
-  { id: 'geometry', name: 'Geometri', icon: Triangle, description: 'Geometrik şekil veya çizim', color: 'bg-indigo-500' },
+  { id: 'geometry_shape', name: 'Geometrik Şekil', icon: Triangle,    description: 'Üçgen, dörtgen, çember (TYT\'de en sık)', color: 'bg-indigo-500', emoji: '🔺', exams: ['TYT','AYT','LGS','SINIF'], subjects: ['matematik','geometri'] },
+  { id: '3d_solid',        name: '3D Cisim',        icon: Layers,      description: 'Küp, prizma, silindir, koni',                  color: 'bg-cyan-500',   emoji: '🧊', exams: ['TYT','AYT','LGS','SINIF'], subjects: ['matematik','geometri'] },
+  { id: 'coordinate_graph',name: 'Koordinat/Fonksiyon', icon: LineChart, description: 'Koordinat düzlemi, integral alanı (AYT)', color: 'bg-blue-500',   emoji: '📈', exams: ['AYT','TYT','ALES','DGS','SINIF'], subjects: ['matematik','geometri','fizik'] },
+  { id: 'data_graph',      name: 'Veri Grafiği',    icon: BarChart3,   description: 'Pasta, sütun, çizgi grafik (KPSS\'de çok)', color: 'bg-sky-500',    emoji: '🥧', exams: ['TYT','KPSS','KPSS_ONLISANS','KPSS_ORTAOGRETIM','ALES','DGS','SINIF'], subjects: [] },
+  { id: 'physics_experiment', name: 'Fizik Düzeneği', icon: Zap,       description: 'Elektrik devresi, yay-kütle, optik (TYT/AYT\'de çok)', color: 'bg-yellow-500', emoji: '⚡', exams: ['TYT','AYT','LGS','SINIF'], subjects: ['fizik','fen_bilimleri'] },
+  { id: 'wave_force',      name: 'Dalga/Kuvvet',    icon: Target,      description: 'Dalga grafiği, kuvvet diyagramı, vektörler', color: 'bg-orange-500', emoji: '〜', exams: ['TYT','AYT','SINIF'], subjects: ['fizik','fen_bilimleri'] },
+  { id: 'biology_diagram', name: 'Biyoloji Şeması', icon: Dna,         description: 'Hücre zarı, nefron, popülasyon grafiği',    color: 'bg-green-500',  emoji: '🧬', exams: ['TYT','AYT','LGS','SINIF'], subjects: ['biyoloji','fen_bilimleri'] },
+  { id: 'chemistry_schema',name: 'Kimya Şeması',    icon: FlaskConical,description: 'Elektrokimyasal hücre, piston, molekül',   color: 'bg-emerald-500',emoji: '⚗️', exams: ['AYT','TYT','SINIF'], subjects: ['kimya','fen_bilimleri'] },
+  { id: 'geography_map',   name: 'Coğrafya Haritası', icon: Map,       description: 'Numaralı bölge haritası, iklim/tarih (KPSS\'de çok)', color: 'bg-amber-500', emoji: '🗺️', exams: ['TYT','AYT','KPSS','KPSS_ONLISANS','KPSS_ORTAOGRETIM','DGS','LGS','SINIF'], subjects: ['cografya','tarih','sosyal_bilgiler'] },
+  { id: 'logic_table',     name: 'Veri/Mantık Tablosu', icon: BarChart3, description: 'Karşılaştırma tablosu, Venn, akış (ALES/DGS)', color: 'bg-rose-500',  emoji: '📊', exams: ['KPSS','KPSS_ONLISANS','KPSS_ORTAOGRETIM','ALES','DGS','SINIF'], subjects: [] },
 ]
+
+// Sınava göre uygun görsel tipleri filtrele
+function getImageTypesForExam(examMode: string | null, subjectCode?: string) {
+  if (!examMode) return IMAGE_TYPES
+  return IMAGE_TYPES.filter(t => {
+    const examMatch = t.exams.includes(examMode) || t.exams.includes('SINIF')
+    const subjectMatch = !subjectCode || t.subjects.length === 0 || t.subjects.includes(subjectCode)
+    return examMatch && subjectMatch
+  })
+}
 
 // Zorluk seviyeleri
 const DIFFICULTIES = [
@@ -76,6 +91,12 @@ interface Subject {
   code: string
   icon: string
   color: string
+}
+
+interface ExamSubject {
+  subject_code: string
+  subject_name: string
+  topics: { id: string; main_topic: string; sub_topic: string | null; learning_outcome: string | null }[]
 }
 
 interface Topic {
@@ -132,8 +153,14 @@ export default function ImageQuestionGeneratorPage() {
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [topics, setTopics] = useState<Topic[]>([])
   const [selectedTopic, setSelectedTopic] = useState<string>('')
-  const [selectedImageType, setSelectedImageType] = useState<string>('graph')
+  const [selectedImageType, setSelectedImageType] = useState<string>('geometry_shape')
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('medium')
+
+  // Sınav modu (TYT, AYT, KPSS, DGS, ALES veya null=sınıf bazlı)
+  const [selectedExamMode, setSelectedExamMode] = useState<string | null>(null)
+  const [examSubjects, setExamSubjects] = useState<ExamSubject[]>([])
+  const [loadingExamSubjects, setLoadingExamSubjects] = useState(false)
+  const [selectedExamSubjectCode, setSelectedExamSubjectCode] = useState<string>('')
   
   // Generated question state (Tekli mod)
   const [generatedQuestion, setGeneratedQuestion] = useState<GeneratedImageQuestion | null>(null)
@@ -257,9 +284,50 @@ export default function ImageQuestionGeneratorPage() {
     }
   }
 
+  // Sınav konularını yükle (TYT/AYT/KPSS/DGS/ALES)
+  async function loadExamSubjects(examMode: string) {
+    setLoadingExamSubjects(true)
+    setExamSubjects([])
+    setSelectedExamSubjectCode('')
+    setSelectedTopic('')
+    setTopics([])
+    try {
+      const res = await fetch(`/api/exam-topics?exam_type=${examMode}`)
+      const data = await res.json()
+      if (data.subjects) setExamSubjects(data.subjects)
+    } catch (err) {
+      console.error('Sınav konuları yüklenemedi:', err)
+    } finally {
+      setLoadingExamSubjects(false)
+    }
+  }
+
+  // Sınav modu değişince
+  function handleExamModeChange(mode: string | null) {
+    setSelectedExamMode(mode)
+    setSelectedSubject('')
+    setSelectedTopic('')
+    setTopics([])
+    setGeneratedQuestion(null)
+    setSelectedExamSubjectCode('')
+    if (mode) {
+      loadExamSubjects(mode)
+      // Görsel tipi sınava uygun ilk tipe ayarla
+      const compatibleTypes = getImageTypesForExam(mode, undefined)
+      if (compatibleTypes.length > 0) setSelectedImageType(compatibleTypes[0].id)
+    } else {
+      setExamSubjects([])
+    }
+  }
+
   // Görüntülü soru üret
   async function generateImageQuestion() {
-    if (!selectedSubject || !selectedTopic) {
+    if (selectedExamMode) {
+      if (!selectedExamSubjectCode || !selectedTopic) {
+        setError('Lütfen ders ve konu seçin')
+        return
+      }
+    } else if (!selectedSubject || !selectedTopic) {
       setError('Lütfen ders ve konu seçin')
       return
     }
@@ -268,21 +336,33 @@ export default function ImageQuestionGeneratorPage() {
     setError(null)
     setGeneratedQuestion(null)
 
-    const selectedSubjectData = subjects.find(s => s.id === selectedSubject)
-    const selectedTopicData = topics.find(t => t.id === selectedTopic)
+    // Ders adını al
+    let subjectName = ''
+    let topicName = ''
+    if (selectedExamMode) {
+      const examSub = examSubjects.find(s => s.subject_code === selectedExamSubjectCode)
+      subjectName = examSub?.subject_name || selectedExamSubjectCode
+      const examTopic = examSub?.topics.find(t => t.id === selectedTopic)
+      topicName = examTopic ? `${examTopic.main_topic}${examTopic.sub_topic ? ` - ${examTopic.sub_topic}` : ''}` : ''
+    } else {
+      const selectedSubjectData = subjects.find(s => s.id === selectedSubject)
+      const selectedTopicData = topics.find(t => t.id === selectedTopic)
+      subjectName = selectedSubjectData?.name || ''
+      topicName = selectedTopicData?.main_topic || ''
+    }
 
     try {
       const response = await fetch('/api/ai/generate-image-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          grade: selectedGrade,
-          subject: selectedSubjectData?.name || '',
-          topic: selectedTopicData?.main_topic || '',
+          grade: selectedExamMode ? 11 : selectedGrade,
+          subject: subjectName,
+          topic: topicName,
           imageType: selectedImageType,
-          // imageDescription kaldırıldı - AI otomatik üretecek
           difficulty: selectedDifficulty,
-          generateImage: true
+          generateImage: true,
+          examMode: selectedExamMode,
         })
       })
 
@@ -407,21 +487,37 @@ export default function ImageQuestionGeneratorPage() {
 
   // Tek bir soru üret (toplu mod için)
   async function generateBatchSingleQuestion(index: number): Promise<BatchQuestion | null> {
-    const topic = topics.find(t => t.id === selectedTopic)
-    const subject = subjects.find(s => s.id === selectedSubject)
-    if (!topic || !subject) return null
+    // Sınav modu veya sınıf bazlı
+    let subjectName = ''
+    let topicName = ''
+
+    if (selectedExamMode) {
+      const examSub = examSubjects.find(s => s.subject_code === selectedExamSubjectCode)
+      if (!examSub) return null
+      subjectName = examSub.subject_name
+      const examTopic = examSub.topics.find(t => t.id === selectedTopic)
+      if (!examTopic) return null
+      topicName = examTopic.main_topic + (examTopic.sub_topic ? ` - ${examTopic.sub_topic}` : '')
+    } else {
+      const topic = topics.find(t => t.id === selectedTopic)
+      const subject = subjects.find(s => s.id === selectedSubject)
+      if (!topic || !subject) return null
+      subjectName = subject.name
+      topicName = topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : '')
+    }
 
     try {
       const response = await fetch('/api/ai/generate-image-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          grade: selectedGrade,
-          subject: subject.name,
-          topic: topic.main_topic + (topic.sub_topic ? ` - ${topic.sub_topic}` : ''),
+          grade: selectedExamMode ? 11 : selectedGrade,
+          subject: subjectName,
+          topic: topicName,
           imageType: selectedImageType,
           difficulty: getRandomBatchDifficulty(),
-          generateImage: true
+          generateImage: true,
+          examMode: selectedExamMode,
         })
       })
 
@@ -668,8 +764,53 @@ export default function ImageQuestionGeneratorPage() {
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Sol Panel - Form */}
           <div className="space-y-6">
-            {/* Sınıf Seçimi */}
-            <motion.div 
+            {/* Sınav Modu Seçimi */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-2xl shadow-lg p-5 border border-gray-100"
+            >
+              <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                <Target className="w-4 h-4 text-purple-500" />
+                Sınav Modu
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleExamModeChange(null)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    !selectedExamMode ? 'bg-purple-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >📚 Sınıf Bazlı</button>
+                {[
+                  { mode: 'TYT', color: 'bg-orange-500', emoji: '📝' },
+                  { mode: 'AYT', color: 'bg-rose-500', emoji: '🎯' },
+                  { mode: 'KPSS', color: 'bg-blue-600', emoji: '🏛️' },
+                  { mode: 'KPSS_ONLISANS', color: 'bg-cyan-600', emoji: '🎒', label: 'KPSS Ön L.' },
+                  { mode: 'KPSS_ORTAOGRETIM', color: 'bg-teal-600', emoji: '🎒', label: 'KPSS Lise' },
+                  { mode: 'DGS', color: 'bg-green-600', emoji: '🔄' },
+                  { mode: 'ALES', color: 'bg-violet-600', emoji: '🎓' },
+                ].map(({ mode, color, emoji, label }) => (
+                  <button
+                    key={mode}
+                    onClick={() => handleExamModeChange(mode)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      selectedExamMode === mode ? `${color} text-white shadow` : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {emoji} {label || mode}
+                  </button>
+                ))}
+              </div>
+              {selectedExamMode && (
+                <p className="mt-2 text-xs text-purple-600 bg-purple-50 px-3 py-1.5 rounded-lg">
+                  ✨ ÖSYM {selectedExamMode} formatında görüntülü soru üretilecek
+                </p>
+              )}
+            </motion.div>
+
+            {/* Sınıf Seçimi (sadece sınıf bazlı modda) */}
+            {!selectedExamMode && (
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100"
@@ -694,9 +835,10 @@ export default function ImageQuestionGeneratorPage() {
                 ))}
               </div>
             </motion.div>
+            )}
 
             {/* Ders ve Konu Seçimi */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 }}
@@ -704,10 +846,63 @@ export default function ImageQuestionGeneratorPage() {
             >
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-purple-500" />
-                Ders ve Konu
+                {selectedExamMode ? `${selectedExamMode} Ders ve Konu` : 'Ders ve Konu'}
               </h2>
-              
-              {/* Ders Seçimi */}
+
+              {/* Sınav modu: ders listesi */}
+              {selectedExamMode ? (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Ders</label>
+                    {loadingExamSubjects ? (
+                      <div className="flex items-center gap-2 py-3 text-sm text-gray-500">
+                        <Loader2 className="w-4 h-4 animate-spin" /> Yükleniyor...
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {examSubjects.map(sub => (
+                          <button
+                            key={sub.subject_code}
+                            onClick={() => {
+                              setSelectedExamSubjectCode(sub.subject_code)
+                              setSelectedTopic('')
+                              // Görsel tipini derse uygun ayarla
+                              const compatibleTypes = getImageTypesForExam(selectedExamMode, sub.subject_code)
+                              if (compatibleTypes.length > 0) setSelectedImageType(compatibleTypes[0].id)
+                            }}
+                            className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                              selectedExamSubjectCode === sub.subject_code
+                                ? 'bg-purple-500 text-white shadow'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {sub.subject_name}
+                            <span className="ml-1 text-xs opacity-70">({sub.topics.length})</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Konu</label>
+                    <select
+                      value={selectedTopic}
+                      onChange={(e) => setSelectedTopic(e.target.value)}
+                      disabled={!selectedExamSubjectCode}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    >
+                      <option value="">Konu seçin...</option>
+                      {(examSubjects.find(s => s.subject_code === selectedExamSubjectCode)?.topics || []).map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.main_topic}{t.sub_topic ? ` — ${t.sub_topic}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+              {/* Sınıf bazlı: normal ders listesi */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ders</label>
                 <select
@@ -745,6 +940,8 @@ export default function ImageQuestionGeneratorPage() {
                   ))}
                 </select>
               </div>
+                </>
+              )}
             </motion.div>
 
             {/* Görüntü Tipi Seçimi */}
@@ -759,23 +956,23 @@ export default function ImageQuestionGeneratorPage() {
                 Görüntü Tipi
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {IMAGE_TYPES.map(type => {
+                {getImageTypesForExam(selectedExamMode, selectedExamSubjectCode || undefined).map(type => {
                   const Icon = type.icon
                   return (
                     <button
                       key={type.id}
                       onClick={() => setSelectedImageType(type.id)}
-                      className={`p-4 rounded-xl text-left transition-all ${
+                      className={`p-3 rounded-xl text-left transition-all hover:scale-105 ${
                         selectedImageType === type.id
                           ? 'bg-purple-50 border-2 border-purple-500 shadow-lg'
                           : 'bg-gray-50 border-2 border-transparent hover:border-gray-200'
                       }`}
                     >
-                      <div className={`w-10 h-10 ${type.color} rounded-lg flex items-center justify-center mb-2`}>
-                        <Icon className="w-5 h-5 text-white" />
+                      <div className={`w-9 h-9 ${type.color} rounded-lg flex items-center justify-center mb-2`}>
+                        <span className="text-base">{type.emoji}</span>
                       </div>
-                      <p className="font-medium text-gray-900">{type.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{type.description}</p>
+                      <p className="font-medium text-gray-900 text-sm">{type.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{type.description}</p>
                     </button>
                   )
                 })}
