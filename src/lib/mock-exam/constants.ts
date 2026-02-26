@@ -719,6 +719,23 @@ export const EXAM_CONFIGS: Record<string, ExamTypeConfig> = {
     basePoints: 100,
   },
   // ===========================================
+  // YDS (Yabancı Dil Bilgisi Seviye Tespit Sınavı)
+  // 80 soru, 180 dakika, 4 yanlış = 1 doğru
+  // ===========================================
+  YDS: {
+    label: 'YDS Deneme Sınavı',
+    shortLabel: 'YDS',
+    grades: [0],
+    duration: 180,
+    totalQuestions: 80,
+    subjects: [
+      { code: 'ingilizce', name: 'Ingilizce', displayName: 'İngilizce', questionCount: 80, coefficient: 1.25 },
+    ],
+    wrongPenalty: 4,
+    scoreRange: { min: 0, max: 100 },
+    basePoints: 0,
+  },
+  // ===========================================
   // LGS
   // ===========================================
   LGS: {
@@ -773,6 +790,7 @@ export const EXAM_TYPE_LABELS: Record<string, string> = {
   KPSS: 'KPSS Lisans',
   KPSS_ONLISANS: 'KPSS Ön Lisans',
   KPSS_ORTAOGRETIM: 'KPSS Ortaöğretim',
+  YDS: 'YDS',
 }
 
 // Ders renkleri (UI icin)

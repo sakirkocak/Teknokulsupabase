@@ -27,6 +27,7 @@ const EXAM_TYPE_COLORS: Record<string, { badge: string; accent: string; hover: s
   KPSS_ORTAOGRETIM: { badge: 'bg-teal-100 text-teal-700',     accent: 'border-l-teal-400',   hover: 'hover:border-teal-300' },
   DGS:              { badge: 'bg-green-100 text-green-700',   accent: 'border-l-green-400',  hover: 'hover:border-green-300' },
   ALES:             { badge: 'bg-violet-100 text-violet-700', accent: 'border-l-violet-400', hover: 'hover:border-violet-300' },
+  YDS:              { badge: 'bg-sky-100 text-sky-700',       accent: 'border-l-sky-400',    hover: 'hover:border-sky-300' },
 }
 
 function getBurslulukColor(exam_type: string) {

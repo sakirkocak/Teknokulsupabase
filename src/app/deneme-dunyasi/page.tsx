@@ -53,6 +53,7 @@ const EXAM_CATEGORIES: ExamTypeCategory[] = [
   { key: 'DGS', label: 'DGS', shortLabel: 'DGS', icon: '🔄', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200', selectedBg: 'bg-green-600', examType: 'DGS' },
   { key: 'ALES', label: 'ALES', shortLabel: 'ALES', icon: '🎓', color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200', selectedBg: 'bg-violet-600', examType: 'ALES' },
   { key: 'BURSLULUK', label: 'Bursluluk', shortLabel: 'Bursluluk', icon: '⭐', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', selectedBg: 'bg-amber-500', examGroup: 'BURSLULUK' },
+  { key: 'YDS', label: 'YDS', shortLabel: 'YDS', icon: '🇬🇧', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-sky-200', selectedBg: 'bg-sky-600', examType: 'YDS' },
 ]
 
 const GRADE_CATEGORIES: GradeCategory[] = [
