@@ -231,6 +231,15 @@ export default function ImageQuestionGeneratorPage() {
     }
   }, [selectedSubject, selectedGrade])
 
+  // Sınav modu değişince exam subjects yükle
+  useEffect(() => {
+    if (selectedExamMode) {
+      loadExamSubjects(selectedExamMode)
+    } else {
+      setExamSubjects([])
+    }
+  }, [selectedExamMode])
+
   // Dersleri yükle - Sınıfa göre müfredattaki dersler
   async function loadSubjects() {
     setLoadingSubjects(true)
@@ -302,7 +311,7 @@ export default function ImageQuestionGeneratorPage() {
     }
   }
 
-  // Sınav modu değişince
+  // Sınav modu değişince (sadece state güncelle — yükleme useEffect'te)
   function handleExamModeChange(mode: string | null) {
     setSelectedExamMode(mode)
     setSelectedSubject('')
@@ -310,13 +319,10 @@ export default function ImageQuestionGeneratorPage() {
     setTopics([])
     setGeneratedQuestion(null)
     setSelectedExamSubjectCode('')
+    setExamSubjects([])
     if (mode) {
-      loadExamSubjects(mode)
-      // Görsel tipi sınava uygun ilk tipe ayarla
       const compatibleTypes = getImageTypesForExam(mode, undefined)
       if (compatibleTypes.length > 0) setSelectedImageType(compatibleTypes[0].id)
-    } else {
-      setExamSubjects([])
     }
   }
 
@@ -548,7 +554,12 @@ export default function ImageQuestionGeneratorPage() {
 
   // Toplu üretimi başlat
   async function startBatchGeneration() {
-    if (!selectedSubject || !selectedTopic) {
+    if (selectedExamMode) {
+      if (!selectedExamSubjectCode || !selectedTopic) {
+        setError('Lütfen ders ve konu seçin')
+        return
+      }
+    } else if (!selectedSubject || !selectedTopic) {
       setError('Lütfen ders ve konu seçin')
       return
     }
@@ -1369,9 +1380,40 @@ export default function ImageQuestionGeneratorPage() {
         {/* ========== TOPLU ÜRETİM MODU ========== */}
         {generationMode === 'batch' && (
           <div className="grid lg:grid-cols-3 gap-6">
-            {/* Sol Panel - Ayarlar */}
+            {/* Sol Panel - Tekli üretimle aynı ayarlar */}
             <div className="space-y-4">
-              {/* Sınıf Seçimi */}
+
+              {/* Sınav Modu */}
+              <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2 text-sm">
+                  <Target className="w-4 h-4 text-orange-500" />
+                  Sınav Modu
+                </h3>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => handleExamModeChange(null)}
+                    disabled={isBatchGenerating}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${
+                      !selectedExamMode ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >📚 Sınıf</button>
+                  {[
+                    { mode: 'TYT', emoji: '📝' }, { mode: 'AYT', emoji: '🎯' },
+                    { mode: 'KPSS', emoji: '🏛️' }, { mode: 'KPSS_ONLISANS', emoji: '🎒', label: 'KPSS ÖL' },
+                    { mode: 'KPSS_ORTAOGRETIM', emoji: '🎒', label: 'KPSS L' },
+                    { mode: 'DGS', emoji: '🔄' }, { mode: 'ALES', emoji: '🎓' },
+                  ].map(({ mode, emoji, label }) => (
+                    <button key={mode} onClick={() => handleExamModeChange(mode)} disabled={isBatchGenerating}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${
+                        selectedExamMode === mode ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >{emoji} {label || mode}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sınıf (sadece sınıf bazlı modda) */}
+              {!selectedExamMode && (
               <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <GraduationCap className="w-5 h-5 text-orange-500" />
@@ -1381,54 +1423,94 @@ export default function ImageQuestionGeneratorPage() {
                   value={selectedGrade}
                   onChange={(e) => setSelectedGrade(Number(e.target.value))}
                   disabled={isBatchGenerating}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
+                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
                 >
                   {GRADES.map(g => (
-                    <option key={g.grade} value={g.grade}>
-                      {g.label} - {g.level}
-                    </option>
+                    <option key={g.grade} value={g.grade}>{g.label} - {g.level}</option>
                   ))}
                 </select>
               </div>
+              )}
 
-              {/* Ders Seçimi */}
+              {/* Ders ve Konu */}
               <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
                 <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-orange-500" />
-                  Ders
+                  {selectedExamMode ? `${selectedExamMode} Ders ve Konu` : 'Ders ve Konu'}
                 </h3>
-                <select
-                  value={selectedSubject}
-                  onChange={(e) => setSelectedSubject(e.target.value)}
-                  disabled={loadingSubjects || isBatchGenerating}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
-                >
-                  <option value="">Ders Seçin</option>
-                  {subjects.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
 
-              {/* Konu Seçimi */}
-              <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-100">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-orange-500" />
-                  Konu
-                </h3>
-                <select
-                  value={selectedTopic}
-                  onChange={(e) => setSelectedTopic(e.target.value)}
-                  disabled={loadingTopics || !selectedSubject || isBatchGenerating}
-                  className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
-                >
-                  <option value="">Konu Seçin</option>
-                  {topics.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.main_topic} {t.sub_topic ? `- ${t.sub_topic}` : ''}
-                    </option>
-                  ))}
-                </select>
+                {selectedExamMode ? (
+                  <>
+                    {/* Sınav ders butonları */}
+                    <div className="mb-3">
+                      {loadingExamSubjects ? (
+                        <div className="flex items-center gap-2 py-2 text-sm text-gray-400">
+                          <Loader2 className="w-4 h-4 animate-spin" /> Yükleniyor...
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {examSubjects.map(sub => (
+                            <button
+                              key={sub.subject_code}
+                              onClick={() => {
+                                setSelectedExamSubjectCode(sub.subject_code)
+                                setSelectedTopic('')
+                                const types = getImageTypesForExam(selectedExamMode, sub.subject_code)
+                                if (types.length > 0) setSelectedImageType(types[0].id)
+                              }}
+                              disabled={isBatchGenerating}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${
+                                selectedExamSubjectCode === sub.subject_code
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {sub.subject_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <select
+                      value={selectedTopic}
+                      onChange={(e) => setSelectedTopic(e.target.value)}
+                      disabled={!selectedExamSubjectCode || isBatchGenerating}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                    >
+                      <option value="">Konu seçin...</option>
+                      {(examSubjects.find(s => s.subject_code === selectedExamSubjectCode)?.topics || []).map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.main_topic}{t.sub_topic ? ` — ${t.sub_topic}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <>
+                    <select
+                      value={selectedSubject}
+                      onChange={(e) => { setSelectedSubject(e.target.value); setSelectedTopic('') }}
+                      disabled={loadingSubjects || isBatchGenerating}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-orange-500 disabled:opacity-50 mb-3"
+                    >
+                      <option value="">Ders seçin...</option>
+                      {subjects.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
+                    </select>
+                    <select
+                      value={selectedTopic}
+                      onChange={(e) => setSelectedTopic(e.target.value)}
+                      disabled={loadingTopics || !selectedSubject || isBatchGenerating}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+                    >
+                      <option value="">Konu seçin...</option>
+                      {topics.map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.main_topic}{t.sub_topic ? ` - ${t.sub_topic}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
               </div>
 
               {/* Görsel Tipi */}
@@ -1437,27 +1519,20 @@ export default function ImageQuestionGeneratorPage() {
                   <ImageIcon className="w-5 h-5 text-orange-500" />
                   Görsel Tipi
                 </h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {IMAGE_TYPES.map(type => {
-                    const Icon = type.icon
-                    return (
-                      <button
-                        key={type.id}
-                        onClick={() => setSelectedImageType(type.id)}
-                        disabled={isBatchGenerating}
-                        className={`p-2 rounded-lg border-2 transition-all text-center ${
-                          selectedImageType === type.id
-                            ? 'border-orange-500 bg-orange-50'
-                            : 'border-gray-200 hover:border-orange-300'
-                        } disabled:opacity-50`}
-                      >
-                        <Icon className={`w-5 h-5 mx-auto mb-1 ${
-                          selectedImageType === type.id ? 'text-orange-500' : 'text-gray-400'
-                        }`} />
-                        <span className="text-xs">{type.name}</span>
-                      </button>
-                    )
-                  })}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {getImageTypesForExam(selectedExamMode, selectedExamSubjectCode || undefined).map(type => (
+                    <button
+                      key={type.id}
+                      onClick={() => setSelectedImageType(type.id)}
+                      disabled={isBatchGenerating}
+                      className={`p-2 rounded-lg border-2 transition-all text-left flex items-center gap-2 ${
+                        selectedImageType === type.id ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
+                      } disabled:opacity-50`}
+                    >
+                      <span className="text-base">{type.emoji}</span>
+                      <span className="text-xs font-medium truncate">{type.name}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
