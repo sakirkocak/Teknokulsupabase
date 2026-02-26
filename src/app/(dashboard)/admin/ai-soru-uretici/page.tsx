@@ -335,7 +335,27 @@ export default function AIQuestionGeneratorPage() {
   }, [selectedSubject, selectedGrade, supabase])
 
   // Load exam topics when exam mode changes
+  const YDS_QUESTION_TYPES = [
+    { subject_code: 'grammar',             subject_name: 'Dil Bilgisi',         topics: [{ id: 'grammar',             main_topic: 'grammar',             sub_topic: null, exam_type: 'YDS', subject_code: 'grammar',             subject_name: 'İngilizce', topic_order: 1, question_weight: 10, osym_frequency: 'high' }] },
+    { subject_code: 'vocabulary',          subject_name: 'Kelime Bilgisi',      topics: [{ id: 'vocabulary',          main_topic: 'vocabulary',          sub_topic: null, exam_type: 'YDS', subject_code: 'vocabulary',          subject_name: 'İngilizce', topic_order: 2, question_weight: 6,  osym_frequency: 'high' }] },
+    { subject_code: 'cloze',              subject_name: 'Cloze Test',          topics: [{ id: 'cloze',              main_topic: 'cloze',              sub_topic: null, exam_type: 'YDS', subject_code: 'cloze',              subject_name: 'İngilizce', topic_order: 3, question_weight: 10, osym_frequency: 'high' }] },
+    { subject_code: 'sentence_completion', subject_name: 'Cümle Tamamlama',    topics: [{ id: 'sentence_completion', main_topic: 'sentence_completion', sub_topic: null, exam_type: 'YDS', subject_code: 'sentence_completion', subject_name: 'İngilizce', topic_order: 4, question_weight: 10, osym_frequency: 'high' }] },
+    { subject_code: 'reading',            subject_name: 'Okuma Anlama',        topics: [{ id: 'reading',            main_topic: 'reading',            sub_topic: null, exam_type: 'YDS', subject_code: 'reading',            subject_name: 'İngilizce', topic_order: 5, question_weight: 20, osym_frequency: 'high' }] },
+    { subject_code: 'translation_en_tr',  subject_name: 'Çeviri (İng→Tr)',     topics: [{ id: 'translation_en_tr',  main_topic: 'translation_en_tr',  sub_topic: null, exam_type: 'YDS', subject_code: 'translation_en_tr',  subject_name: 'İngilizce', topic_order: 6, question_weight: 3,  osym_frequency: 'medium' }] },
+    { subject_code: 'translation_tr_en',  subject_name: 'Çeviri (Tr→İng)',     topics: [{ id: 'translation_tr_en',  main_topic: 'translation_tr_en',  sub_topic: null, exam_type: 'YDS', subject_code: 'translation_tr_en',  subject_name: 'İngilizce', topic_order: 7, question_weight: 3,  osym_frequency: 'medium' }] },
+    { subject_code: 'dialogue',           subject_name: 'Diyalog Tamamlama',   topics: [{ id: 'dialogue',           main_topic: 'dialogue',           sub_topic: null, exam_type: 'YDS', subject_code: 'dialogue',           subject_name: 'İngilizce', topic_order: 8, question_weight: 5,  osym_frequency: 'medium' }] },
+    { subject_code: 'near_synonym',       subject_name: 'Anlama Yakın Cümle',  topics: [{ id: 'near_synonym',       main_topic: 'near_synonym',       sub_topic: null, exam_type: 'YDS', subject_code: 'near_synonym',       subject_name: 'İngilizce', topic_order: 9, question_weight: 5,  osym_frequency: 'medium' }] },
+    { subject_code: 'paragraph_completion', subject_name: 'Paragraf Tamamlama', topics: [{ id: 'paragraph_completion', main_topic: 'paragraph_completion', sub_topic: null, exam_type: 'YDS', subject_code: 'paragraph_completion', subject_name: 'İngilizce', topic_order: 10, question_weight: 5, osym_frequency: 'medium' }] },
+    { subject_code: 'irrelevant_sentence', subject_name: 'Yabancı Cümle',     topics: [{ id: 'irrelevant_sentence', main_topic: 'irrelevant_sentence', sub_topic: null, exam_type: 'YDS', subject_code: 'irrelevant_sentence', subject_name: 'İngilizce', topic_order: 11, question_weight: 5, osym_frequency: 'medium' }] },
+  ]
+
   const loadExamTopics = useCallback(async (examType: string) => {
+    // YDS için DB'ye gitme — statik soru tipi listesi kullan
+    if (examType === 'YDS') {
+      setExamSubjects(YDS_QUESTION_TYPES as any)
+      setLoadingExamTopics(false)
+      return
+    }
     setLoadingExamTopics(true)
     try {
       const response = await fetch(`/api/exam-topics?exam_type=${examType}`)
@@ -634,15 +654,33 @@ export default function AIQuestionGeneratorPage() {
     if (batchSelectedExamSubjects.length === 0 || examSubjects.length === 0) return
 
     const topics: ExamTopic[] = []
-    for (const subjectCode of batchSelectedExamSubjects) {
-      const subjectData = examSubjects.find(s => s.subject_code === subjectCode)
-      if (subjectData) {
-        topics.push(...subjectData.topics)
+
+    if (selectedExamMode === 'YDS') {
+      // YDS'de her seçili soru tipi direkt bir topic'tir
+      for (const typeCode of batchSelectedExamSubjects) {
+        topics.push({
+          id: typeCode,
+          exam_type: 'YDS',
+          subject_code: typeCode,
+          subject_name: 'İngilizce',
+          main_topic: typeCode,
+          sub_topic: null,
+          topic_order: 0,
+          question_weight: 1,
+          osym_frequency: 'medium',
+        })
+      }
+    } else {
+      for (const subjectCode of batchSelectedExamSubjects) {
+        const subjectData = examSubjects.find(s => s.subject_code === subjectCode)
+        if (subjectData) {
+          topics.push(...subjectData.topics)
+        }
       }
     }
 
     setBatchExamTopics(topics)
-    addBatchLog(`${topics.length} ${selectedExamMode} konusu seçildi (${batchSelectedExamSubjects.length} ders)`, 'success')
+    addBatchLog(`${topics.length} ${selectedExamMode} ${selectedExamMode === 'YDS' ? 'soru tipi' : 'konusu'} seçildi`, 'success')
   }
 
   useEffect(() => {
@@ -662,14 +700,14 @@ export default function AIQuestionGeneratorPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subject: examTopic.subject_name,
+          subject: selectedExamMode === 'YDS' ? 'İngilizce' : examTopic.subject_name,
           topic: examTopic.main_topic + (examTopic.sub_topic ? ` - ${examTopic.sub_topic}` : ''),
           learningOutcome: examTopic.main_topic + (examTopic.sub_topic ? ` - ${examTopic.sub_topic}` : ''),
           difficulty,
           count: batchQuestionsPerTopic,
           lang: selectedLanguage,
           visualType: batchSelectedVisualType,
-          examMode: 'TYT'
+          examMode: selectedExamMode
         }),
         signal: controller.signal
       })
@@ -2368,11 +2406,11 @@ export default function AIQuestionGeneratorPage() {
                     </label>
                     {loadingExamTopics ? (
                       <div className="flex items-center justify-center py-4">
-                        <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                        <Loader2 className={`w-6 h-6 animate-spin ${selectedExamMode === 'YDS' ? 'text-sky-500' : 'text-orange-500'}`} />
                       </div>
                     ) : examSubjects.length === 0 ? (
                       <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                        {selectedExamMode} dersleri yükleniyor...
+                        {selectedExamMode} verileri yüklenemedi
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg">
@@ -2386,7 +2424,7 @@ export default function AIQuestionGeneratorPage() {
                           }}
                           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                             batchSelectedExamSubjects.length === examSubjects.length
-                              ? 'bg-orange-500 text-white'
+                              ? selectedExamMode === 'YDS' ? 'bg-sky-500 text-white' : 'bg-orange-500 text-white'
                               : 'bg-white text-gray-700 border border-gray-200'
                           }`}
                         >
@@ -2396,8 +2434,16 @@ export default function AIQuestionGeneratorPage() {
                           const subjectIcons: Record<string, string> = {
                             turkce: '📖', matematik: '📐', geometri: '📏', fizik: '⚛️',
                             kimya: '🧪', biyoloji: '🧬', tarih: '📜', cografya: '🌍',
-                            felsefe: '💭', din_kulturu: '🕌'
+                            felsefe: '💭', din_kulturu: '🕌',
+                            grammar: '🔤', vocabulary: '📖', cloze: '📝',
+                            sentence_completion: '✏️', reading: '📚',
+                            translation_en_tr: '🔄', translation_tr_en: '🔁',
+                            dialogue: '💬', near_synonym: '🔁',
+                            paragraph_completion: '📋', irrelevant_sentence: '❌'
                           }
+                          const isSelected = batchSelectedExamSubjects.includes(subject.subject_code)
+                          const activeColor = selectedExamMode === 'YDS' ? 'bg-sky-500' : 'bg-orange-500'
+                          const hoverBorder = selectedExamMode === 'YDS' ? 'hover:border-sky-300' : 'hover:border-orange-300'
                           return (
                             <button
                               key={subject.subject_code}
@@ -2409,15 +2455,15 @@ export default function AIQuestionGeneratorPage() {
                                 )
                               }}
                               className={`px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1 ${
-                                batchSelectedExamSubjects.includes(subject.subject_code)
-                                  ? 'bg-orange-500 text-white'
-                                  : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
+                                isSelected
+                                  ? `${activeColor} text-white`
+                                  : `bg-white text-gray-700 border border-gray-200 ${hoverBorder}`
                               }`}
                             >
                               <span>{subjectIcons[subject.subject_code] || '📖'}</span>
                               <span>{subject.subject_name}</span>
-                              <span className="text-xs opacity-75">({subject.topics.length})</span>
-                              {batchSelectedExamSubjects.includes(subject.subject_code) && <Check className="w-3 h-3" />}
+                              {selectedExamMode !== 'YDS' && <span className="text-xs opacity-75">({subject.topics.length})</span>}
+                              {isSelected && <Check className="w-3 h-3" />}
                             </button>
                           )
                         })}
@@ -2606,7 +2652,7 @@ export default function AIQuestionGeneratorPage() {
                         className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <Play className="w-5 h-5" />
-                        {batchProgress.status === 'paused' ? 'Devam Et' : selectedExamMode ? 'TYT Üretimi Başlat' : 'Üretimi Başlat'}
+                        {batchProgress.status === 'paused' ? 'Devam Et' : selectedExamMode ? `${selectedExamMode} Üretimi Başlat` : 'Üretimi Başlat'}
                       </button>
                     ) : (
                       <button
