@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const cached = getCachedResponse(cacheKey)
     if (cached) return NextResponse.json(cached)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' })
 
     const prompt = `Sen çok yönlü bir eğitim asistanısın. Bu görseldeki soruyu analiz et ve çöz.
 

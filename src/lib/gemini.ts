@@ -149,17 +149,17 @@ const curriculumQuestionSchema = {
   required: ['questions']
 }
 
-// Gemini 3 Flash - Ocak 2025 bilgi tabanı, gelişmiş akıl yürütme
-export const geminiModel = genAI.getGenerativeModel({ 
-  model: 'gemini-3-flash-preview'
+// Gemini 3.1 Pro - En yeni, en kaliteli soru üretimi
+export const geminiModel = genAI.getGenerativeModel({
+  model: 'gemini-3.1-pro-preview'
 })
 
 // =====================================================
-// NANO BANANA PRO - GÖRÜNTÜ ÜRETİMİ
-// Gemini 3 Pro Image Preview - Yüksek kaliteli görüntü üretimi
+// NANO BANANA 2 - GÖRÜNTÜ ÜRETİMİ
+// Gemini 3.1 Flash Image Preview - Hız + kalite dengesi
 // =====================================================
-export const geminiImageModel = genAI.getGenerativeModel({ 
-  model: 'gemini-3-pro-image-preview'
+export const geminiImageModel = genAI.getGenerativeModel({
+  model: 'gemini-3.1-flash-image-preview'
 })
 
 // Soru tipleri

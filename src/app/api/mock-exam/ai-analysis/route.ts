@@ -54,7 +54,7 @@ Lütfen su formatta yanit ver (JSON):
   "motivationalMessage": "Motivasyon mesaji (1-2 cumle)"
 }`
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' })
     const aiResult = await model.generateContent(prompt)
     const text = aiResult.response.text()
 

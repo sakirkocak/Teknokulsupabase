@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg'
 
     // Gemini Vision modeli
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' })
 
     const prompt = `Sen bir eğitim analiz uzmanısın. Bu deneme sınavı sonuç karnesini detaylı analiz et.
 

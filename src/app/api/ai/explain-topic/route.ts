@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const cached = getCachedResponse(cacheKey)
     if (cached) return NextResponse.json(cached)
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' })
 
     const prompt = `Sen deneyimli bir öğretmensin. Bir lise öğrencisi sana şu soruyu/konuyu sordu: "${topic}"
 

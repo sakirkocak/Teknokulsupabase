@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Gemini ile düzeltme yap
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
     
     const prompt = `Sen bir LaTeX düzeltme uzmanısın. Aşağıdaki matematik sorusundaki LaTeX formatını düzelt.
 
