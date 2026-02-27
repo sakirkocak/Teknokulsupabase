@@ -357,7 +357,10 @@ export default function ImageQuestionGeneratorPage() {
       topicName = selectedTopicData?.main_topic || ''
     }
 
+    let questionData: any = null
+
     try {
+      // Aşama 1: Soru metnini üret (görselsiz, hızlı ~15s)
       const response = await fetch('/api/ai/generate-image-question', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -367,7 +370,7 @@ export default function ImageQuestionGeneratorPage() {
           topic: topicName,
           imageType: selectedImageType,
           difficulty: selectedDifficulty,
-          generateImage: true,
+          generateImage: false,
           examMode: selectedExamMode,
         })
       })
@@ -378,7 +381,8 @@ export default function ImageQuestionGeneratorPage() {
         throw new Error(data.error || 'Soru üretme hatası')
       }
 
-      setGeneratedQuestion(data.question)
+      questionData = data.question
+      setGeneratedQuestion(questionData)
       setExpandedSection('preview')
 
     } catch (err: any) {
@@ -386,6 +390,22 @@ export default function ImageQuestionGeneratorPage() {
       setError(err.message || 'Soru üretilirken bir hata oluştu')
     } finally {
       setGenerating(false)
+    }
+
+    // Aşama 2: Görseli ayrı istek olarak üret (soru zaten ekranda)
+    if (questionData?.image_prompt) {
+      setGeneratingImage(true)
+      try {
+        const imgResponse = await fetch(`/api/ai/generate-image-question?prompt=${encodeURIComponent(questionData.image_prompt)}`)
+        const imgData = await imgResponse.json()
+        if (imgResponse.ok && imgData.image) {
+          setGeneratedQuestion(prev => prev ? { ...prev, image_base64: imgData.image } : prev)
+        }
+      } catch (imgErr) {
+        console.error('Görsel üretme hatası:', imgErr)
+      } finally {
+        setGeneratingImage(false)
+      }
     }
   }
 
@@ -522,7 +542,7 @@ export default function ImageQuestionGeneratorPage() {
           topic: topicName,
           imageType: selectedImageType,
           difficulty: getRandomBatchDifficulty(),
-          generateImage: true,
+          generateImage: false,
           examMode: selectedExamMode,
         })
       })
