@@ -515,3 +515,48 @@ export interface MockExamResultDocument {
   sosyal_net?: number
   completed_at: number
 }
+
+// =====================================================
+// PUBLISHER QUESTIONS SCHEMA
+// =====================================================
+
+export const publisherQuestionsSchema: CollectionCreateSchema = {
+  name: 'publisher_questions',
+  fields: [
+    { name: 'id', type: 'string' },
+    { name: 'question_text', type: 'string' },
+    { name: 'subject', type: 'string', facet: true },
+    { name: 'topic', type: 'string', facet: true },
+    { name: 'difficulty', type: 'string', facet: true },
+    { name: 'exam_type', type: 'string', facet: true, optional: true },
+    { name: 'image_type', type: 'string', facet: true, optional: true },
+    { name: 'grade', type: 'int32', facet: true, optional: true },
+    { name: 'bloom_level', type: 'string', facet: true, optional: true },
+    { name: 'learning_outcome', type: 'string', optional: true },
+    { name: 'image_description', type: 'string', optional: true },
+    { name: 'status', type: 'string', facet: true },
+    { name: 'is_available', type: 'bool', facet: true },
+    { name: 'verified', type: 'bool', optional: true },
+    { name: 'price_credits', type: 'int32' },
+    { name: 'created_at', type: 'int64', sort: true },
+    // Vektör arama için embedding (Gemini text-embedding-004 = 768 dim)
+    { name: 'embedding', type: 'float[]', num_dim: 768, optional: true } as any,
+  ],
+  default_sorting_field: 'created_at',
+}
+
+export interface TypesensePublisherQuestion {
+  id: string
+  question_text: string
+  subject: string
+  topic: string
+  difficulty: string
+  exam_type?: string
+  image_type?: string
+  grade?: number
+  bloom_level?: string
+  status: string
+  is_available: boolean
+  price_credits: number
+  created_at: number
+}

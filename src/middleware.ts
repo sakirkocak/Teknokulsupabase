@@ -190,7 +190,7 @@ export async function middleware(request: NextRequest) {
   const isAuthPath = authPaths.some(path => pathname.startsWith(path))
 
   // Korumalı rotalar
-  const protectedPaths = ['/koc', '/ogrenci', '/veli', '/admin']
+  const protectedPaths = ['/koc', '/ogrenci', '/veli', '/admin', '/yayinevi']
   const isProtectedPath = !isPublicPath && protectedPaths.some(path => pathname.startsWith(path))
 
   // Korumalı sayfaya giriş yapmadan erişim
@@ -223,6 +223,7 @@ export async function middleware(request: NextRequest) {
         ogrenci: '/ogrenci',
         veli: '/veli',
         admin: '/admin',
+        yayinevi: '/yayinevi',
       }
 
       const userDashboard = roleRoutes[profile.role] || '/'
@@ -250,6 +251,11 @@ export async function middleware(request: NextRequest) {
       // Veli sadece /veli'ye erişebilir
       if (profile.role === 'veli' && !pathname.startsWith('/veli')) {
         return NextResponse.redirect(new URL('/veli', request.url))
+      }
+
+      // Yayınevi sadece /yayinevi'ye erişebilir
+      if (profile.role === 'yayinevi' && !pathname.startsWith('/yayinevi')) {
+        return NextResponse.redirect(new URL('/yayinevi', request.url))
       }
     }
   }

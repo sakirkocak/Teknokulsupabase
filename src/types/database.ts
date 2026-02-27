@@ -1,4 +1,4 @@
-export type UserRole = 'ogrenci' | 'ogretmen' | 'veli' | 'admin'
+export type UserRole = 'ogrenci' | 'ogretmen' | 'veli' | 'admin' | 'yayinevi'
 
 export interface Profile {
   id: string
@@ -518,4 +518,49 @@ export interface LeaderboardEntry {
   district_rank?: number
   city_rank?: number
   turkey_rank?: number
+}
+
+// =====================================================
+// YAYINEVİ (PUBLISHER) TİPLERİ
+// =====================================================
+
+export interface PublisherQuestion {
+  id: string
+  question_text: string
+  options: Record<string, string>  // { A: '...', B: '...', C: '...', D: '...', E?: '...' }
+  correct_answer: string
+  explanation: string | null
+  difficulty: string
+  bloom_level: string | null
+  image_url: string | null
+  image_prompt: string | null
+  subject: string
+  topic: string
+  exam_type: string | null
+  grade: number | null
+  image_type: string | null
+  status: 'pending_review' | 'available' | 'sold'
+  is_available: boolean
+  purchased_by: string | null
+  price_credits: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PublisherCredits {
+  id: string
+  publisher_id: string
+  balance: number
+  updated_at: string
+}
+
+export interface PublisherCreditHistory {
+  id: string
+  publisher_id: string
+  amount: number
+  reason: string | null
+  question_id: string | null
+  created_by: string | null
+  created_at: string
 }

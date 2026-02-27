@@ -37,6 +37,7 @@ export const COLLECTIONS = {
   QUESTION_ACTIVITY: 'question_activity',  // Soru çözüm aktiviteleri (günlük/haftalık stats)
   MOCK_EXAMS: 'mock_exams',  // Deneme sınavları
   MOCK_EXAM_RESULTS: 'mock_exam_results',  // Deneme sonuçları
+  PUBLISHER_QUESTIONS: 'publisher_questions',  // Yayınevi soruları
 } as const
 
 /**

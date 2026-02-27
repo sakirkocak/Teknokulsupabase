@@ -2678,6 +2678,7 @@ export default function HomePage() {
                 <li><Link href="/giris" className="hover:text-primary-500">Giriş Yap</Link></li>
                 <li><Link href="/kayit" className="hover:text-primary-500">Kayıt Ol</Link></li>
                 <li><Link href="/koc-ol" className="hover:text-primary-500">Koç Ol</Link></li>
+                <li><Link href="/kurumsal" className="hover:text-primary-500">Kurumsal Giriş</Link></li>
               </ul>
             </div>
 

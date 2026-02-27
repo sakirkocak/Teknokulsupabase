@@ -7,12 +7,12 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { getInitials } from '@/lib/utils'
 import NotificationBell from './NotificationBell'
-import { 
-  GraduationCap, 
-  LayoutDashboard, 
-  Users, 
-  ClipboardList, 
-  MessageSquare, 
+import {
+  GraduationCap,
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  MessageSquare,
   Settings,
   LogOut,
   Menu,
@@ -39,7 +39,10 @@ import {
   Shield,
   Activity,
   Video,
-  QrCode
+  QrCode,
+  ShoppingBag,
+  Coins,
+  Building2
 } from 'lucide-react'
 
 type NavItem = {
@@ -110,15 +113,24 @@ const navItems: Record<string, NavItem[]> = {
     { label: 'İçerikler', href: '/admin/icerikler', icon: ClipboardList },
     { label: 'Raporlar', href: '/admin/raporlar', icon: TrendingUp },
     { label: 'Ayarlar', href: '/admin/ayarlar', icon: Settings },
+    { label: 'Yayınevi Yönetimi', href: '/admin/yayinevi-yonetimi', icon: Building2 },
+    { label: 'Yayınevi Soru Üretici', href: '/admin/yayinevi-soru-uretici', icon: ImageIcon },
+  ],
+  yayinevi: [
+    { label: 'Dashboard', href: '/yayinevi', icon: LayoutDashboard },
+    { label: 'Soru Marketi', href: '/yayinevi/market', icon: ShoppingBag },
+    { label: 'Sorularım', href: '/yayinevi/sorularim', icon: BookOpen },
+    { label: 'Kredi', href: '/yayinevi/kredi', icon: Coins },
+    { label: 'Profil', href: '/yayinevi/profil', icon: Settings },
   ],
 }
 
-export default function DashboardLayout({ 
+export default function DashboardLayout({
   children,
-  role = 'ogrenci' 
-}: { 
+  role = 'ogrenci'
+}: {
   children: React.ReactNode
-  role?: 'koc' | 'ogrenci' | 'veli' | 'admin'
+  role?: 'koc' | 'ogrenci' | 'veli' | 'admin' | 'yayinevi'
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -179,6 +191,7 @@ export default function DashboardLayout({
     ogrenci: 'Öğrenci',
     veli: 'Veli',
     admin: 'Admin',
+    yayinevi: 'Yayınevi',
   }
 
   return (
