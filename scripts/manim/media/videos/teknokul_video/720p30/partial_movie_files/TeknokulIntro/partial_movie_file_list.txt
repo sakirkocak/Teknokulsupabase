@@ -1,0 +1,8 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/2448811360_2577171668_2756629052.mp4'
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/1156059186_1336421913_893094955.mp4'
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/1156059186_2807004273_4224171920.mp4'
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/1156059186_1260267617_4224171920.mp4'
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/1156059186_2291030110_4267804485.mp4'
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/1156059186_3394500337_2951013667.mp4'
+file 'file:/Users/sakirkocak/Teknokul Rıza-Şakir/scripts/manim/media/videos/teknokul_video/720p30/partial_movie_files/TeknokulIntro/1156059186_1697441826_3235535942.mp4'
