@@ -56,15 +56,6 @@ export default function CerezPolitikasi() {
                 </p>
                 <p className="text-xs text-gray-500 mt-2">Süre: 1 yıl</p>
               </div>
-
-              <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">📊 Analitik Çerezler</h3>
-                <p className="text-sm">
-                  Platform kullanımını analiz etmek, ziyaretçi sayısını ölçmek ve hizmetlerimizi 
-                  iyileştirmek için kullanılır. Bu veriler anonim olarak toplanır.
-                </p>
-                <p className="text-xs text-gray-500 mt-2">Süre: 2 yıl</p>
-              </div>
             </div>
           </section>
 
@@ -99,12 +90,6 @@ export default function CerezPolitikasi() {
                     <td className="border border-gray-200 p-3">1 yıl</td>
                     <td className="border border-gray-200 p-3">İşlevsel</td>
                   </tr>
-                  <tr>
-                    <td className="border border-gray-200 p-3">_vercel_analytics</td>
-                    <td className="border border-gray-200 p-3">Site analizi</td>
-                    <td className="border border-gray-200 p-3">1 yıl</td>
-                    <td className="border border-gray-200 p-3">Analitik</td>
-                  </tr>
                 </tbody>
               </table>
             </div>
@@ -115,7 +100,7 @@ export default function CerezPolitikasi() {
             <p className="mb-3">Platformumuzda aşağıdaki üçüncü taraf hizmetlerinin çerezleri kullanılabilir:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong>Supabase:</strong> Kimlik doğrulama ve oturum yönetimi</li>
-              <li><strong>Vercel:</strong> Performans ve analitik</li>
+              <li><strong>Vercel:</strong> Site barındırma ve performans</li>
             </ul>
           </section>
 

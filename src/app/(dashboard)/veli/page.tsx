@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useProfile, useParentProfile } from '@/hooks/useProfile'
@@ -24,10 +23,8 @@ import {
   Trophy,
   Star
 } from 'lucide-react'
-import { trackSignup } from '@/lib/gtag'
 
 function ParentDashboardContent() {
-  const searchParams = useSearchParams()
   const { profile, loading: profileLoading } = useProfile()
   const { parentProfile, loading: parentLoading } = useParentProfile(profile?.id || '')
   const [children, setChildren] = useState<any[]>([])
@@ -35,16 +32,6 @@ function ParentDashboardContent() {
   const [studentEmail, setStudentEmail] = useState('')
   const [adding, setAdding] = useState(false)
   const supabase = createClient()
-
-  // Yeni kayıt dönüşüm takibi (Google Ads)
-  useEffect(() => {
-    const isWelcome = searchParams.get('welcome') === 'true'
-    if (isWelcome) {
-      // Google Ads dönüşümünü tetikle
-      trackSignup('veli')
-      console.log('📊 Veli kayıt dönüşümü izlendi')
-    }
-  }, [searchParams])
 
   useEffect(() => {
     if (parentProfile?.id) {

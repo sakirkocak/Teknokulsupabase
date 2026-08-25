@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import Script from 'next/script'
-import { Suspense } from 'react'
 import { Inter } from 'next/font/google'
-import GoogleAdsTracker from '@/components/GoogleAdsTracker'
 import JsonLdSchema from '@/components/JsonLdSchema'
 import { MotionProvider } from '@/components/MotionProvider'
 import { LazyWidgets } from '@/components/LazyWidgets'
@@ -61,9 +58,6 @@ export const metadata: Metadata = {
   },
   verification: {
     google: 'WzuPyvuTXOhcUAQKmvXXqJMOa3WIWXF5MIMmDruO7zs',
-  },
-  other: {
-    'google-adsense-account': 'ca-pub-2370010010396512',
   },
   alternates: {
     canonical: baseUrl,
@@ -140,47 +134,10 @@ export default function RootLayout({
         <link rel="preconnect" href="https://cnawnprwdcfmyswqolsu.supabase.co" />
         <link rel="dns-prefetch" href="https://kc8bx4n1ldm30q6fp-1.a1.typesense.net" />
         <link rel="dns-prefetch" href="https://cnawnprwdcfmyswqolsu.supabase.co" />
-        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="https://pagead2.googlesyndication.com" />
       </head>
       <body className={`${inter.className} font-sans`}>
         {/* JSON-LD Structured Data */}
         <JsonLdSchema />
-        
-        {/* Google Analytics + Ads Tag (gtag.js) */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-C6HMDXCKK8"
-          strategy="afterInteractive"
-        />
-        <Script id="google-tags" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            
-            gtag('config', 'G-C6HMDXCKK8');
-            gtag('config', 'AW-17821953417');
-            gtag('config', 'AW-1004911211');
-
-            gtag('event', 'conversion', {
-              'send_to': 'AW-1004911211/j1d_CPCe_N0bEOv0lt8D',
-              'value': 1.0,
-              'currency': 'TRY'
-            });
-          `}
-        </Script>
-        
-        {/* Google AdSense - lazyOnload ile yükle (LCP iyileştirmesi) */}
-        <Script
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2370010010396512"
-          strategy="lazyOnload"
-          crossOrigin="anonymous"
-        />
-        
-        {/* Google Ads Dönüşüm İzleme */}
-        <Suspense fallback={null}>
-          <GoogleAdsTracker />
-        </Suspense>
         
         {/* Framer Motion Performans Optimizasyonu */}
         <MotionProvider>
