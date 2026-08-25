@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
+import { SITE_URL } from '@/lib/site'
 
 export default function GizlilikPolitikasi() {
   return (
@@ -42,8 +43,8 @@ export default function GizlilikPolitikasi() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Uygulamanın Niteliği</h2>
             <p>
               Teknokul mobil uygulaması bir <strong>WebView uygulamasıdır</strong> ve yalnızca{' '}
-              <a href="https://www.teknokul.com.tr" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">
-                https://www.teknokul.com.tr
+              <a href={SITE_URL} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">
+                {SITE_URL}
               </a>{' '}
               adresinde yer alan web sitesinin mobil cihazlar üzerinden görüntülenmesini sağlar.
             </p>

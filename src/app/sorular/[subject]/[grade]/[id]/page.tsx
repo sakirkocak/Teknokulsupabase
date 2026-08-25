@@ -12,6 +12,7 @@ import {
   ArrowLeft, ArrowRight, Target, Sparkles, Clock,
   Share2, Bookmark, ThumbsUp, MessageCircle
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 // ISR - 1 saat cache (şimşek hız için!)
 // Soru içeriği nadiren değişir, cache'lenebilir
@@ -120,11 +121,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${gradeNum}. Sınıf ${question.subject_name} Sorusu | Teknokul`,
       description: questionPreview,
-      url: `https://www.teknokul.com.tr/sorular/${subject}/${grade}/${id}`,
+      url: `${SITE_URL}/sorular/${subject}/${grade}/${id}`,
       type: 'article',
     },
     alternates: {
-      canonical: `https://www.teknokul.com.tr/sorular/${subject}/${grade}/${id}`,
+      canonical: `${SITE_URL}/sorular/${subject}/${grade}/${id}`,
     },
   }
 }
@@ -201,7 +202,7 @@ export default async function SingleQuestionPage({ params }: Props) {
   const subjectColor = subjectColors[subject] || defaultColor
   
   const difficulty = difficultyConfig[question.difficulty] || difficultyConfig['medium']
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Şıkları parse et
   const options = question.options as { A: string; B: string; C: string; D: string; E?: string }

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'Eğitim Rehberleri | Verimli Çalışma Teknikleri',
@@ -18,12 +19,12 @@ export const metadata: Metadata = {
     'eğitim rehberi',
   ],
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/rehberler',
+    canonical: `${SITE_URL}/rehberler`,
   },
   openGraph: {
     title: 'Eğitim Rehberleri | Teknokul',
     description: 'Verimli ders çalışma teknikleri, sınav hazırlık rehberleri ve motivasyon ipuçları. Ücretsiz eğitim içerikleri.',
-    url: 'https://www.teknokul.com.tr/rehberler',
+    url: `${SITE_URL}/rehberler`,
     type: 'website',
   },
 }

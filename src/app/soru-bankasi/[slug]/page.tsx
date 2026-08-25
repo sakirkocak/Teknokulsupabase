@@ -14,6 +14,7 @@ import {
   FileText
 } from 'lucide-react'
 import DownloadButton from './DownloadButton'
+import { SITE_URL, SITE_DOMAIN } from '@/lib/site'
 
 // Dinamik metadata
 export async function generateMetadata({ 
@@ -113,7 +114,7 @@ export default async function SoruBankasiDetailPage({
     publisher: {
       '@type': 'Organization',
       name: 'Teknokul',
-      url: 'https://teknokul.com.tr'
+      url: SITE_URL
     },
     datePublished: bank.created_at,
     dateModified: bank.updated_at,
@@ -274,7 +275,7 @@ export default async function SoruBankasiDetailPage({
                   "Bu soru bankası Şakir Koçak'ın tüm insanlara armağanıdır."
                 </p>
                 <p className="text-sm text-indigo-600 dark:text-indigo-400 mt-2">
-                  <a href="https://teknokul.com.tr" className="hover:underline">teknokul.com.tr</a>
+                  <a href={SITE_URL} className="hover:underline">{SITE_DOMAIN}</a>
                   {' • '}
                   <a href="https://instagram.com/sakirkocak" target="_blank" rel="noopener noreferrer" className="hover:underline">
                     📷 @sakirkocak

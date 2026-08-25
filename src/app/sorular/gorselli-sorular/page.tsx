@@ -9,6 +9,7 @@ import {
   ChevronRight, ImageIcon, Play, ArrowLeft, 
   Star, CheckCircle, Zap, Crown, BarChart3, Table2
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'Görselli Sorular - Grafik, Tablo, Şema | Teknokul',
@@ -17,11 +18,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Görselli Sorular | Teknokul',
     description: 'Grafik, tablo ve şema içeren sorular',
-    url: 'https://www.teknokul.com.tr/sorular/gorselli-sorular',
+    url: `${SITE_URL}/sorular/gorselli-sorular`,
     type: 'website',
   },
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/sorular/gorselli-sorular',
+    canonical: `${SITE_URL}/sorular/gorselli-sorular`,
   },
 }
 
@@ -193,7 +194,7 @@ async function getImageQuestions() {
 
 export default async function GorselliSorularPage() {
   const { questions, totalCount, subjectStats, source } = await getImageQuestions()
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {

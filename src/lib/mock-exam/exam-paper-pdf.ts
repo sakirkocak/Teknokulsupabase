@@ -74,10 +74,10 @@ function getSubjectDisplayName(code: string): string {
 
 /**
  * SVG watermark pattern data URI olustur
- * Her 300x200 kutuda diyagonal "teknokul.com.tr" yazar
+ * Her 300x200 kutuda diyagonal "Teknokul" yazar
  */
 function getWatermarkSvgDataUri(): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" transform="rotate(-30 150 100)" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="%23f97316" opacity="0.09" letter-spacing="2">teknokul.com.tr</text></svg>`
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" transform="rotate(-30 150 100)" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="%23f97316" opacity="0.09" letter-spacing="2">Teknokul</text></svg>`
   return `data:image/svg+xml,${svg}`
 }
 
@@ -524,7 +524,7 @@ export function generateExamPaperHtml(
   ${opticalForm}
 
   <div class="paper-footer">
-    <div class="paper-footer-brand">teknokul.com.tr</div>
+    <div class="paper-footer-brand">Teknokul</div>
     <div style="margin-top: 4px;">Bu soru kagidi ${date} tarihinde olusturulmustur.</div>
   </div>
 

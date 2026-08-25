@@ -31,6 +31,7 @@ import {
   YKS_GECMIS_YILLAR 
 } from '@/lib/exam-calculations'
 import { CalculatorSchema, FAQSchema } from '@/components/JsonLdSchema'
+import { SITE_URL, SITE_DOMAIN } from '@/lib/site'
 
 // TYT Dersleri (Toplam 120 soru, 165 dakika)
 const TYT_DERSLER = [
@@ -164,7 +165,7 @@ export default function YKSPuanHesaplamaPage() {
 ⭐ Yerleştirme Puanı: ${formatPuan(sonuc.yerlesmeYKS)}
 🏆 Tahmini Sıralama: ${formatSiralama(sonuc.tahminiSiralama)}
 
-Hesapla: teknokul.com.tr/yks-puan-hesaplama`
+Hesapla: ${SITE_DOMAIN}/yks-puan-hesaplama`
 
     if (navigator.share) {
       try {
@@ -196,7 +197,7 @@ Hesapla: teknokul.com.tr/yks-puan-hesaplama`
       <CalculatorSchema
         name="YKS Puan Hesaplama Aracı"
         description="2025 YKS (TYT-AYT) puan hesaplama. Sayısal, Sözel, Eşit Ağırlık ve Dil puan türleri için anlık hesaplama. Diploma notu dahil."
-        url="https://www.teknokul.com.tr/yks-puan-hesaplama"
+        url={`${SITE_URL}/yks-puan-hesaplama`}
       />
       <FAQSchema faqs={YKS_FAQS} />
 

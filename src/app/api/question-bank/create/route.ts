@@ -19,6 +19,7 @@ import { createPDFFromHtml } from '@/lib/question-bank/pdf-creator'
 import { ParsedRequest, QuestionForPDF } from '@/lib/question-bank/types'
 import { upsertBank } from '@/lib/typesense-banks'
 import crypto from 'crypto'
+import { SITE_URL } from '@/lib/site'
 
 // Service role client for Storage operations
 function getServiceClient() {
@@ -384,8 +385,8 @@ export async function POST(request: NextRequest) {
         if (uploadError) {
           console.error('⚠️ Storage upload failed:', uploadError)
         } else {
-          // Proxy URL oluştur (teknokul.com.tr/pdf/slug.pdf formatında)
-          pdfUrl = `https://teknokul.com.tr/pdf/${slug}.pdf`
+          // Proxy URL oluştur (<site>/pdf/slug.pdf formatında)
+          pdfUrl = `${SITE_URL}/pdf/${slug}.pdf`
           console.log(`✅ PDF uploaded, URL: ${pdfUrl}`)
           
           // question_banks tablosunu güncelle

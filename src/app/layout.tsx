@@ -4,8 +4,9 @@ import JsonLdSchema from '@/components/JsonLdSchema'
 import { MotionProvider } from '@/components/MotionProvider'
 import { LazyWidgets } from '@/components/LazyWidgets'
 import './globals.css'
+import { SITE_URL } from '@/lib/site'
 
-const baseUrl = 'https://www.teknokul.com.tr'
+const baseUrl = SITE_URL
 
 const inter = Inter({
   subsets: ['latin', 'latin-ext'],

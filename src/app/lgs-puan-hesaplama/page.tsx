@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { hesaplaLGS, LGSNetler, LGSSonuc, formatPuan, LGS_GECMIS_YILLAR } from '@/lib/exam-calculations'
 import { CalculatorSchema, FAQSchema } from '@/components/JsonLdSchema'
+import { SITE_URL, SITE_DOMAIN } from '@/lib/site'
 
 // Ders bilgileri - LGS 2025 (Toplam 90 soru)
 // Katsayı 4: Ana dersler (toplam puanın %80'i)
@@ -101,7 +102,7 @@ export default function LGSPuanHesaplamaPage() {
 ⭐ Tahmini Puan: ${formatPuan(sonuc.tahminiPuan)}
 📈 Yüzdelik Dilim: %${sonuc.tahminiYuzdelik}
 
-Hesapla: teknokul.com.tr/lgs-puan-hesaplama`
+Hesapla: ${SITE_DOMAIN}/lgs-puan-hesaplama`
 
     if (navigator.share) {
       try {
@@ -130,7 +131,7 @@ Hesapla: teknokul.com.tr/lgs-puan-hesaplama`
       <CalculatorSchema
         name="LGS Puan Hesaplama Aracı"
         description="2025 LGS sınavı için anlık puan hesaplama. Türkçe, Matematik, Fen, Sosyal, Din ve İngilizce netlerinizi girin, puanınızı ve yüzdelik diliminizi öğrenin."
-        url="https://www.teknokul.com.tr/lgs-puan-hesaplama"
+        url={`${SITE_URL}/lgs-puan-hesaplama`}
       />
       <FAQSchema faqs={LGS_FAQS} />
 

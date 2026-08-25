@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
+import { SITE_URL } from '@/lib/site'
 
 /**
  * Teknokul Akıllı Sitemap Sistemi
@@ -14,7 +15,7 @@ import { createClient } from '@supabase/supabase-js'
  */
 
 const QUESTIONS_PER_SITEMAP = 10000 // Her sitemap max 10K URL
-const baseUrl = 'https://www.teknokul.com.tr'
+const baseUrl = SITE_URL
 
 // Sitemap için service role client (build zamanında çalışır)
 function getSupabaseClient() {

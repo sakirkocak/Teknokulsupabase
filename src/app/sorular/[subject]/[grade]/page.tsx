@@ -13,6 +13,7 @@ import {
   ArrowLeft, Play, Target, Sparkles, Monitor, Palette, 
   Music, Dumbbell, HeartPulse, Hammer
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 // difficultyConfig kaldırıldı - QuestionPreviewList'te kullanılıyor
 
@@ -130,11 +131,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title,
       description,
-      url: `https://www.teknokul.com.tr/sorular/${subject}/${grade}-sinif`,
+      url: `${SITE_URL}/sorular/${subject}/${grade}-sinif`,
       type: 'website',
     },
     alternates: {
-      canonical: `https://www.teknokul.com.tr/sorular/${subject}/${grade}-sinif`,
+      canonical: `${SITE_URL}/sorular/${subject}/${grade}-sinif`,
     },
   }
 }
@@ -358,7 +359,7 @@ export default async function GradePage({ params }: Props) {
   
   const colors = subjectColors[subject] || defaultColors
   const icon = subjectIcons[subject] || <BookOpen className="w-6 h-6" />
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   const isLGS = grade === 8
   const isYKS = grade === 12

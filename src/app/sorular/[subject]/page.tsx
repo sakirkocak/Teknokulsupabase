@@ -12,6 +12,7 @@ import {
   ArrowLeft, Code, Palette, Music, Dumbbell, HeartPulse,
   Hammer, Monitor, Zap
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 // ISR - 1 saat cache (şimşek hız!)
 export const revalidate = 3600
@@ -179,11 +180,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     openGraph: {
       title: `${subjectInfo.name} Soruları | Teknokul`,
       description,
-      url: `https://www.teknokul.com.tr/sorular/${subject}`,
+      url: `${SITE_URL}/sorular/${subject}`,
       type: 'website',
     },
     alternates: {
-      canonical: `https://www.teknokul.com.tr/sorular/${subject}`,
+      canonical: `${SITE_URL}/sorular/${subject}`,
     },
   }
 }
@@ -380,7 +381,7 @@ export default async function SubjectPage({ params }: Props) {
   
   const colors = subjectColors[subject] || defaultColors
   const icon = subjectIcons[subject] || <BookOpen className="w-8 h-8" />
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Meta enhancement varsa description al
   const enhancement = subjectMetaEnhancements[subject]

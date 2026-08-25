@@ -8,6 +8,7 @@ import {
   ChevronRight, Sparkles, Play, ArrowLeft, 
   Star, CheckCircle, Zap, Crown, Calendar, BarChart3
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'Yeni Eklenen Sorular - Bu Hafta | Teknokul',
@@ -16,11 +17,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Yeni Eklenen Sorular | Teknokul',
     description: 'Bu hafta eklenen taze sorular',
-    url: 'https://www.teknokul.com.tr/sorular/yeni-eklenen-sorular',
+    url: `${SITE_URL}/sorular/yeni-eklenen-sorular`,
     type: 'website',
   },
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/sorular/yeni-eklenen-sorular',
+    canonical: `${SITE_URL}/sorular/yeni-eklenen-sorular`,
   },
 }
 
@@ -199,7 +200,7 @@ async function getNewQuestions() {
 
 export default async function YeniSorularPage() {
   const { questions, totalCount, subjectStats, source } = await getNewQuestions()
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {

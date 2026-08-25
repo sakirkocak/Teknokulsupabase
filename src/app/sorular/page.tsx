@@ -10,6 +10,7 @@ import {
   ChevronRight, GraduationCap, Sparkles, TrendingUp,
   Target, Star, Clock, Image as ImageIcon, Zap
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 // ISR - Her saat yenile (cache için optimal)
 export const revalidate = 3600
@@ -21,11 +22,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Soru Bankası - Tüm Dersler | Teknokul',
     description: 'MEB müfredatına uygun 30.000+ soru ile pratik yap.',
-    url: 'https://www.teknokul.com.tr/sorular',
+    url: `${SITE_URL}/sorular`,
     type: 'website',
   },
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/sorular',
+    canonical: `${SITE_URL}/sorular`,
   },
 }
 
@@ -228,7 +229,7 @@ async function getData(): Promise<{ subjects: SubjectWithCount[], stats: Stats }
 export default async function SorularPage() {
   const { subjects, stats } = await getData()
   
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Programatik SEO sayfaları
   const specialPages = [

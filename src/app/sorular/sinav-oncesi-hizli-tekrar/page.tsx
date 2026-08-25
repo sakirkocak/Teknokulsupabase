@@ -8,6 +8,7 @@ import {
   ChevronRight, Clock, Play, ArrowLeft, 
   Star, CheckCircle, Zap, Crown, Sparkles, BarChart3
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'Sınav Öncesi Hızlı Tekrar - 50 Kritik Soru | Teknokul',
@@ -16,11 +17,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Sınav Öncesi Hızlı Tekrar | Teknokul',
     description: 'Son dakika pratik - kritik 50 soru',
-    url: 'https://www.teknokul.com.tr/sorular/sinav-oncesi-hizli-tekrar',
+    url: `${SITE_URL}/sorular/sinav-oncesi-hizli-tekrar`,
     type: 'website',
   },
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/sorular/sinav-oncesi-hizli-tekrar',
+    canonical: `${SITE_URL}/sorular/sinav-oncesi-hizli-tekrar`,
   },
 }
 
@@ -188,7 +189,7 @@ async function getQuickReviewQuestions() {
 
 export default async function HizliTekrarPage() {
   const { questions, totalCount, subjectStats, source } = await getQuickReviewQuestions()
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {

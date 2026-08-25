@@ -8,6 +8,7 @@ import {
   ChevronRight, Zap, Crown, Target, Play,
   ArrowLeft, Star, CheckCircle, Flame, BarChart3
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'LGS En Zor 100 Soru - Kendini Sına | Teknokul',
@@ -16,11 +17,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'LGS En Zor 100 Soru | Teknokul',
     description: 'Kendini sınava hazırla - en zorlu sorularla!',
-    url: 'https://www.teknokul.com.tr/sorular/lgs-en-zor-100',
+    url: `${SITE_URL}/sorular/lgs-en-zor-100`,
     type: 'website',
   },
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/sorular/lgs-en-zor-100',
+    canonical: `${SITE_URL}/sorular/lgs-en-zor-100`,
   },
 }
 
@@ -204,7 +205,7 @@ async function getHardQuestions() {
 
 export default async function LGSEnZor100Page() {
   const { questions, totalCount, subjectStats, source } = await getHardQuestions()
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {

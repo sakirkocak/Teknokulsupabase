@@ -1,5 +1,7 @@
+import { SITE_URL } from '@/lib/site'
+
 export default function JsonLdSchema() {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Organization Schema
   const organizationSchema = {
@@ -187,7 +189,7 @@ export function ArticleSchema({
   authorName?: string
   imageUrl?: string
 }) {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   const articleSchema = {
     '@context': 'https://schema.org',
@@ -292,7 +294,7 @@ export function QuizSchema({
   questions: QuizQuestion[]
   url: string
 }) {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   const quizSchema = {
     '@context': 'https://schema.org/',
@@ -357,7 +359,7 @@ export function BreadcrumbSchema({
 }: {
   items: { name: string; url: string }[]
 }) {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -392,7 +394,7 @@ export function QuestionListSchema({
   url: string
   items: { name: string; url: string; position: number }[]
 }) {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   const listSchema = {
     '@context': 'https://schema.org',
@@ -451,7 +453,7 @@ export function LearningResourceSchema({
   hasSolution?: boolean
   hasVideo?: boolean
 }) {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Eğitim seviyesi belirleme
   const getEducationalLevel = (g: number) => {
@@ -580,7 +582,7 @@ export function EducationalQuestionSchema({
   hasVideo?: boolean
   solveCount?: number
 }) {
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   const difficultyMap: Record<string, string> = {
     'easy': 'Kolay',

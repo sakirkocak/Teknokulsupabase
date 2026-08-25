@@ -93,7 +93,7 @@ export function generatePDFHtml(
   const difficultyName = parsed.difficulty ? difficultyNames[parsed.difficulty] : 'Karışık'
 
   // Watermark SVG
-  const watermarkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" transform="rotate(-30 150 100)" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="%23667eea" opacity="0.09" letter-spacing="2">teknokul.com.tr</text></svg>`
+  const watermarkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" transform="rotate(-30 150 100)" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="%23667eea" opacity="0.09" letter-spacing="2">Teknokul</text></svg>`
   const watermarkBg = `data:image/svg+xml,${watermarkSvg}`
 
   // Sınıf/Sınav bilgisi
@@ -490,7 +490,7 @@ export function generatePDFHtml(
     <div class="cover-footer">
       <div>Hazırlayan: ${userName}</div>
       <div>${date}</div>
-      <div style="margin-top: 15px; font-size: 14px; font-weight: 600;">teknokul.com.tr</div>
+      <div style="margin-top: 15px; font-size: 14px; font-weight: 600;">Teknokul</div>
       <div style="margin-top: 8px; font-size: 12px;">📷 @sakirkocak</div>
     </div>
   </div>
@@ -525,7 +525,7 @@ export function generatePDFHtml(
       <div class="pdf-footer-text" style="font-style: italic; margin-bottom: 10px;">
         "Bu soru bankası Şakir Koçak'ın tüm insanlara armağanıdır."
       </div>
-      <div class="pdf-footer-brand">teknokul.com.tr</div>
+      <div class="pdf-footer-brand">Teknokul</div>
       <div style="margin-top: 8px; font-size: 12px; color: #667eea;">
         📷 Instagram: @sakirkocak
       </div>

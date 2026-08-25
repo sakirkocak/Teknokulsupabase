@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'LGS Puan Hesaplama 2025 | Anlık Net ve Yüzdelik Hesaplama',
@@ -17,12 +18,12 @@ export const metadata: Metadata = {
     'liseye geçiş sınavı puan hesaplama',
   ],
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/lgs-puan-hesaplama',
+    canonical: `${SITE_URL}/lgs-puan-hesaplama`,
   },
   openGraph: {
     title: 'LGS Puan Hesaplama 2025 | Teknokul',
     description: 'Netlerinizi girin, LGS puanınızı ve yüzdelik diliminizi anında öğrenin. Ücretsiz ve güncel katsayılarla hesaplama.',
-    url: 'https://www.teknokul.com.tr/lgs-puan-hesaplama',
+    url: `${SITE_URL}/lgs-puan-hesaplama`,
     type: 'website',
     images: [
       {

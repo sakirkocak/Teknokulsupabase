@@ -2,7 +2,7 @@
  * PDF Proxy Route
  * /pdf/[slug].pdf → Supabase Storage'dan PDF döndür
  * 
- * Bu sayede URL'ler teknokul.com.tr/pdf/... şeklinde görünür
+ * Bu sayede URL'ler <site>/pdf/... şeklinde görünür
  */
 
 import { NextRequest, NextResponse } from 'next/server'

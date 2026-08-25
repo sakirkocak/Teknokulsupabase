@@ -12,6 +12,7 @@ import {
   Sparkles
 } from 'lucide-react'
 import { ArticleSchema, FAQSchema } from '@/components/JsonLdSchema'
+import { SITE_URL } from '@/lib/site'
 
 // Makale verileri (statik, sonra Supabase'den çekilebilir)
 const MAKALELER: Record<string, {
@@ -979,7 +980,7 @@ export async function generateMetadata({
     description: makale.ozet,
     keywords: makale.etiketler,
     alternates: {
-      canonical: `https://www.teknokul.com.tr/rehberler/${slug}`,
+      canonical: `${SITE_URL}/rehberler/${slug}`,
     },
     openGraph: {
       title: makale.baslik,

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'YKS Puan Hesaplama 2025 | TYT-AYT Net Hesaplama',
@@ -18,12 +19,12 @@ export const metadata: Metadata = {
     'diploma notu katkısı',
   ],
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/yks-puan-hesaplama',
+    canonical: `${SITE_URL}/yks-puan-hesaplama`,
   },
   openGraph: {
     title: 'YKS Puan Hesaplama 2025 | Teknokul',
     description: 'TYT ve AYT netlerinizi girin, YKS puanınızı ve sıralamanızı anında öğrenin. Ücretsiz ve güncel katsayılarla hesaplama.',
-    url: 'https://www.teknokul.com.tr/yks-puan-hesaplama',
+    url: `${SITE_URL}/yks-puan-hesaplama`,
     type: 'website',
     images: [
       {

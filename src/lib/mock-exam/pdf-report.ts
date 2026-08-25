@@ -501,7 +501,7 @@ export function generateExamReportHtml(data: ExamResultDetail): string {
   ${renderTopicAnalysis(topicAnalysis)}
 
   <div class="report-footer">
-    <div class="report-footer-brand">teknokul.com.tr</div>
+    <div class="report-footer-brand">Teknokul</div>
     <div style="margin-top: 4px;">Bu rapor ${new Date().toLocaleDateString('tr-TR')} tarihinde olusturulmustur.</div>
   </div>
 </body>

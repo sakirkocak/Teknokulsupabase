@@ -8,6 +8,7 @@ import {
   ChevronRight, TrendingUp, Play, ArrowLeft, 
   Star, CheckCircle, Zap, Crown, Users, Trophy, BarChart3
 } from 'lucide-react'
+import { SITE_URL } from '@/lib/site'
 
 export const metadata: Metadata = {
   title: 'En Çok Çözülen Sorular - Popüler 100 | Teknokul',
@@ -16,11 +17,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'En Çok Çözülen Sorular | Teknokul',
     description: 'Öğrencilerin favorisi - popüler 100 soru',
-    url: 'https://www.teknokul.com.tr/sorular/en-cok-cozulen',
+    url: `${SITE_URL}/sorular/en-cok-cozulen`,
     type: 'website',
   },
   alternates: {
-    canonical: 'https://www.teknokul.com.tr/sorular/en-cok-cozulen',
+    canonical: `${SITE_URL}/sorular/en-cok-cozulen`,
   },
 }
 
@@ -194,7 +195,7 @@ async function getPopularQuestions() {
 
 export default async function EnCokCozulenPage() {
   const { questions, totalCount, subjectStats, source } = await getPopularQuestions()
-  const baseUrl = 'https://www.teknokul.com.tr'
+  const baseUrl = SITE_URL
   
   // Quiz Schema için soruları hazırla
   const quizQuestions: QuizQuestion[] = questions.slice(0, 10).map((q) => {

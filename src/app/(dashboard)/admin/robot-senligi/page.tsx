@@ -22,6 +22,7 @@ import {
   BarChart3
 } from 'lucide-react'
 import Link from 'next/link'
+import { SITE_URL } from '@/lib/site'
 
 interface Robot {
   id: string
@@ -49,8 +50,6 @@ interface Evaluation {
   mekanizma_kullanimi?: number
   islevsellik?: number
 }
-
-const SITE_URL = 'https://teknokul.com.tr'
 
 const CATEGORY_LABELS: Record<string, string> = {
   inovatif_tasarim: 'İnovatif Tasarım',

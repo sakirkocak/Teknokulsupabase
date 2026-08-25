@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { SITE_URL } from '@/lib/site'
 
 export async function GET() {
   const supabase = await createClient()
@@ -18,7 +19,7 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(1000)  // Max 1000 URL per sitemap
   
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://teknokul.com.tr'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || SITE_URL
   
   interface SitemapUrl {
     loc: string

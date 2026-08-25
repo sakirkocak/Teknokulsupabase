@@ -1,3 +1,5 @@
+import { SITE_URL } from '@/lib/site'
+
 /**
  * YouTube Playlist Yönetimi
  * Türk Müfredatına göre otomatik playlist oluşturma
@@ -65,8 +67,8 @@ export function generatePlaylistDescription(grade: number, subject: string): str
 ✅ Adım adım açıklamalı çözümler
 ✅ Yapay zeka ile üretilmiş profesyonel videolar
 
-🌐 Daha fazlası için: https://teknokul.com.tr
-📱 Tüm sorular: https://teknokul.com.tr/sorular
+🌐 Daha fazlası için: ${SITE_URL}
+📱 Tüm sorular: ${SITE_URL}/sorular
 
 #${subject.replace(/\s+/g, '')} #${grade}Sınıf #SoruÇözümü #Teknokul #Eğitim #LGS #YKS`
 }
@@ -201,16 +203,16 @@ ${shortQuestion}
 
 ✨ Bu video Teknokul yapay zeka sistemi tarafından otomatik olarak oluşturulmuştur.
 
-🔗 Bu soruyu çöz: https://teknokul.com.tr/sorular/${SUBJECT_CODES[subject] || subject.toLowerCase()}/${grade}/${questionId}
+🔗 Bu soruyu çöz: ${SITE_URL}/sorular/${SUBJECT_CODES[subject] || subject.toLowerCase()}/${grade}/${questionId}
 
-📚 Daha fazla ${subject} sorusu: https://teknokul.com.tr/sorular/${SUBJECT_CODES[subject] || subject.toLowerCase()}/${grade}
+📚 Daha fazla ${subject} sorusu: ${SITE_URL}/sorular/${SUBJECT_CODES[subject] || subject.toLowerCase()}/${grade}
 
-🌐 Tüm sorular: https://teknokul.com.tr/sorular
+🌐 Tüm sorular: ${SITE_URL}/sorular
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎓 Teknokul - Öğrenmenin Dijital Üssü
 🤖 Yapay Zeka Destekli Eğitim Platformu
-📱 https://teknokul.com.tr
+📱 ${SITE_URL}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${generateHashtags({ grade, subject, topic, difficulty })}`
